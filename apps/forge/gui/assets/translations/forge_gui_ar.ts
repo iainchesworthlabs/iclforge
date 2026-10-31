@@ -2565,7 +2565,7 @@
     <message>
         <location filename="../qml/Main.qml" line="1209"/>
         <source>A TrueHD project codes one WAV, and this one has %1, so none was loaded.</source>
-        <translation type="unfinished"></translation>
+        <translation>يشفّر مشروع TrueHD ملف WAV واحدًا، وهذا المشروع يحتوي على %1، لذلك لم يُحمَّل أي ملف.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1221"/>
@@ -4806,7 +4806,7 @@
     <message>
         <location filename="../qml/QcDialog.qml" line="45"/>
         <source>TrueHD / MLP (*.thd *.mlp)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD / MLP (*.thd *.mlp)</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="46"/>
@@ -4873,12 +4873,12 @@
     <message>
         <location filename="../qml/QcDialog.qml" line="229"/>
         <source>Integrity: PASS</source>
-        <translation type="unfinished"></translation>
+        <translation>السلامة: ناجح</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="229"/>
         <source>Integrity: FAIL</source>
-        <translation type="unfinished"></translation>
+        <translation>السلامة: فشل</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="245"/>
@@ -5117,7 +5117,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="46"/>
         <source>Choose an AC-3, E-AC-3, AC-4 or TrueHD stream</source>
-        <translation type="unfinished"></translation>
+        <translation>اختر دفق AC-3 أو E-AC-3 أو AC-4 أو TrueHD</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="47"/>
@@ -5132,7 +5132,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="48"/>
         <source>TrueHD / MLP (*.thd *.mlp)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD / MLP (*.thd *.mlp)</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="49"/>
@@ -5164,7 +5164,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="99"/>
         <source>Encode TrueHD…</source>
-        <translation type="unfinished"></translation>
+        <translation>ترميز TrueHD…</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="107"/>
@@ -5174,7 +5174,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="114"/>
         <source>Decodes an already-encoded AC-3, E-AC-3, AC-4 or TrueHD file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.</source>
-        <translation type="unfinished"></translation>
+        <translation>يفك ترميز ملف AC-3 أو E-AC-3 أو AC-4 أو TrueHD مرمَّز مسبقًا ويشغّل طبقته الأساسية المفكوكة عبر مخرج عادي — ومثل كل فك ترميز في هذه النافذة، يشغّل بث Atmos طبقته الأساسية 5.1 هنا لا الكائنات غير الممزوجة (انظر «افحص الكائنات» لتلك). و«صدّر» يكتب ناتج فك الترميز إلى ملف WAV، ولبث Atmos ملف WAV لكل كائن.</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="125"/>
@@ -5278,82 +5278,82 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="33"/>
         <source>Choose a WAV file</source>
-        <translation type="unfinished">اختر ملف WAV</translation>
+        <translation>اختر ملف WAV</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="34"/>
         <source>WAV audio (*.wav)</source>
-        <translation type="unfinished">صوت WAV (*.wav)</translation>
+        <translation>صوت WAV (*.wav)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="34"/>
         <source>All files (*)</source>
-        <translation type="unfinished">كل الملفات (*)</translation>
+        <translation>كل الملفات (*)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="41"/>
         <source>Save the TrueHD stream as</source>
-        <translation type="unfinished"></translation>
+        <translation>حفظ دفق TrueHD باسم</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>TrueHD stream (*.thd)</source>
-        <translation type="unfinished"></translation>
+        <translation>دفق TrueHD (*.thd)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="54"/>
         <source>Encode TrueHD</source>
-        <translation type="unfinished"></translation>
+        <translation>ترميز TrueHD</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="62"/>
         <source>Close</source>
-        <translation type="unfinished">إغلاق</translation>
+        <translation>إغلاق</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="70"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>يشفّر ملف WAV دون فقدان إلى TrueHD: يُفكّ ترميز الدفق إلى العيّنات نفسها تمامًا التي أُدخلت. يسمّي قناع القنوات في ملف WAV مكبّرات الصوت؛ وإذا لم يكن في الملف قناع فتؤخذ القنوات بالترتيب الذي يكتبه forge decode. الناتج دفق .thd خام؛ ويكتب forge truehd-encode أيضًا Matroska وMP4 ودفق نقل Blu-ray.</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="79"/>
         <source>Choose WAV…</source>
-        <translation type="unfinished">اختر WAV…</translation>
+        <translation>اختر WAV…</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="88"/>
         <source>No file chosen</source>
-        <translation type="unfinished"></translation>
+        <translation>لم يُختر أي ملف</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="98"/>
         <source>Save as…</source>
-        <translation type="unfinished"></translation>
+        <translation>حفظ باسم…</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="107"/>
         <source>Not chosen yet</source>
-        <translation type="unfinished"></translation>
+        <translation>لم يُختر بعد</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="115"/>
         <source>Verify: decode every access unit and compare it with the input</source>
-        <translation type="unfinished"></translation>
+        <translation>تحقّق: فكّ ترميز كل وحدة وصول ومقارنتها بالمدخل</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="123"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
-        <translation type="unfinished"></translation>
+        <translation>كتابة عروض القناتين وست القنوات كمزائج مخفَّضة (truehd-downmix=standard)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
         <source>Encode</source>
-        <translation type="unfinished"></translation>
+        <translation>ترميز</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="139"/>
         <source>Stop</source>
-        <translation type="unfinished">أوقف</translation>
+        <translation>أوقف</translation>
     </message>
 </context>
 <context>

@@ -2565,7 +2565,7 @@
     <message>
         <location filename="../qml/Main.qml" line="1209"/>
         <source>A TrueHD project codes one WAV, and this one has %1, so none was loaded.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַ TrueHD־פּראָיעקט קאָדירט איין WAV־טעקע, און דער דאָזיקער האָט %1, דעריבער איז קיין איינע נישט אָנגעלאָדן געוואָרן.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1221"/>
@@ -4806,7 +4806,7 @@
     <message>
         <location filename="../qml/QcDialog.qml" line="45"/>
         <source>TrueHD / MLP (*.thd *.mlp)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD / MLP (*.thd *.mlp)</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="46"/>
@@ -4873,12 +4873,12 @@
     <message>
         <location filename="../qml/QcDialog.qml" line="229"/>
         <source>Integrity: PASS</source>
-        <translation type="unfinished"></translation>
+        <translation>אינטעגריטעט: דורכגעגאַנגען</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="229"/>
         <source>Integrity: FAIL</source>
-        <translation type="unfinished"></translation>
+        <translation>אינטעגריטעט: דורכגעפֿאַלן</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="245"/>
@@ -5117,7 +5117,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="46"/>
         <source>Choose an AC-3, E-AC-3, AC-4 or TrueHD stream</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַב אױס אַ AC-3, E-AC-3, AC-4 אָדער TrueHD שטראָם</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="47"/>
@@ -5132,7 +5132,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="48"/>
         <source>TrueHD / MLP (*.thd *.mlp)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD / MLP (*.thd *.mlp)</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="49"/>
@@ -5164,7 +5164,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="99"/>
         <source>Encode TrueHD…</source>
-        <translation type="unfinished"></translation>
+        <translation>קאָדירן TrueHD…</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="107"/>
@@ -5174,7 +5174,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="114"/>
         <source>Decodes an already-encoded AC-3, E-AC-3, AC-4 or TrueHD file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.</source>
-        <translation type="unfinished"></translation>
+        <translation>דעקאָדירט אַ שוין־קאָדירטע AC-3, E-AC-3, AC-4 אָדער TrueHD טעקע און שפּילט איר דעקאָדירט בעט דורך אַ געוויינטלעכן אַרויסגאַנג — ווי יעדע אַנדערע דעקאָדירונג אין דעם דאָזיקן פֿענצטער, שפּילט אַן Atmos סטרים דאָ זײַן 5.1 בעט, ניט אומגעמישטע אָביעקטן (זעט באַטראַכטן די אָביעקטן פֿאַר יענע). עקספּאָרטירן שרײַבט די דעקאָדירונג אין אַ WAV, און פֿאַר אַן Atmos סטרים איין WAV פּער אָביעקט.</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="125"/>
@@ -5278,82 +5278,82 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="33"/>
         <source>Choose a WAV file</source>
-        <translation type="unfinished">אויסקלײַבן אַ WAV־טעקע</translation>
+        <translation>אויסקלײַבן אַ WAV־טעקע</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="34"/>
         <source>WAV audio (*.wav)</source>
-        <translation type="unfinished">WAV אַודיאָ (*.wav)</translation>
+        <translation>WAV אַודיאָ (*.wav)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="34"/>
         <source>All files (*)</source>
-        <translation type="unfinished">אַלע טעקעס (*)</translation>
+        <translation>אַלע טעקעס (*)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="41"/>
         <source>Save the TrueHD stream as</source>
-        <translation type="unfinished"></translation>
+        <translation>ראַטעוועט דעם TrueHD שטראָם אַלס</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>TrueHD stream (*.thd)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD שטראָם (*.thd)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="54"/>
         <source>Encode TrueHD</source>
-        <translation type="unfinished"></translation>
+        <translation>קאָדירן TrueHD</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="62"/>
         <source>Close</source>
-        <translation type="unfinished">פֿאַרמאַכן</translation>
+        <translation>פֿאַרמאַכן</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="70"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>קאָדירט אַ WAV טעקע אָן פֿאַרלוסט ווי TrueHD: דער שטראָם דעקאָדירט זיך צו גענוי די סאַמפּלס וואָס זענען אַרײַנגעגאַנגען. די קאַנאַל־מאַסקע פֿון דער WAV נעמט די הויכרעדער; אַ טעקע אָן מאַסקע ווערט גענומען אין דער סדר ווי forge decode שרײַבט. דער רעזולטאַט איז אַ בלויזער .thd שטראָם; forge truehd-encode שרײַבט אויך Matroska, MP4 און אַ Blu-ray טראַנספּאָרט־שטראָם.</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="79"/>
         <source>Choose WAV…</source>
-        <translation type="unfinished">אויסקלײַבן WAV…</translation>
+        <translation>אויסקלײַבן WAV…</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="88"/>
         <source>No file chosen</source>
-        <translation type="unfinished"></translation>
+        <translation>קיין טעקע נישט אויסגעקליבן</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="98"/>
         <source>Save as…</source>
-        <translation type="unfinished"></translation>
+        <translation>ראַטעווע אַלס…</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="107"/>
         <source>Not chosen yet</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָך נישט אויסגעקליבן</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="115"/>
         <source>Verify: decode every access unit and compare it with the input</source>
-        <translation type="unfinished"></translation>
+        <translation>אָפּשטימען: דעקאָדירן יעדע צוטריטס־איינהייט און פֿאַרגלײַכן מיט דעם אינפּוט</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="123"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
-        <translation type="unfinished"></translation>
+        <translation>שרײַב די 2- און 6־קאַנאַל פּרעזענטאַציעס ווי אַראָפּגעמישטע מישונגען (truehd-downmix=standard)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
         <source>Encode</source>
-        <translation type="unfinished"></translation>
+        <translation>קאָדירן</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="139"/>
         <source>Stop</source>
-        <translation type="unfinished">אָפּשטעלן</translation>
+        <translation>אָפּשטעלן</translation>
     </message>
 </context>
 <context>

@@ -2565,7 +2565,7 @@
     <message>
         <location filename="../qml/Main.qml" line="1209"/>
         <source>A TrueHD project codes one WAV, and this one has %1, so none was loaded.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ein TrueHD-Projekt kodiert eine WAV-Datei, dieses hat %1, daher wurde keine geladen.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1221"/>
@@ -4806,7 +4806,7 @@
     <message>
         <location filename="../qml/QcDialog.qml" line="45"/>
         <source>TrueHD / MLP (*.thd *.mlp)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD / MLP (*.thd *.mlp)</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="46"/>
@@ -4873,12 +4873,12 @@
     <message>
         <location filename="../qml/QcDialog.qml" line="229"/>
         <source>Integrity: PASS</source>
-        <translation type="unfinished"></translation>
+        <translation>Integrität: BESTANDEN</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="229"/>
         <source>Integrity: FAIL</source>
-        <translation type="unfinished"></translation>
+        <translation>Integrität: FEHLGESCHLAGEN</translation>
     </message>
     <message>
         <location filename="../qml/QcDialog.qml" line="245"/>
@@ -5117,7 +5117,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="46"/>
         <source>Choose an AC-3, E-AC-3, AC-4 or TrueHD stream</source>
-        <translation type="unfinished"></translation>
+        <translation>AC-3-, E-AC-3-, AC-4- oder TrueHD-Stream wählen</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="47"/>
@@ -5132,7 +5132,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="48"/>
         <source>TrueHD / MLP (*.thd *.mlp)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD / MLP (*.thd *.mlp)</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="49"/>
@@ -5164,7 +5164,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="99"/>
         <source>Encode TrueHD…</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD kodieren…</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="107"/>
@@ -5174,7 +5174,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="114"/>
         <source>Decodes an already-encoded AC-3, E-AC-3, AC-4 or TrueHD file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.</source>
-        <translation type="unfinished"></translation>
+        <translation>Decodiert eine bereits codierte AC-3-, E-AC-3-, AC-4- oder TrueHD--Datei und spielt ihr decodiertes Bett über eine gewöhnliche Ausgabe ab — wie jede andere Decodierung in diesem Fenster spielt ein Atmos-Stream hier sein 5.1-Bett, nicht ungemischte Objekte (dafür siehe „Objekte inspizieren“). Der Export schreibt die Decodierung in ein WAV, und bei einem Atmos-Stream ein WAV pro Objekt.</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="125"/>
@@ -5278,82 +5278,82 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="33"/>
         <source>Choose a WAV file</source>
-        <translation type="unfinished">WAV-Datei wählen</translation>
+        <translation>WAV-Datei wählen</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="34"/>
         <source>WAV audio (*.wav)</source>
-        <translation type="unfinished">WAV-Audio (*.wav)</translation>
+        <translation>WAV-Audio (*.wav)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="34"/>
         <source>All files (*)</source>
-        <translation type="unfinished">Alle Dateien (*)</translation>
+        <translation>Alle Dateien (*)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="41"/>
         <source>Save the TrueHD stream as</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD-Stream speichern unter</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>TrueHD stream (*.thd)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD-Stream (*.thd)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="54"/>
         <source>Encode TrueHD</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD kodieren</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="62"/>
         <source>Close</source>
-        <translation type="unfinished">Schließen</translation>
+        <translation>Schließen</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="70"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>Kodiert eine WAV-Datei verlustfrei als TrueHD: Der Stream wird zu genau den Samples dekodiert, die hineingegangen sind. Die Kanalmaske der WAV-Datei benennt die Lautsprecher; eine Datei ohne Maske wird in der Reihenfolge gelesen, in der forge decode schreibt. Das Ergebnis ist ein reiner .thd-Stream; forge truehd-encode schreibt auch Matroska, MP4 und einen Blu-ray-Transportstrom.</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="79"/>
         <source>Choose WAV…</source>
-        <translation type="unfinished">WAV wählen…</translation>
+        <translation>WAV wählen…</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="88"/>
         <source>No file chosen</source>
-        <translation type="unfinished"></translation>
+        <translation>Keine Datei gewählt</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="98"/>
         <source>Save as…</source>
-        <translation type="unfinished"></translation>
+        <translation>Speichern unter…</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="107"/>
         <source>Not chosen yet</source>
-        <translation type="unfinished"></translation>
+        <translation>Noch nicht gewählt</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="115"/>
         <source>Verify: decode every access unit and compare it with the input</source>
-        <translation type="unfinished"></translation>
+        <translation>Prüfen: jede Zugriffseinheit dekodieren und mit der Eingabe vergleichen</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="123"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
-        <translation type="unfinished"></translation>
+        <translation>Die 2- und 6-Kanal-Darstellungen als heruntergemischte Mischungen schreiben (truehd-downmix=standard)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
         <source>Encode</source>
-        <translation type="unfinished"></translation>
+        <translation>Kodieren</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="139"/>
         <source>Stop</source>
-        <translation type="unfinished">Stoppen</translation>
+        <translation>Stoppen</translation>
     </message>
 </context>
 <context>
