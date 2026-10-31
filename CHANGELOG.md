@@ -10,13 +10,6 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
-- **Added: `iclforge.truehd`, the TrueHD and MLP decoder in the Python bindings.** `probe`, `access_units`, `scan` (length, timing and the
-  restarts to seek by), `decode` (a whole bare stream to an `int32` array) and a `Decoder` that takes one access unit at a time, with
-  `TruehdError` for failures. The wheel built the library before and used none of it. The tests hold the decode to the SHA-256 of what
-  FFmpeg's strict decode of each committed fixture gives, a decode started at the restart for a sample to the samples of the whole decode,
-  and (when `ICLFORGE_FORGE` names an executable) the samples to `forge decode`'s. The encoder, the Atmos layer and the metadata edits are
-  not bound.
-
 - **Added: `iclforge-wasm-decoder/truehd` decodes TrueHD and MLP in the browser and in Node (WP7).** A fourth Embind module,
   `iclforge_wasm_truehd` (`apps/demos/wasm/truehd_bindings.cpp`), wraps the decode side of `iclforge::truehd` (probe, the scan into access
   units, the scan of a whole stream for its length and restarts, and the decoder), and `bindings/js/src/truehd.ts` is the typed wrapper:
