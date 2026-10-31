@@ -550,3 +550,66 @@ Each has a recommendation, and none is settled here.
 
 The questions that block the most work are 1 and 2 (H5, H7), 5 (all of H6 and so H7), 7 (part of
 H4) and 8 (the last part of H0).
+
+## H6 to H8: the local and Android endpoints (2026-10-31)
+
+Branch `feature/truehd-hearth-endpoints`, WP2's items 6 and 7. This section is what was built without hardware, what each platform's
+output does, and the questions that are the owner's. Entries 120 to 129 are this block's; the numbering is the work packages' README. **Nothing here has been run
+against a receiver**, on any platform, and the output decision says so (`apps/hearth/engine/src/mat_status.hpp` is the list).
+
+**The carrier.** The owner's decision of 2026-10-29: eight channels of 16 bits, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 kHz
+family, 3,840 link frames to a 61,440-byte burst. `iclforge::audio::BitstreamFormat::kMat` carries it (`link_rate()`, `carrier_channels()`,
+`carrier_frame_bytes()`); the 48, 96 and 192 kHz rates all run the 192 kHz link because 24 access units of 40, 80 or 160 samples are all 20 ms.
+
+| Platform | What the backend does | Checked against | Run |
+|---|---|---|---|
+| ALSA | Opens 8 channels S16 at the link rate on a `hdmi` or `iec958` name with the non-audio channel status at that rate; refuses a device that cannot be eight wide | ALSA's `null` and `file` devices on Ubuntu 24.04: a MAT burst reaches an 8-channel device byte for byte | not run |
+| PipeWire | Negotiates SPA's `TRUEHD` codec on the link rate with 16-byte frames; the node's `iec958.codecs` must list `TrueHD` | The codec mapping and the list reading, headless; no sink | not run |
+| WASAPI | Exclusive mode, `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, 8 channels, the 7.1 mask | Every field of the format, against the SDK's own GUID; never opened on a device | not run |
+| Core Audio | Refuses (`kUnsupportedFormat`); no format ID is known | The refusal | not run, not offered |
+| Android | Two optional bridge methods open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND`; a bridge without them refuses | The pure half (`android_support.hpp`) only; **not built** (no NDK on the machine) | not run |
+
+**The output decision.** For a TrueHD item (MLP has no carriage) on a build whose player can send MAT (`OutputRequest::mat_passthrough`, false
+until the player is wired, see 127): an output that takes MAT through a platform that has been run is chosen automatically; one that
+takes it through a platform that has not is decoded here with the reason saying *which* platform has not been run and why, and **pinning
+Bitstream sends it anyway**, with the same warning. The Output picker lists such an output as "TrueHD (MAT) opens, not run". With
+`mat_passthrough` false the decision is what it was before.
+
+**The fallback chain (H8, no transcode).** When a TrueHD or MLP item is decoded, `truehd_fallback_presentation()` gives the stream's own
+presentation the output's width calls for: 8 channels or more the 8 channel one, 6 or 7 the 6 channel one, anything narrower or unstated the stereo
+one; `follow=off`, or no output that can take PCM, refuses. It is carried in `OutputChoice::presentation` and applied nowhere yet.
+
+**Entries.**
+
+120. **The carrier is provisional until one receiver names a stream TrueHD** (`libs/containers/ERRATA.md`, question 7 stays open). Every
+     platform above is "not run". *Recommend:* the first run is the Raspberry Pi (ALSA) into the Onkyo TX-RZ740 with `forge spdif`'s eight-channel WAV
+     of a fixture, played with the device name the library builds for `AES3=0x0e`
+     (`aplay -D "hdmi:CARD=<card>,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e" mat.wav`; untried here); then Windows; Core Audio last.
+     WP6's session was said to be producing MAT bursts for the Shield and the Onkyo: its branch (`feature/truehd-validation`) held none when this was
+     written, so the bursts for the first run are `forge spdif` of the 25 fixtures.
+121. **A platform marked "not run" is never chosen automatically.** The user can pin Bitstream to try it. *Recommend:* keep, and flip a platform to
+     "run" only in the commit that records a run that passed (the table has a test that pins it).
+122. **WASAPI's MLP format fields.** `dwEncodedSamplesPerSec` is the content rate and `dwEncodedChannelCount` 8, as the other two families have
+     them; the mask is `KSAUDIO_SPEAKER_7POINT1_SURROUND`. Microsoft's description of the MLP format would settle them; this project has not seen a driver
+     accept or refuse them. *Recommend:* the Windows run with the receiver; if `IsFormatSupported` refuses, try the link rate in
+     `dwEncodedSamplesPerSec` and record which one a driver takes. Please supply the Microsoft text if you have it.
+123. **PipeWire's TRUEHD stream.** The rate (the link's) and the frame (16 bytes) it expects are assumed from how E-AC-3 is handled here.
+     *Recommend:* the first PipeWire run reads them from `pw-dump` on the sink's node.
+124. **Core Audio.** No format ID for TrueHD is known to the backend; the session had no Mac. A Mac may offer eight channels of 192 kHz linear PCM on
+     HDMI, in which MAT could be sent as data. *Recommend:* leave refused; ask a Mac owner to list the HDMI stream's physical formats (the backend's
+     `kAudioStreamPropertyAvailablePhysicalFormats`) before any code.
+125. **Android.** The bridge methods are written and not built; the Shield's HDMI policy lists TrueHD and IEC 61937 at 7.1 masks and only stereo IEC 61937
+     was tried (`hearth-android-findings.md`, S4). *Recommend:* let CI build the APK first, then one Shield run into the Onkyo; questions 12 and 5 of the
+     audit are answered yes by the owner's decision of 2026-10-29, so no further permission is asked here.
+126. **The fallback chain's unstated width is stereo.** An output that does not state its width (0 channels) gets the stream's stereo mix, as the
+     owner's chain says; before this it would have been the best presentation folded by the renderer. *Recommend:* keep; and the player applies
+     `OutputChoice::presentation` (it sets `DecoderSettings`' presentation for the item).
+127. **The player does not send MAT yet.** `OutputRequest::mat_passthrough` is false in `OutputSelector`, because the player (`player.cpp`, WP2's file)
+     has no call site that packs a TrueHD item's access units with `MatPacker`, starts at a restart unit, carries a part-filled burst across a gapless
+     join (`MatPacker::flush` at the end of the queue), and submits the bursts to the passthrough sink. *Recommend:* WP2's session adds it when it
+     merges this branch, and then turns the flag on.
+128. **Which receivers take MAT** is read from the ELD (CEA-861 audio format code 12) under ALSA and from `iec958.codecs` under PipeWire. Windows,
+     macOS and Android have no descriptor reader, so there the open is all there is and a receiver that is off looks like one that takes it.
+     *Recommend:* leave until the EDID read lands for those platforms (WP7's, if at all).
+129. **AC-4 HBR16 is still refused** although the eight-channel link now exists on ALSA: it needs its own subtype under WASAPI, which the SDK does not
+     define, and no receiver is known to take it. *Recommend:* leave refused.

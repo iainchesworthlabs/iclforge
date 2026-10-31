@@ -118,6 +118,30 @@ TEST_CASE("the codec sent over IEC958 matches the bitstream format asked for") {
     CHECK(carrier_rate(BitstreamFormat::kAc4Hbr4, 48000) == 192000);
 }
 
+TEST_CASE("TrueHD is negotiated as SPA's TRUEHD on the 192 kHz or 176.4 kHz link") {
+    CHECK(iec958_codec_for(BitstreamFormat::kMat) == SPA_AUDIO_IEC958_CODEC_TRUEHD);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 48000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 96000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 44100) == 176400);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 32000) == 0);
+}
+
+TEST_CASE("a codec list enables TrueHD in either of SPA's spellings, and nothing else does") {
+    using iclforge::pipewire::codec_enabled;
+    // The list a Raspberry Pi and an Atmos receiver came up with, unprompted.
+    const std::string listed = "[ PCM DTS AC3 EAC3 TrueHD DTS-HD ]";
+    CHECK(codec_enabled(listed, BitstreamFormat::kMat));
+    CHECK(codec_enabled(listed, BitstreamFormat::kAc3));
+    CHECK(codec_enabled(listed, BitstreamFormat::kEac3));
+    CHECK(codec_enabled(R"(["PCM","TRUEHD"])", BitstreamFormat::kMat));
+    // A list without it does not, and neither AC3 nor DTS-HD stands in for it.
+    CHECK_FALSE(codec_enabled("[ PCM AC3 EAC3 DTS-HD ]", BitstreamFormat::kMat));
+    CHECK_FALSE(codec_enabled("[ PCM TrueHD ]", BitstreamFormat::kEac3));
+    CHECK_FALSE(codec_enabled("", BitstreamFormat::kMat));
+    // AC-4 has no codec to list.
+    CHECK_FALSE(codec_enabled(listed, BitstreamFormat::kAc4));
+}
+
 TEST_CASE("a node is classified as a source, a sink, or neither") {
     const spa_dict_item source_items[] = {{PW_KEY_MEDIA_CLASS, "Audio/Source"}};
     const auto source = make_dict(source_items, 1);

@@ -4403,95 +4403,105 @@
         <translation>AC-3 %1 · E-AC-3 %2</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="191"/>
-        <location filename="../qml/OutputPicker.qml" line="203"/>
+        <location filename="../qml/OutputPicker.qml" line="154"/>
+        <source> · TrueHD (MAT) ✓</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPicker.qml" line="155"/>
+        <source> · TrueHD (MAT) opens, not run</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPicker.qml" line="198"/>
+        <location filename="../qml/OutputPicker.qml" line="210"/>
         <source>Where Hearth plays</source>
         <translation>היכן Hearth מנגן</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="197"/>
+        <location filename="../qml/OutputPicker.qml" line="204"/>
         <source>OUTPUT</source>
         <translation>פלט</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="223"/>
+        <location filename="../qml/OutputPicker.qml" line="230"/>
         <source>This computer · PCM</source>
         <translation>המחשב הזה · PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="279"/>
+        <location filename="../qml/OutputPicker.qml" line="286"/>
         <source>%1 · default</source>
         <translation>%1 · ברירת מחדל</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="294"/>
-        <location filename="../qml/OutputPicker.qml" line="383"/>
-        <location filename="../qml/OutputPicker.qml" line="488"/>
+        <location filename="../qml/OutputPicker.qml" line="301"/>
+        <location filename="../qml/OutputPicker.qml" line="390"/>
+        <location filename="../qml/OutputPicker.qml" line="495"/>
         <source>playing here</source>
         <translation>מנגן כאן</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="308"/>
+        <location filename="../qml/OutputPicker.qml" line="315"/>
         <source>No output devices were found on this computer.</source>
         <translation>לא נמצאו התקני פלט במחשב הזה.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="315"/>
+        <location filename="../qml/OutputPicker.qml" line="322"/>
         <source>Passthrough · the receiver decodes</source>
         <translation>מעבר ישיר · המקלט מפענח</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="340"/>
+        <location filename="../qml/OutputPicker.qml" line="347"/>
         <source>%1, passthrough</source>
         <translation>%1, מעבר ישיר</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="397"/>
+        <location filename="../qml/OutputPicker.qml" line="404"/>
         <source>No passthrough-capable outputs were found.</source>
         <translation>לא נמצאו פלטים התומכים במעבר ישיר.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="406"/>
+        <location filename="../qml/OutputPicker.qml" line="413"/>
         <source>Read by asking each endpoint whether it accepts AC-3 and E-AC-3 over IEC 61937 in exclusive mode. An item the receiver takes is sent to it untouched, and the receiver decodes and renders it: the decoder settings, the speaker setup and the volume here do not apply, and the meters show a decode made here. Anything else is decoded and played to the same output as PCM.</source>
         <translation>נקבע בכך ששואלים כל נקודת קצה אם היא מקבלת AC-3 ו-E-AC-3 דרך IEC 61937 במצב בלעדי. פריט שהמקלט מקבל נשלח אליו ללא שינוי, והמקלט מפענח ומעבד אותו: הגדרות המפענח, תצורת הרמקולים ועוצמת הקול כאן אינן חלות, והמדדים מציגים פענוח שנעשה כאן. כל השאר מפוענח ומושמע באותו פלט כ-PCM.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="418"/>
+        <location filename="../qml/OutputPicker.qml" line="425"/>
         <source>Network · Sendspin</source>
         <translation>רשת · Sendspin</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="441"/>
+        <location filename="../qml/OutputPicker.qml" line="448"/>
         <source>%1, group</source>
         <translation>%1, קבוצה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="480"/>
+        <location filename="../qml/OutputPicker.qml" line="487"/>
         <source>%1 · %2</source>
         <translation>%1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="502"/>
+        <location filename="../qml/OutputPicker.qml" line="509"/>
         <source>No groups yet. On the Network page, pair a sink and add it to a group - a group of one plays to a single sink.</source>
         <translation>עדיין אין קבוצות. בדף הרשת, צמדו נגן והוסיפו אותו לקבוצה - קבוצה של אחד מנגנת אל נגן יחיד.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="513"/>
+        <location filename="../qml/OutputPicker.qml" line="520"/>
         <source>Each sink in a group decodes the stream for itself, to its own speakers. A group plays to the members connected when it starts, and to others as they connect.</source>
         <translation>כל נגן בקבוצה מפענח את הזרם לעצמו, אל הרמקולים שלו. קבוצה מנגנת אל החברים המחוברים כשהיא מתחילה, ואל האחרים כשהם מתחברים.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="529"/>
+        <location filename="../qml/OutputPicker.qml" line="536"/>
         <source>Network page…</source>
         <translation>דף הרשת…</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="535"/>
+        <location filename="../qml/OutputPicker.qml" line="542"/>
         <source>Cancel</source>
         <translation>ביטול</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPicker.qml" line="540"/>
+        <location filename="../qml/OutputPicker.qml" line="547"/>
         <source>Play here</source>
         <translation>נגנו כאן</translation>
     </message>
@@ -6108,17 +6118,17 @@ Drop AC-3, E-AC-3, AC-4, TrueHD or MLP files (raw, MP4, Matroska or MPEG-TS) or 
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1631"/>
+        <location filename="../../src/hearth_controller.cpp" line="1643"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>בנייה זו אינה נושאת קובץ הודעות מוטמע (:/notices/NOTICES.txt לא הודר לתוכה); קובץ NOTICES.txt שליד היישום וקובץ LICENSE שבמאגר אומרים מה היא כוללת.</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2830"/>
+        <location filename="../../src/hearth_controller.cpp" line="2842"/>
         <source>saved to %1</source>
         <translation>נשמר אל %1</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2833"/>
+        <location filename="../../src/hearth_controller.cpp" line="2845"/>
         <source>could not write %1: %2</source>
         <translation>לא ניתן היה לכתוב את %1: %2</translation>
     </message>
