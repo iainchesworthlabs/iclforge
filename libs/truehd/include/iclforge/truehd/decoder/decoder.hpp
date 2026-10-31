@@ -81,6 +81,9 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
+    // The rows whose matrix output the quantiser step masks: 0 all, 1 the coded rows only (8 and
+    // up), 2 the bed rows only.
+    int mask_rows = 0;
     bool object_restart_clears = false;  // an object restart clears the filter histories
     // The object matrices' noise index: bit 0 counts the samples from the start of the block, not
     // of the access unit; bit 1 numbers the matrices from the first, not from the last.
@@ -161,6 +164,9 @@ struct DecoderCounters {
         std::uint8_t out_bits = 0;
     };
     std::vector<ObjectIntervalFacts> object_interval_facts;
+    // The quantiser steps and output shifts, by matrix channel, at the first interval's check.
+    std::array<std::uint8_t, kMaxChannels> object_quant_step{};
+    std::array<std::int8_t, kMaxChannels> object_output_shift{};
     // For the same intervals, the fold of each matrix channel's own samples (the check byte of the
     // fold of that channel alone): columns 0 to 11 after the matrices, 12 to 23 before them.
     static constexpr std::size_t kObjectColumns = 24;

@@ -179,6 +179,15 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
             std::printf("%c", updates > 9 ? '+' : static_cast<char>('0' + updates));
         }
         std::printf("\n");
+        std::printf("    quantiser steps by matrix channel at the first check:");
+        for (int ch = 0; ch < 12; ++ch) {
+            std::printf(" %u", c.object_quant_step[static_cast<std::size_t>(ch)]);
+        }
+        std::printf("\n    output shifts by matrix channel at the first check:");
+        for (int ch = 0; ch < 12; ++ch) {
+            std::printf(" %d", c.object_output_shift[static_cast<std::size_t>(ch)]);
+        }
+        std::printf("\n");
         std::printf("    per interval of the object substream: check, matrices, largest noise shift, "
                     "bits of the largest coded / bed / output sample:\n");
         for (std::size_t i = 0; i < c.object_interval_facts.size() && i < 80; ++i) {
@@ -239,6 +248,12 @@ int main(int argc, char** argv) {
                                     ((bits & 8) != 0 ? " inverse-fshift" : ""));
         settings.push_back({combination_names.back().c_str(), combined});
     }
+    DecoderLab mask_coded = base;
+    mask_coded.mask_rows = 1;
+    settings.push_back({"quantiser mask: coded rows only", mask_coded});
+    DecoderLab mask_bed = base;
+    mask_bed.mask_rows = 2;
+    settings.push_back({"quantiser mask: bed rows only", mask_bed});
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;
     settings.push_back({"object restart clears histories", cleared});

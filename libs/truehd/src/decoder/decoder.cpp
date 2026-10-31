@@ -352,6 +352,10 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             facts.coded_bits = bits_of(state.peak_coded);
             facts.bed_bits = bits_of(state.peak_bed);
             facts.out_bits = bits_of(state.peak_out);
+            if (counters.object_interval_facts.empty()) {
+                counters.object_quant_step = state.quant_step;
+                counters.object_output_shift = state.output_shift;
+            }
             counters.object_interval_facts.push_back(facts);
         }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
@@ -688,7 +692,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             const int m = object && config.lab.reverse_matrices ? state.matrix_count - 1 - step : step;
             const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
             const std::uint32_t keep =
-                plan.out <= max_chan && !(object && config.lab.no_quantiser_mask)
+                plan.out <= max_chan && !(object && config.lab.no_quantiser_mask) &&
+                        !(object && config.lab.mask_rows == 1 && plan.out < state.context.min_chan) &&
+                        !(object && config.lab.mask_rows == 2 && plan.out >= state.context.min_chan)
                     ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) -
                         1U)
                     : 0xFFFFFFFFU;
