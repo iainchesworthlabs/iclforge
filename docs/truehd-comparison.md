@@ -68,7 +68,9 @@ Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.73
 
 \* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.
 
-**Film excerpts, run locally.** The owner's three Blu-ray discs gave fourteen excerpts of film audio, all 24 bit: six of 45 s at 48 kHz
+**Film and concert excerpts, run locally.** The owner's three Blu-ray discs gave fourteen excerpts of film audio, and a concert
+release (a Blu-ray rip on the owner's server, 2025) ten of music (two 40 s excerpts each of its TrueHD 7.1 track, also as 5.1 and as stereo
+by picking channels, and of its 96 and 192 kHz FLAC stereo tracks), all 24 bit. The film excerpts: six of 45 s at 48 kHz
 (5.1 from the lossless DTS-HD MA track of one disc, and 7.1 from the TrueHD tracks of two, the 7.1 presentation of a TrueHD plus Atmos
 track) and eight of 40 s at 96 kHz (7.1 from the 96 kHz TrueHD track of the third disc, from its main feature and from a short clip, with
 the same audio as stereo and as 5.1 by picking channels, not mixing). All were decoded by FFmpeg. The 96 kHz audio is band-limited: its
@@ -92,8 +94,19 @@ and in FFmpeg's strict decode, sample for sample.
 | film 96 kHz 7.1 H b | 8 | 40 | 33,913,138 * | 23,047,752 | - | 25.0% |
 | film 96 kHz 7.1 H c | 8 | 40 | 25,857,542 * | 13,769,546 | - | 14.9% |
 | film 96 kHz 7.1 H d | 8 | 40 | 28,795,906 * | 16,848,970 | - | 18.3% |
+| concert stereo 192 kHz a | 2 | 40 | 27,209,944 | 27,711,254 | 1.018 | 60.1% |
+| concert stereo 192 kHz b | 2 | 40 | 26,556,322 | 27,527,458 | 1.037 | 59.7% |
+| concert stereo 48 kHz a | 2 | 40 | 7,248,272 | 6,834,960 | 0.943 | 59.3% |
+| concert stereo 48 kHz b | 2 | 40 | 7,351,392 | 6,806,874 | 0.926 | 59.1% |
+| concert 5.1 48 kHz a | 6 | 40 | 16,016,666 | 15,242,040 | 0.952 | 44.1% |
+| concert 5.1 48 kHz b | 6 | 40 | 16,198,998 | 15,280,502 | 0.943 | 44.2% |
+| concert 7.1 48 kHz a | 8 | 40 | 20,693,566 * | 20,369,902 | - | 44.2% |
+| concert 7.1 48 kHz b | 8 | 40 | 20,944,280 * | 19,535,482 | - | 42.4% |
+| concert stereo 96 kHz a | 2 | 40 | 16,336,062 | 15,901,132 | 0.973 | 69.0% |
+| concert stereo 96 kHz b | 2 | 40 | 16,381,882 | 15,936,542 | 0.973 | 69.2% |
 
-On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. FFmpeg's 7.1 streams do not decode to the source, so they
+On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. **On the concert, real full-band music, forge is 0.93 to 0.95 of FFmpeg's size at 48 kHz
+(stereo, 5.1), 0.97 at 96 kHz and 1.02 and 1.04 at 192 kHz**: the concert is louder, full-band music where the programme rows are the repository's own recordings, and the 192 kHz loss is the specification's order-4 limit (below, ERRATA question 96). FFmpeg's 7.1 streams do not decode to the source, so they
 have no ratio. A 7.1 file with the standard channel mask lists BL BR before SL SR, TrueHD has Ls Rs before Lrs Rrs, and
 `forge decode` writes no mask: its output has the last four channels swapped in pairs, which the harness expects and FFmpeg's decode,
 which writes the mask's order, does not show.

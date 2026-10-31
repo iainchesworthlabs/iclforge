@@ -385,7 +385,9 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     LPCM clips (no use for 24 bit); eight 40 s excerpts of it (7.1, and the same audio as 5.1 and stereo by picking channels) are
     in `D:/ac3bld/thd-corpus` too: forge is 0.84 to 0.94 of FFmpeg's size on the stereo and 5.1, and every stream is exact in both
     decoders. That audio is band-limited (74 to 82 dB below the total above 24 kHz), the kind of source question 91's IIR estimate
-    was about, so the estimate could be run on it. Still open, the owner's: 24-bit music and speech. **Recommendation:** 5 to 10
+    was about, so the estimate could be run on it. A concert release the owner pointed to (a Blu-ray rip on the server: TrueHD plus Atmos 7.1 at 48 kHz, FLAC stereo at 96 and 192
+    kHz, all 24 bit, real full-band music) gave ten more 40 s excerpts, the 24-bit music asked for: forge is 0.93 to 0.95 of FFmpeg's size at
+    48 kHz, 0.97 at 96 and 1.02 to 1.04 at 192 kHz, every stream exact in both decoders. Still open, the owner's: speech at 24 bit. **Recommendation:** 5 to 10
     excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
     music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
 93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,
@@ -1208,3 +1210,11 @@ unit of 160 samples holds at most 2). The order is held here: a test encodes 192
 orders 8 and 4 (same bytes) and at 2 (different bytes). The declared peak rate is the configured ceiling (18 Mbit/s, 17,992,800 at 176.4
 kHz), not the stream's measured peak, on purpose (entry 12): it is the rate the stream is declared and checked not to exceed. The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
 `test_encoder.cpp` holds the two substreams.
+
+**96. FIR order at 192 kHz costs 2 to 4 per cent on real music (TH spec §9.6; entry 35; question 14).** On two 40 s excerpts of the concert's
+192 kHz FLAC stereo track forge's stream is 1.018 and 1.037 of FFmpeg's (27,711,254 and 27,527,458 bytes against 27,209,944 and
+26,556,322), where at 96 kHz it is 0.973 and at 48 kHz 0.93 to 0.95. The one substream of a stereo stream at 176.4 and 192 kHz is held to
+FIR order 4 as the specification says (the "in substream 0" limits of §9.7 of the reference copy), and FFmpeg's encoder writes order 7 and its
+decoder reads it. **Recommendation:** keep the specification's limit: the loss is small, the specification does not say why the limit is there (a hardware
+decoder's filter cycles is a guess), and the one reader that shows order 7 is accepted is not a Blu-ray player. If the owner wants to
+trade the limit for size, an option `fir-order-over-spec` could lift it for authoring to software players, off by default. Left as is.
