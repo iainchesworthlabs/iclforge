@@ -66,6 +66,11 @@ struct ItemFacts {
     // and for AC-4 the stream's own rate (23.44, 24, 25, 29.97 and on). What a sink's stated
     // limit (`max_frame_rate`) is compared with; 0 where it is not known.
     double frame_rate = 0.0;
+    // The most coded data a second the programme is declared to need, in kbit/s: for TrueHD and
+    // MLP the peak data rate the stream's major sync states (TH spec section 4.4), which a sink's
+    // stated limit (`max_data_rate`) and chunk size are compared with. 0 where it is not known,
+    // and for every other codec.
+    std::uint32_t peak_kbps = 0;
     // Measured over the whole programme, the same definition
     // io::ProbeReport::bitrate_kbps uses: its bytes * 8, over its duration.
     // Unset until the item has been probed, the same as the fields above.

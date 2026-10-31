@@ -850,6 +850,7 @@ GroupPlan NetworkSinks::plan_group(const GroupPlanRequest& request) {
                             .objects = request.objects,
                             .objects_alone = request.objects_alone,
                             .frame_rate = request.frame_rate,
+                            .peak_kbps = request.peak_kbps,
                             .karaoke = request.karaoke};
     const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
 

@@ -417,6 +417,8 @@ std::expected<void, std::string> Session::open_truehd(const std::string& path, L
         index_->channels_of(iclforge::truehd::Presentation::kBest));
     facts_.frame_rate = static_cast<double>(index_->sample_rate) /
                         static_cast<double>(index_->samples_per_unit);
+    facts_.peak_kbps = static_cast<std::uint32_t>(
+        (static_cast<std::uint64_t>(index_->peak_data_rate) * index_->sample_rate + 8U) / 16U / 1000U);
     if (index_->skipped_bytes > 0) {
         note += fmt::format("{}{} bytes did not read as access units, and are skipped.",
                             note.empty() ? "" : " ", index_->skipped_bytes);

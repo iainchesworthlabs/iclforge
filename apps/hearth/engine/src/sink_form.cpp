@@ -1,5 +1,7 @@
 #include "sink_form.hpp"
 
+#include "iclforge/sendspin/chunks.hpp"
+
 #include <fmt/format.h>
 
 #include "iclforge/ac3/decoder/output.hpp"
@@ -29,6 +31,8 @@ namespace sp = sendspin::player;
             return "E-AC-3";
         case sp::DataType::kAc4:
             break;
+        case sp::DataType::kTruehd:
+            return "TrueHD";
     }
     return "AC-4";
 }
@@ -122,6 +126,21 @@ constexpr double kFrameRateSlack = 1.005;
     if (rate_limit != 0 && stream.frame_rate > static_cast<double>(rate_limit) * kFrameRateSlack) {
         return fmt::format("This sink decodes {} up to {} frames a second, and this stream has {}",
                            type_text(type), rate_limit, rate_text(stream.frame_rate));
+    }
+    if (type == sp::DataType::kTruehd && stream.peak_kbps != 0) {
+        const std::uint32_t data_limit = support.max_data_rate_of(type);
+        if (data_limit != 0 && stream.peak_kbps > data_limit) {
+            return fmt::format("This sink takes {} up to {} kbit/s, and this stream's peak is {}",
+                               type_text(type), data_limit, stream.peak_kbps);
+        }
+        // The longest chunk: 24 units, 20 ms, at the stream's peak, with the chunk header.
+        const std::uint64_t chunk_bytes =
+            (static_cast<std::uint64_t>(stream.peak_kbps) * 1000U / 8U / 50U) +
+            sendspin::kBurstChunkHeaderBytes;
+        if (support.max_chunk_bytes != 0 && chunk_bytes > support.max_chunk_bytes) {
+            return fmt::format("This sink takes chunks of up to {} bytes, and this stream's peak makes {}",
+                               support.max_chunk_bytes, chunk_bytes);
+        }
     }
     return std::nullopt;
 }
@@ -424,9 +443,10 @@ sp::DataType data_type_of(audio::BitstreamFormat format) {
         case audio::BitstreamFormat::kAc4:
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
-        // TrueHD has no Sendspin data type yet (H5): a group is never given a MAT stream.
-        case audio::BitstreamFormat::kMat:
             break;
+        case audio::BitstreamFormat::kMat:
+            // TrueHD in a group is the access units, not the MAT burst (sendspin::kTruehdUnitsPerChunk).
+            return sp::DataType::kTruehd;
     }
     return sp::DataType::kAc4;
 }
@@ -437,7 +457,9 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
         return pcm_choice(*refusal, stream, sink, policy);
     }
     const std::string coded =
-        fmt::format("Sending {} as it is", audio::format_name(*stream.stream));
+        fmt::format("Sending {} as it is", stream.stream == audio::BitstreamFormat::kMat
+                                               ? std::string_view{"TrueHD"}
+                                               : audio::format_name(*stream.stream));
     // A karaoke stream is sent as it is only to a sink that reproduces it: decoded here for one
     // that does not, so that a group hears one reproduction. Where this app cannot send it PCM,
     // the stream still plays, as coded, and the reason says so.

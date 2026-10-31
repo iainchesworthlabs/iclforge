@@ -1,5 +1,7 @@
 #include "player.hpp"
 
+#include "iclforge/sendspin/chunks.hpp"
+
 #include <fmt/format.h>
 
 #include <algorithm>
@@ -219,6 +221,11 @@ HeldOutput Player::held_output() const {
 }
 
 std::optional<audio::BitstreamFormat> Player::sent_stream(const Session& session) const {
+    if (session.truehd() && session.facts().codec == ItemCodec::kTruehd) {
+        // A group is sent TrueHD's access units, 24 to a chunk, by data type (H5). MLP has no data
+        // type and is decoded here, as is a stream the member lists do not take.
+        return audio::BitstreamFormat::kMat;
+    }
     if (session.ac4()) {
         // A sink decodes the presentation of no preferences; one the
         // listener's choice would not play is decoded here.
@@ -364,6 +371,8 @@ void Player::reset_packer() {
     packed_spans_.clear();
     group_payload_.clear();
     group_burst_start_frame_ = 0;
+    group_truehd_units_ = 0;
+    group_truehd_samples_ = 0;
 }
 
 void Player::send_unit(std::span<const std::byte> unit, std::uint32_t samples,
@@ -431,6 +440,10 @@ void Player::send_unit(std::span<const std::byte> unit, std::uint32_t samples,
 void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t samples,
                                 std::uint64_t start) {
     const std::optional<audio::BitstreamFormat> stream = transport_.open_format().stream;
+    if (stream && audio::is_mat(*stream)) {
+        send_truehd_unit_to_group(unit, samples, start);
+        return;
+    }
     if (stream && audio::is_ac4(*stream)) {
         // A sync frame to a burst, of the type the item's largest frame
         // needs. Where it goes on the group's timeline comes from the
@@ -528,6 +541,46 @@ void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t s
     pending_group_bursts_.push_back(PendingGroupBurst{
         .pc = pc, .pd = pd, .payload = std::move(group_payload_), .frame = group_burst_start_frame_});
     group_payload_.clear();
+}
+
+void Player::send_truehd_unit_to_group(std::span<const std::byte> unit, std::uint32_t samples,
+                                       std::uint64_t start) {
+    // A chunk is whole access units, at most 24 and at most what one encrypted message holds; the
+    // unit that would pass either starts the next. Where on the group's timeline it falls comes from
+    // the session, as for AC-4: the decoder's blocks run short of what it holds back.
+    if (!group_payload_.empty() &&
+        (group_truehd_units_ >= sendspin::kTruehdUnitsPerChunk ||
+         group_payload_.size() + unit.size() > sendspin::kMaxTruehdChunkBytes)) {
+        flush_truehd_chunk();
+    }
+    if (group_payload_.empty()) {
+        const Segment& segment = segments_.back();
+        group_burst_start_frame_ = static_cast<std::int64_t>(
+            segment.output_start + (start > segment.item_start ? start - segment.item_start : 0));
+        group_truehd_units_ = 0;
+        group_truehd_samples_ = 0;
+    }
+    group_payload_.insert(group_payload_.end(), unit.begin(), unit.end());
+    ++group_truehd_units_;
+    group_truehd_samples_ += samples;
+    if (group_truehd_units_ >= sendspin::kTruehdUnitsPerChunk) {
+        flush_truehd_chunk();
+    }
+}
+
+void Player::flush_truehd_chunk() {
+    if (group_payload_.empty()) {
+        return;
+    }
+    pending_group_bursts_.push_back(PendingGroupBurst{
+        .pc = static_cast<std::uint16_t>(sendspin::BurstDataType::kTruehd),
+        .pd = static_cast<std::uint16_t>(group_payload_.size()),
+        .payload = std::move(group_payload_),
+        .frame = group_burst_start_frame_,
+        .frames = static_cast<std::int64_t>(group_truehd_samples_)});
+    group_payload_.clear();
+    group_truehd_units_ = 0;
+    group_truehd_samples_ = 0;
 }
 
 void Player::encode_transcoded(bool last) {
@@ -1541,7 +1594,11 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                                                       .coded_channels = facts.channels,
                                                       .objects = facts.objects,
                                                       .objects_alone = facts.objects_alone,
-                                                      .frame_rate = facts.frame_rate,
+                                                      .frame_rate = session_->truehd()
+                                                                        ? facts.frame_rate / static_cast<double>(
+                                                                              sendspin::kTruehdUnitsPerChunk)
+                                                                        : facts.frame_rate,
+                                                      .peak_kbps = facts.peak_kbps,
                                                       .karaoke = karaoke_choice(facts, settings_)});
     } else {
         opened = sink_->open(
@@ -1800,6 +1857,11 @@ void Player::fill(std::size_t frames) {
         }
         // Frames a unit completed without a report of its own.
         encode_transcoded(false);
+    }
+    if (session_->finished() && mode_ == OutputMode::kNetworkGroup) {
+        // The last chunk of an item holds whatever units were left, which a join does not wait to
+        // fill: the next item may be another rate, and a sink joins at a chunk.
+        flush_truehd_chunk();
     }
     note_truehd_counters();
 }

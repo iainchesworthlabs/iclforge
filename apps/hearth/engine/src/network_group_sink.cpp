@@ -86,6 +86,7 @@ public:
                     .objects = format.objects,
                     .objects_alone = format.objects_alone,
                     .frame_rate = format.frame_rate,
+                    .peak_kbps = format.peak_kbps,
                     .karaoke = format.karaoke,
                     .layout = format.layout});
          const std::vector<render::OutputLayout>& planned = group_plan.variants;
@@ -111,12 +112,11 @@ public:
          }
      }
      const bool converting = group_rate != format.sample_rate;
-     if (converting && bursts) {
-         // The planner holds back PCM when a member takes the stream as it is, so this is a plan
-         // that went wrong; sent both, the group would pair burst frames with PCM at another rate.
-         return std::unexpected(fmt::format(
-             "The group \"{}\" was planned to be sent PCM at {} Hz and the stream as it is at {} Hz.",
-             group_name, group_rate, format.sample_rate));
+     if (converting) {
+         // The planner sends PCM at another rate only to a group none of whose members take the
+         // stream as it is (sink_form.hpp, plan_group_forms()), so there are no bursts to send,
+         // and burst frames counted at the stream's rate would not fit a timeline run at this one.
+         bursts.reset();
      }
      m::AudioFormat group_pcm = pcm;
      group_pcm.sample_rate = static_cast<std::int32_t>(group_rate);
@@ -277,6 +277,9 @@ public:
                       std::int64_t frame, std::int64_t frames) override {
         if (!group_) {
             return false;
+        }
+        if (!converters_.empty()) {
+            return true;  // no member of a converting group takes bursts (open())
         }
         // Group::Burst::payload is std::span<const std::uint8_t> - sendspin's
         // own byte type, not forge's std::byte this interface otherwise

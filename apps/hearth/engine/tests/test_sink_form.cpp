@@ -1136,3 +1136,72 @@ TEST_CASE("sink form: a group is sent PCM at one rate", "[hearth][sink_form][rat
         CHECK(mentions(plan.members[1].choice.reason, "own timeline at 44100 Hz"));
     }
 }
+
+namespace {
+
+// A TrueHD item as the group's planner sees it: access units, 24 to a chunk (frame_rate counts
+// chunks), and the peak the stream declares.
+StreamNeeds truehd_item(std::uint32_t rate, std::uint16_t channels, std::uint32_t peak_kbps) {
+    return {.stream = BitstreamFormat::kMat,
+            .sample_rate = rate,
+            .coded_channels = channels,
+            .frame_rate = 50.0,
+            .peak_kbps = peak_kbps};
+}
+
+}  // namespace
+
+TEST_CASE("sink form: a TrueHD item is sent as access units to a sink that lists TrueHD, within its limits",
+          "[hearth][sink_form][truehd]") {
+    SinkFacts sink = hearth_sink({sp::DataType::kAc3, sp::DataType::kTruehd});
+    CHECK(data_type_of(BitstreamFormat::kMat) == sp::DataType::kTruehd);
+
+    SECTION("a sink that lists it is sent the stream, and the reason says TrueHD, not MAT") {
+        const auto choice = choose_sink_form(truehd_item(k48k, 6, 18000), sink);
+        CHECK(choice.form == SinkForm::kCoded);
+        CHECK(mentions(choice.reason, "Sending TrueHD as it is"));
+        CHECK_FALSE(mentions(choice.reason, "MAT"));
+    }
+    SECTION("a sink that does not list it is sent PCM, and the reason names the codec") {
+        const SinkFacts old = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3});
+        const auto choice = choose_sink_form(truehd_item(k48k, 6, 18000), old);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        CHECK(mentions(choice.reason, "does not decode TrueHD"));
+    }
+    SECTION("a data rate the sink states is compared with the stream's declared peak") {
+        sink.iclforge_support->max_data_rate[static_cast<std::size_t>(sp::DataType::kTruehd)] = 12000;
+        const auto over = choose_sink_form(truehd_item(k48k, 6, 18000), sink);
+        REQUIRE(over.form == SinkForm::kPcm);
+        CHECK(mentions(over.reason, "up to 12000 kbit/s"));
+        CHECK(mentions(over.reason, "peak is 18000"));
+        CHECK(choose_sink_form(truehd_item(k48k, 6, 9000), sink).form == SinkForm::kCoded);
+        // A stream that declares no peak is not compared.
+        CHECK(choose_sink_form(truehd_item(k48k, 6, 0), sink).form == SinkForm::kCoded);
+    }
+    SECTION("a chunk the sink cannot take, from the stream's peak, is refused by size") {
+        // The ESP32-S3 and -P4 take 25,600 bytes a chunk (firmware/hearth-sink/profiles.json): 20 ms
+        // of 18 Mbit/s is 45,000.
+        sink.iclforge_support->max_chunk_bytes = 25600;
+        const auto over = choose_sink_form(truehd_item(k48k, 2, 18000), sink);
+        REQUIRE(over.form == SinkForm::kPcm);
+        CHECK(mentions(over.reason, "chunks of up to 25600 bytes"));
+        CHECK(choose_sink_form(truehd_item(k48k, 2, 9000), sink).form == SinkForm::kCoded);
+    }
+    SECTION("the channel and chunk-rate limits apply to TrueHD as to the other types") {
+        limit(sink, sp::DataType::kTruehd, 2);
+        const auto wide = choose_sink_form(truehd_item(k48k, 6, 4000), sink);
+        REQUIRE(wide.form == SinkForm::kPcm);
+        CHECK(mentions(wide.reason, "up to 2 channels"));
+        sink.iclforge_support->max_frame_rate[static_cast<std::size_t>(sp::DataType::kTruehd)] = 25;
+        StreamNeeds stereo = truehd_item(k48k, 2, 4000);
+        const auto fast = choose_sink_form(stereo, sink);
+        REQUIRE(fast.form == SinkForm::kPcm);
+        CHECK(mentions(fast.reason, "up to 25 frames a second"));
+    }
+    SECTION("a rate the sink does not list for coded streams is sent as PCM at one it lists") {
+        const auto choice = choose_sink_form(truehd_item(96000, 2, 4000), sink);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        CHECK(mentions(choice.reason, "plays coded streams at 48000 Hz only"));
+        CHECK(choice.sample_rate == 48000);
+    }
+}

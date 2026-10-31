@@ -2727,3 +2727,220 @@ TEST_CASE("engine: a 96 kHz item reaches a group of 48 kHz sinks converted, as P
     CHECK(worst < 2.0 / 32768.0);
     CHECK(energy > 1.0);
 }
+
+namespace {
+
+// A group of the Hearth test sinks in one place, paired through NetworkSinks the way the page pairs
+// them, for the TrueHD cases below. `configure` sets the options each sink starts with.
+struct TruehdGroup {
+    fs::path scratch;
+    std::map<std::string, std::unique_ptr<testsink::Sink>> sinks_by_name;
+    std::map<std::string, std::unique_ptr<CodeLog>> logs;
+    std::unique_ptr<iclforge::hearth::MemorySettingsStore> settings;
+    std::unique_ptr<iclforge::hearth::PairingStore> store;
+    std::unique_ptr<iclforge::hearth::NetworkSinks> sinks;
+    std::shared_ptr<iclforge::sendspin::Group> group;
+    std::string group_id;
+
+    testsink::Sink& sink(const std::string& name) { return *sinks_by_name.at(name); }
+};
+
+std::unique_ptr<TruehdGroup> make_truehd_group(
+    const std::string& tag,
+    const std::vector<std::pair<std::string, std::function<void(testsink::SinkOptions&)>>>& members) {
+    namespace ss = iclforge::sendspin;
+    auto out = std::make_unique<TruehdGroup>();
+    out->scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_engine_group_" + tag + "_" + scratch_pid_suffix());
+    fs::remove_all(out->scratch);
+    for (const auto& [name, configure] : members) {
+        out->logs[name] = std::make_unique<CodeLog>();
+        testsink::SinkOptions options;
+        options.name = name;
+        options.address = "127.0.0.1";
+        options.port = 0;
+        options.state_directory = out->scratch / name / "state";
+        options.output_directory = out->scratch / name / "out";
+        options.advertise = false;
+        options.codecs = {m::Codec::kPcm};
+        options.layout = "2.0";
+        configure(options);
+        auto started = testsink::Sink::start(options, *out->logs[name]);
+        REQUIRE(started.has_value());
+        out->sinks_by_name[name] = std::move(*started);
+    }
+    out->settings = std::make_unique<iclforge::hearth::MemorySettingsStore>();
+    out->store = std::make_unique<iclforge::hearth::PairingStore>(
+        *out->settings, [] { return std::string("2026-10-31"); });
+    const std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    out->sinks = std::make_unique<iclforge::hearth::NetworkSinks>(
+        *identity, "Test Hearth", *out->store, iclforge::hearth::NetworkSinksOptions{.browse = false});
+    REQUIRE(out->sinks->started());
+    for (const auto& [name, configure] : members) {
+        static_cast<void>(configure);
+        out->sinks->on_found(ss::discovery::Service{.instance = name,
+                                                    .host = "127.0.0.1",
+                                                    .addresses = {"127.0.0.1"},
+                                                    .port = out->sink(name).port(),
+                                                    .txt = {{.key = "path", .value = "/sendspin"}}});
+    }
+    for (const auto& [name, configure] : members) {
+        static_cast<void>(configure);
+        pair_through(*out->sinks, name, *out->logs[name]);
+    }
+    out->group_id = out->sinks->create_group("TrueHD");
+    REQUIRE_FALSE(out->group_id.empty());
+    for (const auto& [name, configure] : members) {
+        static_cast<void>(configure);
+        out->sinks->add_group_member(out->group_id, name);
+    }
+    out->group = out->sinks->group(out->group_id);
+    REQUIRE(out->group != nullptr);
+    return out;
+}
+
+// Plays the TrueHD item to the end through the application's planner and the engine.
+EngineStatus play_truehd_item(TruehdGroup& rig, const iclforge::hearth::testing::MadeStream& made) {
+    const ItemLoader loader =
+        [&made](const std::string& path) -> std::expected<LoadedItem, std::string> {
+        if (path != "item") {
+            return std::unexpected("no such file: " + path);
+        }
+        return LoadedItem{.source = std::make_shared<iclforge::hearth::MemoryByteSource>(made.bytes),
+                          .truehd = true};
+    };
+    const auto master = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(master.has_value());
+    EngineOutputs outputs{.group = iclforge::hearth::make_group_sink(
+                              [group = rig.group](const std::string&) { return group; },
+                              [&sinks = *rig.sinks](const iclforge::hearth::GroupPlanRequest& request) {
+                                  return sinks.plan_group(request);
+                              })};
+    Engine engine(std::move(outputs), loader, *master, iclforge::hearth::DecoderSettings{},
+                  EngineTiming{.period = 5ms, .budget = 4800});
+    engine.set_output_preferences(OutputPreferences{.pinned = OutputMode::kNetworkGroup,
+                                                    .follow_sink = true,
+                                                    .group_name = rig.group_id,
+                                                    .group_ready = true});
+    engine.add({QueueItem{.path = "item", .title = "TrueHD"}});
+    engine.play();
+    REQUIRE(eventually([&] {
+        const EngineStatus status = engine.status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+    return engine.status();
+}
+
+}  // namespace
+
+// planning/truehd-parity-hearth-player.md, H5: a TrueHD item is sent to a sink that lists "truehd" as
+// its access units, 24 to a chunk, which it decodes itself, and to a sink that does not as the PCM
+// the application decodes. The two play the same samples, because the codec is lossless and the
+// layout is the stream's own.
+TEST_CASE("engine: a TrueHD item reaches a group as access units for the sink that decodes them and as PCM "
+          "for the one that does not",
+          "[hearth][group][websocket][iclforge][truehd][coded]") {
+    namespace th = iclforge::hearth::testing;
+    constexpr std::uint64_t kItemFrames = 96000;  // 2 s: 2,400 units, 100 chunks of 24
+    const th::MadeStream made = th::make_stream(2, kItemFrames, 48000);
+    auto rig = make_truehd_group("truehd_coded", {
+        {"decodes", [](testsink::SinkOptions&) {}},
+        {"plays_pcm", [](testsink::SinkOptions& options) {
+             options.data_types = {iclforge::sendspin::player::DataType::kAc3,
+                                   iclforge::sendspin::player::DataType::kEac3};
+         }}});
+    QuietLog quiet;
+    static_cast<void>(quiet);
+
+    const EngineStatus finished = play_truehd_item(*rig, made);
+    INFO("output_reason: " << finished.output_reason << " / note: " << finished.note
+                           << " / error: " << finished.error);
+    REQUIRE(finished.history.size() == 1);
+    CHECK(finished.history.front().frames == finished.history.front().expected_frames);
+    CHECK(finished.history.front().frames == kItemFrames);
+
+    testsink::Sink& decodes = rig->sink("decodes");
+    testsink::Sink& plays_pcm = rig->sink("plays_pcm");
+    // (A sink's frames are the PCM chunks it was sent; what a sink decoded from chunks is in its WAV.)
+    const bool arrived = eventually([&] {
+        return decodes.totals().bursts >= 100 && plays_pcm.totals().frames >= kItemFrames;
+    });
+    INFO("decodes: " << decodes.totals().bursts << " bursts, " << decodes.totals().frames
+                     << " frames; plays_pcm: " << plays_pcm.totals().bursts << " bursts, "
+                     << plays_pcm.totals().frames << " frames");
+    REQUIRE(arrived);
+    // 2,400 units in chunks of 24: 100 chunks, and no PCM to the sink that decodes them.
+    CHECK(decodes.totals().bursts == 100);
+    CHECK(decodes.totals().frames == 0);
+    CHECK(plays_pcm.totals().bursts == 0);
+    CHECK(plays_pcm.totals().frames == kItemFrames);
+
+    // The page is told what each was sent, and why.
+    bool coded_line = false;
+    bool pcm_line = false;
+    for (const std::string& line : rig->sinks->take_log()) {
+        coded_line = coded_line || (line.find("decodes: Sending TrueHD as it is") != std::string::npos);
+        pcm_line = pcm_line || (line.find("plays_pcm: This sink does not decode TrueHD") != std::string::npos);
+    }
+    CHECK(coded_line);
+    CHECK(pcm_line);
+
+    // And the samples: what the sink decoded from the chunks is what the application decoded for the
+    // other, and both are the stream's own PCM.
+    const auto coded_wav = read_wav_holding(
+        only_file(rig->scratch / "decodes" / "out", "bursts-", ".wav").string(), kItemFrames);
+    const auto pcm_wav = read_wav_holding(
+        only_file(rig->scratch / "plays_pcm" / "out", "stream-", ".wav").string(), kItemFrames);
+    REQUIRE(coded_wav.has_value());
+    REQUIRE(pcm_wav.has_value());
+    REQUIRE(coded_wav->channels.size() == 2);
+    REQUIRE(pcm_wav->channels.size() == 2);
+    REQUIRE(coded_wav->frame_count() == kItemFrames);
+    REQUIRE(pcm_wav->frame_count() == kItemFrames);
+    double worst_between = 0.0;
+    double worst_from_source = 0.0;
+    double energy = 0.0;
+    for (std::size_t channel = 0; channel < 2; ++channel) {
+        for (std::size_t frame = 0; frame < kItemFrames; ++frame) {
+            const double coded = static_cast<double>(coded_wav->channels[channel][frame]);
+            const double pcm = static_cast<double>(pcm_wav->channels[channel][frame]);
+            const double source = static_cast<double>(made.pcm[(frame * 2) + channel]) / 8388608.0;
+            worst_between = std::max(worst_between, std::abs(coded - pcm));
+            worst_from_source = std::max(worst_from_source, std::abs(coded - source));
+            energy += source * source;
+        }
+    }
+    CHECK(worst_between < 2.0 / 32768.0);
+    CHECK(worst_from_source < 2.0 / 32768.0);
+    CHECK(energy > 1.0);
+}
+
+// A sink states how much coded data it takes (the support object's max_data_rate), and a stream whose
+// declared peak is more goes to it as PCM, with the reason on the page: refused by name before any
+// chunk is sent.
+TEST_CASE("engine: a TrueHD item over a sink's stated data rate is sent that sink as PCM, by name",
+          "[hearth][group][websocket][iclforge][truehd][coded]") {
+    namespace th = iclforge::hearth::testing;
+    constexpr std::uint64_t kItemFrames = 24000;
+    const th::MadeStream made = th::make_stream(2, kItemFrames, 48000);
+    auto rig = make_truehd_group("truehd_limit", {
+        {"limited", [](testsink::SinkOptions& options) { options.max_data_rate = 1000; }},
+        {"open", [](testsink::SinkOptions&) {}}});
+
+    const EngineStatus finished = play_truehd_item(*rig, made);
+    INFO("output_reason: " << finished.output_reason << " / error: " << finished.error);
+    REQUIRE(finished.history.size() == 1);
+    testsink::Sink& limited = rig->sink("limited");
+    testsink::Sink& open = rig->sink("open");
+    REQUIRE(eventually([&] { return limited.totals().frames >= kItemFrames && open.totals().bursts >= 25; }));
+    // The stream declares 18 Mbit/s as its peak (the encoder's default), more than 1,000 kbit/s.
+    CHECK(limited.totals().bursts == 0);
+    CHECK(limited.totals().frames == kItemFrames);
+    CHECK(open.totals().bursts == 25);
+    CHECK(open.totals().frames == 0);
+    bool said = false;
+    for (const std::string& line : rig->sinks->take_log()) {
+        said = said || (line.find("limited: This sink takes TrueHD up to 1000 kbit/s") != std::string::npos);
+    }
+    CHECK(said);
+}

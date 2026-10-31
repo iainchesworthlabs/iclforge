@@ -119,6 +119,10 @@ struct StreamNeeds {
     // ItemFacts::frame_rate: the frames a second the programme is coded at, which a sink's
     // stated limit (`max_frame_rate`) is compared with; 0 where it is not known, and not compared.
     double frame_rate = 0.0;
+    // ItemFacts::peak_kbps: the coded kbit/s the programme is declared to need at most, which a
+    // sink's stated `max_data_rate`, and the size of a chunk it is sent, are compared with; 0
+    // where it is not known and not compared.
+    std::uint32_t peak_kbps = 0;
     // Set for a karaoke AC-3 stream whose reproduction is wanted (ItemFacts::karaoke with a
     // reproduction other than "as coded"), which a sink must be told for itself or be sent PCM
     // that has it applied. Unset for every other stream, and for a karaoke one played as coded.
