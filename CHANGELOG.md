@@ -10,6 +10,20 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `hb_ch_assign_cycle`, a hand-built TrueHD stream whose `ch_assign` is a six-cycle (WP7).** Every matrix channel goes to another
+  output position and the assignment is not its own inverse, so the two readings of the field (entries 42 and 45 of `ERRATA.md`) decode
+  it to different channels; it has no matrix, shift or filter, so that the reading is the only thing it tests. It is a substream of two
+  channels and one of six, the shape FFmpeg's encoder writes for 5.1: FFmpeg 8.0.1's strict decode, `forge decode` and the reference give
+  the signal it was built from, and the reference with the field read the other way does not. The 26 streams before it are unchanged
+  byte for byte. `tools/references/truehd_writer.py` makes it.
+- **Added: `fuzz_iamf_parse` has seeds and a place in the run list (`BASE_TARGETS` of `tools/fuzz/run.sh`), so `fuzz-regress`, `fuzz-short` and
+  `fuzz-nightly` run it.** It was built and run by nothing, and would have started from an empty corpus. `iclforge-iamf-seed-tool` (in the
+  containers tests, a dependency of `iclforge-tests`) writes 17 seeds with the module's own writers: a 7.1.4 PCM programme, with and
+  without trimming and Temporal Delimiters; object programmes in the polar, 8-bit and 16-bit Cartesian codings, with a moving object and
+  a coupled pair; an object programme as an initialization segment and two movie fragments; and Opus, AAC-LC and FLAC ones with filler
+  packets; each as a raw OBU stream and as an ISO-BMFF file, 17 files of 0.3 to 10 KB. `tools/fuzz/generate-seeds.sh` runs the tool when
+  it is beside forge. `test_iamf_seeds.cpp` holds each seed to being read by its own framing's reader, decoded where it is `ipcm`, and
+  refused by the other's. `tools/checks/check_fuzz_harnesses.py` has no known gap left.
 - **Added: `scan_stream()` and 15 `iclforge_truehd_scanned_stream_*` functions give a TrueHD or MLP stream's length, timing and seek points.**
   A scan reads a stream in memory once and reports its sample rate, the units and their bytes, the samples (the padding the last unit's
   end-of-stream marker counts left out, so the figure is exact), the duration, the bytes it skipped and the units with a major sync, which are
