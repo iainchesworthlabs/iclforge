@@ -761,6 +761,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 stats.coded_last[c] = coded[ch];
                 stats.out_last[c] = out[ch];
             }
+            for (int ch = 0; ch < 12; ++ch) {
+                counters.object_first_out.push_back(ch < out_channels ? out[ch] : 0);
+            }
             ++stats.samples;
         }
     }

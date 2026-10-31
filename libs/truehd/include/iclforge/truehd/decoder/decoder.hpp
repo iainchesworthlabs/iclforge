@@ -200,6 +200,10 @@ struct DecoderCounters {
         std::array<std::int32_t, kMaxChannels> out_last{};
         std::uint64_t samples = 0;
     } object_stats;
+    // The output rows (after the matrices, before the output shift) of the same first intervals,
+    // 12 values a sample, for the lab to find the samples that differ in a stream whose objects
+    // are constant.
+    std::vector<std::int32_t> object_first_out;
     std::uint64_t check_failures =
         0;  // nibble, major sync CRC, restart CRC, parity and segment CRC together
     // Block headers that send matrices, and the matrices among them with lsb_bypass set (TH spec

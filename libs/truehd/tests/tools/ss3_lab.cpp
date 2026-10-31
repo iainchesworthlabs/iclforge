@@ -102,6 +102,53 @@ void print_subsets(const DecoderCounters& c) {
     }
 }
 
+// For a stream whose objects are constant (a synthetic control): the values each matrix channel's
+// output takes in the first intervals, and where it leaves its most common value. A channel that
+// is not constant in such a stream shows its errors here without the lossless check.
+void print_constant_deviations(const DecoderCounters& c) {
+    const std::size_t samples = c.object_first_out.size() / 12;
+    if (samples == 0) {
+        return;
+    }
+    std::printf("    output values of the first %zu samples by matrix channel (value x count; the "
+                "first samples that are not the most common value, as index:value):\n",
+                samples);
+    for (std::size_t ch = 0; ch < 12; ++ch) {
+        std::vector<std::pair<std::int32_t, std::size_t>> counts;
+        for (std::size_t i = 0; i < samples; ++i) {
+            const std::int32_t v = c.object_first_out[i * 12 + ch];
+            auto it = std::find_if(counts.begin(), counts.end(),
+                                   [v](const auto& e) { return e.first == v; });
+            if (it == counts.end()) {
+                counts.emplace_back(v, 1);
+            } else {
+                ++it->second;
+            }
+        }
+        std::sort(counts.begin(), counts.end(),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+        std::printf("      ch %2zu:", ch);
+        for (std::size_t k = 0; k < counts.size() && k < 5; ++k) {
+            std::printf(" %d x%zu", counts[k].first, counts[k].second);
+        }
+        if (counts.size() > 5) {
+            std::printf(" (%zu distinct)", counts.size());
+        }
+        if (counts.size() > 1 && counts.front().second * 10 >= samples * 9) {
+            std::printf("  off:");
+            std::size_t shown = 0;
+            for (std::size_t i = 0; i < samples && shown < 16; ++i) {
+                const std::int32_t v = c.object_first_out[i * 12 + ch];
+                if (v != counts.front().first) {
+                    std::printf(" %zu:%d", i, v);
+                    ++shown;
+                }
+            }
+        }
+        std::printf("\n");
+    }
+}
+
 void run(const std::vector<std::byte>& stream, const char* name, const DecoderLab& lab,
          bool stats = false, bool brief = false) {
     DecoderConfig config;
@@ -182,6 +229,7 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
             std::printf("%c", updates > 9 ? '+' : static_cast<char>('0' + updates));
         }
         std::printf("\n");
+        print_constant_deviations(c);
         std::printf("    quantiser steps by matrix channel at the first check:");
         for (int ch = 0; ch < 12; ++ch) {
             std::printf(" %u", c.object_quant_step[static_cast<std::size_t>(ch)]);
