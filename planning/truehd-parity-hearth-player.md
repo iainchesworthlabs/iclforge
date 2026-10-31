@@ -6,6 +6,12 @@
     in Hearth, what TrueHD would do, and what is missing. The ESP32 firmware is another audit's.
     Round 2 is the owner's to decide after reading this page.
 
+!!! note "Status as of 2026-10-31: H4 and the streaming demuxer are built; H5 is not"
+    H0 to H3 are built (2026-10-30). The streaming demuxer for Matroska and MP4, the per-output choice of a remux's track
+    (engine only), and H4 (a group sent PCM and Opus at one rate, with the audio converted for a sink that does not list the
+    item's) are built on `feature/truehd-hearth-network` and checked by engine and loopback tests on Windows with Qt 6.12:
+    no board, receiver or Shield was used. Questions 13 to 17 below are new. H5 and the ESP32 phases have not been started.
+
 "DD+" here is E-AC-3, with AC-3 and the JOC object layer riding with it. "TH spec" is the owner's
 *Dolby TrueHD (MLP) Reference Specification*, which is not in the repository
 ([truehd.md](truehd.md) says what it is).
@@ -515,6 +521,32 @@ Each has a recommendation, and none is settled here.
     repository has no HDMI carriage for it. *Recommend:* yes.
 12. **Android.** May a session on a Shield open an 8-channel `ENCODING_IEC61937` track and list a
     `truehd` data type? *Recommend:* yes, after H5 or H6.
+
+13. **Transport Streams over 1 GiB.** The Matroska and MP4 readers say where a frame lies in the file, so a film's
+    track is read in windows; the MPEG-TS reader rebuilds a PES packet from many transport packets and says
+    nothing of where they lay, so a transport stream is read whole and one over 1 GiB is refused by name. *Recommend:*
+    leave it until a remux in `.ts` or `.m2ts` is wanted, since Blu-ray remuxes are Matroska; then give
+    `mpegts::Reader` a callback with each payload's packet runs, which `ExtentMap` can already hold.
+14. **Where the track preference is set.** `DecoderSettings::track` is automatic (the AC-3, E-AC-3 or AC-4 track for an output
+    whose decision for it is a bitstream, the TrueHD everywhere else), best, or compressed; the window has no control for it.
+    The speaker setup is one setup, not one per output (`settings_model.hpp`), so a stored value per output would be
+    the first of its kind. *Recommend:* a three-way choice on the Decoder tab beside the presentation, stored with the other
+    decoder settings, and automatic as the default until H6 sends TrueHD to a receiver as it is; then automatic is
+    retired for a receiver that takes MAT.
+15. **PCM at another rate beside the stream as it is.** A group has one timeline in the stream's frames when any member is
+    sent the coded stream, so PCM members that need another rate are held back there. The case is rare (AC-3 and E-AC-3 are
+    32, 44.1 and 48 kHz; TrueHD's high rates have no coded form on the network until H5) and becomes common with H5 for a
+    96 kHz item with one capable receiver and some boards. *Recommend:* decide it with H5: either the group's PCM follows the
+    coded timeline by frame count at the converted rate, or the boards are sent nothing for that item.
+16. **The cost of the map of a track.** The map keeps 24 bytes for each run of the track in the file, and a run is a frame
+    when other tracks lie between the frames. A remux with one TrueHD access unit to a block is some 8.6 million blocks in two
+    hours, 200 MB; one with a block of 24 units is 8 MB. This session has no remux of a disc to count. *Recommend:* the
+    owner opens one in Hearth and reports the memory; if it is large, keep one entry for each 64 KiB of the track and parse
+    from the nearest cluster, which is a change inside `ExtentMap`.
+17. **The order of H5 and H6.** Branch `feature/truehd-hearth-endpoints` adds `BitstreamFormat::kMat` and edits
+    `data_type_of()` and the output decision, which H5's data type touches. *Recommend:* merge it first and start H5 on top.
+    H5 and the ESP32 phases 0 to 4 also need board time (P4, S3, C6), which was not asked for because no phase that
+    needed one was reached.
 
 The questions that block the most work are 1 and 2 (H5, H7), 5 (all of H6 and so H7), 7 (part of
 H4) and 8 (the last part of H0).

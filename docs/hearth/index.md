@@ -31,15 +31,21 @@ added or dropped. The queue marks a file it cannot read as not playable, with th
 reaches it, and skips it or stops there as Settings > Playback > **An item fails** says.
 
 A file with a TrueHD track first and an AC-3 or E-AC-3 track after it, as a Blu-ray remux has, plays the
-TrueHD track: it is the first track Hearth can play. The AC-3 or E-AC-3 track is listed in the Media page as
-another track of the file, and Hearth has no control yet to play it instead.
+TrueHD track where the output decodes here, because it is the first track Hearth can play. Hearth cannot send TrueHD on
+as it is yet, so where the output decision for the AC-3 or E-AC-3 track is a bitstream to a receiver, that track plays
+instead and the receiver is sent it as it is. The decoder setting `track` (in the engine's `DecoderSettings`) says which:
+automatic as described, best (always the TrueHD) or compressed (always the AC-3, E-AC-3 or AC-4 track). The window has no
+control for it yet. The other track is listed in the Media page as another track of the file.
 
 TrueHD and MLP are decoded to the stream's own channels and rate (44.1 to 192 kHz, up to 8 channels of the
 2, 6 and 8 channel presentations) and placed on the output layout like any other bed: a layout that has a
 channel's speaker plays it exactly, and a channel the layout has no speaker for is panned between the speakers it has.
 A bare `.thd` or `.mlp` file is not read into memory; it is indexed once when it is opened, which reads the
-whole file, and then read as it plays. A TrueHD track in a container is demuxed from a copy of the whole file
-in memory, so a film's remux of tens of gigabytes is not something to open yet. A damaged unit plays as
+whole file, and then read as it plays. So is a TrueHD track in a Matroska or MP4 file: the container is read once, a
+window at a time, to find where the track's frames lie, and the track is then read from there as it plays, so a
+film's remux of tens of gigabytes does not need the memory of the file or of the track. A Transport Stream is still
+read whole, and one over 1 GiB is refused by name. Opening a film reads the file once from front to back, which takes as long as
+the disk takes to read it. A damaged unit plays as
 silence until the stream's next restart header; the This frame card shows the counts, and the diagnostics file adds them to the line of each item played.
 
 A TrueHD decoder can only join a stream at a unit that carries a major sync, and the encoder decides how

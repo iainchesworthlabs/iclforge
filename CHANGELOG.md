@@ -10,6 +10,21 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: Hearth reads a Matroska or MP4 file's TrueHD track where it lies, a window at a time.** A film remux's lossless track (about
+  4.5 GB for two hours) was copied into memory beside the file; now `iclforge::apps::index_container_track` finds where its frames lie
+  (`libs/containers`' Matroska `Reader::push_at` and MP4 `demux_seekable_at` say at what offset) and `ExtentSource` reads the track back by
+  offset, so a bare `.thd` file and a container's track play the same way. A Transport Stream is still read whole, and one over 1 GiB is
+  refused by name. A test reads a generated 160 MiB file through a source that refuses reads over 10 MiB.
+- **Changed: a remux with TrueHD first and AC-3 or E-AC-3 after it is played as the receiver can take it.** Hearth decodes the TrueHD but
+  cannot send it on as it is, so a receiver that used to be sent the compressed track got PCM. `DecoderSettings::track` (automatic, best,
+  compressed) says which plays; automatic gives the compressed track to an output whose decision for it is a bitstream and the TrueHD
+  to every other. The window has no control for it yet.
+- **Added: Hearth sends a network group PCM at one rate and converts what a sink does not list.** A 96 kHz item reached a board that lists 48
+  kHz as nothing. The planner now converts to the rate each sink lists nearest in the stream's family (96 to 48 kHz, 88.2 to 44.1), settles
+  one rate for the group, holds back a sink that does not list it with the reason, and holds PCM at another rate back where the group also
+  carries the stream as it is. The conversion is `iclforge::dsp::StreamResampler`, the AC-4 sample rate converter's filter run on blocks.
+  Opus stays at 48 kHz and takes a stream at another rate only where the sink lists no PCM at it. Loopback test only: no board has been sent
+  a converted stream.
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was
