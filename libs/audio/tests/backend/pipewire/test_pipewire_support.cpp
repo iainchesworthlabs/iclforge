@@ -56,33 +56,6 @@ TEST_CASE("E-AC-3 runs the link four times as fast as its content, same as ALSA"
     CHECK(carrier_rate(BitstreamFormat::kEac3, 32000) == 128000);
 }
 
-TEST_CASE("TrueHD is negotiated as SPA's TRUEHD codec, on a link at four times its content rate") {
-    // The link's eight channels are not in the format: the codec implies them
-    // (audio::carrier_channels()), and the rate is the link's, the owner's
-    // reading of the MAT carrier (libs/containers/ERRATA.md, M7).
-    REQUIRE(iec958_codec_for(BitstreamFormat::kTrueHd).has_value());
-    CHECK(*iec958_codec_for(BitstreamFormat::kTrueHd) == SPA_AUDIO_IEC958_CODEC_TRUEHD);
-    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 48000) == 192000);
-    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 44100) == 176400);
-    // The link does not follow the content rate above 48 kHz.
-    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 96000) == 192000);
-    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 88200) == 176400);
-    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 32000) == 0);
-    // The three codecs it can be told from stay what they were.
-    CHECK(*iec958_codec_for(BitstreamFormat::kAc3) == SPA_AUDIO_IEC958_CODEC_AC3);
-    CHECK(*iec958_codec_for(BitstreamFormat::kEac3) == SPA_AUDIO_IEC958_CODEC_EAC3);
-    CHECK_FALSE(iec958_codec_for(BitstreamFormat::kAc4).has_value());
-}
-
-TEST_CASE("a sink's TrueHD entry is found by its SPA name, and not inside another") {
-    // As WirePlumber writes it from a receiver's ELD (docs/crucible/design/promotion.md).
-    const std::string eld = "[ PCM DTS AC3 EAC3 TrueHD DTS-HD ]";
-    CHECK(codec_listed(eld, "TrueHD"));
-    CHECK(codec_listed(R"(["PCM","TrueHD"])", "TrueHD"));
-    CHECK_FALSE(codec_listed("[ PCM AC3 EAC3 ]", "TrueHD"));
-    CHECK_FALSE(codec_listed("[ PCM TrueHDX ]", "TrueHD"));
-}
-
 TEST_CASE("an iec958.codecs list is read name by name") {
     // WirePlumber writes the property from the sink's ELD, in SPA's codec
     // names, and serialises it either with quotes or without.
@@ -143,6 +116,30 @@ TEST_CASE("the codec sent over IEC958 matches the bitstream format asked for") {
     // The link rates are the same arithmetic as ALSA's all the same.
     CHECK(carrier_rate(BitstreamFormat::kAc4, 48000) == 48000);
     CHECK(carrier_rate(BitstreamFormat::kAc4Hbr4, 48000) == 192000);
+}
+
+TEST_CASE("TrueHD is negotiated as SPA's TRUEHD on the 192 kHz or 176.4 kHz link") {
+    CHECK(iec958_codec_for(BitstreamFormat::kMat) == SPA_AUDIO_IEC958_CODEC_TRUEHD);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 48000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 96000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 44100) == 176400);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 32000) == 0);
+}
+
+TEST_CASE("a codec list enables TrueHD in either of SPA's spellings, and nothing else does") {
+    using iclforge::pipewire::codec_enabled;
+    // The list a Raspberry Pi and an Atmos receiver came up with, unprompted.
+    const std::string listed = "[ PCM DTS AC3 EAC3 TrueHD DTS-HD ]";
+    CHECK(codec_enabled(listed, BitstreamFormat::kMat));
+    CHECK(codec_enabled(listed, BitstreamFormat::kAc3));
+    CHECK(codec_enabled(listed, BitstreamFormat::kEac3));
+    CHECK(codec_enabled(R"(["PCM","TRUEHD"])", BitstreamFormat::kMat));
+    // A list without it does not, and neither AC3 nor DTS-HD stands in for it.
+    CHECK_FALSE(codec_enabled("[ PCM AC3 EAC3 DTS-HD ]", BitstreamFormat::kMat));
+    CHECK_FALSE(codec_enabled("[ PCM TrueHD ]", BitstreamFormat::kEac3));
+    CHECK_FALSE(codec_enabled("", BitstreamFormat::kMat));
+    // AC-4 has no codec to list.
+    CHECK_FALSE(codec_enabled(listed, BitstreamFormat::kAc4));
 }
 
 TEST_CASE("a node is classified as a source, a sink, or neither") {

@@ -366,7 +366,8 @@ sp::DataType data_type_of(audio::BitstreamFormat format) {
         case audio::BitstreamFormat::kAc4:
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
-        case audio::BitstreamFormat::kTrueHd:  // Sendspin has no data type for it; Hearth sends none
+        // TrueHD has no Sendspin data type yet (H5): a group is never given a MAT stream.
+        case audio::BitstreamFormat::kMat:
             break;
     }
     return sp::DataType::kAc4;

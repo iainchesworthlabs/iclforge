@@ -29,6 +29,7 @@
 #include "iclforge/audio/ring_buffer.hpp"
 #include "iclforge/audio/speakers.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iec61937_format.hpp"
 #include "windows_support.hpp"
 
 namespace iclforge::audio {
@@ -44,12 +45,10 @@ using windows_audio::kIidMmDeviceEnumerator;
 using windows_audio::stream_gone;
 using windows_audio::kCarrierBits;
 using windows_audio::kCarrierChannels;
-using windows_audio::kSpeakerStereo;
-using windows_audio::kSubtypePcm;
 using windows_audio::make_ac3_format;
 using windows_audio::make_eac3_format;
-using windows_audio::make_truehd_format;
-using windows_audio::WaveFormatIec61937;
+using windows_audio::make_format;
+using windows_audio::make_mat_format;
 
 // PKEY_Device_FriendlyName, spelled out for the same reason as in the capture
 // backend: functiondiscoverykeys_devpkey.h needs a fragile include ordering.
@@ -62,17 +61,11 @@ constexpr PROPERTYKEY kPkeyDeviceFriendlyName = {
 constexpr PROPERTYKEY kPkeyDeviceDescription = {
     {0xa45c254e, 0xdf1c, 0x4efd, {0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0}}, 2};
 
-// AC-3, E-AC-3 or TrueHD: start() refuses AC-4 before it gets here, there being
-// no subformat to name it by (see passthrough.hpp's header comment), and TrueHD
-// at a content rate with no MAT link.
-WaveFormatIec61937 make_format(BitstreamFormat format, std::uint32_t sample_rate,
-                               DWORD encoded_channels) {
-    if (format == BitstreamFormat::kTrueHd) {
-        return make_truehd_format(link_rate(format, sample_rate), sample_rate);
-    }
-    return format == BitstreamFormat::kEac3 ? make_eac3_format(sample_rate, encoded_channels)
-                                            : make_ac3_format(sample_rate, encoded_channels);
-}
+// KSDATAFORMAT_SUBTYPE_PCM: {00000001-0000-0010-8000-00aa00389b71}, the
+// WAVE_FORMAT_PCM tag in the same GUID family. Needed for the rate probes,
+// which ask about ordinary PCM rather than a bitstream.
+constexpr GUID kSubtypePcm = {
+    0x00000001, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 
 std::string to_utf8(const wchar_t* wide) {
     if (wide == nullptr) {
@@ -174,6 +167,10 @@ std::vector<std::uint32_t> probe_sample_rates(IAudioClient* client, WORD channel
 
 }  // namespace
 
+PassthroughBackend passthrough_backend() {
+    return PassthroughBackend::kWasapi;
+}
+
 std::string_view describe(PassthroughError error) {
     switch (error) {
         case PassthroughError::kNoBackend: return "no passthrough backend on this platform";
@@ -227,9 +224,9 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
 
     auto ac3_format = make_ac3_format(sample_rate, 6);
     auto eac3_format = make_eac3_format(sample_rate, 6);
-    // Nothing to ask at a content rate that has no MAT link.
-    const std::uint32_t truehd_link = link_rate(BitstreamFormat::kTrueHd, sample_rate);
-    auto truehd_format = make_truehd_format(truehd_link, sample_rate);
+    // The eight-channel MAT link; a content rate it has no link for is not asked about.
+    auto mat_format = make_mat_format(sample_rate);
+    const bool mat_has_link = mat_format.FormatExt.Format.nSamplesPerSec != 0;
     std::vector<RenderDeviceInfo> devices;
     for (UINT i = 0; i < count; ++i) {
         ComPtr<IMMDevice> device;
@@ -298,10 +295,12 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
             info.supports_eac3_passthrough =
                 client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
                                           &eac3_format.FormatExt.Format, nullptr) == S_OK;
-            info.supports_truehd_passthrough =
-                truehd_link != 0 &&
-                client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
-                                          &truehd_format.FormatExt.Format, nullptr) == S_OK;
+            // The same question for the eight-channel MLP subtype. Only an answer to the open:
+            // whether a receiver then names the stream TrueHD is not something WASAPI reports.
+            info.supports_mat_passthrough =
+                mat_has_link && client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
+                                                          &mat_format.FormatExt.Format,
+                                                          nullptr) == S_OK;
 
             // Control probe with an ordinary exclusive-mode PCM format, so a
             // "no" above can be attributed to the device rather than to
@@ -474,10 +473,12 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (is_ac4(format_kind) || link_rate(format_kind, sample_rate) == 0) {
-        // AC-4 has no subformat to name it by, and a TrueHD content rate outside both
-        // families has no MAT link.
+    if (is_ac4(format_kind)) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
+    }
+    if (link_rate(format_kind, sample_rate) == 0) {
+        // MAT at a content rate it has no link for.
+        return std::unexpected(PassthroughError::kFormatRejected);
     }
     // A render thread that ended because its device went away still holds
     // its client until it is joined, and an exclusive hold can refuse the
@@ -508,7 +509,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         }
     }
 
-    auto format = make_format(format_kind, sample_rate, 6);
+    auto format = make_format(format_kind, sample_rate, is_mat(format_kind) ? 8 : 6);
     const std::size_t frame_bytes = format.FormatExt.Format.nBlockAlign;
 
     // Room for roughly a second of bursts, so a caller encoding slightly
@@ -516,7 +517,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     impl_->burst_bytes = max_burst_bytes(format_kind);
     impl_->queue = std::make_unique<ByteRingBuffer>(impl_->burst_bytes * 40);
     impl_->frame_bytes = frame_bytes;
-    impl_->ratio = link_ratio(format_kind, sample_rate);
+    impl_->ratio = carrier_ratio(format_kind, sample_rate);
     impl_->submitted.store(0, std::memory_order_relaxed);
     impl_->rendered_bytes.store(0, std::memory_order_relaxed);
     impl_->underruns.store(0, std::memory_order_relaxed);

@@ -13,7 +13,6 @@
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/containers/iec61937/mat.hpp"
-#include "iclforge/containers/iec61937/mat.hpp"
 
 // Exclusive-mode IEC 61937 passthrough: hand already-packed AC-3, E-AC-3 or
 // AC-4 bursts to an S/PDIF or HDMI endpoint so the AV receiver on the other
@@ -31,6 +30,14 @@
 // refuse every AC-4 format with kUnsupportedFormat. AC-4 HBR16 needs the
 // eight-channel high-bit-rate link, which no backend here opens, so ALSA and
 // Android refuse it the same way.
+//
+// TrueHD travels as MAT (kMat), IEC 61937 data type 22, on an eight-channel link:
+// 8 channels of 16 bits at 192 kHz for content in the 48 kHz family and 176.4 kHz
+// for the 44.1 kHz family, 3,840 link frames to a burst (link_rate() and
+// carrier_channels() have the figures). That carrier is arithmetic on the burst
+// size and an assumption (libs/containers/ERRATA.md, question 7), and no backend
+// has been run against a receiver; apps/hearth/engine/src/mat_status.hpp keeps
+// the list of what has and has not been run.
 //
 // Exclusive mode is mandatory. In shared mode the Windows audio engine would
 // treat the bursts as ordinary PCM and mix, resample or volume-scale them;
@@ -58,21 +65,38 @@ enum class PassthroughError : std::uint8_t {
 
 [[nodiscard]] std::string_view describe(PassthroughError error);
 
+// Which platform audio API this build's PassthroughSink drives: the one fact about the build that
+// says what has been tried with it, because what has been run against a receiver is a property of
+// an API (apps/hearth/engine/src/mat_status.hpp) and not of a device. kNone is a build with no
+// passthrough backend, whose sink refuses every format.
+enum class PassthroughBackend : std::uint8_t { kNone, kAlsa, kPipeWire, kWasapi, kCoreAudio, kAndroid };
+
+[[nodiscard]] PassthroughBackend passthrough_backend();
+
+// "ALSA", "PipeWire", "WASAPI", "Core Audio", "Android" or "no backend".
+[[nodiscard]] constexpr std::string_view backend_name(PassthroughBackend backend) {
+    switch (backend) {
+        case PassthroughBackend::kAlsa:
+            return "ALSA";
+        case PassthroughBackend::kPipeWire:
+            return "PipeWire";
+        case PassthroughBackend::kWasapi:
+            return "WASAPI";
+        case PassthroughBackend::kCoreAudio:
+            return "Core Audio";
+        case PassthroughBackend::kAndroid:
+            return "Android";
+        case PassthroughBackend::kNone:
+            break;
+    }
+    return "no backend";
+}
+
 // Which IEC 61937 encapsulation to bitstream. AC-3 and E-AC-3 need different
 // WASAPI subformats and different carrier (link) sample rates - Dolby Digital
 // Plus runs the carrier at 4x the content rate (Microsoft's "Representing
 // Formats for IEC 61937 Transmissions") - and different burst sizes
 // (iclforge::containers::iec61937::kBurstBytes vs kEac3BurstBytes).
-//
-// kTrueHd is TrueHD in MAT (IEC 61937 data type 22), the one format whose
-// carrier is not two channels: eight 16-bit channels on a link of 192 kHz for the
-// 48 kHz family and 176.4 kHz for the 44.1 family (link_rate(); four times the
-// content rate at 44.1 and 48 kHz), 20 ms to a burst at the 48 kHz family and 21.8
-// at the 44.1 (carrier_channels()). The owner confirmed that reading on
-// 2026-10-31 (libs/containers/ERRATA.md, M7) and Microsoft's "Representing Formats
-// for IEC 61937 Transmissions" gives the same link; no receiver has yet been
-// played one, and only the PipeWire and WASAPI backends send it. Every other backend
-// refuses it with kUnsupportedFormat, whatever the device.
 //
 // The AC-4 formats are its links rather than its data types: kAc4 carries
 // IEC 61937-14's AC-4 and AC-4 LD data-bursts on a link at the content rate,
@@ -80,14 +104,17 @@ enum class PassthroughError : std::uint8_t {
 // HBR16 ones at sixteen times it. An AC-4 burst is as long as its own
 // repetition period, which follows the stream's frame rate
 // (iclforge::containers::iec61937::Ac4BurstPacker).
-enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr16, kTrueHd };
+//
+// kMat is TrueHD in its MAT 1.0 frame (iclforge::containers::iec61937::MatPacker): a burst of
+// 61,440 bytes whatever the stream holds, one per 24 access units. MLP has no carriage here.
+enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr16, kMat };
 
 [[nodiscard]] constexpr bool is_ac4(BitstreamFormat format) {
     return format == BitstreamFormat::kAc4 || format == BitstreamFormat::kAc4Hbr4 ||
            format == BitstreamFormat::kAc4Hbr16;
 }
 
-// "AC-3", "E-AC-3", "AC-4", "AC-4 HBR4", "AC-4 HBR16" or "TrueHD".
+// "AC-3", "E-AC-3", "AC-4", "AC-4 HBR4", "AC-4 HBR16" or "TrueHD (MAT)".
 [[nodiscard]] constexpr std::string_view format_name(BitstreamFormat format) {
     switch (format) {
         case BitstreamFormat::kAc3:
@@ -100,20 +127,26 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
             return "AC-4 HBR4";
         case BitstreamFormat::kAc4Hbr16:
             return "AC-4 HBR16";
-        case BitstreamFormat::kTrueHd:
-            return "TrueHD";
+        case BitstreamFormat::kMat:
+            return "TrueHD (MAT)";
     }
     return "unknown";
 }
 
-// Link frames per content frame: 4 for E-AC-3, AC-4 HBR4 and TrueHD, whose
-// links run at four times the content rate, 16 for AC-4 HBR16, and 1 for AC-3
-// and AC-4.
+[[nodiscard]] constexpr bool is_mat(BitstreamFormat format) {
+    return format == BitstreamFormat::kMat;
+}
+
+// Link frames per content frame: 4 for E-AC-3 and AC-4 HBR4, whose links run
+// at four times the content rate, 16 for AC-4 HBR16, and 1 for AC-3 and AC-4.
+// MAT's link rate does not follow the content rate (see link_rate()), so its
+// ratio here is the one of content at 48 or 44.1 kHz; the two-argument overload
+// has the others.
 [[nodiscard]] constexpr std::uint32_t carrier_ratio(BitstreamFormat format) {
     switch (format) {
         case BitstreamFormat::kEac3:
         case BitstreamFormat::kAc4Hbr4:
-        case BitstreamFormat::kTrueHd:
+        case BitstreamFormat::kMat:
             return 4U;
         case BitstreamFormat::kAc4Hbr16:
             return 16U;
@@ -124,14 +157,14 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
     return 1U;
 }
 
-// The rate of the link `format` runs on for content at `content_rate`: the content rate
-// times carrier_ratio() for every format but TrueHD. MAT's link is 192 kHz whatever the
-// 48 kHz family's content rate (48, 96 or 192 kHz) and 176.4 kHz for the 44.1 family
-// (44.1, 88.2 or 176.4 kHz), which is what Microsoft's "Representing Formats for IEC 61937
-// Transmissions" says of TrueHD and the owner's reading of the carrier agrees with. 0 for a
-// TrueHD content rate that is in neither family, which has no MAT link to open.
-[[nodiscard]] constexpr std::uint32_t link_rate(BitstreamFormat format, std::uint32_t content_rate) {
-    if (format != BitstreamFormat::kTrueHd) {
+// The rate the link itself runs at to carry `content_rate` of `format`, in Hz, and 0 where the
+// format has no link at that content rate. For every format but MAT it is the content rate times
+// carrier_ratio(). A MAT burst always covers 20 ms (24 access units of 40, 80 or 160 samples at 48,
+// 96 or 192 kHz), so its link is 192,000 Hz for the 48 kHz family at any of those rates and
+// 176,400 Hz for the 44.1 kHz family; no other content rate has one.
+[[nodiscard]] constexpr std::uint32_t link_rate(BitstreamFormat format,
+                                                   std::uint32_t content_rate) {
+    if (format != BitstreamFormat::kMat) {
         return content_rate * carrier_ratio(format);
     }
     switch (content_rate) {
@@ -149,28 +182,23 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
     return 0U;
 }
 
-// Link frames to a content frame at `content_rate`: carrier_ratio() but for TrueHD, whose
-// link does not follow the content rate above 48 kHz (4 at 48 kHz, 2 at 96 kHz, 1 at 192 kHz).
-// 0 when link_rate() is.
-[[nodiscard]] constexpr std::uint32_t link_ratio(BitstreamFormat format, std::uint32_t content_rate) {
-    if (format != BitstreamFormat::kTrueHd) {
-        return carrier_ratio(format);
-    }
+// Link frames per content frame at this content rate: link_rate() over it, and 0 where there
+// is no link. Equal to carrier_ratio(format) for every format but MAT, whose ratio is 4, 2 or 1.
+[[nodiscard]] constexpr std::uint32_t carrier_ratio(BitstreamFormat format,
+                                                    std::uint32_t content_rate) {
     const std::uint32_t link = link_rate(format, content_rate);
-    return link == 0U ? 0U : link / content_rate;
+    return content_rate == 0U || link == 0U ? 0U : link / content_rate;
 }
 
-// Channels in a link frame: eight for TrueHD's MAT carrier, two for every
-// other format here (AC-4 HBR16's eight-channel link is one no backend opens).
-[[nodiscard]] constexpr std::uint32_t carrier_channels(BitstreamFormat format) {
-    return format == BitstreamFormat::kTrueHd ? 8U : 2U;
+// Channels of the link: 8 for the formats that ride the eight-channel link (MAT, and AC-4 HBR16,
+// which no backend opens) and 2 for the others.
+[[nodiscard]] constexpr std::uint16_t carrier_channels(BitstreamFormat format) {
+    return format == BitstreamFormat::kMat || format == BitstreamFormat::kAc4Hbr16 ? 8U : 2U;
 }
 
-// Bytes in a link frame: the channels at 16 bits each, 4 for a two-channel
-// carrier and 16 for TrueHD's, so a burst's length in bytes is that many times
-// its length in link frames.
+// Bytes of one link frame: every link here carries 16-bit samples.
 [[nodiscard]] constexpr std::size_t carrier_frame_bytes(BitstreamFormat format) {
-    return std::size_t{carrier_channels(format)} * 2U;
+    return static_cast<std::size_t>(carrier_channels(format)) * 2U;
 }
 
 // The longest burst `format` has, in bytes: every AC-3 and E-AC-3 burst is
@@ -191,7 +219,7 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
         case BitstreamFormat::kAc4Hbr16:
             return containers::iec61937::repetition_period(
                 containers::iec61937::BurstDataType::kAc4Hbr16);
-        case BitstreamFormat::kTrueHd:
+        case BitstreamFormat::kMat:
             return containers::iec61937::kMatBurstBytes;
     }
     return containers::iec61937::kBurstBytes;
@@ -219,17 +247,17 @@ struct RenderDeviceInfo {
     // there is no separate passthrough format for Atmos, since the object
     // container is ordinary Annex E aux data).
     bool supports_eac3_passthrough = false;
-    // As above, for TrueHD in MAT (BitstreamFormat::kTrueHd): the sink lists
-    // TrueHD among its codecs and took the eight-channel link when asked. Set
-    // by the PipeWire backend alone; every other backend leaves it false,
-    // because none of them sends the format.
-    bool supports_truehd_passthrough = false;
     // As above, for AC-4 on a link at the content rate (BitstreamFormat::
     // kAc4). Set only where the platform can send AC-4 at all (the header
     // comment says which), and there it says what the AC-3 answer says: the
     // endpoint takes an IEC 61937 link at that rate. Whether the receiver
     // decodes AC-4 is not something any of these platforms reports.
     bool supports_ac4_passthrough = false;
+    // The endpoint opened the eight-channel MAT link (BitstreamFormat::kMat) at the content rate
+    // passed to enumerate_render_devices(). Set only by a backend that can open that link, and
+    // only a statement about the open: whether a receiver names what arrives TrueHD is something
+    // no backend learns, and none has been run against one (apps/hearth/engine/src/mat_status.hpp).
+    bool supports_mat_passthrough = false;
     // Whether plain 16-bit stereo PCM is accepted in exclusive mode. This
     // separates the two reasons passthrough can be unavailable: a device that
     // refuses even PCM has exclusive mode switched off (or is in use), while

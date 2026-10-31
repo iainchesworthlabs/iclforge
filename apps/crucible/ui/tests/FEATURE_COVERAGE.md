@@ -243,7 +243,7 @@ belongs to one platform skips on the others.
    into the Qt Quick test binary.
 
 6. **The TrueHD 5.1 mode and the endpoint table's TRUEHD column** (row 95).
-   The real probe answers true for TrueHD only for a PipeWire sink that lists it or a Windows endpoint that accepts it, and the
+   The real probe answers true for TrueHD only where the audio library opens its MAT link (a PipeWire sink that lists it, a Windows endpoint that accepts it, an ALSA device that is eight wide), and the
    suites' endpoints (a scripted machine, or a CI runner with no such sink) never do, so
    the mode is never chosen. The
    pin entry, the tray entry and the pin's round trip are covered; the page in

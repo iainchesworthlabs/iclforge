@@ -148,7 +148,7 @@ int open_source(const std::string& path, Source& source) {
     // TrueHD first: its major sync is not found in an AC-3 stream, and an AC-3 stream's syncword
     // is not found in a TrueHD one at a unit boundary.
     if (const auto info = iclforge::truehd::probe_stream(source.data)) {
-        source.format = BitstreamFormat::kTrueHd;
+        source.format = BitstreamFormat::kMat;
         source.sample_rate = info->sample_rate;
         source.units = info->access_units;
         source.pass = &pass_truehd;
@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
                     d.is_default ? "*" : " ", d.id.c_str(),
                     d.supports_ac3_passthrough ? "YES" : "no",
                     d.supports_eac3_passthrough ? "YES" : "no",
-                    d.supports_truehd_passthrough ? "YES" : "no",
+                    d.supports_mat_passthrough ? "YES" : "no",
                     d.supports_exclusive_pcm ? "yes" : "no", d.name.c_str());
     }
     if (argc < 3) {

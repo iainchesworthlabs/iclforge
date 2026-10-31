@@ -10,16 +10,7 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
-- **Added: `BitstreamFormat::kTrueHd`: the PipeWire and WASAPI backends send TrueHD in MAT on an eight-channel carrier; the others refuse it. No receiver has been played one.**
-  The carrier (eight 16-bit channels at four times the content rate, 176.4 kHz for the 44.1 family, 3,840 link frames and 20 ms (21.8 for the 44.1 family) to a
-  61,440-byte burst) is the owner's reading, confirmed on 2026-10-31. PipeWire negotiates SPA's `TRUEHD` codec at the link rate, probes a
-  sink for it only when its `iec958.codecs` lists TrueHD, fills buffers in whole 16-byte link frames, and keeps `position()` in content
-  frames. WASAPI asks `IsFormatSupported` for `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP` (MAT 1.0) with the values of Microsoft's own
-  example, which the tests hold the format builders to. The link is 192 kHz for 48, 96 and 192 kHz content and 176.4 kHz for the 44.1
-  family (`link_rate()`), so it is not four times the content rate above 48 kHz. `carrier_channels()`, `carrier_frame_bytes()` and `RenderDeviceInfo::supports_truehd_passthrough` are new; ALSA, Android
-  and macOS refuse the format with `kUnsupportedFormat` before a device is looked up, and so does every backend at a content rate with no MAT link. Not shown: that a sink accepts the link or
-  that a receiver locks on it, and the rate PipeWire is told is the E-AC-3 convention extended.
-- **Added: Crucible has a pinned TrueHD 5.1 mode, tested bit for bit over scripted devices; only a PipeWire sink that lists TrueHD, or a Windows endpoint that accepts it, is offered it.**
+- **Added: Crucible has a pinned TrueHD 5.1 mode, tested bit for bit over scripted devices; it is offered where the audio library's MAT link opens.**
   `OutputMode::kTrueHd51` takes the encoder's 5.1 bed, as the DD 5.1 mode does, rounds it to 24-bit integers (to nearest, ties to even,
   clamped), encodes it with `iclforge::truehd` and packs the access units 24 to a MAT burst for the burst sink; a fresh encoder starts
   with the mode, so the first burst after a switch opens with a major sync. It is chosen only by pinning (`crucible-run --pin truehd`, the
@@ -28,8 +19,10 @@ See [README.md](README.md) for the project overview and
   decode it with this library to the rounded input, sample for sample, over the repository's 5.1 programme material at both of the engine's
   frame sizes, over rounding ties, clamps, NaN and infinities among the music, and across switches into the mode and back;
   `tools/checks/verify_crucible_truehd_leg.py` holds the same bursts to FFmpeg's strict decode in the core lane. `BurstSink::start` takes a
-  format instead of a flag and `DeviceFacts` and `EndpointFacts` gain `accepts_truehd`; the real probe answers true only for a PipeWire
-  sink that lists TrueHD or a Windows endpoint that accepts the format, so on macOS no endpoint offers the mode and a pin falls back with the reason line saying so. Not measured: any receiver, the throughput on the Raspberry Pi 4B and the Windows machine, and the latency
+  format instead of a flag and `DeviceFacts` and `EndpointFacts` gain `accepts_truehd`; the real probe answers with the library's
+  `supports_mat_passthrough` (ALSA, PipeWire and WASAPI open the eight-channel link; Core Audio refuses it), so where no endpoint opens it a pin
+  falls back with the reason line saying so. `crucible-probe` replaces the hand-built `passthrough_probe`: it lists each endpoint with
+  `truehd=` and streams a TrueHD file as MAT to one, and the hidden case `[truehd_cost]` times the leg per frame. Not measured: any receiver, the throughput on the Raspberry Pi 4B and the Windows machine, and the latency
   end to end. The restart interval is the encoder's 128 access units (about 107 ms) until a receiver confirms 8.
 - **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
   borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
@@ -56,6 +49,15 @@ See [README.md](README.md) for the project overview and
   and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
   an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
   tests and `forge` links, and the evolution tests pass against it.
+- **Added: TrueHD as MAT in the audio library's passthrough sink, and the Hearth output decision that knows it; not run on any platform.**
+  `BitstreamFormat::kMat` opens the eight-channel link (16 bits, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 kHz family, 3,840 frames
+  to a 61,440-byte burst, the owner's decision of 2026-10-29): ALSA on an HDMI device, PipeWire as SPA's `TRUEHD`, WASAPI as
+  `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, and Android through two new optional bridge methods (not built); Core Audio refuses it. The sink
+  descriptor reads a MAT entry from ALSA's ELD and PipeWire's codec list. Hearth's output decision lists each platform as "not run" until a run on a
+  receiver passes, picks MAT automatically only for a platform that has, sends it when Bitstream is pinned (with the warning), and gives the
+  fallback for a TrueHD item that is decoded: the stream's presentation for the output's width, else stereo, else a refusal; there is no transcode.
+  The player does not pack MAT bursts yet, so a TrueHD item is still decoded. The Output picker shows "TrueHD (MAT) opens, not run".
+
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was

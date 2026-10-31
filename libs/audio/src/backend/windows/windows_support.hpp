@@ -3,11 +3,9 @@
 #include <windows.h>
 // windows.h must precede the audio headers.
 #include <audioclient.h>
-#include <mmreg.h>
 #include <mmdeviceapi.h>
 #include <wrl/client.h>
 
-#include <cstdint>
 #include <expected>
 
 // The handful of things capture.cpp, device_watcher.cpp, monitor.cpp and
@@ -124,130 +122,6 @@ template <typename Error>
 // loop needed a different one from passthrough.cpp's exclusive-mode loop.
 [[nodiscard]] inline bool stream_gone(HRESULT result) {
     return result == AUDCLNT_E_DEVICE_INVALIDATED || result == AUDCLNT_E_SERVICE_NOT_RUNNING;
-}
-
-// KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL from ksmedia.h:
-// {00000092-0000-0010-8000-00aa00389b71}. The low 16 bits of Data1 are the
-// wFormatTag (0x0092 = WAVE_FORMAT_DOLBY_AC3_SPDIF).
-constexpr GUID kSubtypeIec61937DolbyDigital = {
-    0x00000092, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-// KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS from ksmedia.h:
-// {0000000a-0cea-0010-8000-00aa00389b71}. A different GUID family from AC-3's
-// (Data2 0x0cea rather than 0x0000) - confirmed against a Windows SDK
-// ksmedia.h mirror and against Microsoft's own "Representing Formats for IEC
-// 61937 Transmissions" documentation, which gives this exact value in a
-// worked Dolby Digital Plus example.
-constexpr GUID kSubtypeIec61937DolbyDigitalPlus = {
-    0x0000000a, 0x0cea, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-// KSDATAFORMAT_SUBTYPE_PCM: {00000001-0000-0010-8000-00aa00389b71}, the
-// WAVE_FORMAT_PCM tag in the same GUID family. Needed for the rate probes,
-// which ask about ordinary PCM rather than a bitstream.
-constexpr GUID kSubtypePcm = {
-    0x00000001, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-// The IEC 61937 carrier is a 2-channel 16-bit stream; one AC-3 frame occupies
-// one 6144-byte burst = 1536 stereo frames, matching the AC-3 frame duration.
-constexpr WORD kCarrierChannels = 2;
-constexpr WORD kCarrierBits = 16;
-constexpr DWORD kSpeakerStereo = 0x3;  // KSAUDIO_SPEAKER_STEREO
-
-// WAVEFORMATEXTENSIBLE_IEC61937 (ksmedia.h): a WAVEFORMATEXTENSIBLE followed
-// by three fields describing the *encoded* stream inside the carrier.
-struct WaveFormatIec61937 {
-    WAVEFORMATEXTENSIBLE FormatExt;
-    DWORD dwEncodedSamplesPerSec;
-    DWORD dwEncodedChannelCount;
-    DWORD dwAverageBytesPerSec;
-};
-
-inline WaveFormatIec61937 make_ac3_format(std::uint32_t sample_rate, DWORD encoded_channels) {
-    WaveFormatIec61937 format{};
-    auto& wf = format.FormatExt.Format;
-    wf.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    wf.nChannels = kCarrierChannels;
-    wf.nSamplesPerSec = sample_rate;
-    wf.wBitsPerSample = kCarrierBits;
-    wf.nBlockAlign = static_cast<WORD>(kCarrierChannels * kCarrierBits / 8);
-    wf.nAvgBytesPerSec = sample_rate * wf.nBlockAlign;
-    wf.cbSize = sizeof(WaveFormatIec61937) - sizeof(WAVEFORMATEX);
-
-    format.FormatExt.Samples.wValidBitsPerSample = kCarrierBits;
-    format.FormatExt.dwChannelMask = kSpeakerStereo;
-    format.FormatExt.SubFormat = kSubtypeIec61937DolbyDigital;
-
-    // Describes the AC-3 payload, not the carrier: the decoded rate and how
-    // many channels the receiver will reproduce.
-    format.dwEncodedSamplesPerSec = sample_rate;
-    format.dwEncodedChannelCount = encoded_channels;
-    format.dwAverageBytesPerSec = 0;  // 0 is permitted and means "unspecified"
-    return format;
-}
-
-// Dolby Digital Plus over IEC 60958/61937: per Microsoft's "Representing
-// Formats for IEC 61937 Transmissions", "the link-sampling rate must be four
-// times the sampling rate of the content" - so unlike AC-3, the carrier
-// itself (nSamplesPerSec/nAvgBytesPerSec) runs at 4x `sample_rate`, which
-// stays the CONTENT rate throughout. Field values otherwise mirror
-// Microsoft's own worked 48 kHz DD+ example verbatim.
-inline WaveFormatIec61937 make_eac3_format(std::uint32_t sample_rate, DWORD encoded_channels) {
-    WaveFormatIec61937 format{};
-    auto& wf = format.FormatExt.Format;
-    wf.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    wf.nChannels = kCarrierChannels;
-    wf.nSamplesPerSec = sample_rate * 4;
-    wf.wBitsPerSample = kCarrierBits;
-    wf.nBlockAlign = static_cast<WORD>(kCarrierChannels * kCarrierBits / 8);
-    wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.nBlockAlign;
-    wf.cbSize = sizeof(WaveFormatIec61937) - sizeof(WAVEFORMATEX);
-
-    format.FormatExt.Samples.wValidBitsPerSample = kCarrierBits;
-    format.FormatExt.dwChannelMask = kSpeakerStereo;
-    format.FormatExt.SubFormat = kSubtypeIec61937DolbyDigitalPlus;
-
-    format.dwEncodedSamplesPerSec = sample_rate;
-    format.dwEncodedChannelCount = encoded_channels;
-    format.dwAverageBytesPerSec = 0;  // ignored for this format (MS docs)
-    return format;
-}
-
-// KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP from ksmedia.h (Windows SDK 10.0.26100):
-// {0000000c-0cea-0010-8000-00aa00389b71}, Dolby MAT 1.0, which Microsoft's "Representing
-// Formats for IEC 61937 Transmissions" describes as TrueHD at 24 bits, 192 kHz, up to 18 Mbps,
-// 8 channels. MAT 2.0 and 2.1 have GUIDs of their own (0000010c and 0000030c); a stream of this
-// library's is MAT 1.0 (no metadata beyond the coded bitstream), so this is the one it asks for.
-constexpr GUID kSubtypeIec61937DolbyMlp = {
-    0x0000000c, 0x0cea, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-constexpr WORD kTruehdCarrierChannels = 8;
-constexpr DWORD kSpeaker71 = 0xFF;  // KSAUDIO_SPEAKER_7POINT1
-
-// TrueHD in MAT: unlike every format above the carrier is eight channels wide (four IEC 60958
-// lines), 16 bytes to a link frame, at `link_rate` (192000 or 176400, audio::link_rate()) whatever
-// the content rate. The values are Microsoft's own worked example for MAT 1.0 verbatim, which is
-// written for a 96 kHz stream: nChannels 8, a 7.1 mask, 16 valid bits, dwEncodedChannelCount 8.
-// Whether a 5.1 stream wants dwEncodedChannelCount 6 instead is not something the page says, and
-// no driver has been asked.
-inline WaveFormatIec61937 make_truehd_format(std::uint32_t link_rate, std::uint32_t content_rate) {
-    WaveFormatIec61937 format{};
-    auto& wf = format.FormatExt.Format;
-    wf.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    wf.nChannels = kTruehdCarrierChannels;
-    wf.nSamplesPerSec = link_rate;
-    wf.wBitsPerSample = kCarrierBits;
-    wf.nBlockAlign = static_cast<WORD>(kTruehdCarrierChannels * kCarrierBits / 8);
-    wf.nAvgBytesPerSec = link_rate * wf.nBlockAlign;
-    wf.cbSize = sizeof(WaveFormatIec61937) - sizeof(WAVEFORMATEX);
-
-    format.FormatExt.Samples.wValidBitsPerSample = kCarrierBits;
-    format.FormatExt.dwChannelMask = kSpeaker71;
-    format.FormatExt.SubFormat = kSubtypeIec61937DolbyMlp;
-
-    format.dwEncodedSamplesPerSec = content_rate;
-    format.dwEncodedChannelCount = kTruehdCarrierChannels;
-    format.dwAverageBytesPerSec = 0;  // ignored for this format (MS docs)
-    return format;
 }
 
 }  // namespace iclforge::windows_audio

@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "iclforge/audio/passthrough.hpp"
 #include "device_names.hpp"
 
 // The ALSA backend's pure half, tested on a machine with no sound card.
@@ -98,6 +97,25 @@ TEST_CASE("AC-4 runs its link at the content rate and its HBR4 bursts at four ti
         CHECK(non_audio_channel_status(carrier_rate(BitstreamFormat::kAc4, base)).has_value());
         CHECK(non_audio_channel_status(carrier_rate(BitstreamFormat::kAc4Hbr4, base)).has_value());
     }
+}
+
+TEST_CASE("MAT runs an eight-channel link at 192 kHz, or 176.4 kHz for the 44.1 kHz family") {
+    using iclforge::alsa::carrier_rate;
+    using iclforge::alsa::passthrough_device_name;
+    using iclforge::audio::BitstreamFormat;
+
+    CHECK(carrier_rate(BitstreamFormat::kMat, 48000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 96000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 192000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 44100) == 176400);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 88200) == 176400);
+    CHECK(carrier_rate(BitstreamFormat::kMat, 32000) == 0);
+    // Both links have a consumer frequency code, so the channel status says the right rate.
+    CHECK(non_audio_channel_status(carrier_rate(BitstreamFormat::kMat, 48000))->aes3 == 0x0E);
+    CHECK(non_audio_channel_status(carrier_rate(BitstreamFormat::kMat, 44100))->aes3 == 0x0C);
+    // And the name an HDMI output is opened by carries the non-audio bit at that rate.
+    CHECK(passthrough_device_name("hdmi:CARD=PCH,DEV=3", carrier_rate(BitstreamFormat::kMat, 96000)) ==
+          "hdmi:CARD=PCH,DEV=3,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e");
 }
 
 TEST_CASE("the whole status matches what alsa-lib's own iec958 device defaults to") {
@@ -254,13 +272,4 @@ TEST_CASE("a candidate device name survives the round trip to an openable one") 
     REQUIRE(opened.has_value());
     CHECK(opened->starts_with(base));
     CHECK(has_channel_status_args(*opened));
-}
-
-TEST_CASE("TrueHD is refused before any card is opened") {
-    // This backend carries two channels; MAT needs eight, which it does not write.
-    iclforge::audio::PassthroughSink sink;
-    const auto started = sink.start("", 48000, iclforge::audio::BitstreamFormat::kTrueHd);
-    REQUIRE_FALSE(started.has_value());
-    CHECK(started.error() == iclforge::audio::PassthroughError::kUnsupportedFormat);
-    CHECK_FALSE(sink.running());
 }

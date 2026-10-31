@@ -34,7 +34,7 @@ iclforge::audio::BitstreamFormat library_format(BurstFormat format) {
     switch (format) {
         case BurstFormat::kAc3: return iclforge::audio::BitstreamFormat::kAc3;
         case BurstFormat::kEac3: return iclforge::audio::BitstreamFormat::kEac3;
-        case BurstFormat::kTrueHd: return iclforge::audio::BitstreamFormat::kTrueHd;
+        case BurstFormat::kTrueHd: return iclforge::audio::BitstreamFormat::kMat;
     }
     return iclforge::audio::BitstreamFormat::kAc3;
 }
@@ -146,7 +146,7 @@ public:
                           .is_default = device.is_default,
                           .accepts_eac3 = device.supports_eac3_passthrough,
                           .accepts_ac3 = device.supports_ac3_passthrough,
-                          .accepts_truehd = device.supports_truehd_passthrough,
+                          .accepts_truehd = device.supports_mat_passthrough,
                           .shared_channels = device.channels};
             if (const auto spatial = iclforge::audio::probe_spatial_capability(device.id);
                 spatial && spatial->available) {

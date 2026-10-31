@@ -14,9 +14,10 @@
     recommendations below, since the owner has not replied: question 1 yes, pin-only; 2 a 5.1 bed; 3 pin-only; 4
     plain rounding; 5 48 kHz; 8 the restart interval stays at the encoder's 128 until a receiver confirms 8; 9
     the codec-path switch keeps its E-AC-3 meaning; 10 `DownmixMode::kNone` and the E-AC-3 encoder's bed. Question 6
-    was answered by the owner on 2026-10-31 (eight 16-bit channels at 192 kHz, 176.4 kHz for the 44.1 family) and phase 1
-    is built for PipeWire and WASAPI: `BitstreamFormat::kTrueHd`, the eight-channel carrier, `supports_truehd_passthrough`
-    (Microsoft's page gives the same carrier). Not built: Core Audio (it refuses the format), the hardware reading and the throughput (phase 4). What this round asks is in
+    was answered by the owner on 2026-10-31 (eight 16-bit channels at 192 kHz, 176.4 kHz for the 44.1 family; Microsoft's page gives the same link).
+    Phase 1 was built by the Hearth session in parallel and merged first (`BitstreamFormat::kMat`, `supports_mat_passthrough`, ALSA, PipeWire and WASAPI;
+    Core Audio refuses it); this branch uses that. Not built: the hardware reading and the throughput (phase 4). `crucible-probe` and the hidden case `[truehd_cost]` are
+    the tools for it. What this round asks is in
     [Questions from the build](#questions-from-the-build), at the end.
 
 ## Basis
@@ -255,7 +256,7 @@ probe for now); `fake_devices.hpp` records the format and can script `accepts_tr
 six legs; no new mode exists.
 
 **Phase 1: the audio backends carry MAT (C11, C12, then C13). Size L to XL. Waits for Q6.**
-`BitstreamFormat::kTrueHd`, an eight-channel carrier in `PassthroughSink`, `supports_truehd_passthrough`, and per backend:
+`BitstreamFormat::kMat` (built by the Hearth session), an eight-channel carrier in `PassthroughSink`, `supports_mat_passthrough`, and per backend:
 PipeWire first, since it is Crucible's Linux path and the Pi's receiver already published TrueHD in its codec list; WASAPI
 second; Core Audio only if the owner wants macOS pursued. ALSA and Android serve forge and Hearth and are not Crucible's.
 This phase belongs to whichever document owns `libs/audio`; it is listed so that the dependency is visible. *Risks:* the

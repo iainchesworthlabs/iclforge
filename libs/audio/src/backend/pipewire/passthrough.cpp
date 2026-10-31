@@ -77,11 +77,9 @@ namespace {
 using iclforge::pipewire::Stream;
 using iclforge::pipewire::ThreadLoop;
 
-// The carrier is a 16-bit stream whatever rides inside it, two channels wide
-// but for TrueHD's eight - see iclforge::pipewire::kCarrierFrameBytes and the
-// ALSA backend's identical constant and comment. A link frame's bytes are
-// audio::carrier_frame_bytes() of the format in use.
-constexpr std::size_t kCarrierFrameBytes = iclforge::pipewire::kCarrierFrameBytes;
+// The carrier is a 16-bit stream, two channels wide for every format but MAT, whose
+// eight-channel link (16 bytes a frame) is what a TRUEHD stream is opened with; see the ALSA
+// backend's identical constant and comment, and audio::carrier_frame_bytes().
 
 // A real connection attempt (start()) is allowed longer to settle than a
 // probe made purely to answer an enumerate_render_devices() question -
@@ -193,12 +191,10 @@ bool probe_connect(const std::string& node_id, const spa_pod** params, std::uint
     return ready;
 }
 
-// AC-3, E-AC-3 or TrueHD: nothing asks for AC-4, which has no SPA codec
-// (start() refuses it first), so UNKNOWN is never what a sink is offered. The
-// rate is the link's (carrier_rate()): 192 kHz for TrueHD, whose eight
-// channels the codec implies. That, and not the content rate, is what the
-// owner's reading of the MAT carrier says; it is the E-AC-3 convention
-// extended and has not been tried against a receiver.
+// AC-3, E-AC-3 or TrueHD (MAT): nothing asks for AC-4, which has no SPA codec (start() refuses it
+// first), so UNKNOWN is never what a sink is offered. The rate is the link's (192 kHz, or 176.4
+// kHz, for MAT), as it is for E-AC-3's four-times link; that PipeWire reads a TRUEHD stream's
+// rate and frame as these is an assumption this backend has not seen confirmed by a sink.
 const spa_pod* build_iec958_pod(spa_pod_builder& builder, BitstreamFormat format,
                                  std::uint32_t carrier) {
     spa_audio_info_iec958 info{};
@@ -327,7 +323,8 @@ std::vector<CandidateSink> candidate_sinks() {
         CandidateSink candidate{.id = std::move(sink.name), .name = std::move(sink.description)};
         candidate.codec_ac3 = iclforge::pipewire::codec_listed(sink.codecs, "AC3");
         candidate.codec_eac3 = iclforge::pipewire::codec_listed(sink.codecs, "EAC3");
-        candidate.codec_truehd = iclforge::pipewire::codec_listed(sink.codecs, "TrueHD");
+        candidate.codec_truehd =
+            iclforge::pipewire::codec_enabled(sink.codecs, BitstreamFormat::kMat);
         candidate.channels = sink.channels;
         candidate.speakers = speakers_of_position(sink.position, sink.channels);
         candidate.rate = sink.rate;
@@ -337,6 +334,10 @@ std::vector<CandidateSink> candidate_sinks() {
 }
 
 }  // namespace
+
+PassthroughBackend passthrough_backend() {
+    return PassthroughBackend::kPipeWire;
+}
 
 std::string_view describe(PassthroughError error) {
     switch (error) {
@@ -383,10 +384,11 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
                 sink.codec_ac3 && probe_iec958(sink.id, BitstreamFormat::kAc3, sample_rate),
             .supports_eac3_passthrough =
                 sink.codec_eac3 && probe_iec958(sink.id, BitstreamFormat::kEac3, sample_rate),
-            .supports_truehd_passthrough =
-                sink.codec_truehd && probe_iec958(sink.id, BitstreamFormat::kTrueHd, sample_rate),
             // No SPA codec for AC-4 (iec958_codec_for()).
             .supports_ac4_passthrough = false,
+            // TrueHD: enabled on the node by the session manager, and then connected.
+            .supports_mat_passthrough =
+                sink.codec_truehd && probe_iec958(sink.id, BitstreamFormat::kMat, sample_rate),
             .supports_exclusive_pcm = probe_exclusive_pcm(sink.id, sample_rate),
             // What the node is configured as, which for a device sink is what
             // the device renders. The rate is the one rate it is running at,
@@ -420,6 +422,8 @@ struct PassthroughSink::Impl {
     Stream stream;
     std::unique_ptr<ByteRingBuffer> queue;
     std::size_t burst_bytes = containers::iec61937::kBurstBytes;
+    // Bytes of one link frame (carrier_frame_bytes()): 4, or 16 for MAT.
+    std::size_t frame_bytes = 4;
     // Raised by start(). Lowered by stop(), or by state_changed() when the
     // stream ends on its own.
     std::atomic_bool running{false};
@@ -431,8 +435,6 @@ struct PassthroughSink::Impl {
     // second, for position().
     std::uint32_t ratio = 1;
     std::uint32_t carrier_rate = 0;
-    // Bytes in a link frame (carrier_frame_bytes()): 4, or 16 for TrueHD.
-    std::size_t frame_bytes = kCarrierFrameBytes;
     // As MonitorSink's PipeWire backend keeps them, in link frames: the
     // frames the process callback has handed the stream since the last start
     // or flush, against those it has not had heard, for position().
@@ -526,11 +528,7 @@ struct PassthroughSink::Impl {
             buffer->requested > 0 ? static_cast<std::uint32_t>(buffer->requested) *
                                          static_cast<std::uint32_t>(impl.frame_bytes)
                                    : spa_buf->datas[0].maxsize;
-        // A whole number of link frames, whatever the buffer's own size: a
-        // TrueHD frame is 16 bytes and a buffer's maximum need not be a
-        // multiple of that.
-        const std::size_t byte_count = std::min<std::size_t>(requested, spa_buf->datas[0].maxsize) /
-                                       impl.frame_bytes * impl.frame_bytes;
+        const std::size_t byte_count = std::min<std::size_t>(requested, spa_buf->datas[0].maxsize);
 
         auto* out = static_cast<std::byte*>(spa_buf->datas[0].data);
         const auto got = impl.queue->read(std::span{out, byte_count});
@@ -734,10 +732,12 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (!iclforge::pipewire::iec958_codec_for(format_kind) ||
-        link_rate(format_kind, sample_rate) == 0) {
-        // No SPA codec for AC-4, or no MAT link at a content rate outside both families.
+    if (!iclforge::pipewire::iec958_codec_for(format_kind)) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
+    }
+    if (iclforge::pipewire::carrier_rate(format_kind, sample_rate) == 0) {
+        // MAT at a content rate it has no link for: refused before any sink is looked up.
+        return std::unexpected(PassthroughError::kFormatRejected);
     }
     // A stream that ended on its own still has its loop and its stream, and
     // still holds its sink exclusively; stop() tears both down in the right
@@ -760,9 +760,9 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         // reason: the connect alone said yes on the headphone jack. A sink
         // whose session manager has not enabled this codec is not asked.
         for (const auto& sink : candidates) {
-            const bool enabled = format_kind == BitstreamFormat::kEac3    ? sink.codec_eac3
-                                 : format_kind == BitstreamFormat::kTrueHd ? sink.codec_truehd
-                                                                           : sink.codec_ac3;
+            const bool enabled = format_kind == BitstreamFormat::kEac3   ? sink.codec_eac3
+                                 : format_kind == BitstreamFormat::kMat ? sink.codec_truehd
+                                                                        : sink.codec_ac3;
             if (enabled && probe_iec958(sink.id, format_kind, sample_rate)) {
                 target = sink.id;
                 break;
@@ -792,9 +792,9 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     // that ordering is what keeps this race-free.
     impl_->queue = std::make_unique<ByteRingBuffer>(burst_bytes * 40);
     impl_->burst_bytes = burst_bytes;
-    impl_->ratio = link_ratio(format_kind, sample_rate);
-    impl_->carrier_rate = carrier;
+    impl_->ratio = carrier_ratio(format_kind, sample_rate);
     impl_->frame_bytes = carrier_frame_bytes(format_kind);
+    impl_->carrier_rate = carrier;
     impl_->submitted.store(0, std::memory_order_relaxed);
     impl_->rendered.store(0, std::memory_order_relaxed);
     impl_->rendered_bytes = 0;

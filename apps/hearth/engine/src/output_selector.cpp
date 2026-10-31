@@ -32,12 +32,15 @@ EndpointFacts endpoint_facts(
     row.speakers = device.speakers;
     row.accepts_ac3 = device.supports_ac3_passthrough;
     row.accepts_eac3 = device.supports_eac3_passthrough;
+    row.accepts_mat = device.supports_mat_passthrough;
+    row.backend = audio::passthrough_backend();
     // A local output decodes into the endpoint's shared-mode mixer, which
     // every render endpoint the enumeration lists has.
     row.accepts_pcm = true;
     if (descriptor) {
         row.accepts_ac3 = row.accepts_ac3 && descriptor->ac3;
         row.accepts_eac3 = row.accepts_eac3 && descriptor->eac3;
+        row.accepts_mat = row.accepts_mat && descriptor->mat;
         row.source = CapabilitySource::kDescriptor;
         return row;
     }
@@ -47,6 +50,7 @@ EndpointFacts endpoint_facts(
             // all: the probe's yes says only that the output would open.
             row.accepts_ac3 = false;
             row.accepts_eac3 = false;
+            row.accepts_mat = false;
             row.source = CapabilitySource::kNoDescriptor;
             break;
         case audio::EdidError::kNoBackend:
@@ -128,8 +132,8 @@ const std::vector<EndpointFacts>& OutputSelector::endpoints(std::uint32_t sample
                             case audio::BitstreamFormat::kAc4:
                                 reading.device.supports_ac4_passthrough = true;
                                 break;
-                            case audio::BitstreamFormat::kTrueHd:
-                                reading.device.supports_truehd_passthrough = true;
+                            case audio::BitstreamFormat::kMat:
+                                reading.device.supports_mat_passthrough = true;
                                 break;
                             case audio::BitstreamFormat::kAc4Hbr4:
                             case audio::BitstreamFormat::kAc4Hbr16:
@@ -152,6 +156,7 @@ const std::vector<EndpointFacts>& OutputSelector::endpoints(std::uint32_t sample
         if (!bitstream_output_) {
             row.accepts_ac3 = false;
             row.accepts_eac3 = false;
+            row.accepts_mat = false;
         }
         rows_.push_back(std::move(row));
     }

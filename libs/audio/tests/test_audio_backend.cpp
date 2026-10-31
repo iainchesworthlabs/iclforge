@@ -292,51 +292,6 @@ TEST_CASE("passthrough formats: the rate and burst lengths and name of each link
     CHECK(iclforge::audio::is_ac4(BitstreamFormat::kAc4));
     CHECK_FALSE(iclforge::audio::is_ac4(BitstreamFormat::kEac3));
 
-    // TrueHD in MAT: a link at four times the content rate, but eight channels
-    // wide, so a link frame is 16 bytes and a 61 440-byte burst is 3 840 of
-    // them: 20 ms at 192 kHz, as it is 960 content frames at 48 kHz.
-    CHECK(iclforge::audio::carrier_ratio(BitstreamFormat::kTrueHd) == 4);
-    CHECK(iclforge::audio::format_name(BitstreamFormat::kTrueHd) == "TrueHD");
-    CHECK_FALSE(iclforge::audio::is_ac4(BitstreamFormat::kTrueHd));
-    for (const auto format : {BitstreamFormat::kAc3, BitstreamFormat::kEac3, BitstreamFormat::kAc4,
-                              BitstreamFormat::kAc4Hbr4, BitstreamFormat::kAc4Hbr16}) {
-        CHECK(iclforge::audio::carrier_channels(format) == 2);
-        CHECK(iclforge::audio::carrier_frame_bytes(format) == 4);
-    }
-    CHECK(iclforge::audio::carrier_channels(BitstreamFormat::kTrueHd) == 8);
-    CHECK(iclforge::audio::carrier_frame_bytes(BitstreamFormat::kTrueHd) == 16);
-    CHECK(iclforge::audio::max_burst_bytes(BitstreamFormat::kTrueHd) == 61440);
-    CHECK(iclforge::audio::max_burst_bytes(BitstreamFormat::kTrueHd) /
-              iclforge::audio::carrier_frame_bytes(BitstreamFormat::kTrueHd) ==
-          48000 * 4 / 50);
-    CHECK(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 61440));
-    CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 61436));
-    CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 24576));
-
-    // MAT's link is 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 family, whatever
-    // the content rate within it (Microsoft's "Representing Formats for IEC 61937
-    // Transmissions"), so the ratio of link to content falls as the content rate rises. A burst
-    // is 3 840 link frames and holds 24 access units: 960 content frames at 44.1 and 48 kHz, 1 920
-    // at 88.2 and 96, 3 840 at 176.4 and 192 (20 ms at the 48 kHz family, 21.8 ms at the 44.1).
-    struct Case {
-        std::uint32_t content, link, ratio, frames;
-    };
-    for (const auto& c : {Case{48000, 192000, 4, 960}, Case{96000, 192000, 2, 1920},
-                          Case{192000, 192000, 1, 3840}, Case{44100, 176400, 4, 960},
-                          Case{88200, 176400, 2, 1920}, Case{176400, 176400, 1, 3840}}) {
-        CAPTURE(c.content);
-        CHECK(iclforge::audio::link_rate(BitstreamFormat::kTrueHd, c.content) == c.link);
-        CHECK(iclforge::audio::link_ratio(BitstreamFormat::kTrueHd, c.content) == c.ratio);
-        CHECK(3840U / c.ratio == c.frames);
-    }
-    // No MAT link outside the two families, and every other format's link is the content rate
-    // times its ratio as it was.
-    CHECK(iclforge::audio::link_rate(BitstreamFormat::kTrueHd, 32000) == 0);
-    CHECK(iclforge::audio::link_ratio(BitstreamFormat::kTrueHd, 32000) == 0);
-    CHECK(iclforge::audio::link_rate(BitstreamFormat::kEac3, 48000) == 192000);
-    CHECK(iclforge::audio::link_rate(BitstreamFormat::kAc3, 48000) == 48000);
-    CHECK(iclforge::audio::link_ratio(BitstreamFormat::kEac3, 44100) == 4);
-
     // Every AC-3 and E-AC-3 burst is one length; an AC-4 burst is as long as
     // its repetition period, up to the longest (2 048 IEC 60958 frames of four
     // bytes at the content rate).
@@ -352,6 +307,78 @@ TEST_CASE("passthrough formats: the rate and burst lengths and name of each link
     CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kAc4, 8196));
     CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kAc4, 1602 * 4 + 2));
     CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kAc4, 0));
+}
+
+TEST_CASE("passthrough formats: MAT rides an eight-channel link that follows the content family",
+          "[audio-backend][concurrency]") {
+    using iclforge::audio::BitstreamFormat;
+    using iclforge::audio::carrier_channels;
+    using iclforge::audio::carrier_frame_bytes;
+    using iclforge::audio::link_rate;
+    using iclforge::audio::carrier_ratio;
+    constexpr auto kMat = BitstreamFormat::kMat;
+
+    // 24 access units of 40, 80 or 160 samples at 48, 96 or 192 kHz are all 20 ms, so the burst
+    // fills the same 3,840 link frames at 192 kHz whichever of the three the content is in; the
+    // 44.1 kHz family does the same at 176.4 kHz (libs/containers/ERRATA.md, question 7).
+    for (const std::uint32_t content : {48000U, 96000U, 192000U}) {
+        CHECK(link_rate(kMat, content) == 192000U);
+    }
+    for (const std::uint32_t content : {44100U, 88200U, 176400U}) {
+        CHECK(link_rate(kMat, content) == 176400U);
+    }
+    CHECK(carrier_ratio(kMat, 48000U) == 4U);
+    CHECK(carrier_ratio(kMat, 96000U) == 2U);
+    CHECK(carrier_ratio(kMat, 192000U) == 1U);
+    CHECK(carrier_ratio(kMat, 44100U) == 4U);
+    CHECK(carrier_ratio(kMat, 88200U) == 2U);
+    CHECK(carrier_ratio(kMat, 176400U) == 1U);
+
+    // No other content rate has a link, and the answer is "none", not a guess.
+    for (const std::uint32_t content : {0U, 8000U, 32000U, 22050U, 384000U}) {
+        CHECK(link_rate(kMat, content) == 0U);
+        CHECK(carrier_ratio(kMat, content) == 0U);
+    }
+
+    CHECK(carrier_channels(kMat) == 8U);
+    CHECK(carrier_frame_bytes(kMat) == 16U);
+    CHECK(iclforge::audio::max_burst_bytes(kMat) == 61440U);
+    CHECK(iclforge::audio::max_burst_bytes(kMat) / carrier_frame_bytes(kMat) == 3840U);
+    CHECK(iclforge::audio::burst_size_fits(kMat, 61440U));
+    CHECK_FALSE(iclforge::audio::burst_size_fits(kMat, 61424U));
+    CHECK(iclforge::audio::is_mat(kMat));
+    CHECK_FALSE(iclforge::audio::is_mat(BitstreamFormat::kEac3));
+    CHECK_FALSE(iclforge::audio::is_ac4(kMat));
+    CHECK(iclforge::audio::format_name(kMat) == "TrueHD (MAT)");
+
+    // The content frames in a burst, as position() counts them: 24 access units whatever the rate.
+    CHECK(3840U / carrier_ratio(kMat, 48000U) == 24U * 40U);
+    CHECK(3840U / carrier_ratio(kMat, 96000U) == 24U * 80U);
+    CHECK(3840U / carrier_ratio(kMat, 192000U) == 24U * 160U);
+
+    // Every other format keeps its figures: two channels, four bytes a frame, the old ratios.
+    for (const auto other : {BitstreamFormat::kAc3, BitstreamFormat::kEac3, BitstreamFormat::kAc4,
+                             BitstreamFormat::kAc4Hbr4}) {
+        CHECK(carrier_channels(other) == 2U);
+        CHECK(carrier_frame_bytes(other) == 4U);
+        CHECK(link_rate(other, 48000U) == 48000U * carrier_ratio(other));
+        CHECK(carrier_ratio(other, 48000U) == carrier_ratio(other));
+    }
+    CHECK(carrier_channels(BitstreamFormat::kAc4Hbr16) == 8U);
+}
+
+TEST_CASE("passthrough: MAT at a content rate it has no link for is refused before a device is touched",
+          "[audio-backend][concurrency]") {
+    // 32 kHz is no TrueHD rate, so there is no link to open on any platform; the answer comes
+    // before a device is looked up. A build with no backend, or one that does not carry MAT, says
+    // so with its own error.
+    iclforge::audio::PassthroughSink sink;
+    const auto started = sink.start("", 32000, iclforge::audio::BitstreamFormat::kMat);
+    REQUIRE_FALSE(started.has_value());
+    CHECK((started.error() == iclforge::audio::PassthroughError::kFormatRejected ||
+           started.error() == iclforge::audio::PassthroughError::kUnsupportedFormat ||
+           started.error() == iclforge::audio::PassthroughError::kNoBackend));
+    CHECK_FALSE(sink.running());
 }
 
 TEST_CASE("passthrough: AC-4 HBR16 is refused everywhere before a device is touched",

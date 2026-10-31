@@ -101,13 +101,13 @@ DD+ 5.1, encoded losslessly and carried as MAT bursts, and it carries no objects
 loaded. Lossless starts at 24-bit integers: Crucible's mix is floating point, it is rounded to the
 nearest 24-bit value (a tie goes to the even one), and the stream decodes to exactly those values
 and no further back. The mode also needs an audio backend that can carry MAT, which is eight
-channels at 192 kHz: PipeWire's can, on a sink whose codec list names TrueHD, and WASAPI's can, on
-an endpoint that accepts Microsoft's MAT 1.0 format in exclusive mode; the macOS, ALSA and Android
-backends cannot. So on macOS no endpoint reads as taking TrueHD, and a pin on a mode no endpoint
+channels at 192 kHz: ALSA's can, PipeWire's can, on a sink whose codec list names TrueHD, and
+WASAPI's can, on an endpoint that accepts Microsoft's MAT 1.0 format in exclusive mode; Core
+Audio's cannot. So on macOS no endpoint reads as taking TrueHD, and a pin on a mode no endpoint
 carries falls back to the automatic choice with the reason line saying so. The engine side is
-tested over scripted devices, bit for bit, and the two backends have been built and tested without
-a receiver: nothing has been played into one, so whether an endpoint accepts the stream or a
-receiver locks on it is not known.
+tested over scripted devices, bit for bit, and the library's backends have been built and tested
+without a receiver: nothing has been played into one, so whether an endpoint accepts the stream or
+a receiver locks on it is not known.
 Its LFE channel is empty, because Crucible's mix has no LFE source: a tap's LFE is dropped.
 
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint

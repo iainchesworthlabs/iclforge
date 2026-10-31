@@ -58,6 +58,18 @@
 // stream's frame rate, so the queue holds bursts of different lengths and the
 // counts below are kept in bytes. AC-4 HBR16 needs the eight-channel
 // high-bit-rate link, which this backend does not open, and is refused.
+//
+// ---------------------------------------------------------------------------
+// MAT (TrueHD)
+// ---------------------------------------------------------------------------
+// The same eight-channel link, but this backend does open it for MAT: the PCM is
+// 8 channels of 16 bits at 192 kHz (176.4 kHz for the 44.1 kHz family), a burst
+// is 3,840 frames of 16 bytes, and the channel status is the one every other
+// format has, at the link's rate. Only an HDMI output offers 8 channels at that
+// rate, so an S/PDIF output answers no. This is what the code does, not what has
+// been seen to work: nothing has played MAT through ALSA to a receiver
+// (apps/hearth/engine/src/mat_status.hpp), and whether an HDMI driver sets its
+// high-bit-rate flag for the open is the driver's.
 
 #include <alsa/asoundlib.h>
 
@@ -91,14 +103,14 @@ using alsa::HwParams;
 using alsa::Pcm;
 using alsa::SwParams;
 
-// The IEC 61937 carrier is a 2-channel 16-bit stream whatever rides inside it,
-// so a burst's length in bytes and in sample-frames differ by a constant 4.
-// One AC-3 burst is 6144 bytes = 1536 frames; one E-AC-3 burst is four times
-// that in both, and travels over a link clocked four times as fast, so it
+// The IEC 61937 carrier is a 16-bit stream whatever rides inside it, two
+// channels wide for every format but MAT (audio::carrier_channels()), so a
+// burst's length in bytes and in sample-frames differ by a constant 4 (16 for
+// MAT). One AC-3 burst is 6144 bytes = 1536 frames; one E-AC-3 burst is four
+// times that in both, and travels over a link clocked four times as fast, so it
 // still covers the same span of time.
-constexpr unsigned kCarrierChannels = 2;
+constexpr unsigned kStereoChannels = 2;
 constexpr snd_pcm_format_t kCarrierFormat = SND_PCM_FORMAT_S16_LE;
-constexpr std::size_t kCarrierFrameBytes = 4;
 constexpr unsigned kPeriodsPerBuffer = 4;
 constexpr int kWaitMs = 100;
 // How many recoveries one burst's write may need before the rest of it is
@@ -142,15 +154,15 @@ PassthroughError open_failure(int error) {
 // whether the parameters would be accepted, and stops before installing them;
 // start() installs them and then sets up the software parameters too, sizing
 // the period to one whole burst, and learns whether the hardware can pause.
-bool configure(snd_pcm_t* pcm, std::uint32_t carrier, std::size_t burst_frames, bool commit,
-               bool* can_pause = nullptr) {
+bool configure(snd_pcm_t* pcm, std::uint32_t carrier, unsigned channels, std::size_t burst_frames,
+               bool commit, bool* can_pause = nullptr) {
     HwParams params;
     if (!params || snd_pcm_hw_params_any(pcm, params.get()) < 0) {
         return false;
     }
     if (snd_pcm_hw_params_set_access(pcm, params.get(), SND_PCM_ACCESS_RW_INTERLEAVED) < 0 ||
         snd_pcm_hw_params_set_format(pcm, params.get(), kCarrierFormat) < 0 ||
-        snd_pcm_hw_params_set_channels(pcm, params.get(), kCarrierChannels) < 0) {
+        snd_pcm_hw_params_set_channels(pcm, params.get(), channels) < 0) {
         return false;
     }
     // set_rate, not set_rate_near: a burst stream at the wrong rate is not a
@@ -200,14 +212,14 @@ bool configure(snd_pcm_t* pcm, std::uint32_t carrier, std::size_t burst_frames, 
 // way the WASAPI one is not - it briefly holds the device - and it answers
 // "no" for a device that is merely busy. Both are stated in the header's
 // wording for supports_exclusive_pcm, which exists to tell those two apart.
-bool probe(const std::string& name, std::uint32_t carrier) {
+bool probe(const std::string& name, std::uint32_t carrier, unsigned channels = kStereoChannels) {
     const alsa::QuietErrors quiet;
     snd_pcm_t* handle = nullptr;
     if (snd_pcm_open(&handle, name.c_str(), SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK) < 0) {
         return false;
     }
     const Pcm owned{handle};
-    return configure(handle, carrier, /*burst_frames=*/0, /*commit=*/false);
+    return configure(handle, carrier, channels, /*burst_frames=*/0, /*commit=*/false);
 }
 
 // The SPEAKER_* bit an ALSA channel position names (iclforge::audio::speakers.hpp).
@@ -320,11 +332,18 @@ EndpointFacts endpoint_facts(const std::string& name) {
 // offered the carrier parameters.
 bool probe_format(std::string_view base, BitstreamFormat format, std::uint32_t content_rate) {
     const std::uint32_t carrier = alsa::carrier_rate(format, content_rate);
+    if (carrier == 0) {
+        return false;  // MAT has no link at this content rate
+    }
     const auto name = alsa::passthrough_device_name(base, carrier);
-    return name.has_value() && probe(*name, carrier);
+    return name.has_value() && probe(*name, carrier, carrier_channels(format));
 }
 
 }  // namespace
+
+PassthroughBackend passthrough_backend() {
+    return PassthroughBackend::kAlsa;
+}
 
 std::string_view describe(PassthroughError error) {
     switch (error) {
@@ -392,6 +411,10 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
             // AC-4's link is AC-3's - two channels at the content rate, the
             // same channel status - so one probe answers both.
             .supports_ac4_passthrough = ac3_link,
+            // The eight-channel MAT link: only an HDMI output offers 8 channels
+            // at 192 kHz, so a S/PDIF one answers no here.
+            .supports_mat_passthrough =
+                digital && probe_format(candidate.name, BitstreamFormat::kMat, sample_rate),
             // The control probe: the same carrier format on the raw hardware
             // device, with no channel status. A device that takes this but
             // neither of the above cannot bitstream; one that takes none of
@@ -436,6 +459,8 @@ struct PassthroughSink::Impl {
     std::size_t burst_bytes = containers::iec61937::kBurstBytes;
     // Link frames to a content frame (carrier_ratio()), for position().
     std::uint32_t ratio = 1;
+    // Bytes of one link frame (carrier_frame_bytes()): 4, or 16 for MAT.
+    std::size_t frame_bytes = 4;
     // Raised by start(). Lowered by stop(), or by the render thread itself
     // when the device goes away under it (see the end of its loop).
     std::atomic_bool running{false};
@@ -491,7 +516,7 @@ std::optional<MonitorPosition> PassthroughSink::position() const {
     if (!running() || !impl_->queue) {
         return std::nullopt;
     }
-    const std::uint64_t queued_here = impl_->queue->available() / kCarrierFrameBytes;
+    const std::uint64_t queued_here = impl_->queue->available() / impl_->frame_bytes;
     // snd_pcm_delay() already counts the whole path out of the machine, as
     // the device's queue; there is no latency left to add.
     return per_content_frame(impl_->counter.position(queued_here, /*latency=*/0), impl_->ratio);
@@ -587,7 +612,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (format_kind == BitstreamFormat::kAc4Hbr16 || format_kind == BitstreamFormat::kTrueHd) {
+    if (format_kind == BitstreamFormat::kAc4Hbr16) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
     // A render thread that ended because its device went away still has the
@@ -603,8 +628,14 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     // period and the write chunk are sized to; shorter bursts run on in the
     // queue behind each other.
     const std::uint32_t carrier = alsa::carrier_rate(format_kind, sample_rate);
+    if (carrier == 0) {
+        // MAT at a content rate it has no link for.
+        return std::unexpected(PassthroughError::kFormatRejected);
+    }
+    const unsigned channels = carrier_channels(format_kind);
+    const std::size_t frame_bytes = carrier_frame_bytes(format_kind);
     const std::size_t burst_bytes = max_burst_bytes(format_kind);
-    const std::size_t burst_frames = burst_bytes / kCarrierFrameBytes;
+    const std::size_t burst_frames = burst_bytes / frame_bytes;
 
     // Pick the device before touching it. An empty id means "the default
     // output", which for a bitstream can only mean a digital one that has
@@ -644,7 +675,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     Pcm opened{handle};
 
     bool can_pause = false;
-    if (!configure(handle, carrier, burst_frames, /*commit=*/true, &can_pause)) {
+    if (!configure(handle, carrier, channels, burst_frames, /*commit=*/true, &can_pause)) {
         return std::unexpected(PassthroughError::kFormatRejected);
     }
     if (snd_pcm_prepare(handle) < 0) {
@@ -657,7 +688,8 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     impl_->queue = std::make_unique<ByteRingBuffer>(burst_bytes * 40);
     impl_->format = format_kind;
     impl_->burst_bytes = burst_bytes;
-    impl_->ratio = carrier_ratio(format_kind);
+    impl_->ratio = carrier_ratio(format_kind, sample_rate);
+    impl_->frame_bytes = frame_bytes;
     impl_->submitted.store(0);
     impl_->submitted_bytes.store(0);
     impl_->rendered_bytes.store(0);
@@ -670,7 +702,8 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     impl_->running.store(true, std::memory_order_release);
     impl_->pcm = opened.release();
 
-    impl_->worker = std::jthread([this, burst_bytes, burst_frames](const std::stop_token& stop) {
+    impl_->worker = std::jthread([this, burst_bytes, burst_frames,
+                                  frame_bytes](const std::stop_token& stop) {
         snd_pcm_t* pcm = impl_->pcm;
         std::vector<std::byte> chunk(burst_bytes);
         std::uint64_t handed_over = 0;
@@ -774,7 +807,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
             int retries = 0;
             while (done < burst_frames && !stop.stop_requested()) {
                 const snd_pcm_sframes_t written =
-                    snd_pcm_writei(pcm, chunk.data() + done * kCarrierFrameBytes,
+                    snd_pcm_writei(pcm, chunk.data() + done * frame_bytes,
                                    static_cast<snd_pcm_uframes_t>(burst_frames - done));
                 if (written < 0) {
                     if (snd_pcm_recover(pcm, static_cast<int>(written), /*silent=*/1) < 0) {

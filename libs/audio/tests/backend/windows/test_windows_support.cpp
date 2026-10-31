@@ -8,7 +8,6 @@
 // windows.h must precede the audio headers.
 #include <audioclient.h>
 
-#include "iclforge/audio/passthrough.hpp"
 #include "windows_support.hpp"
 
 // The Windows backend's pure half, tested with no live audio device: a plain
@@ -73,68 +72,4 @@ TEST_CASE("the performance counter and the steady clock share an epoch") {
     // The counter was read between the two clock reads, to within a millisecond of slack.
     CHECK(counter_ns >= before_ns - 1'000'000);
     CHECK(counter_ns <= after_ns + 1'000'000);
-}
-
-// The three bitstream formats, held to the values Microsoft's "Representing Formats for IEC 61937
-// Transmissions" gives in its worked examples: a Dolby Digital Plus 48 kHz one and a Dolby MAT
-// 1.0 one (written there at 96 kHz content). WASAPI refuses a format that differs by a field.
-using iclforge::windows_audio::make_ac3_format;
-using iclforge::windows_audio::make_eac3_format;
-using iclforge::windows_audio::make_truehd_format;
-
-TEST_CASE("Dolby Digital Plus is Microsoft's example: a 2-channel link at 4x the content rate") {
-    const auto format = make_eac3_format(48000, 6);
-    const auto& wf = format.FormatExt.Format;
-    CHECK(wf.wFormatTag == WAVE_FORMAT_EXTENSIBLE);
-    CHECK(wf.nChannels == 2);
-    CHECK(wf.nSamplesPerSec == 192000);
-    CHECK(wf.nAvgBytesPerSec == 768000);
-    CHECK(wf.nBlockAlign == 4);
-    CHECK(wf.wBitsPerSample == 16);
-    CHECK(wf.cbSize == 34);
-    CHECK(format.FormatExt.Samples.wValidBitsPerSample == 16);
-    CHECK(format.dwEncodedSamplesPerSec == 48000);
-    CHECK(format.dwEncodedChannelCount == 6);
-    CHECK(format.dwAverageBytesPerSec == 0);
-    CHECK(sizeof(format) == 52);
-    CHECK(make_ac3_format(48000, 6).FormatExt.Format.nSamplesPerSec == 48000);
-}
-
-TEST_CASE("TrueHD in MAT is Microsoft's MAT 1.0 example: eight channels on a 192 kHz link") {
-    // Microsoft's example is 96 kHz content: the link is 192 kHz whatever the content rate of
-    // the 48 kHz family, and 176.4 kHz for the 44.1 family.
-    for (const std::uint32_t content : {48000U, 96000U, 192000U}) {
-        const auto format = make_truehd_format(iclforge::audio::link_rate(
-                                                   iclforge::audio::BitstreamFormat::kTrueHd, content),
-                                               content);
-        const auto& wf = format.FormatExt.Format;
-        CAPTURE(content);
-        CHECK(wf.wFormatTag == WAVE_FORMAT_EXTENSIBLE);
-        CHECK(wf.nChannels == 8);
-        CHECK(wf.nSamplesPerSec == 192000);
-        CHECK(wf.nAvgBytesPerSec == 3072000);
-        CHECK(wf.nBlockAlign == 16);
-        CHECK(wf.wBitsPerSample == 16);
-        CHECK(wf.cbSize == 34);
-        CHECK(format.FormatExt.Samples.wValidBitsPerSample == 16);
-        CHECK(format.FormatExt.dwChannelMask == 0xFF);  // KSAUDIO_SPEAKER_7POINT1
-        CHECK(format.dwEncodedSamplesPerSec == content);
-        CHECK(format.dwEncodedChannelCount == 8);
-        CHECK(format.dwAverageBytesPerSec == 0);
-        // KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP, {0000000c-0cea-0010-8000-00aa00389b71}.
-        CHECK(format.FormatExt.SubFormat.Data1 == 0x0000000c);
-        CHECK(format.FormatExt.SubFormat.Data2 == 0x0cea);
-        CHECK(format.FormatExt.SubFormat.Data3 == 0x0010);
-    }
-    const auto family = make_truehd_format(176400, 44100);
-    CHECK(family.FormatExt.Format.nSamplesPerSec == 176400);
-    CHECK(family.FormatExt.Format.nAvgBytesPerSec == 176400 * 16);
-}
-
-TEST_CASE("TrueHD at a content rate with no MAT link is refused before any endpoint is looked up") {
-    iclforge::audio::PassthroughSink sink;
-    const auto started = sink.start("", 32000, iclforge::audio::BitstreamFormat::kTrueHd);
-    REQUIRE_FALSE(started.has_value());
-    CHECK(started.error() == iclforge::audio::PassthroughError::kUnsupportedFormat);
-    CHECK_FALSE(sink.running());
 }
