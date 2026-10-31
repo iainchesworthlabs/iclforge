@@ -366,20 +366,40 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     least-squares FIR coefficients make the same stream within 0.04 per cent. **Recommendation:** do not write the IIR filter now: the gain is
     on one kind of source, no external decoder but FFmpeg's exercises the tool, and the encoder is already smaller than FFmpeg's wherever
     the comparison is valid except at 192 kHz, where the limit is the specification's (entry 35). Revisit if the owner's material is mostly
-    resampled up.
+    resampled up. *Read from the reference specification (§9.2, §9.3, §9.5, §9.6):* an IIR needs order 0 to 4 with order A + order B <= 8,
+    `coeff_q` 8 to 15 and the same for both filters of a channel, `coeff_bits` 1 to 16 with `coeff_bits + coeff_shift <= 16`, coefficients
+    within +-32767, `state_bits` 1 to 15 with the loaded state within +-2^23, and an output within +-2^23 (substreams 0 and 1) or +-2^31
+    (2 and 3); a restart never clears the IIR state (only the order and shift go to 0), so decoding from a restart on its own needs
+    `new_states` or a zero history. **The specification gives no stability criterion** for the quantised recursion, only these ranges and
+    "a conformant encoder SHALL detect filter overload", so the instability of my prototype is the case it leaves to the encoder. It says
+    nothing that ties IIR to resampled or band-limited material, and no decoder but FFmpeg's is known to exercise it (whether DEE writes
+    one is not looked at). The recommendation stands.
 92. **The corpus for the encoder comparison.** The repository has no 24-bit programme material: `testdata/audio` is 16 bit (a Mendelssohn
     recording, a spoken-word recording, a 2.5 s 5.1 reference), so the 24-bit rows of `compare_truehd_encoders.py --programme` are 16-bit samples
-    in a 24-bit container (they cost the same as the 16-bit rows) and the 7.1 rows repeat two 5.1 channels. **Recommendation:** 5 to 10
+    in a 24-bit container (they cost the same as the 16-bit rows) and the 7.1 rows repeat two 5.1 channels. The reference session holds no source material of
+    this kind (only the DEE-encoded set, which is not source) and knows of no licensed 24-bit, film or 7.1 recording; forge can synthesise
+    signals but that is not programme material. **Open, the owner's:** **Recommendation:** 5 to 10
     excerpts of 30 to 60 s that the owner is free to commit or to keep local (`--corpus DIR` reads a directory of WAV files), in three groups:
     music (24 bit, 48 and 96 kHz, 2.0 and 5.1), film (5.1 and 7.1) and speech, plus the 13 committed sources.
 93. **DEE's 20-bit tones stream is larger than forge's and than the 24-bit one (WP5 question 3).** `thd-fx-2ch-tones-48k20` is 16,298 bytes from DEE,
     9,954 from forge and 19,598 from FFmpeg's encoder, while the 16-bit stream of the same tones is 9,140 (DEE) and 9,116 (forge). Is there a DEE
-    option or behaviour that explains DEE's larger 20-bit stream? **Recommendation:** ask the owner, who has DEE's options; do not look in the stream.
+    option or behaviour that explains DEE's larger 20-bit stream? *From the specification only:* the one documented reason is the count of significant bits. `output_shift` and the
+    block's `huff_lsbs` capture trailing zeros, so 16 bit material in a 24 bit container has 8 and a 20 bit one 4, about 4 more significant
+    bits to code per sample; forge's 20 bit stream is 0.8 KB larger than its 16 bit one, DEE's 7 KB, FFmpeg's 5.7 KB. The specification has no
+    20-bit rule that forces extra size (dither and noise belong to `noise_type`, LSB bypass is optional, `mlp_quants` is only 0 = 16, 1 = 20,
+    2 = 24 bits), so forge's smaller stream is missing nothing it requires. Why DEE's is larger is an encoder strategy and not in the
+    specification. **Open, the owner's:** **Recommendation:** ask the owner, who has DEE's options; do not look in the stream.
 94. **What "better than DEE" means for the encoder (WP5 question 1).** The comparison reports size at equal losslessness, the only measure two
     lossless streams of one source have, and not speed: DEE is a licensed binary on another machine, so its speed is not comparable.
     **Recommendation:** size first (bytes for the same bit-exact decode), then forge's own speed against the real-time budget (`iclforge-perf`).
     On the 11 committed legs where DEE's stream is the source forge is 0.734 of its size in all and not larger on any (0.553 to 0.997); on the
-    5.1 music, the row that decided it, 0.966.
+    5.1 music, the row that decided it, 0.966. *The specification adds two budgets an authoring flow keeps, beyond size:* a peak data rate of
+    at most 18 Mbit/s (§4.4, raw 6000 at 48 kHz, Blu-ray's default and ceiling) and the 75 ms decoder latency (§18, `input_timing` steps of
+    at most `samples_per_75ms`, with `block_data_bits` at most 16,000 and at most 2 blocks per segment for 2 substreams). The encoder
+    declares and keeps the peak rate and the 75 ms already (entry 12; `encoder.cpp` refuses a stream it cannot send within both);
+    "real-time headroom" is that and the speed. **Not checked:** it has no test of its own for `block_data_bits` at most 16,000 or the
+    blocks per segment (a 192 kHz 6 channel stream of white noise has more than 16,000 bits in a block of 160 samples if sent raw), which
+    is a gap to measure with the stream probe and close in a later change. No tighter ceiling is known; the work-package README names none.
 
 ## Entries
 
