@@ -658,6 +658,28 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
 
+    if (index == kObjectSubstream && counters.object_checks_kept < 3) {
+        auto& stats = counters.object_stats;
+        for (int i = 0; i < block; ++i) {
+            const std::int32_t* const coded = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            const std::int32_t* const out = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            for (int ch = 0; ch < out_channels; ++ch) {
+                const auto c = static_cast<std::size_t>(ch);
+                const bool first = stats.samples == 0 && i == 0;
+                stats.coded_min[c] = first ? coded[ch] : std::min(stats.coded_min[c], coded[ch]);
+                stats.coded_max[c] = first ? coded[ch] : std::max(stats.coded_max[c], coded[ch]);
+                stats.out_min[c] = first ? out[ch] : std::min(stats.out_min[c], out[ch]);
+                stats.out_max[c] = first ? out[ch] : std::max(stats.out_max[c], out[ch]);
+                if (!first) {
+                    stats.coded_changes[c] += coded[ch] != stats.coded_last[c] ? 1U : 0U;
+                    stats.out_changes[c] += out[ch] != stats.out_last[c] ? 1U : 0U;
+                }
+                stats.coded_last[c] = coded[ch];
+                stats.out_last[c] = out[ch];
+            }
+            ++stats.samples;
+        }
+    }
     if (config.lab.lower_rows_after_matrices && index < kObjectSubstream) {
         std::copy_n(matrix_base, static_cast<std::size_t>(block) * kRowStride, rows_base);
     }

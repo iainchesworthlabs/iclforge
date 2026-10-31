@@ -10,6 +10,7 @@ The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of 
                                      [--dump-header]
                                      [--first-unit N] [--last-unit N]
                                      [--dump-bits N] [--lossless]
+                                     [--dump-unit U[,U...]]
 
 Substream 3 is parsed under each combination of the readings the specification leaves open
 (libs/truehd/ERRATA.md, entries 8 to 10 and 60): how many coefficients a matrix sends, whether a
@@ -554,6 +555,21 @@ def print_restart_bits(data, units, count, first_unit=0, last_unit=None, limit=5
             print(f"{at:5d} {text[at : at + 64]}")
 
 
+def print_unit_bits(data, units, wanted, count):
+    """The first `count` bits of substream 3's segment (payload) of each unit in `wanted`, as
+    binary, 64 to a line: the block header and what follows, for a unit that is not a restart.
+    For a stream of one's own test signal; parameters and the start of the residuals."""
+    for number, unit, entries, offset, stream_count in units_of(data, units):
+        if number not in wanted or stream_count < 4:
+            continue
+        entry, segment = list(segments_of(unit, entries, offset))[3]
+        payload = segment[:-2] if entry["crc_present"] else segment
+        text = "".join(f"{byte:08b}" for byte in payload)[:count]
+        print(f"unit {number}: segment {len(payload)} bytes")
+        for at in range(0, len(text), 64):
+            print(f"{at:5d} {text[at : at + 64]}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("stream", type=pathlib.Path)
@@ -595,6 +611,12 @@ def main():
         "check or the parse first fails",
     )
     parser.add_argument(
+        "--dump-unit",
+        default="",
+        metavar="U[,U...]",
+        help="print the first --dump-bits (default 600) bits of these units' substream 3 segment",
+    )
+    parser.add_argument(
         "--dump-header",
         action="store_true",
         help="print the bits after the restart header that the steady-state restarts all share",
@@ -616,6 +638,10 @@ def main():
         default = {key: values[0] for key, values in READINGS.items()}
         default["gap_bits"] = 0
         print(dict(full_decode(data, default, args.units)))
+        return 0
+    if args.dump_unit:
+        wanted = {int(item) for item in args.dump_unit.split(",") if item}
+        print_unit_bits(data, max(wanted) + 1, wanted, args.dump_bits or 600)
         return 0
     if args.dump_bits:
         print_restart_bits(data, args.units, args.dump_bits, args.first_unit, args.last_unit)

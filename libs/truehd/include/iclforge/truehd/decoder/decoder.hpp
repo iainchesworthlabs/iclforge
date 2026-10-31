@@ -135,6 +135,20 @@ struct DecoderCounters {
     std::array<std::uint8_t, kObjectChecksKept> object_check_stored{};
     std::array<std::uint8_t, kObjectChecksKept> object_check_folded{};
     std::size_t object_checks_kept = 0;
+    // The first three intervals of the object substream, by matrix channel: the smallest and the
+    // largest value and the number of samples that differ from the one before, in the rows as
+    // decoded (before the matrices) and in the rows as output (after them). Counts and ranges only.
+    struct ObjectStats {
+        std::array<std::int32_t, kMaxChannels> coded_min{};
+        std::array<std::int32_t, kMaxChannels> coded_max{};
+        std::array<std::uint32_t, kMaxChannels> coded_changes{};
+        std::array<std::int32_t, kMaxChannels> out_min{};
+        std::array<std::int32_t, kMaxChannels> out_max{};
+        std::array<std::uint32_t, kMaxChannels> out_changes{};
+        std::array<std::int32_t, kMaxChannels> coded_last{};
+        std::array<std::int32_t, kMaxChannels> out_last{};
+        std::uint64_t samples = 0;
+    } object_stats;
     std::uint64_t check_failures =
         0;  // nibble, major sync CRC, restart CRC, parity and segment CRC together
     // Block headers that send matrices, and the matrices among them with lsb_bypass set (TH spec

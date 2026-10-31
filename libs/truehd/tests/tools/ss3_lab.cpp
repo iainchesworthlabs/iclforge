@@ -28,7 +28,21 @@ struct Setting {
     DecoderLab lab;
 };
 
-void run(const std::vector<std::byte>& stream, const char* name, const DecoderLab& lab) {
+void print_stats(const DecoderCounters& c, int channels) {
+    std::printf("    object substream, first intervals (%llu samples), by matrix channel:\n"
+                "    ch  coded min..max (changes)        out min..max (changes)\n",
+                static_cast<unsigned long long>(c.object_stats.samples));
+    for (int ch = 0; ch < channels; ++ch) {
+        const auto i = static_cast<std::size_t>(ch);
+        std::printf("    %2d  %11d..%-11d (%5u)   %11d..%-11d (%5u)\n", ch,
+                    c.object_stats.coded_min[i], c.object_stats.coded_max[i],
+                    c.object_stats.coded_changes[i], c.object_stats.out_min[i],
+                    c.object_stats.out_max[i], c.object_stats.out_changes[i]);
+    }
+}
+
+void run(const std::vector<std::byte>& stream, const char* name, const DecoderLab& lab,
+         bool stats = false, bool brief = false) {
     DecoderConfig config;
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
@@ -66,6 +80,9 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
         std::printf("  first: %s", first_error.c_str());
     }
     std::printf("\n");
+    if (brief) {
+        return;
+    }
     // The first checks of the object substream: the stored byte, the folded byte, and their XOR.
     std::printf("    stored/folded/xor:");
     for (std::size_t i = 0; i < c.object_checks_kept; ++i) {
@@ -73,6 +90,9 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
                     static_cast<unsigned>(c.object_check_stored[i] ^ c.object_check_folded[i]));
     }
     std::printf("\n");
+    if (stats) {
+        print_stats(c, 12);
+    }
 }
 
 }  // namespace
@@ -94,25 +114,38 @@ int main(int argc, char** argv) {
         stream[i] = static_cast<std::byte>(raw[i]);
     }
     std::vector<Setting> settings;
-    for (int ext = 0; ext < 4; ++ext) {
-        DecoderLab base;
-        base.extension_variant = ext;
-        settings.push_back({"standard", base});
-        DecoderLab after = base;
-        after.lower_rows_after_matrices = true;
-        settings.push_back({"lower rows after their matrices", after});
-        DecoderLab keep = base;
-        keep.no_quantiser_mask = true;
-        settings.push_back({"no quantiser mask", keep});
-        DecoderLab reverse = base;
-        reverse.reverse_matrices = true;
-        settings.push_back({"matrices last to first", reverse});
-        DecoderLab shift = base;
-        shift.inverse_f_shift = true;
-        settings.push_back({"inverse f_shift", shift});
-    }
+    DecoderLab base;
+    settings.push_back({"standard", base});
+    DecoderLab after = base;
+    after.lower_rows_after_matrices = true;
+    settings.push_back({"lower rows after their matrices", after});
+    DecoderLab keep = base;
+    keep.no_quantiser_mask = true;
+    settings.push_back({"no quantiser mask", keep});
+    DecoderLab reverse = base;
+    reverse.reverse_matrices = true;
+    settings.push_back({"matrices last to first", reverse});
+    DecoderLab shift = base;
+    shift.inverse_f_shift = true;
+    settings.push_back({"inverse f_shift", shift});
+    bool first = true;
     for (const Setting& setting : settings) {
-        run(stream, setting.name, setting.lab);
+        run(stream, setting.name, setting.lab, first);
+        first = false;
+    }
+    // The grammars of the second precision term, under the standard arithmetic: a grammar that
+    // reads the owner's stream pushes the first error far past the first extension.
+    std::printf("grammars of the second precision term (variant: bit 0 all channels, bit 1 shared "
+                "width, bits 2-3 structure, bit 4 width + 1, bits 5-6 field bits):\n");
+    for (int variant = 0; variant < 128; ++variant) {
+        if (((variant >> 2) & 3) == 3) {
+            continue;
+        }
+        DecoderLab lab;
+        lab.extension_variant = variant;
+        char name[32];
+        std::snprintf(name, sizeof name, "extension variant %3d", variant);
+        run(stream, name, lab, false, true);
     }
     return 0;
 }

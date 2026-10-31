@@ -156,35 +156,67 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
             matrix.ext_value = {};
         }
     }
-    // The second precision term.
+    // The second precision term (A2). Its grammar is open (ERRATA.md entry 69), so the variants of
+    // BlockContext::object_extension_variant read it several ways: bit 0 reads a value for every
+    // matrix channel and not for the present ones; bit 1 shares one width among the matrices; bits
+    // 2 and 3 choose how B2 and C2 gate the widths and the values (0: B2 gates a block of C2, then
+    // C2 the widths and the values always follow; 1: B2 gates the widths, C2 the values; 2: the
+    // widths always follow A2, then the values); bit 4 adds one to the width of a value; bits 5 and
+    // 6 give the reserved field next to a width 2, 3, 0 or 1 bits.
     if (reader.read(1) != 0) {
         set.extension = true;
-        if (reader.read(1) != 0) {
-            const bool all_channels = (context.object_extension_variant & 1) != 0;
-            const bool shared_width = (context.object_extension_variant & 2) != 0;
-            if (reader.read(1) != 0) {
-                std::uint8_t shared = 0;
-                std::uint8_t shared_field = 0;
-                if (shared_width) {
-                    shared = static_cast<std::uint8_t>(reader.read(4));
-                    shared_field = static_cast<std::uint8_t>(reader.read(2));
-                }
-                for (unsigned m = 0; m < set.count; ++m) {
-                    MatrixSpec& matrix = set.items[m];
-                    matrix.ext_width = shared_width ? shared : static_cast<std::uint8_t>(reader.read(4));
-                    matrix.ext_field2 =
-                        shared_width ? shared_field : static_cast<std::uint8_t>(reader.read(2));
-                }
+        const int variant = context.object_extension_variant;
+        const bool all_channels = (variant & 1) != 0;
+        const bool shared_width = (variant & 2) != 0;
+        const int structure = (variant >> 2) & 3;
+        const int width_bias = (variant >> 4) & 1;
+        constexpr std::array<int, 4> kFieldBits{2, 3, 0, 1};
+        const int field_bits = kFieldBits[static_cast<std::size_t>((variant >> 5) & 3)];
+        const auto read_widths = [&] {
+            std::uint8_t shared = 0;
+            std::uint8_t shared_field = 0;
+            if (shared_width) {
+                shared = static_cast<std::uint8_t>(reader.read(4));
+                shared_field = static_cast<std::uint8_t>(reader.read(field_bits));
             }
             for (unsigned m = 0; m < set.count; ++m) {
                 MatrixSpec& matrix = set.items[m];
+                matrix.ext_width =
+                    shared_width ? shared : static_cast<std::uint8_t>(reader.read(4));
+                matrix.ext_field2 = shared_width
+                                        ? shared_field
+                                        : static_cast<std::uint8_t>(reader.read(field_bits));
+            }
+        };
+        const auto read_values = [&] {
+            for (unsigned m = 0; m < set.count; ++m) {
+                MatrixSpec& matrix = set.items[m];
+                const int width = matrix.ext_width + width_bias;
                 for (int c = 0; c < channels; ++c) {
                     const auto index = static_cast<std::size_t>(c);
-                    if ((all_channels || matrix.present[index]) && matrix.ext_width != 0) {
-                        matrix.ext_value[index] = read_signed(reader, matrix.ext_width);
+                    if ((all_channels || matrix.present[index]) && width > 0) {
+                        matrix.ext_value[index] = read_signed(reader, width);
                     }
                 }
             }
+        };
+        if (structure == 0) {
+            if (reader.read(1) != 0) {
+                if (reader.read(1) != 0) {
+                    read_widths();
+                }
+                read_values();
+            }
+        } else if (structure == 1) {
+            if (reader.read(1) != 0) {
+                read_widths();
+            }
+            if (reader.read(1) != 0) {
+                read_values();
+            }
+        } else {
+            read_widths();
+            read_values();
         }
     }
     return set;
