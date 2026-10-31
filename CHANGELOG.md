@@ -24,6 +24,10 @@ See [README.md](README.md) for the project overview and
   packets; each as a raw OBU stream and as an ISO-BMFF file, 17 files of 0.3 to 10 KB. `tools/fuzz/generate-seeds.sh` runs the tool when
   it is beside forge. `test_iamf_seeds.cpp` holds each seed to being read by its own framing's reader, decoded where it is `ipcm`, and
   refused by the other's. `tools/checks/check_fuzz_harnesses.py` has no known gap left.
+- **Fixed: a shared build of the library did not link `forge` or the TrueHD tests.** `EvolutionFrame::find` and `oamd` were defined in the library
+  and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
+  an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
+  tests and `forge` links, and the evolution tests pass against it.
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was

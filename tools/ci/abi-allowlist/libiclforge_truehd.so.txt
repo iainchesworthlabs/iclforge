@@ -30,6 +30,8 @@ iclforge::truehd::Encoder::samples_per_access_unit() const
 iclforge::truehd::Encoder::stats() const
 iclforge::truehd::Encoder::substreams() const
 iclforge::truehd::Encoder::~Encoder()
+iclforge::truehd::EvolutionFrame::find(unsigned long) const
+iclforge::truehd::EvolutionFrame::oamd() const
 iclforge::truehd::access_unit_length_bytes(std::span<std::byte const, 18446744073709551615ul>)
 iclforge::truehd::apply_edit(iclforge::truehd::ChannelMeaningEdit const&, iclforge::truehd::ChannelMeaning&)
 iclforge::truehd::channel_count_of_assignment(unsigned int)
