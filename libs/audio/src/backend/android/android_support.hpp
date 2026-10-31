@@ -41,7 +41,16 @@ namespace iclforge::android_audio {
 // carrier_ratio()).
 [[nodiscard]] constexpr std::uint32_t carrier_rate(audio::BitstreamFormat format,
                                                     std::uint32_t content_rate) {
-    return content_rate * audio::carrier_ratio(format);
+    return audio::link_rate(format, content_rate);
+}
+
+// The eight-channel mask the Kotlin bridge opens a MAT track with is CHANNEL_OUT_7POINT1_SURROUND
+// (0x18FC), and the bridge is told the CHANNEL COUNT, so that the native side names no Android
+// constant it does not need: audio::carrier_channels() is the count. A format whose link is not
+// two channels wide needs the bridge's link methods (isLinkSupported, openLink) rather than the
+// two-channel ones (isDirectPlaybackSupported, open), which every bridge has.
+[[nodiscard]] constexpr bool needs_link_bridge(audio::BitstreamFormat format) {
+    return audio::is_mat(format);
 }
 
 // AudioTrack.ERROR_DEAD_OBJECT, which AudioTrack.write() returns once the
@@ -71,7 +80,8 @@ inline constexpr int kAudioTrackErrorDeadObject = -6;
 [[nodiscard]] inline audio::RenderDeviceInfo make_render_device_info(bool ac3_supported,
                                                                      bool eac3_supported,
                                                                      bool pcm_supported,
-                                                                     bool ac4_supported = false) {
+                                                                     bool ac4_supported = false,
+                                                                     bool mat_supported = false) {
     audio::RenderDeviceInfo info;
     info.id = "default";
     info.name = "Android system audio output (HDMI-routed)";
@@ -79,6 +89,9 @@ inline constexpr int kAudioTrackErrorDeadObject = -6;
     info.supports_ac3_passthrough = ac3_supported;
     info.supports_eac3_passthrough = eac3_supported;
     info.supports_ac4_passthrough = ac4_supported;
+    // An ENCODING_IEC61937 track on the eight-channel mask at the MAT link rate, asked of the
+    // route with the bridge's isLinkSupported(): audio::carrier_channels() and carrier_rate().
+    info.supports_mat_passthrough = mat_supported;
     info.supports_exclusive_pcm = pcm_supported;
     return info;
 }

@@ -316,6 +316,19 @@
       "displayName": "Linux GCC Release"
     },
     {
+      "name": "config-linux-gcc-no-truehd",
+      "inherits": [ "release", "linux-gcc", "core" ],
+      "displayName": "Linux GCC Release, without the TrueHD codec",
+      "description": "ICLFORGE_BUILD_TRUEHD=OFF with the tests and examples on, which the root CMakeLists.txt allows only for a build with neither forge nor Hearth: forge decodes and probes TrueHD through iclforge::truehd unconditionally, and Hearth's engine links it. What this builds is the library without the codec: the C API answers every iclforge_truehd_* call with ICLFORGE_ERROR_UNSUPPORTED from libs/capi/src/truehd_absent.cpp, and libs/capi/tests/test_capi_truehd_absent.cpp holds it to that. No other leg builds that file (the minimal profiles that set the option have no tests). The _ci-core.yml job truehd-off runs it nightly.",
+      "cacheVariables": {
+        "ICLFORGE_BUILD_TRUEHD": "OFF",
+        "ICLFORGE_BUILD_CLI": "OFF",
+        "ICLFORGE_BUILD_GUI": "OFF",
+        "ICLFORGE_BUILD_HEARTH": "OFF",
+        "VCPKG_MANIFEST_FEATURES": ""
+      }
+    },
+    {
       "name": "config-linux-gcc-debug",
       "inherits": [ "debug", "linux-gcc", "core" ],
       "displayName": "Linux GCC Debug"
@@ -560,6 +573,11 @@
       "name": "build-windows-llvm-coverage",
       "configurePreset": "config-windows-llvm-coverage",
       "displayName": "Windows LLVM Debug + coverage"
+    },
+    {
+      "name": "build-linux-gcc-no-truehd",
+      "configurePreset": "config-linux-gcc-no-truehd",
+      "displayName": "Linux GCC Release, without the TrueHD codec"
     },
     {
       "name": "build-linux-gcc",
@@ -859,6 +877,12 @@
           "label": "concurrency"
         }
       }
+    },
+    {
+      "name": "test-linux-gcc-no-truehd",
+      "configurePreset": "config-linux-gcc-no-truehd",
+      "displayName": "Linux GCC Release Tests, without the TrueHD codec",
+      "inherits": "test-base"
     },
     {
       "name": "test-linux-gcc-coverage",
