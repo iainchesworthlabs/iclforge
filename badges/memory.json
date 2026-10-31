@@ -1,6 +1,6 @@
 {
   "color": "blue",
   "label": "allocation per frame (heaviest workload)",
-  "message": "AC-3 5.1 decode: 42 KB | E-AC-3 Atmos 4-object decode: 80 KB | AC-4 5.1 encode: 2009 KB | TrueHD 5.1 encode: 54 KB",
+  "message": "AC-3 5.1 decode: 42 KB | E-AC-3 Atmos 4-object decode: 80 KB | AC-4 5.1 encode: 2009 KB | TrueHD 7.1 encode: 80 KB",
   "schemaVersion": 1
 }
