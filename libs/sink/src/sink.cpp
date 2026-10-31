@@ -269,6 +269,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         reported_decoder_.reset();
         const std::string_view codec = stream.data_type == ac::DataType::kAc3    ? "AC-3 "
                                        : stream.data_type == ac::DataType::kEac3 ? "E-AC-3 "
+                                       : stream.data_type == ac::DataType::kTruehd ? "TrueHD "
                                                                                  : "AC-4 ";
         // "to 7.1.4" when the program renders to a layout, and nothing when it does not (it hands the
         // bytes on, as the Android app does).
