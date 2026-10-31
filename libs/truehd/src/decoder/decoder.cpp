@@ -926,7 +926,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 if (index == kObjectSubstream && counters.object_error_context.empty()) {
                     // Lab: where in the segment the object block header failed, and the state it
                     // was read against (counts and widths only).
-                    std::string text = "block header at bit " + std::to_string(header_start) +
+                    std::string text = "unit " + std::to_string(counters.units) + ": block header at bit " + std::to_string(header_start) +
                                        ", failed at bit " + std::to_string(reader.bit_position()) +
                                        ", flags " + std::to_string(state.context.presence_flags) +
                                        ", previous matrices " +
@@ -1018,7 +1018,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     bypassing += state.matrices[static_cast<std::size_t>(m)].lsb_bypass ? 1 : 0;
                 }
                 counters.object_error_context =
-                    "block data at bit " + std::to_string(block_start) + " failed at bit " +
+                    "unit " + std::to_string(counters.units) + ": block data at bit " + std::to_string(block_start) + " failed at bit " +
                     std::to_string(reader.bit_position()) + ", size " +
                     std::to_string(state.block_size) + ", matrices " +
                     std::to_string(state.matrix_count) + " of which " + std::to_string(bypassing) +
