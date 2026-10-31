@@ -45,10 +45,11 @@ template <class E, std::size_t N>
     return {};
 }
 
-constexpr std::array<Named<DataType>, 3> kDataTypes{{
+constexpr std::array<Named<DataType>, kDataTypeCount> kDataTypes{{
     {DataType::kAc3, "ac3"},
     {DataType::kEac3, "eac3"},
     {DataType::kAc4, "ac4"},
+    {DataType::kTruehd, "truehd"},
 }};
 
 constexpr std::array<Named<Output>, 2> kOutputs{{
@@ -113,6 +114,8 @@ constexpr std::int32_t kMaxCodedChannels = 64;
 constexpr std::int32_t kMaxObjects = 255;
 // AC-4's fastest frame rate is 120 fps; a limit above 1000 is not a limit.
 constexpr std::int32_t kMaxFrameRate = 1000;
+// The most a data rate limit may say, in kbit/s: the 18 Mbit/s TrueHD allows, with room to spare.
+constexpr std::int32_t kMaxDataRate = 100'000;
 // The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
 // characters at the most.
 constexpr std::size_t kMaxLayoutText = 512;
@@ -229,6 +232,8 @@ BurstDataType burst_data_type(DataType type) {
             return BurstDataType::kEac3;
         case DataType::kAc4:
             return BurstDataType::kAc4;
+        case DataType::kTruehd:
+            return BurstDataType::kTruehd;
     }
     return BurstDataType::kEac3;
 }
@@ -288,6 +293,17 @@ void write_support(json::Writer& w, const Support& support) {
         w.key("max_frame_rate").begin_object();
         for (const Named<DataType>& entry : kDataTypes) {
             if (const std::uint16_t limit = support.max_frame_rate_of(entry.value); limit != 0) {
+                w.member(entry.name, static_cast<std::int32_t>(limit));
+            }
+        }
+        w.end_object();
+    }
+    const bool any_data_rate_limit =
+        std::ranges::any_of(support.max_data_rate, [](std::uint32_t limit) { return limit != 0; });
+    if (any_data_rate_limit) {
+        w.key("max_data_rate").begin_object();
+        for (const Named<DataType>& entry : kDataTypes) {
+            if (const std::uint32_t limit = support.max_data_rate_of(entry.value); limit != 0) {
                 w.member(entry.name, static_cast<std::int32_t>(limit));
             }
         }
@@ -468,6 +484,24 @@ std::optional<Support> read_support(json::Value value) {
             }
             support.max_frame_rate[static_cast<std::size_t>(entry.value)] =
                 static_cast<std::uint16_t>(*rate);
+        }
+    }
+    // The coded data rate a sink takes, in kbit/s, the same shape as the frame rate.
+    if (const json::Value limits = value["max_data_rate"]; limits.exists()) {
+        if (!limits.is_object()) {
+            return std::nullopt;
+        }
+        for (const Named<DataType>& entry : kDataTypes) {
+            const json::Value limit = limits[entry.name];
+            if (!limit.exists()) {
+                continue;
+            }
+            const std::optional<std::int32_t> rate = read_int32(limit, 1, kMaxDataRate);
+            if (!rate) {
+                return std::nullopt;
+            }
+            support.max_data_rate[static_cast<std::size_t>(entry.value)] =
+                static_cast<std::uint32_t>(*rate);
         }
     }
     // The lyric document a sink holds: an object with the size, absent for a sink that takes none.

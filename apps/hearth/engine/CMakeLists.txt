@@ -32,7 +32,6 @@ add_library(hearth_engine STATIC
     src/stream_decoder.cpp
     src/take_recorder.cpp
     src/transport.cpp
-    src/truehd_index.cpp
     src/unit_reports.cpp)
 target_include_directories(hearth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(hearth_engine PUBLIC cxx_std_23)
@@ -82,6 +81,7 @@ endif()
 # take it up too.
 target_sources(hearth_engine PRIVATE
     "${PROJECT_SOURCE_DIR}/apps/shared/media/src/probe_json.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/truehd_stream.cpp"
     "${PROJECT_SOURCE_DIR}/apps/shared/media/src/ac4_object_render.cpp")
 target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
 
