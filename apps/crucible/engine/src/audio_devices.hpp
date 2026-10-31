@@ -47,8 +47,8 @@ struct DeviceFacts {
     bool is_default = false;
     bool accepts_eac3 = false;
     bool accepts_ac3 = false;
-    // Always false from the real probe for now: no audio backend carries MAT
-    // yet (libs/audio has no TrueHD BitstreamFormat). The fakes script it.
+    // From the real probe where the backend sends TrueHD (PipeWire's does, on
+    // a sink that lists it); false elsewhere. The fakes script it.
     bool accepts_truehd = false;
     std::uint16_t shared_channels = 0;
     bool spatial = false;
