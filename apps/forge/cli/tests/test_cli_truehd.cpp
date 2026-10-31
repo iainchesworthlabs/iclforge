@@ -2535,3 +2535,34 @@ TEST_CASE("monitor reads a TrueHD stream: it plays it, or says why the output ca
         CHECK(run_cli("monitor " + in + "truehd-presentation=7ch", log) == kExitUsage);
     }
 }
+
+TEST_CASE("record codec=truehd takes a lossless stream, or says why the device cannot",
+          "[forge-cli][truehd][record]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "record.log";
+    const fs::path stream = tone.dir / "recorded.thd";
+    SECTION("a take, or the missing device named") {
+        fs::remove(stream);
+        const int code = run_cli("record " + cli_arg(stream) + "1 192 0 codec=truehd", log);
+        const std::string text = read_text(log);
+        CHECK(text.find("codec must be ac3, eac3 or ac4") == std::string::npos);
+        if (code == 0) {
+            // A machine with a capture device: what it heard is a TrueHD stream that decodes.
+            REQUIRE(fs::exists(stream));
+            CHECK(text.find("recorded 1 s from ") != std::string::npos);
+            CHECK(run_cli("decode " + cli_arg(stream) + cli_arg(tone.dir / "recorded.wav"), log) == 0);
+        } else {
+            CHECK(code != kExitUsage);  // not a refusal of the option: the device is what is missing
+            CHECK_FALSE(fs::exists(stream));
+        }
+    }
+    SECTION("what it does not do is refused by name") {
+        CHECK(run_cli("record " + cli_arg(tone.dir / "recorded.ac3") + "1 192 0 codec=truehd", log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("name the output .thd") != std::string::npos);
+        CHECK(run_cli("record " + cli_arg(stream) + "1 192 0 codec=truehd dialnorm=27", log) == kExitUsage);
+        CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
+        CHECK(run_cli("live 0 1 " + cli_arg(tone.dir / "live.thd") + "codec=truehd", log) == kExitUsage);
+        CHECK(read_text(log).find("does not code TrueHD") != std::string::npos);
+    }
+}

@@ -544,6 +544,8 @@ struct Options {
     // always done them.
     std::string take_layout;
     std::optional<iclforge::ac3::plan::Codec> take_codec;
+    // record codec=truehd: a lossless TrueHD take (audio_io.cpp), which is not a plan::Codec.
+    bool take_truehd = false;
     // 'record'/'live' only: how long the capture device may deliver nothing
     // before the session stops as a failure rather than sitting there
     // reading "running" (iclforge::audio::SilenceWatchdog, the same class and the
