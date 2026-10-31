@@ -558,11 +558,23 @@ Each has a recommendation, and none is settled here.
 19. **The presentation a sink takes.** A sink that states 2 or 6 channels is sent PCM, though the stream's 2 and 6 channel
     presentations are substreams 0 and 1 and a sender could drop the rest (19 to 29% of the bytes for a 2 channel presentation).
     *Recommend:* build it with ESP32 phase 5, since only a sink that decodes fewer channels than the stream's best gains by it,
-    and it needs a test of the substream drop against the host's decode of that substream.
+    and it needs a test of the substream drop against the host's decode of that substream. *Answered 2026-11-01 (build it) and
+    built:* `keep_substreams` in `libs/truehd` cuts the units, the group plan names the substreams, and a loopback test plays the
+    cut stream into a sink limited to 2 channels against the library's own 2 channel decode.
 20. **A declared peak is not a measured one.** `max_data_rate` is compared with the peak the major sync declares (18 Mbit/s for
     this library's encoder by default), so a sink that states 12 Mbit/s refuses every stream the encoder writes with its default,
     though most never pass 5. *Recommend:* leave it; a stream's declared peak is what a sink must be able to take, and the
     encoder's peak is a setting (`truehd-peak-rate=`).
+21. **The S3 needs a cable replug.** The decoder probe ran on the C6 and the P4 (bit-exact, figures in
+    [the sinks page](truehd-parity-esp32-sinks.md#measured-on-the-c6-and-the-p4-2026-11-01)); the S3 on COM16 (bench `S3b`,
+    192.168.1.45, lock name `s3a`) stopped accepting writes on its USB-Serial-JTAG port after a GDB session, and a PnP restart
+    needs administrator rights. It holds the probe image in `ota_0` with `otadata` erased; the as-found `ota_0` head and
+    `otadata` are in `D:\ac3bld\truehd-probe-backup\s3b`. *Recommend:* unplug and replug that board's USB cable; then
+    the probe is flashed, read, and the board restored from the backup (the commands are in `firmware/truehd-probe/README.md`).
+22. **The decoder's stack and `reset()`.** Measured: 60 KB of stack on both RISC-V chips (the host estimate was 33 KB), and
+    `Decoder::reset()` builds the new state before releasing the old, so a reset peaks at 316 KB. *Recommend:* approve the
+    footprint work (Phase 1 of the sinks plan) in `libs/truehd`, which WP1 and WP5 also edit; first, release the old state
+    before building the new in `reset()`, a one-line change with the same behaviour that touches no kernel.
 
 The questions that block the most work are 1 and 2 (H5, H7), 5 (all of H6 and so H7), 7 (part of
 H4) and 8 (the last part of H0).

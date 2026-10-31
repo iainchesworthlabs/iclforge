@@ -10,6 +10,11 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
+- **Added: `firmware/truehd-probe`, the TrueHD decoder measured on an ESP32-C6 and an ESP32-P4.** It decodes eight fixtures from flash,
+  checks each against FFmpeg's PCM hash (all sixteen decodes match) and prints the time, heap and stack: the decoder takes 158 KB of heap
+  and 60 KB of stack (the host estimate of the stack, 33 KB, was low), a real-time factor of 0.34 (C6) and 0.13 (P4) for 2.0 at 48 kHz
+  and 0.80 and 0.32 for 5.1; the C6 cannot decode 2.0 at 192 kHz in real time (1.07). `Decoder::reset()` needs the decoder's footprint
+  twice. **Not done:** the S3 (its USB port stopped answering; it needs a cable replug), the decoder in a sink, and a smaller decoder.
 - **Added: Hearth sends TrueHD to the network sinks that decode it, as access units.** `_iclforge_player@v1` gains the data type
   `"truehd"` (a value of `data_types`, not a new version): a burst chunk of 1 to 24 whole access units, `Pc` 22, `Pd` in bytes, at
   most 61,424 bytes, so that a 48 kHz stream is 50 chunks a second and not the 1,200 messages of a unit each and not the 24.6 Mbit/s of
