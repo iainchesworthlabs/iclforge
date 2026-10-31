@@ -19,6 +19,8 @@
 #
 # Every download is checked against a SHA-256 pinned below. Then it prints the configure line.
 #
+# python3 must already be installed: the pins are read with it before apt runs.
+#
 # Usage:
 #   tools/dev/qt-sandbox-setup.sh [options] PREFIX
 #
@@ -62,7 +64,7 @@ APT_PACKAGES=(
     libgl-dev libegl-dev libxkbcommon-dev
     libasound2-dev libpipewire-0.3-dev libspa-0.2-dev
     libflac-dev libopus-dev
-    ninja-build cmake build-essential curl bzip2 patch python3-venv
+    ninja-build cmake build-essential curl bzip2 patch python3-venv git
 )
 
 die() { echo "qt-sandbox-setup: $*" >&2; exit "${2:-1}"; }
@@ -97,6 +99,8 @@ case "$prefix" in
 esac
 mkdir -p "$prefix"
 
+# Read before apt has run, so a machine without it (a minimal image) is told, not left with "command not found".
+command -v python3 >/dev/null 2>&1 || die "python3 is needed before anything else (the pins are read with it): apt-get install python3"
 toolchain_versions="$repo_root/.github/toolchain-versions.json"
 read_pin() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$toolchain_versions" "$1"; }
 qt_version="$(read_pin qt)"
@@ -160,8 +164,9 @@ install_qt() {
         # py7zr: the pinned aqtinstall needs 1.1.3 or later.
         "$prefix/aqt-venv/bin/pip" install --quiet "$aqt_source" "py7zr>=1.1.3"
     fi
-    "$prefix/aqt-venv/bin/aqt" install-qt linux desktop "$qt_version" linux_gcc_64 \
-        -O "$prefix/kit" -m qttasktree qtquick3d qtshadertools
+    # aqt writes aqtinstall.log into its working directory: the prefix, not the repository or a read-only one.
+    (cd "$prefix" && "$prefix/aqt-venv/bin/aqt" install-qt linux desktop "$qt_version" linux_gcc_64 \
+        -O "$prefix/kit" -m qttasktree qtquick3d qtshadertools)
     [[ -f "$qt_kit/lib/cmake/Qt6/Qt6Config.cmake" ]] || die "Qt $qt_version was not installed under $qt_kit"
     [[ -f "$qt_kit/lib/cmake/Qt6ShaderTools/Qt6ShaderToolsConfig.cmake" ]] ||
         die "qtshadertools is missing from $qt_kit: Quick 3D would be found and unusable"

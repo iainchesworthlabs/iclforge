@@ -22,8 +22,8 @@ and those scores are a series of their own, [AC-4 encode quality](quality-trend.
 Its race against DEE's streams of the same sources runs on a maintainer's machine and keeps no
 history to show here ([Validation: AC-4](verification.md#the-encoder)). TrueHD is not in it either. A lossless
 encoder has no quality to race, only size: `tools/checks/verify_truehd_encode_interop.py` records the TrueHD
-encoder's output beside FFmpeg's encoder's for the same input (0.95 times the size over the layouts FFmpeg writes,
-larger at 192 kHz, on full-scale squares and with the downmix presentations), and keeps no history. DEE's TrueHD
+encoder's output beside FFmpeg's encoder's for the same input (0.85 to 0.96 times the size at 44.1 to 96 kHz, larger at 192 kHz, on full-scale squares and with the downmix
+presentations), and keeps no history; [TrueHD against FFmpeg and DEE](truehd-comparison.md) holds the measured table and the method. DEE's TrueHD
 streams are not raced ([Validation: TrueHD](verification.md#truehd-and-mlp)).
 
 <div id="landscape-app">
