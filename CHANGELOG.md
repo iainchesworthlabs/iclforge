@@ -11,7 +11,7 @@ See [README.md](README.md) for the project overview and
 ## [Unreleased]
 
 - **Added: `forge probe` of a TrueHD or MLP stream reports the duration, the data rate against the declared peak (TH spec section 18), the presentations with their speakers, the word length and the restart spacing; `detail=checks` adds the lossless check.** The report moved to `apps/shared/media/src/probe_truehd.cpp`, where Hearth and the window can call it; the `truehd` member of `json=1` keeps its keys and gains these. Golden documents for every TrueHD and MLP fixture are in `testdata/truehd/golden`.
-- **Added: `forge transcode` reads a TrueHD or MLP stream and writes AC-3 or E-AC-3.** The decode of the presentation `truehd-presentation=` names is encoded as the target codec's WAV encode does; the stream's own dialogue norm is not carried (provisional). AC-4 is refused.
+- **Added: `forge transcode` reads a TrueHD or MLP stream and writes AC-3 or E-AC-3.** The decode of the presentation `truehd-presentation=` names is encoded as the target codec's WAV encode does; the dialogue norm the stream stores for the presentation decoded is carried as the dialnorm (the 6 and 8 channel fields as they are, the 2 channel one less 6). AC-4 is refused.
 - **Added: `forge cut` and `forge cat` read TrueHD and MLP streams.** A cut starts at the first access unit that carries a major sync at or
   after the time asked and prints the time it used; a join refuses an input that does not open with a major sync at byte 0 or differs in shape
   (stream type, rate, substreams, channels, channel assignment), and both move whole access units and change no byte. FFmpeg's strict decode of
