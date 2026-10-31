@@ -939,7 +939,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                             text += " " + std::to_string(state.context.object_previous->items[m].ext_width);
                         }
                     }
-                    counters.object_error_context = text + "; blocks of the segment: " + segment_trace;
+                    counters.object_error_context = text + ", error \"" +
+                                                    std::string(header.error().detail) +
+                                                    "\"; blocks of the segment: " + segment_trace;
                 }
                 state.running = false;
                 return std::unexpected(header.error());
@@ -1008,7 +1010,21 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 make_error(ErrorKind::kBadParameter,
                            "more than 255 samples in an access unit (TH spec §3.3)"));
         }
+        const std::size_t block_start = reader.bit_position();
         if (auto decoded = decode_block(index, state, reader, result.samples, emit); !decoded) {
+            if (index == kObjectSubstream && counters.object_error_context.empty()) {
+                int bypassing = 0;
+                for (int m = 0; m < state.matrix_count; ++m) {
+                    bypassing += state.matrices[static_cast<std::size_t>(m)].lsb_bypass ? 1 : 0;
+                }
+                counters.object_error_context =
+                    "block data at bit " + std::to_string(block_start) + " failed at bit " +
+                    std::to_string(reader.bit_position()) + ", size " +
+                    std::to_string(state.block_size) + ", matrices " +
+                    std::to_string(state.matrix_count) + " of which " + std::to_string(bypassing) +
+                    " with bypass, error \"" + std::string(decoded.error().detail) +
+                    "\"; blocks of the segment: " + segment_trace;
+            }
             state.running = false;
             return std::unexpected(decoded.error());
         }
