@@ -443,8 +443,6 @@ sp::DataType data_type_of(audio::BitstreamFormat format) {
         case audio::BitstreamFormat::kAc4:
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
-        // TrueHD has no Sendspin data type yet (H5): a group is never given a MAT stream.
-        case audio::BitstreamFormat::kMat:
             break;
         case audio::BitstreamFormat::kMat:
             // TrueHD in a group is the access units, not the MAT burst (sendspin::kTruehdUnitsPerChunk).
