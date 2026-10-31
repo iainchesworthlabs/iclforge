@@ -175,6 +175,8 @@ struct BlockContext {
     // The object-audio matrices in force before this header: its headers are the ones a section
     // that sends none reuses (TH spec §10.2.1a). Not owned; null when there are none.
     const MatrixSet* object_previous = nullptr;
+    // New headers keep the extension widths of the matrix at the same place in the last set.
+    bool object_inherit_widths = false;
     // The open grammar of the second precision term, for the owner's trials (ERRATA.md entry 69):
     // bit 0 reads a value for every matrix channel and not for the present ones, bit 1 shares one
     // width and one reserved field among the matrices.

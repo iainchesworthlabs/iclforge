@@ -400,6 +400,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     state.context.noise_type = header->noise_type();
     // TH spec §10.2.1a: restart sync 0x31EC has the object-audio matrix section.
     state.context.object_matrices = header->sync == kRestartSyncAtmos;
+    state.context.object_inherit_widths = config.lab.inherit_ext_widths;
     // ERRATA.md entry 69: the object matrices draw generator 1's noise, `field_m4` their shift.
     if (header->sync == kRestartSyncAtmos) {
         state.context.noise_type = true;
@@ -484,9 +485,12 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                                            ? c
                                            : kMaxChannels + (c - restart.matrix_channels());
                     plan.channel[slot] = static_cast<std::uint8_t>(column);
-                    const int scale = config.lab.inverse_f_shift
-                                          ? kMatrixShift - spec.frac_bits - spec.f_shift
-                                          : kMatrixShift - spec.frac_bits + spec.f_shift;
+                    const int scale = (config.lab.inverse_f_shift
+                                           ? kMatrixShift - spec.frac_bits - spec.f_shift
+                                           : kMatrixShift - spec.frac_bits + spec.f_shift) -
+                                      (config.lab.object_2b_divisor && restart.sync == kRestartSyncAtmos
+                                           ? spec.field_2b
+                                           : 0);
                     plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
                 }
             }
