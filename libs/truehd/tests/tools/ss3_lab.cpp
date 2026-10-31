@@ -141,6 +141,9 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
         std::printf("  first: %s", first_error.c_str());
     }
     std::printf("\n");
+    if (!c.object_error_context.empty()) {
+        std::printf("    %s\n", c.object_error_context.c_str());
+    }
     if (brief) {
         return;
     }
@@ -260,12 +263,6 @@ int main(int argc, char** argv) {
         DecoderLab tied = base;
         tied.object_tie_mode = mode;
         settings.push_back({kTieNames[mode], tied});
-    }
-    static const char* const kExtensionNames[] = {"", "extension refines by 2^-(width+1)", "extension refines by 2^-width", "extension refines (width+1), its block only"};
-    for (int mode = 1; mode <= 3; ++mode) {
-        DecoderLab refined = base;
-        refined.object_extension = mode;
-        settings.push_back({kExtensionNames[mode], refined});
     }
     DecoderLab cleared = base;
     cleared.object_restart_clears = true;

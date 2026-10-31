@@ -194,6 +194,29 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         REQUIRE(differs_from_a_shift_of_14);
     }
 
+    SECTION("the extension's finer part adds delta times channel, 2^-bits of a coefficient place") {
+        // ERRATA.md entry 69: coefficient + delta / 2^bits, the delta already scaled to 2^-15.
+        auto rows = base;
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        const std::array<std::int32_t, 2> coeff = {32768, -4 * 1594};
+        const std::array<std::int32_t, 2> delta = {0, 4 * 3986};
+        const std::array<std::uint16_t, kBlock> bypass{};
+        kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
+                              bypass.data(), rows.data(), kStride, {},
+                              kernels::FineTerms{delta.data(), 15});
+        bool differs_from_none = false;
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t main =
+                std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * (-4 * 1594);
+            const std::int64_t finer = std::int64_t{base[row + 1]} * (4 * 3986);
+            REQUIRE(rows[row + 4] ==
+                    static_cast<std::int32_t>(((main << 15) + finer) >> 30));
+            differs_from_none = differs_from_none || rows[row + 4] != static_cast<std::int32_t>(main >> 15);
+        }
+        REQUIRE(differs_from_none);
+    }
+
     SECTION("the output takes the matrix channel it is given, shifts it by that matrix channel's shift, and folds it") {
         const std::array<std::uint8_t, 3> assign = {2, 0, 1};
         const std::array<std::int8_t, 3> shift = {0, 2, -3};  // by matrix channel

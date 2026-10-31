@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 
 #include "iclforge/truehd/core/error.hpp"
@@ -80,9 +81,6 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
-    // The extension's deltas refine the coefficients: 0 they do not; 1 by 2^-(width + 1) of the
-    // coefficient's last place; 2 by 2^-width; 3 as 1, for the block that sends them only.
-    int object_extension = 0;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;
@@ -169,6 +167,7 @@ struct DecoderCounters {
         std::uint8_t out_bits = 0;
     };
     std::vector<ObjectIntervalFacts> object_interval_facts;
+    std::string object_error_context;  // the first object block header that failed (lab)
     // The quantiser steps and output shifts, by matrix channel, at the first interval's check.
     std::array<std::uint8_t, kMaxChannels> object_quant_step{};
     std::array<std::int8_t, kMaxChannels> object_output_shift{};

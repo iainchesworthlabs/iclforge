@@ -927,6 +927,11 @@ that follow the coefficients of that block: read this way the extension ends whe
 the layout an earlier message from the other session proposed; it failed on unit 4072 of `soll_e12` only because that block's start was misplaced, and its lab sweep (variant 16) predated the bypass. The deltas are read and not applied:
 what they do to the coefficients (a ramp over the block is the obvious candidate) is open, and so is why the first matrix of that restart (output 8, 9 coefficients) is missing from the matrix list.
 The 2b = 1 matrix has a coefficient of 2.0 on its own output if the divisor is left as it is, or 1.0 if the divisor takes `field_2b` as well; the second reading is untested.
+**Follow-up (2026-10-31, owner's runs).** (1) A block that sends new matrix headers keeps the extension widths of the matrix at the same place in the last set: soll_e12's first error moves from unit 4076 to 11319, soll_sil6 has 2 errors left (from 5);
+the decoder does it. (2) `field_2b` does not enter the coefficient divisor: with it ctl_c passes 1 of 93 intervals, not 43. (3) The deltas refine the coefficients: coefficient = base + delta / 2^(width + 1), in units of the base's last place
+(a delta is therefore half a place at most); the decoder applies them, and the finer part stands with the matrices until they are replaced. With the finer parts soll_e12 passes 11 of 296 checks (from 9) and soll_sil6 18 of 357 (from 15); a scale of
+2^-width gives 10 and 15. Provisional: no hand-built stream holds the scale, only `test_kernels.cpp` holds the arithmetic. The failing intervals of ctl_c and EX_00002a are not helped (their objects hardly move; the deltas are near 0).
+Still open: the next parse break of soll_e12 (unit 11319, "block header") and of soll_sil6 (unit 19277), and the bulk of the failing checks in files without any extension (ctl_d, EX_00002b).
 
 ## Atmos, spec v3.6
 

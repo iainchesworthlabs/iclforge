@@ -474,10 +474,11 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
             plan.noise_shift = spec.noise_shift;
-            const int mode = restart.sync == kRestartSyncAtmos ? config.lab.object_extension : 0;
-            const bool use_fine = mode != 0 && spec.ext_width != 0 && (mode != 3 || header.matrices->extension);
+            // The extension's deltas refine the coefficients by 2^-(width + 1) of their last place
+            // (ERRATA.md entry 69).
+            const bool use_fine = restart.sync == kRestartSyncAtmos && spec.ext_width != 0;
             if (use_fine) {
-                plan.fine_bits = spec.ext_width + (mode == 2 ? 0 : 1);
+                plan.fine_bits = spec.ext_width + 1;
             }
             if (restart.sync == kRestartSyncAtmos) {
                 plan.noise_shift = spec.field_m4;
@@ -877,8 +878,27 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     "the directory promises a restart header the segment lacks (TH spec §6.2)"));
             }
             state.context.object_previous = state.object_have ? &state.object_last : nullptr;
+            const std::size_t header_start = reader.bit_position();
             auto header = read_block_header(reader, state.context);
             if (!header) {
+                if (index == kObjectSubstream && counters.object_error_context.empty()) {
+                    // Lab: where in the segment the object block header failed, and the state it
+                    // was read against (counts and widths only).
+                    std::string text = "block header at bit " + std::to_string(header_start) +
+                                       ", failed at bit " + std::to_string(reader.bit_position()) +
+                                       ", flags " + std::to_string(state.context.presence_flags) +
+                                       ", previous matrices " +
+                                       std::to_string(state.context.object_previous != nullptr
+                                                          ? state.context.object_previous->count
+                                                          : -1) +
+                                       ", widths";
+                    if (state.context.object_previous != nullptr) {
+                        for (unsigned m = 0; m < state.context.object_previous->count; ++m) {
+                            text += " " + std::to_string(state.context.object_previous->items[m].ext_width);
+                        }
+                    }
+                    counters.object_error_context = text;
+                }
                 state.running = false;
                 return std::unexpected(header.error());
             }
