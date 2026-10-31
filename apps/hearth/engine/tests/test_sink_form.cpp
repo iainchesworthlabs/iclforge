@@ -716,12 +716,19 @@ TEST_CASE("sink form: a layout the sink's PCM cannot carry is folded to the wide
     }
 }
 
-TEST_CASE("sink form: PCM is sent at the stream's own rate, which this app does not resample",
+TEST_CASE("sink form: PCM is sent at the stream's own rate, and converted to another only when "
+          "the sink lists none at it",
           "[hearth][sink_form]") {
     SinkFacts sink;
     sink.kind = SinkKind::kStandardPlayer;
     sink.pcm_formats.push_back({.channels = 2, .sample_rate = 44100, .bit_depth = 16});
-    const auto choice = choose_sink_form(ac3(6), sink);
+    // Converting is on by default: the sink is sent 44.1 kHz and the reason says so.
+    const auto converted = choose_sink_form(ac3(6), sink);
+    CHECK(converted.form == SinkForm::kPcm);
+    CHECK(converted.sample_rate == 44100);
+    CHECK(mentions(converted.reason, "converted here from 48000 Hz to 44100 Hz"));
+    // Switched off, it is sent nothing and the reason names the rates it does list.
+    const auto choice = choose_sink_form(ac3(6), sink, {.convert_rate = false});
     CHECK(choice.form == SinkForm::kNone);
     CHECK(mentions(choice.reason, "44100 Hz only"));
     CHECK(mentions(choice.reason, "48000"));
@@ -1007,4 +1014,125 @@ TEST_CASE("sink form: a group of a board that takes karaoke and one that does no
     // The board that takes it decodes for itself; the other is sent PCM that has it applied.
     CHECK(plan.members[0].action == MemberAction::kCoded);
     CHECK(plan.members[1].action == MemberAction::kPcm);
+}
+
+namespace {
+
+// A board that lists stereo PCM at each of `rates` (16-bit), as the test sink and the boards do.
+SinkFacts pcm_board(std::vector<std::uint32_t> rates, const std::string& id = "board") {
+    SinkFacts sink = hearth_sink({}, {});
+    sink.id = id;
+    for (const std::uint32_t rate : rates) {
+        sink.pcm_formats.push_back({.channels = 2, .sample_rate = rate, .bit_depth = 16});
+    }
+    return sink;
+}
+
+// An item with no coded form (TrueHD, until it travels as it is) at `rate`.
+StreamNeeds decoded_at(std::uint32_t rate) {
+    return {.stream = std::nullopt, .sample_rate = rate, .coded_channels = 2};
+}
+
+}  // namespace
+
+TEST_CASE("sink form: a rate the sink does not list is converted to the nearest it does",
+          "[hearth][sink_form][rate]") {
+    const SinkFacts board = pcm_board({48000, 44100});
+
+    SECTION("96 kHz goes to 48 kHz, and 88.2 kHz to 44.1 kHz: the same family") {
+        const auto choice = choose_sink_form(decoded_at(96000), board);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        CHECK(choice.sample_rate == 48000);
+        CHECK(mentions(choice.reason, "converted here from 96000 Hz to 48000 Hz"));
+        const auto low = choose_sink_form(decoded_at(88200), board);
+        REQUIRE(low.form == SinkForm::kPcm);
+        CHECK(low.sample_rate == 44100);
+    }
+    SECTION("192 kHz and 176.4 kHz likewise") {
+        CHECK(choose_sink_form(decoded_at(192000), board).sample_rate == 48000);
+        CHECK(choose_sink_form(decoded_at(176400), board).sample_rate == 44100);
+    }
+    SECTION("a rate the sink lists is sent as it is, with nothing to convert") {
+        const auto choice = choose_sink_form(decoded_at(48000), board);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        CHECK(choice.sample_rate == 0);
+        CHECK_FALSE(mentions(choice.reason, "converted"));
+    }
+    SECTION("a sink that lists one rate below the stream's is converted down to it") {
+        const auto choice = choose_sink_form(decoded_at(96000), pcm_board({32000}));
+        REQUIRE(choice.form == SinkForm::kPcm);
+        CHECK(choice.sample_rate == 32000);
+    }
+    SECTION("with conversion off the sink is sent nothing, and the reason names its rates") {
+        const auto choice =
+            choose_sink_form(decoded_at(96000), board, {.convert_rate = false});
+        CHECK(choice.form == SinkForm::kNone);
+        CHECK(mentions(choice.reason, "44100"));
+        CHECK(mentions(choice.reason, "not 96000 Hz"));
+    }
+    SECTION("a sink set to Opus is sent Opus at 48 kHz, converted") {
+        SinkFacts opus = pcm_board({48000});
+        opus.codecs = {"opus", "pcm"};
+        const auto choice = choose_sink_form(decoded_at(96000), opus, {.opus = true});
+        REQUIRE(choice.form == SinkForm::kPcm);
+        CHECK(choice.codec == iclforge::hearth::PcmCodec::kOpus);
+        CHECK(choice.sample_rate == 48000);
+        CHECK(mentions(choice.reason, "converted here from 96000 Hz"));
+    }
+}
+
+TEST_CASE("sink form: a group is sent PCM at one rate", "[hearth][sink_form][rate][group]") {
+    const auto master = iclforge::render::OutputLayout::named("2.0");
+    REQUIRE(master.has_value());
+
+    SECTION("boards that list 48 kHz and 44.1 kHz are all sent 48 kHz") {
+        const std::vector<SinkFacts> sinks{pcm_board({48000}, "a"), pcm_board({48000, 44100}, "b")};
+        const auto plan = plan_group_forms(decoded_at(96000), *master, sinks);
+        CHECK(plan.pcm_rate == 48000);
+        REQUIRE(plan.members.size() == 2);
+        for (const auto& member : plan.members) {
+            CHECK(member.action == iclforge::hearth::MemberAction::kPcm);
+            CHECK(member.sample_rate == 48000);
+            CHECK(mentions(member.label, "48000 Hz"));
+        }
+    }
+    SECTION("the rate most of the sinks take is the group's; one that does not is held back") {
+        const std::vector<SinkFacts> sinks{pcm_board({48000}, "a"), pcm_board({48000}, "b"),
+                                           pcm_board({44100}, "c")};
+        const auto plan = plan_group_forms(decoded_at(96000), *master, sinks);
+        CHECK(plan.pcm_rate == 48000);
+        CHECK(plan.members[0].action == iclforge::hearth::MemberAction::kPcm);
+        CHECK(plan.members[1].action == iclforge::hearth::MemberAction::kPcm);
+        REQUIRE(plan.members[2].action == iclforge::hearth::MemberAction::kHold);
+        CHECK(mentions(plan.members[2].choice.reason, "48000"));
+    }
+    SECTION("a sink that lists the stream's own rate keeps the group at it when most do") {
+        const std::vector<SinkFacts> sinks{pcm_board({96000, 48000}, "a"),
+                                           pcm_board({96000}, "b"), pcm_board({48000}, "c")};
+        const auto plan = plan_group_forms(decoded_at(96000), *master, sinks);
+        CHECK(plan.pcm_rate == 0);
+        CHECK(plan.members[0].action == iclforge::hearth::MemberAction::kPcm);
+        CHECK(plan.members[1].action == iclforge::hearth::MemberAction::kPcm);
+        CHECK(plan.members[2].action == iclforge::hearth::MemberAction::kHold);
+    }
+    SECTION("a stream at a rate every member lists needs no conversion") {
+        const std::vector<SinkFacts> sinks{pcm_board({48000}, "a"), pcm_board({48000}, "b")};
+        const auto plan = plan_group_forms(decoded_at(48000), *master, sinks);
+        CHECK(plan.pcm_rate == 0);
+    }
+    SECTION("PCM at another rate does not go with the stream sent as it is") {
+        SinkFacts decodes = hearth_sink({sp::DataType::kAc3});
+        decodes.id = "decodes";
+        decodes.iclforge_support->sample_rates = {48000, 44100};
+        const std::vector<SinkFacts> sinks{decodes, pcm_board({48000}, "board")};
+        // A 44.1 kHz AC-3 programme: the board lists 48 kHz, so would be converted, and the group
+        // also carries the burst stream on a 44.1 kHz timeline.
+        const auto plan = plan_group_forms(
+            {.stream = BitstreamFormat::kAc3, .sample_rate = 44100, .coded_channels = 2}, *master,
+            sinks);
+        CHECK(plan.pcm_rate == 0);
+        CHECK(plan.members[0].action == iclforge::hearth::MemberAction::kCoded);
+        REQUIRE(plan.members[1].action == iclforge::hearth::MemberAction::kHold);
+        CHECK(mentions(plan.members[1].choice.reason, "own timeline at 44100 Hz"));
+    }
 }

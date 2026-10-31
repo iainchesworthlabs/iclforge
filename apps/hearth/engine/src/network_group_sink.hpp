@@ -226,13 +226,25 @@ struct GroupPlanRequest {
     render::OutputLayout layout{};
 };
 
+// What a MemberPlanner answers: the layouts, beyond the request's, that the members chosen for PCM
+// take; and the rate they take it at when that is not the stream's, which the group's sink then
+// converts to (dsp::StreamResampler). A list of layouts alone is a plan with no conversion.
+struct GroupPlan {
+    std::vector<render::OutputLayout> variants{};
+    std::uint32_t pcm_rate = 0;
+
+    GroupPlan() = default;
+    // NOLINTNEXTLINE(google-explicit-constructor): a planner that has no rate to change answers a list.
+    GroupPlan(std::vector<render::OutputLayout> layouts, std::uint32_t rate = 0)
+        : variants(std::move(layouts)), pcm_rate(rate) {}
+};
+
 // Decides, for each member of a group, the form it is sent the programme in
 // (choose_sink_form()), tells the host (ServerHost::use_pcm()), and answers
 // the layouts, beyond the request's, that the members chosen for PCM are to
 // get. Called when a group opens, on the engine's thread. With none, the
 // group plays PCM at the player's layout to whichever members take it.
-using MemberPlanner =
-    std::function<std::vector<render::OutputLayout>(const GroupPlanRequest& request)>;
+using MemberPlanner = std::function<GroupPlan(const GroupPlanRequest& request)>;
 
 // Tells the members of group `group_id` that decode for themselves how to reproduce a karaoke
 // stream, for a choice made while it plays (NetworkGroupSink::set_karaoke()).

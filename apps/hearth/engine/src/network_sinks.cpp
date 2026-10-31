@@ -802,7 +802,7 @@ SinkFacts NetworkSinks::facts_locked(const std::string& instance, const Entry& e
     return facts;
 }
 
-std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanRequest& request) {
+GroupPlan NetworkSinks::plan_group(const GroupPlanRequest& request) {
     if (host_ == nullptr) {
         return {};
     }
@@ -900,7 +900,7 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
             publish_locked();
         }
     }
-    return plan.variants;
+    return GroupPlan{plan.variants, plan.pcm_rate};
 }
 
 bool NetworkSinks::tell_karaoke(const std::string& sink_id, const SinkFacts& facts,

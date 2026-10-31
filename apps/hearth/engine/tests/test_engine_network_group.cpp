@@ -36,6 +36,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/dsp/stream_resampler.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
@@ -44,12 +45,14 @@
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
 #include "iclforge/sendspin/server_store.hpp"
+#include "item_source.hpp"
 #include "network_group_sink.hpp"
 #include "network_sinks.hpp"
 #include "pairing_store.hpp"
 #include "settings_model.hpp"
 #include "sink.hpp"
 #include "stream_decoder.hpp"
+#include "truehd_test_support.hpp"
 
 // Issue #874's own exit (planning/hearth-reference-player.md, A6): "from the
 // app, a group of two test sinks... plays one programme." Unlike
@@ -228,6 +231,10 @@ bool eventually(const std::function<bool()>& done) {
 class CodeLog final : public testsink::SinkLog {
    public:
     void line(std::string_view text) override {
+        {
+            const std::lock_guard lock(mutex_);
+            lines_.emplace_back(text);
+        }
         const std::size_t at = text.find("PAIRING CODE ");
         if (at == std::string_view::npos) {
             return;
@@ -245,10 +252,18 @@ class CodeLog final : public testsink::SinkLog {
         const std::lock_guard lock(mutex_);
         return code_;
     }
+    // Whether the sink has logged a line holding `text`.
+    bool saw(std::string_view text) {
+        const std::lock_guard lock(mutex_);
+        return std::ranges::any_of(lines_, [&](const std::string& line) {
+            return line.find(text) != std::string::npos;
+        });
+    }
 
    private:
     std::mutex mutex_;
     std::optional<std::string> code_;
+    std::vector<std::string> lines_;
 };
 
 std::optional<iclforge::hearth::SinkFacts> find_sink(iclforge::hearth::NetworkSinks& sinks,
@@ -2548,4 +2563,167 @@ TEST_CASE("engine: members that leave and rejoin a group while it plays do not d
     stop = true;
     page.join();
     CHECK(polls.load() > 0);
+}
+
+// planning/truehd-parity-hearth-player.md, H4: a 96 kHz item to a group whose sinks list 48 kHz and
+// 44.1 kHz. Two take PCM and one is set to Opus; the sink that lists 8 channels only has no form at
+// all and is sent nothing, with the reason. The audio is converted here, once, for the group: each
+// PCM sink plays the item at 48 kHz, half as many frames as the item has, and what it plays is the
+// converter's output for the item's own samples.
+TEST_CASE("engine: a 96 kHz item reaches a group of 48 kHz sinks converted, as PCM and as Opus",
+          "[hearth][group][websocket][iclforge][truehd][rate]") {
+    namespace ss = iclforge::sendspin;
+    namespace th = iclforge::hearth::testing;
+    const fs::path scratch = fs::path{ICLFORGE_TEST_SCRATCH_DIR} /
+                             ("hearth_engine_group_rate_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    constexpr std::uint64_t kItemFrames = 96000;
+    const th::MadeStream made = th::make_stream(2, kItemFrames, 96000);
+
+    CodeLog first_log;
+    CodeLog second_log;
+    CodeLog opus_log;
+    CodeLog held_log;
+    const auto make_sink = [&](const std::string& name, CodeLog& log,
+                               std::vector<m::Codec> codecs, std::vector<std::int32_t> widths) {
+        testsink::SinkOptions options;
+        options.name = name;
+        options.address = "127.0.0.1";
+        options.port = 0;
+        options.state_directory = scratch / name / "state";
+        options.output_directory = scratch / name / "out";
+        options.advertise = false;
+        options.codecs = std::move(codecs);
+        options.layout = "2.0";
+        options.max_coded_channels = 2;
+        options.pcm_channels = std::move(widths);
+        auto started = testsink::Sink::start(options, log);
+        REQUIRE(started.has_value());
+        return std::move(*started);
+    };
+    const std::unique_ptr<testsink::Sink> first =
+        make_sink("first", first_log, {m::Codec::kPcm}, {2});
+    const std::unique_ptr<testsink::Sink> second =
+        make_sink("second", second_log, {m::Codec::kPcm}, {2});
+    const std::unique_ptr<testsink::Sink> opus =
+        make_sink("opus", opus_log, {m::Codec::kPcm, m::Codec::kOpus}, {2});
+    const std::unique_ptr<testsink::Sink> held = make_sink("held", held_log, {m::Codec::kPcm}, {8});
+
+    iclforge::hearth::MemorySettingsStore settings;
+    iclforge::hearth::PairingStore store{settings, [] { return std::string("2026-10-31"); }};
+    const std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    iclforge::hearth::NetworkSinks sinks{*identity, "Test Hearth", store,
+                                         iclforge::hearth::NetworkSinksOptions{.browse = false}};
+    REQUIRE(sinks.started());
+    const std::map<const testsink::Sink*, std::string> names{
+        {first.get(), "first"}, {second.get(), "second"}, {opus.get(), "opus"}, {held.get(), "held"}};
+    for (const testsink::Sink* sink : {first.get(), second.get(), opus.get(), held.get()}) {
+        sinks.on_found(ss::discovery::Service{.instance = names.at(sink),
+                                              .host = "127.0.0.1",
+                                              .addresses = {"127.0.0.1"},
+                                              .port = sink->port(),
+                                              .txt = {{.key = "path", .value = "/sendspin"}}});
+    }
+    pair_through(sinks, "first", first_log);
+    pair_through(sinks, "second", second_log);
+    pair_through(sinks, "opus", opus_log);
+    pair_through(sinks, "held", held_log);
+    REQUIRE(sinks.set_sink_opus_fallback("opus", true));
+
+    const std::string group_id = sinks.create_group("Rates");
+    REQUIRE_FALSE(group_id.empty());
+    for (const char* id : {"first", "second", "opus", "held"}) {
+        sinks.add_group_member(group_id, id);
+    }
+    const std::shared_ptr<ss::Group> group = sinks.group(group_id);
+    REQUIRE(group != nullptr);
+
+    const ItemLoader loader =
+        [&made](const std::string& path) -> std::expected<LoadedItem, std::string> {
+        if (path != "item") {
+            return std::unexpected("no such file: " + path);
+        }
+        return LoadedItem{.source = std::make_shared<iclforge::hearth::MemoryByteSource>(made.bytes),
+                          .truehd = true};
+    };
+    const auto master = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(master.has_value());
+    EngineOutputs outputs{.group = iclforge::hearth::make_group_sink(
+                              [group](const std::string&) { return group; },
+                              [&sinks](const iclforge::hearth::GroupPlanRequest& request) {
+                                  return sinks.plan_group(request);
+                              })};
+    Engine engine(std::move(outputs), loader, *master, iclforge::hearth::DecoderSettings{},
+                  EngineTiming{.period = 5ms, .budget = 4800});
+    engine.set_output_preferences(OutputPreferences{.pinned = OutputMode::kNetworkGroup,
+                                                    .follow_sink = true,
+                                                    .group_name = group_id,
+                                                    .group_ready = true});
+    engine.add({QueueItem{.path = "item", .title = "96 kHz"}});
+    engine.play();
+    REQUIRE(eventually([&] {
+        const EngineStatus status = engine.status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+    const EngineStatus finished = engine.status();
+    INFO("output_reason: " << finished.output_reason << " / note: " << finished.note
+                           << " / error: " << finished.error);
+    REQUIRE(finished.history.size() == 1);
+    // The item played to its end, counted in its own frames.
+    CHECK(finished.history.front().frames == finished.history.front().expected_frames);
+
+    // The group is sent 48 kHz: half the item's frames, less the converter's delay, which the
+    // item's end does not flush (it is under a millisecond).
+    const std::uint64_t group_frames = kItemFrames / 2;
+    REQUIRE(eventually([&] {
+        return first->totals().frames >= group_frames - 200 &&
+               second->totals().frames >= group_frames - 200 &&
+               opus->totals().frames >= group_frames - 4800;
+    }));
+    CHECK(first->totals().frames <= group_frames);
+    CHECK(second->totals().frames == first->totals().frames);
+    CHECK(opus_log.saw("stream Opus 48000 Hz"));
+    CHECK(first_log.saw("stream PCM"));
+    // The sink with no 2-channel PCM was sent nothing, and the page is told why.
+    CHECK(held->totals().frames == 0);
+    CHECK(held->totals().chunks == 0);
+    bool said_so = false;
+    for (const std::string& line : sinks.take_log()) {
+        said_so = said_so ||
+                  (line.find("converted here from 96000 Hz to 48000 Hz") != std::string::npos);
+    }
+    CHECK(said_so);
+
+    // What a PCM sink played is the converter's output for the item's samples, within a step of
+    // the 16-bit WAV it wrote.
+    std::vector<std::vector<float>> source(2);
+    for (std::size_t frame = 0; frame < made.frames; ++frame) {
+        for (std::size_t channel = 0; channel < 2; ++channel) {
+            source[channel].push_back(
+                static_cast<float>(made.pcm[(frame * 2) + channel]) / 8388608.0F);
+        }
+    }
+    iclforge::dsp::StreamResampler reference{96000, 48000, 2};
+    std::vector<std::vector<float>> want;
+    const std::array<std::span<const float>, 2> in{source[0], source[1]};
+    reference.process(in, source[0].size(), want);
+    const auto wav = read_wav_holding(
+        only_file(scratch / "first" / "out", "stream-", ".wav").string(), first->totals().frames);
+    REQUIRE(wav.has_value());
+    REQUIRE(wav->channels.size() == 2);
+    const std::size_t compared = std::min<std::size_t>(wav->frame_count(), want[0].size());
+    REQUIRE(compared > group_frames - 400);
+    double worst = 0.0;
+    double energy = 0.0;
+    for (std::size_t channel = 0; channel < 2; ++channel) {
+        for (std::size_t frame = 0; frame < compared; ++frame) {
+            worst = std::max(worst, std::abs(static_cast<double>(wav->channels[channel][frame]) -
+                                             static_cast<double>(want[channel][frame])));
+            energy += static_cast<double>(want[channel][frame]) *
+                      static_cast<double>(want[channel][frame]);
+        }
+    }
+    CHECK(worst < 2.0 / 32768.0);
+    CHECK(energy > 1.0);
 }
