@@ -825,17 +825,21 @@ since none opens the eight-channel high-bit-rate link it needs.
 `RenderDeviceInfo::supports_ac4_passthrough` says whether an endpoint takes the base link; no
 platform reports whether the receiver decodes AC-4, and no receiver found so far does.
 
-**TrueHD.** `BitstreamFormat::kTrueHd` is TrueHD in MAT (IEC 61937 data type 22), and the PipeWire backend alone sends it: SPA's
-`TRUEHD` codec on a link of eight 16-bit channels at 192 kHz (176.4 kHz for the 44.1 family), a 61,440-byte burst being 3,840
-link frames of 16 bytes and 20 ms. `carrier_channels()` and `carrier_frame_bytes()` say how wide a link frame is, and
+**TrueHD.** `BitstreamFormat::kTrueHd` is TrueHD in MAT (IEC 61937 data type 22), and the PipeWire and WASAPI backends send it. On
+PipeWire it is SPA's `TRUEHD` codec; on WASAPI it is `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP` (MAT 1.0) in Microsoft's own worked
+example's values: 8 channels, a 7.1 mask, 16 bits, `dwEncodedChannelCount` 8. Either way the link is eight 16-bit channels at 192 kHz
+for the 48 kHz family (48, 96 and 192 kHz content) and 176.4 kHz for the 44.1 family (`link_rate()`), a 61,440-byte burst being 3,840
+link frames of 16 bytes and 20 ms (21.8 ms for the 44.1 family). `carrier_channels()` and `carrier_frame_bytes()` say how wide a link frame is, and
 `position()` still counts content frames, 960 to a burst at 48 kHz. A sink is probed for it only when its `iec958.codecs` lists
-`TrueHD`, and `RenderDeviceInfo::supports_truehd_passthrough` reports the answer. Every other backend refuses the format with
-`kUnsupportedFormat` before it looks up a device. The carrier is the owner's reading, confirmed on 2026-10-31
+`TrueHD`, WASAPI is asked with `IsFormatSupported` in exclusive mode, and `RenderDeviceInfo::supports_truehd_passthrough` reports the
+answer. ALSA, Android and Core Audio refuse the format with `kUnsupportedFormat` before they look up a device, and every backend
+does at a content rate outside both families. The carrier is the owner's reading, confirmed on 2026-10-31
 ([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md), item 7); **no
 receiver has been played one**, so nothing shows that a sink accepts the link as asked or that a receiver locks on it, and the
-rate PipeWire is told is the E-AC-3 convention (the link's) extended, unchecked against a sink. The ALSA capability parser files a
+rate PipeWire is told is the E-AC-3 convention (the link's) extended, unchecked against a sink, and whether a 5.1 stream wants
+WASAPI's `dwEncodedChannelCount` 6 and not Microsoft's 8 is not something its page says. The ALSA capability parser files a
 TrueHD coding type under "other". The library packs MAT bursts
-([TrueHD in the containers](#truehd-in-the-containers)) and `forge spdif` writes them to a file; nothing but PipeWire sends one to a device,
+([TrueHD in the containers](#truehd-in-the-containers)) and `forge spdif` writes them to a file; nothing but PipeWire and WASAPI sends one to a device,
 and no receiver has been tried with one. This is a gap against E-AC-3 and AC-4 on this page, tracked in the roadmap row
 [TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 

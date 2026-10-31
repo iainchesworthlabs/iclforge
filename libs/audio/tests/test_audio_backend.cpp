@@ -313,6 +313,30 @@ TEST_CASE("passthrough formats: the rate and burst lengths and name of each link
     CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 61436));
     CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 24576));
 
+    // MAT's link is 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 family, whatever
+    // the content rate within it (Microsoft's "Representing Formats for IEC 61937
+    // Transmissions"), so the ratio of link to content falls as the content rate rises. A burst
+    // is 3 840 link frames and holds 24 access units: 960 content frames at 44.1 and 48 kHz, 1 920
+    // at 88.2 and 96, 3 840 at 176.4 and 192 (20 ms at the 48 kHz family, 21.8 ms at the 44.1).
+    struct Case {
+        std::uint32_t content, link, ratio, frames;
+    };
+    for (const auto& c : {Case{48000, 192000, 4, 960}, Case{96000, 192000, 2, 1920},
+                          Case{192000, 192000, 1, 3840}, Case{44100, 176400, 4, 960},
+                          Case{88200, 176400, 2, 1920}, Case{176400, 176400, 1, 3840}}) {
+        CAPTURE(c.content);
+        CHECK(iclforge::audio::link_rate(BitstreamFormat::kTrueHd, c.content) == c.link);
+        CHECK(iclforge::audio::link_ratio(BitstreamFormat::kTrueHd, c.content) == c.ratio);
+        CHECK(3840U / c.ratio == c.frames);
+    }
+    // No MAT link outside the two families, and every other format's link is the content rate
+    // times its ratio as it was.
+    CHECK(iclforge::audio::link_rate(BitstreamFormat::kTrueHd, 32000) == 0);
+    CHECK(iclforge::audio::link_ratio(BitstreamFormat::kTrueHd, 32000) == 0);
+    CHECK(iclforge::audio::link_rate(BitstreamFormat::kEac3, 48000) == 192000);
+    CHECK(iclforge::audio::link_rate(BitstreamFormat::kAc3, 48000) == 48000);
+    CHECK(iclforge::audio::link_ratio(BitstreamFormat::kEac3, 44100) == 4);
+
     // Every AC-3 and E-AC-3 burst is one length; an AC-4 burst is as long as
     // its repetition period, up to the longest (2 048 IEC 60958 frames of four
     // bytes at the content rate).

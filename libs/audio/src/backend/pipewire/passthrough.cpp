@@ -734,7 +734,9 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (!iclforge::pipewire::iec958_codec_for(format_kind)) {
+    if (!iclforge::pipewire::iec958_codec_for(format_kind) ||
+        link_rate(format_kind, sample_rate) == 0) {
+        // No SPA codec for AC-4, or no MAT link at a content rate outside both families.
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
     // A stream that ended on its own still has its loop and its stream, and
@@ -790,7 +792,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     // that ordering is what keeps this race-free.
     impl_->queue = std::make_unique<ByteRingBuffer>(burst_bytes * 40);
     impl_->burst_bytes = burst_bytes;
-    impl_->ratio = carrier_ratio(format_kind);
+    impl_->ratio = link_ratio(format_kind, sample_rate);
     impl_->carrier_rate = carrier;
     impl_->frame_bytes = carrier_frame_bytes(format_kind);
     impl_->submitted.store(0, std::memory_order_relaxed);

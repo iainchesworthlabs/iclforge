@@ -135,10 +135,10 @@ Nothing needs configuring by hand on a receiver that advertises its codecs; the 
 belief that a `iec958Codecs` rule had to be written for WirePlumber turned out not to apply
 to one that does.
 
-That list naming TrueHD is what lets Crucible offer the pinned TrueHD 5.1 mode on that sink, and
-PipeWire's is the only backend that carries MAT. On Windows and macOS an endpoint never reads as
-taking TrueHD, whatever its list says, and a pin on that mode falls back with the reason line
-saying so. The PipeWire path has not been played into a receiver yet.
+That list naming TrueHD is what lets Crucible offer the pinned TrueHD 5.1 mode on that sink; on
+Windows the endpoint has to accept the MAT format in exclusive mode, which is the driver's answer
+and not a list. On macOS an endpoint never reads as taking TrueHD, and a pin on that mode falls
+back with the reason line saying so. Neither path has been played into a receiver yet.
 
 ## Linux: an endpoint that cannot carry a bitstream is offered one
 

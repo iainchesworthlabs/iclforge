@@ -11,7 +11,7 @@
 | AC-4 decode | Public API | File, play and monitor: channel-based to 7.1.4 and objects (A-JOC, direct-coded), one presentation of several mixed, every output and presentation control | File: QC and playback of a chosen presentation; objects shown and exported | No | Desktop, channel-based and immersive to 7.1.4, full or core decoding; objects rendered to speakers; an ESP32-P4 or ESP32-S3 sink built with the AC-4 option decodes it in a group (to 5.1, and at 2.0), and any other sink is sent PCM |
 | TrueHD encode | Public API (C++ and C): 1 to 8 channels, 44.1 to 192 kHz, 16, 20 and 24 bits; MLP is not written | File: `truehd-encode` to a bare stream, MP4, Matroska or MPEG-TS (Blu-ray profile) | No | Pinned mode: the 5.1 bed rounded to 24 bits, tested over scripted devices only | No |
 | TrueHD and MLP decode | Public API (C++ and C): substreams 0 to 2 and a 16-channel substream; the Atmos substream's objects are not read | File: `decode`, `probe`, `levels` and `loudness`, bare or from MP4, Matroska or MPEG-TS; `transcode`, `qc`, `monitor` and `play` refuse it | No | No | No |
-| TrueHD IEC 61937 (MAT) | Public API: `MatPacker`, `wrap_mat_stream` and `unwrap_mat_stream` | `spdif` to a WAV or raw bursts and `unspdif` back; no device output | No | Pinned mode builds the bursts; only PipeWire sends them, and no receiver has been played one | No |
+| TrueHD IEC 61937 (MAT) | Public API: `MatPacker`, `wrap_mat_stream` and `unwrap_mat_stream` | `spdif` to a WAV or raw bursts and `unspdif` back; no device output | No | Pinned mode builds the bursts; PipeWire and WASAPI send them, and no receiver has been played one | No |
 | Atmos/JOC object encode | Public API | File and live | File and live | Placed applications | No |
 | Atmos/JOC object decode | Public API | Inspect and spatial play | Inspect and monitor | No | Desktop and ESP32 |
 | AC-4 content signing | Public API (C++): `iclforge::ac4` content signature, with the operator's own key and certificate chain | `ac4-sign` and `ac4-verify`; `sign-content` on `ac4-encode` and `atmos-encode`, `verify-content` and `check-content` on `decode` | No | No | No |
@@ -20,5 +20,5 @@
 | Metadata and loudness QC | Public API | Yes | Yes | Settings only | No |
 | Live device capture | Internal audio layer | Yes | Yes | Per application | No |
 | PCM monitor playback | Internal audio layer | Yes | Yes | Output fallback | Desktop engine |
-| IEC 61937 passthrough | Internal audio layer | Yes | Yes | Output policy; TrueHD only when pinned, and only a PipeWire sink is offered it | Desktop player, to a receiver chosen in the output picker; the Android TV sink |
+| IEC 61937 passthrough | Internal audio layer | Yes | Yes | Output policy; TrueHD only when pinned, and offered where a PipeWire sink lists it or WASAPI accepts the format | Desktop player, to a receiver chosen in the output picker; the Android TV sink |
 | Sendspin network playback | Sendspin module | Test server only | No | No | Desktop engine, ESP32 sinks and the Android TV sink |

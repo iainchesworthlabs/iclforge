@@ -243,12 +243,12 @@ belongs to one platform skips on the others.
    into the Qt Quick test binary.
 
 6. **The TrueHD 5.1 mode and the endpoint table's TRUEHD column** (row 95).
-   The real probe answers true for TrueHD only for a PipeWire sink that lists it, and the
+   The real probe answers true for TrueHD only for a PipeWire sink that lists it or a Windows endpoint that accepts it, and the
    suites' endpoints (a scripted machine, or a CI runner with no such sink) never do, so
    the mode is never chosen. The
    pin entry, the tray entry and the pin's round trip are covered; the page in
    the mode, the notes shown in it and the column's ticks are not, and wait for a
-   receiver on a PipeWire sink (planning/truehd-parity-crucible.md, Phase 4).
+   receiver (planning/truehd-parity-crucible.md, Phase 4).
 
 ## UI defects found (both fixed)
 

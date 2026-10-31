@@ -42,6 +42,14 @@ using windows_audio::kIidAudioClient;
 using windows_audio::kIidAudioRenderClient;
 using windows_audio::kIidMmDeviceEnumerator;
 using windows_audio::stream_gone;
+using windows_audio::kCarrierBits;
+using windows_audio::kCarrierChannels;
+using windows_audio::kSpeakerStereo;
+using windows_audio::kSubtypePcm;
+using windows_audio::make_ac3_format;
+using windows_audio::make_eac3_format;
+using windows_audio::make_truehd_format;
+using windows_audio::WaveFormatIec61937;
 
 // PKEY_Device_FriendlyName, spelled out for the same reason as in the capture
 // backend: functiondiscoverykeys_devpkey.h needs a fragile include ordering.
@@ -54,96 +62,14 @@ constexpr PROPERTYKEY kPkeyDeviceFriendlyName = {
 constexpr PROPERTYKEY kPkeyDeviceDescription = {
     {0xa45c254e, 0xdf1c, 0x4efd, {0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0}}, 2};
 
-// KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL from ksmedia.h:
-// {00000092-0000-0010-8000-00aa00389b71}. The low 16 bits of Data1 are the
-// wFormatTag (0x0092 = WAVE_FORMAT_DOLBY_AC3_SPDIF).
-constexpr GUID kSubtypeIec61937DolbyDigital = {
-    0x00000092, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-// KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS from ksmedia.h:
-// {0000000a-0cea-0010-8000-00aa00389b71}. A different GUID family from AC-3's
-// (Data2 0x0cea rather than 0x0000) - confirmed against a Windows SDK
-// ksmedia.h mirror and against Microsoft's own "Representing Formats for IEC
-// 61937 Transmissions" documentation, which gives this exact value in a
-// worked Dolby Digital Plus example.
-constexpr GUID kSubtypeIec61937DolbyDigitalPlus = {
-    0x0000000a, 0x0cea, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-// KSDATAFORMAT_SUBTYPE_PCM: {00000001-0000-0010-8000-00aa00389b71}, the
-// WAVE_FORMAT_PCM tag in the same GUID family. Needed for the rate probes,
-// which ask about ordinary PCM rather than a bitstream.
-constexpr GUID kSubtypePcm = {
-    0x00000001, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
-
-// The IEC 61937 carrier is a 2-channel 16-bit stream; one AC-3 frame occupies
-// one 6144-byte burst = 1536 stereo frames, matching the AC-3 frame duration.
-constexpr WORD kCarrierChannels = 2;
-constexpr WORD kCarrierBits = 16;
-constexpr DWORD kSpeakerStereo = 0x3;  // KSAUDIO_SPEAKER_STEREO
-
-// WAVEFORMATEXTENSIBLE_IEC61937 (ksmedia.h): a WAVEFORMATEXTENSIBLE followed
-// by three fields describing the *encoded* stream inside the carrier.
-struct WaveFormatIec61937 {
-    WAVEFORMATEXTENSIBLE FormatExt;
-    DWORD dwEncodedSamplesPerSec;
-    DWORD dwEncodedChannelCount;
-    DWORD dwAverageBytesPerSec;
-};
-
-WaveFormatIec61937 make_ac3_format(std::uint32_t sample_rate, DWORD encoded_channels) {
-    WaveFormatIec61937 format{};
-    auto& wf = format.FormatExt.Format;
-    wf.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    wf.nChannels = kCarrierChannels;
-    wf.nSamplesPerSec = sample_rate;
-    wf.wBitsPerSample = kCarrierBits;
-    wf.nBlockAlign = static_cast<WORD>(kCarrierChannels * kCarrierBits / 8);
-    wf.nAvgBytesPerSec = sample_rate * wf.nBlockAlign;
-    wf.cbSize = sizeof(WaveFormatIec61937) - sizeof(WAVEFORMATEX);
-
-    format.FormatExt.Samples.wValidBitsPerSample = kCarrierBits;
-    format.FormatExt.dwChannelMask = kSpeakerStereo;
-    format.FormatExt.SubFormat = kSubtypeIec61937DolbyDigital;
-
-    // Describes the AC-3 payload, not the carrier: the decoded rate and how
-    // many channels the receiver will reproduce.
-    format.dwEncodedSamplesPerSec = sample_rate;
-    format.dwEncodedChannelCount = encoded_channels;
-    format.dwAverageBytesPerSec = 0;  // 0 is permitted and means "unspecified"
-    return format;
-}
-
-// Dolby Digital Plus over IEC 60958/61937: per Microsoft's "Representing
-// Formats for IEC 61937 Transmissions", "the link-sampling rate must be four
-// times the sampling rate of the content" - so unlike AC-3, the carrier
-// itself (nSamplesPerSec/nAvgBytesPerSec) runs at 4x `sample_rate`, which
-// stays the CONTENT rate throughout. Field values otherwise mirror
-// Microsoft's own worked 48 kHz DD+ example verbatim.
-WaveFormatIec61937 make_eac3_format(std::uint32_t sample_rate, DWORD encoded_channels) {
-    WaveFormatIec61937 format{};
-    auto& wf = format.FormatExt.Format;
-    wf.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    wf.nChannels = kCarrierChannels;
-    wf.nSamplesPerSec = sample_rate * 4;
-    wf.wBitsPerSample = kCarrierBits;
-    wf.nBlockAlign = static_cast<WORD>(kCarrierChannels * kCarrierBits / 8);
-    wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.nBlockAlign;
-    wf.cbSize = sizeof(WaveFormatIec61937) - sizeof(WAVEFORMATEX);
-
-    format.FormatExt.Samples.wValidBitsPerSample = kCarrierBits;
-    format.FormatExt.dwChannelMask = kSpeakerStereo;
-    format.FormatExt.SubFormat = kSubtypeIec61937DolbyDigitalPlus;
-
-    format.dwEncodedSamplesPerSec = sample_rate;
-    format.dwEncodedChannelCount = encoded_channels;
-    format.dwAverageBytesPerSec = 0;  // ignored for this format (MS docs)
-    return format;
-}
-
-// AC-3 or E-AC-3 only: start() refuses AC-4 before it gets here, there being
-// no subformat to name it by (see passthrough.hpp's header comment).
+// AC-3, E-AC-3 or TrueHD: start() refuses AC-4 before it gets here, there being
+// no subformat to name it by (see passthrough.hpp's header comment), and TrueHD
+// at a content rate with no MAT link.
 WaveFormatIec61937 make_format(BitstreamFormat format, std::uint32_t sample_rate,
                                DWORD encoded_channels) {
+    if (format == BitstreamFormat::kTrueHd) {
+        return make_truehd_format(link_rate(format, sample_rate), sample_rate);
+    }
     return format == BitstreamFormat::kEac3 ? make_eac3_format(sample_rate, encoded_channels)
                                             : make_ac3_format(sample_rate, encoded_channels);
 }
@@ -301,6 +227,9 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
 
     auto ac3_format = make_ac3_format(sample_rate, 6);
     auto eac3_format = make_eac3_format(sample_rate, 6);
+    // Nothing to ask at a content rate that has no MAT link.
+    const std::uint32_t truehd_link = link_rate(BitstreamFormat::kTrueHd, sample_rate);
+    auto truehd_format = make_truehd_format(truehd_link, sample_rate);
     std::vector<RenderDeviceInfo> devices;
     for (UINT i = 0; i < count; ++i) {
         ComPtr<IMMDevice> device;
@@ -369,6 +298,10 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
             info.supports_eac3_passthrough =
                 client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
                                           &eac3_format.FormatExt.Format, nullptr) == S_OK;
+            info.supports_truehd_passthrough =
+                truehd_link != 0 &&
+                client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
+                                          &truehd_format.FormatExt.Format, nullptr) == S_OK;
 
             // Control probe with an ordinary exclusive-mode PCM format, so a
             // "no" above can be attributed to the device rather than to
@@ -541,7 +474,9 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (is_ac4(format_kind) || format_kind == BitstreamFormat::kTrueHd) {
+    if (is_ac4(format_kind) || link_rate(format_kind, sample_rate) == 0) {
+        // AC-4 has no subformat to name it by, and a TrueHD content rate outside both
+        // families has no MAT link.
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
     // A render thread that ended because its device went away still holds
@@ -581,7 +516,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     impl_->burst_bytes = max_burst_bytes(format_kind);
     impl_->queue = std::make_unique<ByteRingBuffer>(impl_->burst_bytes * 40);
     impl_->frame_bytes = frame_bytes;
-    impl_->ratio = carrier_ratio(format_kind);
+    impl_->ratio = link_ratio(format_kind, sample_rate);
     impl_->submitted.store(0, std::memory_order_relaxed);
     impl_->rendered_bytes.store(0, std::memory_order_relaxed);
     impl_->underruns.store(0, std::memory_order_relaxed);

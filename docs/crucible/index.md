@@ -124,11 +124,12 @@ bed. Crucible has no AC-4 path. It captures what applications play as PCM and pl
 Atmos objects for a receiver, and no receiver found accepts AC-4
 ([planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md),
 decision 20). Crucible can also encode its 5.1 bed as TrueHD, a mode you pin, lossless from the
-24-bit values the mix is rounded to and with no objects. Only the PipeWire backend carries TrueHD
-to a receiver, on a sink whose codec list names it, so on Windows and macOS no endpoint is offered
-it; the mode has been tested over scripted devices and the PipeWire path has not been played into a
-receiver, so it has never reached one. A receiver's own list of what it accepts naming TrueHD (the
-troubleshooting page quotes one) is what makes PipeWire offer it. TrueHD Atmos is not built. Whether the
+24-bit values the mix is rounded to and with no objects. The PipeWire and WASAPI backends carry TrueHD
+to a receiver (on PipeWire a sink whose codec list names it, on Windows an endpoint that accepts the
+format in exclusive mode), so on macOS no endpoint is offered it; the mode has been tested over
+scripted devices and neither path has been played into a receiver, so it has never reached one. A
+receiver's own list of what it accepts naming TrueHD (the troubleshooting page quotes one) is what
+makes PipeWire offer it. TrueHD Atmos is not built. Whether the
 mode becomes part of the automatic choice waits for a receiver to read it
 ([the roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed)).
 

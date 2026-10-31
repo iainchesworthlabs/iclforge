@@ -64,6 +64,10 @@ TEST_CASE("TrueHD is negotiated as SPA's TRUEHD codec, on a link at four times i
     CHECK(*iec958_codec_for(BitstreamFormat::kTrueHd) == SPA_AUDIO_IEC958_CODEC_TRUEHD);
     CHECK(carrier_rate(BitstreamFormat::kTrueHd, 48000) == 192000);
     CHECK(carrier_rate(BitstreamFormat::kTrueHd, 44100) == 176400);
+    // The link does not follow the content rate above 48 kHz.
+    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 96000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 88200) == 176400);
+    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 32000) == 0);
     // The three codecs it can be told from stay what they were.
     CHECK(*iec958_codec_for(BitstreamFormat::kAc3) == SPA_AUDIO_IEC958_CODEC_AC3);
     CHECK(*iec958_codec_for(BitstreamFormat::kEac3) == SPA_AUDIO_IEC958_CODEC_EAC3);

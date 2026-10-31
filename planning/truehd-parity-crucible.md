@@ -15,8 +15,8 @@
     plain rounding; 5 48 kHz; 8 the restart interval stays at the encoder's 128 until a receiver confirms 8; 9
     the codec-path switch keeps its E-AC-3 meaning; 10 `DownmixMode::kNone` and the E-AC-3 encoder's bed. Question 6
     was answered by the owner on 2026-10-31 (eight 16-bit channels at 192 kHz, 176.4 kHz for the 44.1 family) and phase 1
-    is built for PipeWire only: `BitstreamFormat::kTrueHd`, the eight-channel carrier, `supports_truehd_passthrough`.
-    Not built: WASAPI and Core Audio (they refuse the format), the hardware reading and the throughput (phase 4). What this round asks is in
+    is built for PipeWire and WASAPI: `BitstreamFormat::kTrueHd`, the eight-channel carrier, `supports_truehd_passthrough`
+    (Microsoft's page gives the same carrier). Not built: Core Audio (it refuses the format), the hardware reading and the throughput (phase 4). What this round asks is in
     [Questions from the build](#questions-from-the-build), at the end.
 
 ## Basis
@@ -183,7 +183,7 @@ Counts: 25 rows. By gap: 18 missing, 5 partial, 2 n/a, none 0. By size: 14 S, 7 
 ## Things TrueHD has that DD+ never needed
 
 **MAT carriage over a wider link.** A TrueHD stream reaches a receiver as MAT (IEC 61937 data type 22): a 61,440-byte burst
-holding 24 access units, 20 ms of audio at any supported rate. The library's reading of the carrier is eight 16-bit channels
+holding 24 access units, 20 ms of audio at the 48 kHz family's rates and 21.8 ms at the 44.1 family's. The library's reading of the carrier is eight 16-bit channels
 at 192 kHz (176.4 kHz for the 44.1 family), 24.6 Mbit/s against E-AC-3's 6.1 Mbit/s; it is provisional and is the owner's to
 confirm ([ERRATA](../libs/containers/ERRATA.md), item 7). Every `PassthroughSink` backend assumes a two-channel carrier. This is
 the same missing piece as AC-4 HBR16, which `passthrough.hpp` says no backend opens. The work sits in `libs/audio`
@@ -340,7 +340,7 @@ Raised on 2026-10-31 by the session that built phases 0, 2 and 3. Each has a rec
 recommendation says, provisionally.
 
 12. **Should the TrueHD entry be offered in the Pin list and the tray while no backend can carry it?** The real probe
-    answers false for TrueHD on Windows and macOS (and on a PipeWire sink that does not list it), so a pin on it falls back there,
+    answers false for TrueHD on macOS (and on a PipeWire sink that does not list it, or a Windows endpoint that refuses the format), so a pin on it falls back there,
     with the reason line saying why. The headphones entry is
     dropped where no renderer exists, on the argument that a list should offer what can be chosen. *Recommendation:*
     keep it, because the hardware phase needs the pin and the reason line is honest; revisit when phase 1 lands and the probe can

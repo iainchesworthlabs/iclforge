@@ -84,7 +84,7 @@ inline void ensure_initialized() {
 // code at all.
 [[nodiscard]] constexpr std::uint32_t carrier_rate(audio::BitstreamFormat format,
                                                     std::uint32_t content_rate) {
-    return content_rate * audio::carrier_ratio(format);
+    return audio::link_rate(format, content_rate);
 }
 
 // The SPA codec a format is negotiated as; nothing for AC-4, which PipeWire's

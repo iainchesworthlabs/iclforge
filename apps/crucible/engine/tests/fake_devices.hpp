@@ -399,7 +399,7 @@ inline DeviceFacts hdmi_avr(const std::string& id = "avr") {
     return {.id = id, .name = "AVR (HDMI)", .is_default = false, .accepts_eac3 = true, .accepts_ac3 = true, .shared_channels = 8};
 }
 // The same receiver, reading TrueHD in MAT as well (scripted: the real probe
-// answers true only for a PipeWire sink that lists TrueHD).
+// answers true only for a PipeWire sink that lists TrueHD or a Windows endpoint that accepts it).
 inline DeviceFacts hdmi_avr_truehd(const std::string& id = "avr") {
     DeviceFacts facts = hdmi_avr(id);
     facts.accepts_truehd = true;

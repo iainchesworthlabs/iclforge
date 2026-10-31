@@ -65,11 +65,13 @@ enum class PassthroughError : std::uint8_t {
 // (iclforge::containers::iec61937::kBurstBytes vs kEac3BurstBytes).
 //
 // kTrueHd is TrueHD in MAT (IEC 61937 data type 22), the one format whose
-// carrier is not two channels: eight 16-bit channels at four times the content
-// rate, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 family, 20 ms
-// to a burst (carrier_channels(), carrier_ratio()). The owner confirmed that
-// reading on 2026-10-31 (libs/containers/ERRATA.md, M7); no receiver has yet
-// been played one, and only the PipeWire backend sends it. Every other backend
+// carrier is not two channels: eight 16-bit channels on a link of 192 kHz for the
+// 48 kHz family and 176.4 kHz for the 44.1 family (link_rate(); four times the
+// content rate at 44.1 and 48 kHz), 20 ms to a burst at the 48 kHz family and 21.8
+// at the 44.1 (carrier_channels()). The owner confirmed that reading on
+// 2026-10-31 (libs/containers/ERRATA.md, M7) and Microsoft's "Representing Formats
+// for IEC 61937 Transmissions" gives the same link; no receiver has yet been
+// played one, and only the PipeWire and WASAPI backends send it. Every other backend
 // refuses it with kUnsupportedFormat, whatever the device.
 //
 // The AC-4 formats are its links rather than its data types: kAc4 carries
@@ -120,6 +122,42 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
             break;
     }
     return 1U;
+}
+
+// The rate of the link `format` runs on for content at `content_rate`: the content rate
+// times carrier_ratio() for every format but TrueHD. MAT's link is 192 kHz whatever the
+// 48 kHz family's content rate (48, 96 or 192 kHz) and 176.4 kHz for the 44.1 family
+// (44.1, 88.2 or 176.4 kHz), which is what Microsoft's "Representing Formats for IEC 61937
+// Transmissions" says of TrueHD and the owner's reading of the carrier agrees with. 0 for a
+// TrueHD content rate that is in neither family, which has no MAT link to open.
+[[nodiscard]] constexpr std::uint32_t link_rate(BitstreamFormat format, std::uint32_t content_rate) {
+    if (format != BitstreamFormat::kTrueHd) {
+        return content_rate * carrier_ratio(format);
+    }
+    switch (content_rate) {
+        case 48000U:
+        case 96000U:
+        case 192000U:
+            return 192000U;
+        case 44100U:
+        case 88200U:
+        case 176400U:
+            return 176400U;
+        default:
+            break;
+    }
+    return 0U;
+}
+
+// Link frames to a content frame at `content_rate`: carrier_ratio() but for TrueHD, whose
+// link does not follow the content rate above 48 kHz (4 at 48 kHz, 2 at 96 kHz, 1 at 192 kHz).
+// 0 when link_rate() is.
+[[nodiscard]] constexpr std::uint32_t link_ratio(BitstreamFormat format, std::uint32_t content_rate) {
+    if (format != BitstreamFormat::kTrueHd) {
+        return carrier_ratio(format);
+    }
+    const std::uint32_t link = link_rate(format, content_rate);
+    return link == 0U ? 0U : link / content_rate;
 }
 
 // Channels in a link frame: eight for TrueHD's MAT carrier, two for every
