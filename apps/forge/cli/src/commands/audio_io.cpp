@@ -276,7 +276,7 @@ int record_truehd(std::string_view out_path, std::uint32_t seconds, const auto& 
     const std::size_t total = static_cast<std::size_t>(seconds) * rate;
     iclforge::ac3::io::WavData wav;
     wav.sample_rate = rate;
-    wav.channels.assign(channels, std::vector<float>());
+    wav.channels.resize(channels);
     for (auto& plane : wav.channels) {
         plane.reserve(total);
     }
