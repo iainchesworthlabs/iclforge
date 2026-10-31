@@ -95,6 +95,7 @@ namespace iclforge::coreaudio {
         case audio::BitstreamFormat::kAc4:
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
+        case audio::BitstreamFormat::kTrueHd:  // no MAT format is probed here
             break;
     }
     return std::nullopt;

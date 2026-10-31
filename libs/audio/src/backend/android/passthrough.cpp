@@ -617,7 +617,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (format == BitstreamFormat::kAc4Hbr16) {
+    if (format == BitstreamFormat::kAc4Hbr16 || format == BitstreamFormat::kTrueHd) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
     if (!bridge_ready()) {

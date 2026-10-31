@@ -587,7 +587,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    if (format_kind == BitstreamFormat::kAc4Hbr16) {
+    if (format_kind == BitstreamFormat::kAc4Hbr16 || format_kind == BitstreamFormat::kTrueHd) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
     // A render thread that ended because its device went away still has the

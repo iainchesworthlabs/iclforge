@@ -12,6 +12,8 @@
 
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/mat.hpp"
+#include "iclforge/containers/iec61937/mat.hpp"
 
 // Exclusive-mode IEC 61937 passthrough: hand already-packed AC-3, E-AC-3 or
 // AC-4 bursts to an S/PDIF or HDMI endpoint so the AV receiver on the other
@@ -62,20 +64,28 @@ enum class PassthroughError : std::uint8_t {
 // Formats for IEC 61937 Transmissions") - and different burst sizes
 // (iclforge::containers::iec61937::kBurstBytes vs kEac3BurstBytes).
 //
+// kTrueHd is TrueHD in MAT (IEC 61937 data type 22), the one format whose
+// carrier is not two channels: eight 16-bit channels at four times the content
+// rate, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 family, 20 ms
+// to a burst (carrier_channels(), carrier_ratio()). The owner confirmed that
+// reading on 2026-10-31 (libs/containers/ERRATA.md, M7); no receiver has yet
+// been played one, and only the PipeWire backend sends it. Every other backend
+// refuses it with kUnsupportedFormat, whatever the device.
+//
 // The AC-4 formats are its links rather than its data types: kAc4 carries
 // IEC 61937-14's AC-4 and AC-4 LD data-bursts on a link at the content rate,
 // kAc4Hbr4 its HBR4 ones at four times it, as E-AC-3's, and kAc4Hbr16 its
 // HBR16 ones at sixteen times it. An AC-4 burst is as long as its own
 // repetition period, which follows the stream's frame rate
 // (iclforge::containers::iec61937::Ac4BurstPacker).
-enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr16 };
+enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr16, kTrueHd };
 
 [[nodiscard]] constexpr bool is_ac4(BitstreamFormat format) {
     return format == BitstreamFormat::kAc4 || format == BitstreamFormat::kAc4Hbr4 ||
            format == BitstreamFormat::kAc4Hbr16;
 }
 
-// "AC-3", "E-AC-3", "AC-4", "AC-4 HBR4" or "AC-4 HBR16".
+// "AC-3", "E-AC-3", "AC-4", "AC-4 HBR4", "AC-4 HBR16" or "TrueHD".
 [[nodiscard]] constexpr std::string_view format_name(BitstreamFormat format) {
     switch (format) {
         case BitstreamFormat::kAc3:
@@ -88,16 +98,20 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
             return "AC-4 HBR4";
         case BitstreamFormat::kAc4Hbr16:
             return "AC-4 HBR16";
+        case BitstreamFormat::kTrueHd:
+            return "TrueHD";
     }
     return "unknown";
 }
 
-// Link frames per content frame: 4 for E-AC-3 and AC-4 HBR4, whose links run
-// at four times the content rate, 16 for AC-4 HBR16, and 1 for AC-3 and AC-4.
+// Link frames per content frame: 4 for E-AC-3, AC-4 HBR4 and TrueHD, whose
+// links run at four times the content rate, 16 for AC-4 HBR16, and 1 for AC-3
+// and AC-4.
 [[nodiscard]] constexpr std::uint32_t carrier_ratio(BitstreamFormat format) {
     switch (format) {
         case BitstreamFormat::kEac3:
         case BitstreamFormat::kAc4Hbr4:
+        case BitstreamFormat::kTrueHd:
             return 4U;
         case BitstreamFormat::kAc4Hbr16:
             return 16U;
@@ -106,6 +120,19 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
             break;
     }
     return 1U;
+}
+
+// Channels in a link frame: eight for TrueHD's MAT carrier, two for every
+// other format here (AC-4 HBR16's eight-channel link is one no backend opens).
+[[nodiscard]] constexpr std::uint32_t carrier_channels(BitstreamFormat format) {
+    return format == BitstreamFormat::kTrueHd ? 8U : 2U;
+}
+
+// Bytes in a link frame: the channels at 16 bits each, 4 for a two-channel
+// carrier and 16 for TrueHD's, so a burst's length in bytes is that many times
+// its length in link frames.
+[[nodiscard]] constexpr std::size_t carrier_frame_bytes(BitstreamFormat format) {
+    return std::size_t{carrier_channels(format)} * 2U;
 }
 
 // The longest burst `format` has, in bytes: every AC-3 and E-AC-3 burst is
@@ -126,6 +153,8 @@ enum class BitstreamFormat : std::uint8_t { kAc3, kEac3, kAc4, kAc4Hbr4, kAc4Hbr
         case BitstreamFormat::kAc4Hbr16:
             return containers::iec61937::repetition_period(
                 containers::iec61937::BurstDataType::kAc4Hbr16);
+        case BitstreamFormat::kTrueHd:
+            return containers::iec61937::kMatBurstBytes;
     }
     return containers::iec61937::kBurstBytes;
 }
@@ -152,6 +181,11 @@ struct RenderDeviceInfo {
     // there is no separate passthrough format for Atmos, since the object
     // container is ordinary Annex E aux data).
     bool supports_eac3_passthrough = false;
+    // As above, for TrueHD in MAT (BitstreamFormat::kTrueHd): the sink lists
+    // TrueHD among its codecs and took the eight-channel link when asked. Set
+    // by the PipeWire backend alone; every other backend leaves it false,
+    // because none of them sends the format.
+    bool supports_truehd_passthrough = false;
     // As above, for AC-4 on a link at the content rate (BitstreamFormat::
     // kAc4). Set only where the platform can send AC-4 at all (the header
     // comment says which), and there it says what the AC-3 answer says: the

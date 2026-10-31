@@ -292,6 +292,27 @@ TEST_CASE("passthrough formats: the rate and burst lengths and name of each link
     CHECK(iclforge::audio::is_ac4(BitstreamFormat::kAc4));
     CHECK_FALSE(iclforge::audio::is_ac4(BitstreamFormat::kEac3));
 
+    // TrueHD in MAT: a link at four times the content rate, but eight channels
+    // wide, so a link frame is 16 bytes and a 61 440-byte burst is 3 840 of
+    // them: 20 ms at 192 kHz, as it is 960 content frames at 48 kHz.
+    CHECK(iclforge::audio::carrier_ratio(BitstreamFormat::kTrueHd) == 4);
+    CHECK(iclforge::audio::format_name(BitstreamFormat::kTrueHd) == "TrueHD");
+    CHECK_FALSE(iclforge::audio::is_ac4(BitstreamFormat::kTrueHd));
+    for (const auto format : {BitstreamFormat::kAc3, BitstreamFormat::kEac3, BitstreamFormat::kAc4,
+                              BitstreamFormat::kAc4Hbr4, BitstreamFormat::kAc4Hbr16}) {
+        CHECK(iclforge::audio::carrier_channels(format) == 2);
+        CHECK(iclforge::audio::carrier_frame_bytes(format) == 4);
+    }
+    CHECK(iclforge::audio::carrier_channels(BitstreamFormat::kTrueHd) == 8);
+    CHECK(iclforge::audio::carrier_frame_bytes(BitstreamFormat::kTrueHd) == 16);
+    CHECK(iclforge::audio::max_burst_bytes(BitstreamFormat::kTrueHd) == 61440);
+    CHECK(iclforge::audio::max_burst_bytes(BitstreamFormat::kTrueHd) /
+              iclforge::audio::carrier_frame_bytes(BitstreamFormat::kTrueHd) ==
+          48000 * 4 / 50);
+    CHECK(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 61440));
+    CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 61436));
+    CHECK_FALSE(iclforge::audio::burst_size_fits(BitstreamFormat::kTrueHd, 24576));
+
     // Every AC-3 and E-AC-3 burst is one length; an AC-4 burst is as long as
     // its repetition period, up to the longest (2 048 IEC 60958 frames of four
     // bytes at the content rate).

@@ -30,6 +30,7 @@ using audio::BitstreamFormat;
         case BitstreamFormat::kAc4:
         case BitstreamFormat::kAc4Hbr4:
         case BitstreamFormat::kAc4Hbr16:
+        case BitstreamFormat::kTrueHd:  // no stream Hearth plays is one yet
             break;
     }
     return false;

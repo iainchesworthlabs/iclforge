@@ -8,6 +8,7 @@
 // windows.h must precede the audio headers.
 #include <audioclient.h>
 
+#include "iclforge/audio/passthrough.hpp"
 #include "windows_support.hpp"
 
 // The Windows backend's pure half, tested with no live audio device: a plain
@@ -72,4 +73,15 @@ TEST_CASE("the performance counter and the steady clock share an epoch") {
     // The counter was read between the two clock reads, to within a millisecond of slack.
     CHECK(counter_ns >= before_ns - 1'000'000);
     CHECK(counter_ns <= after_ns + 1'000'000);
+}
+
+TEST_CASE("TrueHD is refused before any endpoint is looked up") {
+    // WASAPI names a codec-specific subformat for AC-3 and E-AC-3 and this
+    // backend writes neither a TrueHD one nor the eight-channel carrier, so it
+    // says so, and does not send MAT as the AC-3 format it falls back to.
+    iclforge::audio::PassthroughSink sink;
+    const auto started = sink.start("", 48000, iclforge::audio::BitstreamFormat::kTrueHd);
+    REQUIRE_FALSE(started.has_value());
+    CHECK(started.error() == iclforge::audio::PassthroughError::kUnsupportedFormat);
+    CHECK_FALSE(sink.running());
 }

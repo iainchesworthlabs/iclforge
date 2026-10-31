@@ -89,7 +89,9 @@ inline void ensure_initialized() {
 
 // The SPA codec a format is negotiated as; nothing for AC-4, which PipeWire's
 // list does not name (UNKNOWN, PCM, DTS, AC3, MPEG, MPEG2_AAC, EAC3, TRUEHD
-// and DTSHD in 1.6), so there is no format to ask a sink for.
+// and DTSHD in 1.6), so there is no format to ask a sink for. TrueHD is named,
+// and its link is eight channels (audio::carrier_channels()), which the format
+// itself does not say: the codec does.
 [[nodiscard]] constexpr std::optional<spa_audio_iec958_codec> iec958_codec_for(
     audio::BitstreamFormat format) {
     switch (format) {
@@ -97,6 +99,8 @@ inline void ensure_initialized() {
             return SPA_AUDIO_IEC958_CODEC_AC3;
         case audio::BitstreamFormat::kEac3:
             return SPA_AUDIO_IEC958_CODEC_EAC3;
+        case audio::BitstreamFormat::kTrueHd:
+            return SPA_AUDIO_IEC958_CODEC_TRUEHD;
         case audio::BitstreamFormat::kAc4:
         case audio::BitstreamFormat::kAc4Hbr4:
         case audio::BitstreamFormat::kAc4Hbr16:
@@ -105,9 +109,10 @@ inline void ensure_initialized() {
     return std::nullopt;
 }
 
-// The carrier is a 2-channel 16-bit stream whatever rides inside it (see
-// iclforge::alsa's identical constant and the comment on it), so a burst's length
-// in bytes and in sample-frames differ by a constant 4 here too.
+// The carrier is a 16-bit stream whatever rides inside it (see iclforge::alsa's
+// identical constant and the comment on it), two channels wide so a burst's
+// length in bytes and in sample-frames differ by a constant 4 here too, except
+// TrueHD's, which is eight wide and 16 (audio::carrier_frame_bytes()).
 inline constexpr std::size_t kCarrierFrameBytes = 4;
 
 // Every Audio/Source or Audio/Sink node currently in the graph, visited once

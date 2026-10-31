@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "iclforge/audio/passthrough.hpp"
 #include "device_names.hpp"
 
 // The ALSA backend's pure half, tested on a machine with no sound card.
@@ -253,4 +254,13 @@ TEST_CASE("a candidate device name survives the round trip to an openable one") 
     REQUIRE(opened.has_value());
     CHECK(opened->starts_with(base));
     CHECK(has_channel_status_args(*opened));
+}
+
+TEST_CASE("TrueHD is refused before any card is opened") {
+    // This backend carries two channels; MAT needs eight, which it does not write.
+    iclforge::audio::PassthroughSink sink;
+    const auto started = sink.start("", 48000, iclforge::audio::BitstreamFormat::kTrueHd);
+    REQUIRE_FALSE(started.has_value());
+    CHECK(started.error() == iclforge::audio::PassthroughError::kUnsupportedFormat);
+    CHECK_FALSE(sink.running());
 }

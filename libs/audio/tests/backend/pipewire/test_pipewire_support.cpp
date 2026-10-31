@@ -56,6 +56,29 @@ TEST_CASE("E-AC-3 runs the link four times as fast as its content, same as ALSA"
     CHECK(carrier_rate(BitstreamFormat::kEac3, 32000) == 128000);
 }
 
+TEST_CASE("TrueHD is negotiated as SPA's TRUEHD codec, on a link at four times its content rate") {
+    // The link's eight channels are not in the format: the codec implies them
+    // (audio::carrier_channels()), and the rate is the link's, the owner's
+    // reading of the MAT carrier (libs/containers/ERRATA.md, M7).
+    REQUIRE(iec958_codec_for(BitstreamFormat::kTrueHd).has_value());
+    CHECK(*iec958_codec_for(BitstreamFormat::kTrueHd) == SPA_AUDIO_IEC958_CODEC_TRUEHD);
+    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 48000) == 192000);
+    CHECK(carrier_rate(BitstreamFormat::kTrueHd, 44100) == 176400);
+    // The three codecs it can be told from stay what they were.
+    CHECK(*iec958_codec_for(BitstreamFormat::kAc3) == SPA_AUDIO_IEC958_CODEC_AC3);
+    CHECK(*iec958_codec_for(BitstreamFormat::kEac3) == SPA_AUDIO_IEC958_CODEC_EAC3);
+    CHECK_FALSE(iec958_codec_for(BitstreamFormat::kAc4).has_value());
+}
+
+TEST_CASE("a sink's TrueHD entry is found by its SPA name, and not inside another") {
+    // As WirePlumber writes it from a receiver's ELD (docs/crucible/design/promotion.md).
+    const std::string eld = "[ PCM DTS AC3 EAC3 TrueHD DTS-HD ]";
+    CHECK(codec_listed(eld, "TrueHD"));
+    CHECK(codec_listed(R"(["PCM","TrueHD"])", "TrueHD"));
+    CHECK_FALSE(codec_listed("[ PCM AC3 EAC3 ]", "TrueHD"));
+    CHECK_FALSE(codec_listed("[ PCM TrueHDX ]", "TrueHD"));
+}
+
 TEST_CASE("an iec958.codecs list is read name by name") {
     // WirePlumber writes the property from the sink's ELD, in SPA's codec
     // names, and serialises it either with quotes or without.

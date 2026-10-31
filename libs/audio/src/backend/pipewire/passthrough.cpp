@@ -77,9 +77,10 @@ namespace {
 using iclforge::pipewire::Stream;
 using iclforge::pipewire::ThreadLoop;
 
-// The carrier is a 2-channel 16-bit stream whatever rides inside it - see
-// iclforge::pipewire::kCarrierFrameBytes and the ALSA backend's identical
-// constant and comment.
+// The carrier is a 16-bit stream whatever rides inside it, two channels wide
+// but for TrueHD's eight - see iclforge::pipewire::kCarrierFrameBytes and the
+// ALSA backend's identical constant and comment. A link frame's bytes are
+// audio::carrier_frame_bytes() of the format in use.
 constexpr std::size_t kCarrierFrameBytes = iclforge::pipewire::kCarrierFrameBytes;
 
 // A real connection attempt (start()) is allowed longer to settle than a
@@ -192,8 +193,12 @@ bool probe_connect(const std::string& node_id, const spa_pod** params, std::uint
     return ready;
 }
 
-// AC-3 or E-AC-3: nothing asks for AC-4, which has no SPA codec (start()
-// refuses it first), so UNKNOWN is never what a sink is offered.
+// AC-3, E-AC-3 or TrueHD: nothing asks for AC-4, which has no SPA codec
+// (start() refuses it first), so UNKNOWN is never what a sink is offered. The
+// rate is the link's (carrier_rate()): 192 kHz for TrueHD, whose eight
+// channels the codec implies. That, and not the content rate, is what the
+// owner's reading of the MAT carrier says; it is the E-AC-3 convention
+// extended and has not been tried against a receiver.
 const spa_pod* build_iec958_pod(spa_pod_builder& builder, BitstreamFormat format,
                                  std::uint32_t carrier) {
     spa_audio_info_iec958 info{};
@@ -245,6 +250,7 @@ struct CandidateSink {
     std::string name;
     bool codec_ac3 = false;
     bool codec_eac3 = false;
+    bool codec_truehd = false;
     std::uint16_t channels = 0;
     std::uint32_t speakers = 0;
     std::uint32_t rate = 0;
@@ -321,6 +327,7 @@ std::vector<CandidateSink> candidate_sinks() {
         CandidateSink candidate{.id = std::move(sink.name), .name = std::move(sink.description)};
         candidate.codec_ac3 = iclforge::pipewire::codec_listed(sink.codecs, "AC3");
         candidate.codec_eac3 = iclforge::pipewire::codec_listed(sink.codecs, "EAC3");
+        candidate.codec_truehd = iclforge::pipewire::codec_listed(sink.codecs, "TrueHD");
         candidate.channels = sink.channels;
         candidate.speakers = speakers_of_position(sink.position, sink.channels);
         candidate.rate = sink.rate;
@@ -376,6 +383,8 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
                 sink.codec_ac3 && probe_iec958(sink.id, BitstreamFormat::kAc3, sample_rate),
             .supports_eac3_passthrough =
                 sink.codec_eac3 && probe_iec958(sink.id, BitstreamFormat::kEac3, sample_rate),
+            .supports_truehd_passthrough =
+                sink.codec_truehd && probe_iec958(sink.id, BitstreamFormat::kTrueHd, sample_rate),
             // No SPA codec for AC-4 (iec958_codec_for()).
             .supports_ac4_passthrough = false,
             .supports_exclusive_pcm = probe_exclusive_pcm(sink.id, sample_rate),
@@ -422,6 +431,8 @@ struct PassthroughSink::Impl {
     // second, for position().
     std::uint32_t ratio = 1;
     std::uint32_t carrier_rate = 0;
+    // Bytes in a link frame (carrier_frame_bytes()): 4, or 16 for TrueHD.
+    std::size_t frame_bytes = kCarrierFrameBytes;
     // As MonitorSink's PipeWire backend keeps them, in link frames: the
     // frames the process callback has handed the stream since the last start
     // or flush, against those it has not had heard, for position().
@@ -513,9 +524,13 @@ struct PassthroughSink::Impl {
 
         const std::uint32_t requested =
             buffer->requested > 0 ? static_cast<std::uint32_t>(buffer->requested) *
-                                         static_cast<std::uint32_t>(kCarrierFrameBytes)
+                                         static_cast<std::uint32_t>(impl.frame_bytes)
                                    : spa_buf->datas[0].maxsize;
-        const std::size_t byte_count = std::min<std::size_t>(requested, spa_buf->datas[0].maxsize);
+        // A whole number of link frames, whatever the buffer's own size: a
+        // TrueHD frame is 16 bytes and a buffer's maximum need not be a
+        // multiple of that.
+        const std::size_t byte_count = std::min<std::size_t>(requested, spa_buf->datas[0].maxsize) /
+                                       impl.frame_bytes * impl.frame_bytes;
 
         auto* out = static_cast<std::byte*>(spa_buf->datas[0].data);
         const auto got = impl.queue->read(std::span{out, byte_count});
@@ -537,10 +552,10 @@ struct PassthroughSink::Impl {
         }
 
         spa_buf->datas[0].chunk->offset = 0;
-        spa_buf->datas[0].chunk->stride = static_cast<std::int32_t>(kCarrierFrameBytes);
+        spa_buf->datas[0].chunk->stride = static_cast<std::int32_t>(impl.frame_bytes);
         spa_buf->datas[0].chunk->size = static_cast<std::uint32_t>(byte_count);
         // In link frames, which is then what pw_time.queued counts.
-        const std::uint64_t frames = byte_count / kCarrierFrameBytes;
+        const std::uint64_t frames = byte_count / impl.frame_bytes;
         buffer->size = frames;
 
         pw_stream_queue_buffer(impl.stream.get(), buffer);
@@ -587,7 +602,7 @@ std::optional<MonitorPosition> PassthroughSink::position() const {
     if (!running() || !impl_->queue) {
         return std::nullopt;
     }
-    const std::uint64_t queued_here = impl_->queue->available() / kCarrierFrameBytes;
+    const std::uint64_t queued_here = impl_->queue->available() / impl_->frame_bytes;
     // pw_time's delay already counts the whole path to the device, as its
     // queue; there is no latency left to add.
     return per_content_frame(impl_->counter.position(queued_here, /*latency=*/0), impl_->ratio);
@@ -743,8 +758,9 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         // reason: the connect alone said yes on the headphone jack. A sink
         // whose session manager has not enabled this codec is not asked.
         for (const auto& sink : candidates) {
-            const bool enabled = format_kind == BitstreamFormat::kEac3 ? sink.codec_eac3
-                                                                        : sink.codec_ac3;
+            const bool enabled = format_kind == BitstreamFormat::kEac3    ? sink.codec_eac3
+                                 : format_kind == BitstreamFormat::kTrueHd ? sink.codec_truehd
+                                                                           : sink.codec_ac3;
             if (enabled && probe_iec958(sink.id, format_kind, sample_rate)) {
                 target = sink.id;
                 break;
@@ -776,6 +792,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     impl_->burst_bytes = burst_bytes;
     impl_->ratio = carrier_ratio(format_kind);
     impl_->carrier_rate = carrier;
+    impl_->frame_bytes = carrier_frame_bytes(format_kind);
     impl_->submitted.store(0, std::memory_order_relaxed);
     impl_->rendered.store(0, std::memory_order_relaxed);
     impl_->rendered_bytes = 0;

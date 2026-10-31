@@ -128,6 +128,9 @@ const std::vector<EndpointFacts>& OutputSelector::endpoints(std::uint32_t sample
                             case audio::BitstreamFormat::kAc4:
                                 reading.device.supports_ac4_passthrough = true;
                                 break;
+                            case audio::BitstreamFormat::kTrueHd:
+                                reading.device.supports_truehd_passthrough = true;
+                                break;
                             case audio::BitstreamFormat::kAc4Hbr4:
                             case audio::BitstreamFormat::kAc4Hbr16:
                                 break;
