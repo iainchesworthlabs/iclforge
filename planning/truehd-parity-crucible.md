@@ -13,9 +13,10 @@
     with the equality oracle, the window, runner, diagnostics, translations and pages. The answers taken from the
     recommendations below, since the owner has not replied: question 1 yes, pin-only; 2 a 5.1 bed; 3 pin-only; 4
     plain rounding; 5 48 kHz; 8 the restart interval stays at the encoder's 128 until a receiver confirms 8; 9
-    the codec-path switch keeps its E-AC-3 meaning; 10 `DownmixMode::kNone` and the E-AC-3 encoder's bed. Not
-    built: the audio backends (phase 1, question 6), so the real probe answers false and no endpoint offers the
-    mode; the hardware reading and the throughput (phase 4). What this round asks is in
+    the codec-path switch keeps its E-AC-3 meaning; 10 `DownmixMode::kNone` and the E-AC-3 encoder's bed. Question 6
+    was answered by the owner on 2026-10-31 (eight 16-bit channels at 192 kHz, 176.4 kHz for the 44.1 family) and phase 1
+    is built for PipeWire only: `BitstreamFormat::kTrueHd`, the eight-channel carrier, `supports_truehd_passthrough`.
+    Not built: WASAPI and Core Audio (they refuse the format), the hardware reading and the throughput (phase 4). What this round asks is in
     [Questions from the build](#questions-from-the-build), at the end.
 
 ## Basis
@@ -339,7 +340,8 @@ Raised on 2026-10-31 by the session that built phases 0, 2 and 3. Each has a rec
 recommendation says, provisionally.
 
 12. **Should the TrueHD entry be offered in the Pin list and the tray while no backend can carry it?** The real probe
-    answers false for TrueHD, so a pin on it always falls back, with the reason line saying why. The headphones entry is
+    answers false for TrueHD on Windows and macOS (and on a PipeWire sink that does not list it), so a pin on it falls back there,
+    with the reason line saying why. The headphones entry is
     dropped where no renderer exists, on the argument that a list should offer what can be chosen. *Recommendation:*
     keep it, because the hardware phase needs the pin and the reason line is honest; revisit when phase 1 lands and the probe can
     answer, and hide it on a platform whose backend will never carry MAT.

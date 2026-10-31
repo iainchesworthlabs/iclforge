@@ -205,8 +205,8 @@ TestCase {
     }
 
     // The Latency and Codec blocks say they do not apply while the TrueHD
-    // mode is the one in use. The mode cannot be reached here (the real probe
-    // answers false for TrueHD until a backend carries it), so this holds the
+    // mode is the one in use. The mode cannot be reached here (no endpoint these
+    // suites can reach lists TrueHD), so this holds the
     // notes to being on the page and shown only in that mode.
     function test_theTruehdNotesAreOnThePageAndHiddenOutsideThatMode() {
         const page = createTemporaryObject(settingsPage, testCase.parent);

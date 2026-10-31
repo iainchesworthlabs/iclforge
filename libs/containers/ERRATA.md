@@ -44,8 +44,9 @@ repeats the comparisons against whatever FFmpeg is installed, and the `[truehd]`
    eight channels of 16-bit PCM, 3,840 frames to the burst, at 192,000 Hz for 48, 96 and 192 kHz content and 176,400 Hz for the
    44.1 family, because 24 access units of 40, 80 or 160 samples at those rates fill 3,840 frames at that rate. That is
    arithmetic on the burst size and an eight-channel assumption, not a statement of TH spec §21.3, and nothing has played the
-   WAV into a receiver. Is eight channels at four times the family rate (HDMI's MAT carrier) the carrier? **Provisional,
-   owner to confirm.**
+   WAV into a receiver. Is eight channels at four times the family rate (HDMI's MAT carrier) the carrier? **The owner
+   confirmed it on 2026-10-31**, and `BitstreamFormat::kTrueHd` in `libs/audio` is written to it; no receiver has been played
+   it, so what is confirmed is the reading and not a lock.
 8. **TrueHD in a transport stream is Blu-ray's alone (`forge ts`).** The command writes TrueHD with `stream_type` 0x83 and the
    `HDMV` registration, and refuses the `dvb` and `atsc` profiles with a usage error, because neither defines TrueHD carriage in
    anything found for this work (C8 is about the same stream_type). Does DVB or ATSC define one?

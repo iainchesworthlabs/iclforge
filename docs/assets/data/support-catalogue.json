@@ -2294,7 +2294,7 @@
         "Public API: `MatPacker`, `wrap_mat_stream` and `unwrap_mat_stream`",
         "`spdif` to a WAV or raw bursts and `unspdif` back; no device output",
         "No",
-        "Pinned mode builds the bursts; no audio backend carries them to a device yet",
+        "Pinned mode builds the bursts; only PipeWire sends them, and no receiver has been played one",
         "No"
       ],
       [
@@ -2366,7 +2366,7 @@
         "Internal audio layer",
         "Yes",
         "Yes",
-        "Output policy; TrueHD only when pinned, and no endpoint is offered it yet",
+        "Output policy; TrueHD only when pinned, and only a PipeWire sink is offered it",
         "Desktop player, to a receiver chosen in the output picker; the Android TV sink"
       ],
       [

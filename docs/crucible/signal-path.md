@@ -95,15 +95,18 @@ exposes one a third party can hand Atmos objects to. On those platforms the head
 decodes and folds instead. It also needs a signing key, because the decoder rebuilds objects only
 from a signed stream; without one the stream is a 5.1 bed and stereo is the fold.
 
-**TrueHD 5.1 is chosen by pinning it, and nothing offers it yet.** The automatic choice never
-picks it, because no receiver has read a TrueHD stream from Crucible. It sends the same 5.1 bed as
+**TrueHD 5.1 is chosen by pinning it, and only a PipeWire sink offers it.** The automatic choice
+never picks it, because no receiver has read a TrueHD stream from Crucible. It sends the same 5.1 bed as
 DD+ 5.1, encoded losslessly and carried as MAT bursts, and it carries no objects whatever key is
 loaded. Lossless starts at 24-bit integers: Crucible's mix is floating point, it is rounded to the
 nearest 24-bit value (a tie goes to the even one), and the stream decodes to exactly those values
 and no further back. The mode also needs an audio backend that can carry MAT, which is eight
-channels at 192 kHz, and none can yet. So no endpoint reads as taking TrueHD, and a pin on it falls
-back to the automatic choice with the reason line saying so. The engine side is tested over
-scripted devices, bit for bit, and has never reached a receiver.
+channels at 192 kHz: PipeWire's can, on a sink whose codec list names TrueHD, and the Windows,
+macOS, ALSA and Android backends cannot. So on Windows and macOS no endpoint reads as taking
+TrueHD, and a pin on it falls back to the automatic choice with the reason line saying so. The
+engine side is tested over scripted devices, bit for bit, and the PipeWire side has been built
+and tested without a receiver: nothing has been played into one, so whether a receiver locks on
+the stream is not known.
 Its LFE channel is empty, because Crucible's mix has no LFE source: a tap's LFE is dropped.
 
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
