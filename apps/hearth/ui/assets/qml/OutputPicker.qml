@@ -99,7 +99,7 @@ Dialog {
     }
 
     readonly property var passthroughDevices: HearthController.outputDevices.filter(
-        function(d) { return d.supportsAc3 || d.supportsEac3; })
+        function(d) { return d.supportsAc3 || d.supportsEac3 || d.supportsMat; })
 
     // What to preselect when the dialog opens: the device actually playing,
     // else this machine's own default, else simply the first row - always
@@ -144,8 +144,15 @@ Dialog {
     }
 
     function passthroughSummary(device) {
-        return qsTr("AC-3 %1 · E-AC-3 %2").arg(device.supportsAc3 ? "✓" : "–")
-                                          .arg(device.supportsEac3 ? "✓" : "–");
+        const base = qsTr("AC-3 %1 · E-AC-3 %2").arg(device.supportsAc3 ? "✓" : "–")
+                                                .arg(device.supportsEac3 ? "✓" : "–");
+        if (!device.supportsMat) {
+            return base;
+        }
+        // The output opens TrueHD's eight-channel link. Until a run on a receiver has shown the
+        // platform's MAT output to work, it says so rather than a tick.
+        return base + (device.matRun ? qsTr(" · TrueHD (MAT) ✓")
+                                     : qsTr(" · TrueHD (MAT) opens, not run"));
     }
 
     component SectionHeading: RowLayout {

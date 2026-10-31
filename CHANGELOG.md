@@ -17,6 +17,11 @@ See [README.md](README.md) for the project overview and
   and (when `ICLFORGE_FORGE` names an executable) the samples to `forge decode`'s. The encoder, the Atmos layer and the metadata edits are
   not bound.
 
+- **Added: `iclforge::truehd` in the Rust crate: TrueHD and MLP decode, probe and scan (WP7).** `probe`, `scan` (the access units as
+  borrowed slices), `ScannedStream` (length, restarts, `restart_for_sample`; `Send + Sync`) and `Decoder`/`Decoded`, with
+  `Error::Truehd(ErrorKind)` for the decode statuses. The sys crate's build script now watches `libs/truehd`. The test holds every
+  committed fixture to the SHA-256 of FFmpeg's strict decode, and to `forge decode` when `ICLFORGE_FORGE` names one; `cargo clippy
+  -D warnings` and `cargo fmt --check` pass. The encoder is not wrapped.
 - **Added: a coverage job for the Qt applications, and a script that builds them on a Linux machine with no Qt.** The nightly run's new
   `coverage-qt` job (`_ci-core.yml`) installs the Qt kit CI pins (6.12.0 with Quick 3D and its shader tools), builds forge-gui, Crucible and
   Hearth's window with gcov, runs the tests labelled for them offscreen (`test-linux-gcc-coverage-qt`) and gates the C++ of `apps/forge/gui`,
@@ -37,6 +42,15 @@ See [README.md](README.md) for the project overview and
   and not exported, so with `BUILD_SHARED_LIBS=ON` (the ABI gate's `config-linux-llvm-shared`, and a Windows DLL build) every consumer failed with
   an unresolved external. Both carry `ICLFORGE_TRUEHD_EXPORT` now and are in the library's ABI allowlist; a Windows DLL build of the TrueHD
   tests and `forge` links, and the evolution tests pass against it.
+- **Added: TrueHD as MAT in the audio library's passthrough sink, and the Hearth output decision that knows it; not run on any platform.**
+  `BitstreamFormat::kMat` opens the eight-channel link (16 bits, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 kHz family, 3,840 frames
+  to a 61,440-byte burst, the owner's decision of 2026-10-29): ALSA on an HDMI device, PipeWire as SPA's `TRUEHD`, WASAPI as
+  `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, and Android through two new optional bridge methods (not built); Core Audio refuses it. The sink
+  descriptor reads a MAT entry from ALSA's ELD and PipeWire's codec list. Hearth's output decision lists each platform as "not run" until a run on a
+  receiver passes, picks MAT automatically only for a platform that has, sends it when Bitstream is pinned (with the warning), and gives the
+  fallback for a TrueHD item that is decoded: the stream's presentation for the output's width, else stereo, else a refusal; there is no transcode.
+  The player does not pack MAT bursts yet, so a TrueHD item is still decoded. The Output picker shows "TrueHD (MAT) opens, not run".
+
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was

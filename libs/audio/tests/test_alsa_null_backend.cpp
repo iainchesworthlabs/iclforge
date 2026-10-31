@@ -571,6 +571,83 @@ TEST_CASE("alsa passthrough: E-AC-3 runs its link at 4x and takes only E-AC-3-si
     CHECK(eventually([&] { return sink.stats().bursts_rendered >= 1; }));
 }
 
+TEST_CASE("alsa passthrough: MAT opens the eight-channel link and takes only MAT-sized bursts",
+          "[audio][alsa-null][concurrency][truehd]") {
+    const NullDevices devices;
+    using iclforge::audio::BitstreamFormat;
+    using iclforge::audio::PassthroughError;
+    const std::vector<std::byte> mat(iclforge::containers::iec61937::kMatBurstBytes);
+    {
+        // 48, 96 and 192 kHz content all run the same 192 kHz link: the hdmi device resolves to
+        // `null`, which takes eight channels at either family's rate.
+        for (const std::uint32_t content : {48000U, 96000U, 192000U, 44100U, 88200U, 176400U}) {
+            iclforge::audio::PassthroughSink sink;
+            REQUIRE(sink.start("hdmi:CARD=Test,DEV=0", content, BitstreamFormat::kMat).has_value());
+            CHECK(sink.running());
+            const std::vector<std::byte> ac3_sized(iclforge::containers::iec61937::kBurstBytes);
+            CHECK_FALSE(sink.submit(ac3_sized));
+            CHECK_FALSE(sink.submit(std::vector<std::byte>(mat.size() - 16)));
+            REQUIRE(sink.submit(mat));
+            CHECK(eventually([&] { return sink.stats().bursts_rendered >= 1; }));
+        }
+    }
+    {
+        // A content rate MAT has no link at is refused before a device is opened.
+        iclforge::audio::PassthroughSink sink;
+        const auto started = sink.start("hdmi:CARD=Test,DEV=0", 32000, BitstreamFormat::kMat);
+        REQUIRE_FALSE(started.has_value());
+        CHECK(started.error() == PassthroughError::kFormatRejected);
+    }
+    {
+        // A stereo-only device cannot carry the eight-channel link, and is refused rather than
+        // opened at two channels, where a MAT burst would be noise on the wire.
+        for (const char* name : {"stereo_xrun", "mono", "floatonly"}) {
+            iclforge::audio::PassthroughSink sink;
+            const auto started = sink.start(name, 48000, BitstreamFormat::kMat);
+            REQUIRE_FALSE(started.has_value());
+            CHECK(started.error() == PassthroughError::kFormatRejected);
+            CHECK_FALSE(sink.running());
+        }
+    }
+}
+
+TEST_CASE("alsa passthrough: a MAT burst reaches an eight-channel device byte for byte, in 16-byte frames",
+          "[audio][alsa-null][concurrency][truehd]") {
+    // A `file` device in front of `null`, so that what the render thread wrote can be read back.
+    const fs::path dir = alsa_null::scratch_dir("alsa_null_mat");
+    const fs::path recorded = dir / "mat_record.raw";
+    fs::remove(recorded);
+    const alsa_null::AlsaConfigScope scope{alsa_null::write_config(
+        dir / "asound.conf",
+        "pcm.mat_record { type file slave.pcm \"null\" file \"" + recorded.string() +
+            "\" format raw }\n")};
+
+    std::vector<std::byte> burst(iclforge::containers::iec61937::kMatBurstBytes);
+    for (std::size_t i = 0; i < burst.size(); ++i) {
+        burst[i] = static_cast<std::byte>((i * 7U + 3U) % 251U);
+    }
+    {
+        iclforge::audio::PassthroughSink sink;
+        REQUIRE(sink.start("mat_record", 96000, iclforge::audio::BitstreamFormat::kMat).has_value());
+        REQUIRE(sink.submit(burst));
+        REQUIRE(eventually([&] { return sink.stats().bursts_rendered >= 1; }));
+        sink.stop();
+    }
+    std::ifstream in{recorded, std::ios::binary};
+    REQUIRE(in.is_open());
+    std::vector<char> written((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    // The link runs from the moment it is opened, so the burst is preceded by the silence of an idle
+    // link (counted as underruns) and followed by more of it. It is there whole and unaltered, on
+    // a burst boundary: a burst is written whole, as 3,840 frames of 16 bytes.
+    REQUIRE(written.size() >= burst.size());
+    CHECK(written.size() % 16 == 0);
+    bool found = false;
+    for (std::size_t at = 0; at + burst.size() <= written.size() && !found; at += burst.size()) {
+        found = std::memcmp(written.data() + at, burst.data(), burst.size()) == 0;
+    }
+    CHECK(found);
+}
+
 TEST_CASE("alsa passthrough: pause, flush and resume take effect before and after the link starts",
           "[audio][alsa-null][concurrency]") {
     const NullDevices devices;
