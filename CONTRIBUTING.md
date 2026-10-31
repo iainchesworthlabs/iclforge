@@ -443,14 +443,16 @@ a mid-level developer who does not already know this audio domain.
 - `docs/performance-quality.md` and its trend pages own performance and quality reporting. Their
   client-side code reads append-only data from the `quality-history` branch. Preserve those page
   paths, element IDs, data names and branch-fed assets unless the data pipeline changes with them.
-- `CHANGELOG.md` records user-visible changes by release.
+- `CHANGELOG.md` records user-visible changes by release. A pull request never edits it: it adds
+  one `changelog.d/<slug>.<type>.md` per change (format in [`changelog.d/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/changelog.d/README.md)),
+  and the release assembles them, so two pull requests landing together cannot collide on it.
 - `ROADMAP.md` is the **status board** for in-flight, partial, proposed, blocked, and out-of-scope
   work. It uses plain-English names; do not allocate new numeric roadmap IDs (`EQ1`, `UX12`, …).
   Legacy IDs at the bottom of `ROADMAP.md` resolve old PR references only.
 - Product index pages (`docs/*/index.md`) and [`docs/library/capabilities.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md)
   state **what ships today**.
 - Detailed implementation decisions belong in [`planning/`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning)
-  or a product's `design/` record. When a plan lands, update CHANGELOG and the product index; trim
+  or a product's `design/` record. When a plan lands, add its changelog fragment and update the product index; trim
   the roadmap row; leave or mark the plan superseded ([`planning/SUPERSEDED.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/SUPERSEDED.md)).
 
 **Each product page set follows one shape.** An `index.md` opens with a status callout (what's
