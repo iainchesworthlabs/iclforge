@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -376,4 +378,41 @@ TEST_CASE("truehd leg: write the bursts and the input for the FFmpeg check",
     file.write(reinterpret_cast<const char*>(pcm.data()),
                static_cast<std::streamsize>(pcm.size() * sizeof(std::int32_t)));
     REQUIRE(file.good());
+}
+
+// What the leg costs a frame, for the machines Crucible runs on (planning/truehd-parity-crucible.md,
+// C24): the reference programme through the stage a 1536-sample frame at a time, timing each
+// submit(), against the 32 ms a frame lasts. Prints and checks nothing else, so it reads the same
+// on a Raspberry Pi and on this tree's CI. Hidden; run it by tag, in a Release build.
+TEST_CASE("truehd leg: what a frame costs, in milliseconds against the 32 the frame lasts",
+          "[.truehd_cost][crucible][output_stage][truehd]") {
+    const Clip clip = programme_clip();
+    auto devices = receiver_that_takes_truehd();
+    OutputStage stage(leg_config(devices));
+    REQUIRE(stage.reprobe(false).mode == OutputMode::kTrueHd51);
+
+    constexpr std::size_t kFrame = 1536;
+    std::array<std::span<const float>, kChannels> views;
+    std::vector<double> ms;
+    for (std::size_t at = 0; at + kFrame <= clip.frames(); at += kFrame) {
+        for (std::size_t ch = 0; ch < kChannels; ++ch) {
+            views[ch] = std::span<const float>(clip.bed[ch]).subspan(at, kFrame);
+        }
+        const auto start = std::chrono::steady_clock::now();
+        stage.submit({}, RawFrame{.objects = {}, .placements = {}, .bed = views});
+        ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+    }
+    REQUIRE_FALSE(ms.empty());
+    std::vector<double> sorted = ms;
+    std::sort(sorted.begin(), sorted.end());
+    double sum = 0.0;
+    for (const double v : ms) {
+        sum += v;
+    }
+    std::printf("truehd leg, %zu frames of %zu samples: mean %.2f ms, median %.2f ms, worst %.2f ms "
+                "(a frame lasts %.1f ms; the encoder emits a restart interval at a time, so the "
+                "worst frame is the one that carries it)\n",
+                ms.size(), kFrame, sum / static_cast<double>(ms.size()), sorted[sorted.size() / 2],
+                sorted.back(), 1000.0 * static_cast<double>(kFrame) / 48000.0);
+    CHECK(stage.status().underruns == 0);
 }
