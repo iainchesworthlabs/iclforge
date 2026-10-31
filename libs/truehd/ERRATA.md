@@ -339,7 +339,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     **Recommendation:** none of (a) to (d) until the DEE set shows what a stream that sets the control bit carries; then gate (a) only for a
     presentation whose control bit is set.
 
-90. **Substreams at 176.4 and 192 kHz with more than 2 channels (TH spec §9.6; entry 90).** The encoder writes one substream at these
+90. **Substreams at 176.4 and 192 kHz with more than 2 channels (TH spec §9.6; entry 91).** *Answered in the encoder, owner to confirm
+    (entry 91).* The encoder wrote one substream at these
     rates, as §9.6 says, and FFmpeg 8.0.1's strict decode (the version `.github/workflows/_ci-core.yml` pins) refuses every such stream of
     3 to 6 channels: `Assignment of matrix channel 0 to invalid output channel -22 is not implemented`, then `No restart header present in
     substream 0`. The same decode takes the stereo streams, and takes the encoder's streams at 44.1, 48, 88.2 and 96 kHz. FFmpeg's own
@@ -351,8 +352,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     forbid a second substream at 176.4 and 192 kHz, or does it only limit the filter order there? **Recommendation:** if §9.6 limits the
     order only, write 2 + the rest as FFmpeg's encoder does, since the one reader that exists refuses the other; if it forbids a second
     substream, keep one and have `truehd-encode` refuse 3 or more channels at these rates with a sentence, since the stream it writes
-    today plays nowhere the owner can test. Left as it is until answered; `compare_truehd_encoders.py` lists the rows as an FFmpeg
-    refusal, not a failure of forge.
+    today plays nowhere the owner can test. The reference text read from the specification answers the first half and the evidence the
+    second (entry 91), and the encoder now writes 2 + the rest; the owner is asked to confirm that a Blu-ray or Dolby player accepts it.
 
 91. **IIR, and a filter order above 8, for material that was resampled up (TH spec §9.5; `libs/truehd/ERRATA.md` question 8, entry 13).**
     The encoder writes no IIR filter. Measured with `tools/checks/compare_truehd_encoders.py`: on the 96 kHz music source
@@ -552,7 +553,7 @@ confirm** (Q10).
 rows 0 and 1 (L, R), substream 1 rows 2 to 5, `ch_assign` is the identity and there are no matrices
 (`dump_struct.py truehd_m51_s24.thd`); a 2 channel decode therefore gives L and R unchanged. The encoder spreads
 channels the same way, and puts rows 6 and 7 of an 8 channel stream in a third substream. At 176.4 and 192 kHz a stream
-has one substream (§9.6). FFmpeg writes no 7.1 stream, so the three substream form has FFmpeg's decoder as its only
+has one substream if it has 1 or 2 channels and two (2 and the rest, at most 6 channels) otherwise (entry 91). FFmpeg writes no 7.1 stream, so the three substream form has FFmpeg's decoder as its only
 check: it decodes it (entries 32 to 34).
 
 **32. A substream above 6 channels (§7.2, §10.2).** A stream whose third substream (rows 6 and 7) has restart sync 0x31EA
@@ -1145,3 +1146,22 @@ strict decode reads them: the encoder now finds each channel's clear low bits in
 same arithmetic in both). The standard downmix folds channels into each other with one step, so a stream with it keeps the common one.
 The same 5.1 stream is 56,672 bytes. The size is the evidence and the strict decode the check; how another encoder chooses a channel's step
 is not looked at (README rule 4 of the work packages).
+
+**91. Two substreams at 176.4 and 192 kHz for 3 or more channels (TH spec §9.6, "192/176.4 kHz Restrictions"; question 90). Provisional, owner to confirm.**
+The restrictions read, for these two rates: filter A (FIR) order at most 4 in substream 0; no filter B (IIR) in substream 0; no LSB bypass in
+substream 0; **a second substream shall not be present**. The encoder followed the last line and wrote one substream of 3 to 6 channels,
+which FFmpeg 8.0.1's strict decode refuses ("Assignment of matrix channel 0 to invalid output channel -22", "No restart header present in
+substream 0"), while FFmpeg's own encoder writes such streams as two substreams (2 and the rest, the layout it uses at 48 kHz) and its
+decoder reads them. The stream and the text disagree, and the stream of the one reader there is wins (this file's preamble): the encoder
+lays out 3 to 6 channels at 176.4 and 192 kHz as at 48 kHz, 2 channels in substream 0 and the rest in substream 1; 1 and 2 channels stay in
+one substream; more than 6 channels stay refused (FFmpeg caps the stream at 6 as well). Substream 0 keeps the written limits (order 4, no
+IIR, no LSB bypass), as every substream of such a stream does here (the order cap applies to all of them, so substream 1 could code a little
+smaller with order 8, which the specification does not say it may). Measured: the 192 kHz 5.1 programme row of `compare_truehd_encoders.py`
+decodes exactly in FFmpeg's strict decode (1,953,458 bytes, 1.149 of FFmpeg's 1,699,984); `verify_truehd_encode_interop.py --full` is
+43 cases, 0 failing, with `synth-6ch-192` at 1.012; `fuzz_truehd_encoder_space.py` ran 2,815 cases and the regression seeds with 0
+failing, where 10 of 110 failed with one substream; a library test decodes 2, 3 and 6 channels at both rates with the encoder's own check
+on. Not known: whether a Dolby decoder (a Blu-ray player) accepts the stream: there is no reference 192 kHz multichannel stream, and DEE has
+no option for these rates, so no oracle but FFmpeg answers it. **Question for the owner (95):** is a stream written against the specification's
+"shall not" acceptable where the reference decoder and FFmpeg's encoder both do the other thing, or should `truehd-encode` refuse 3 or more
+channels at these rates until a player has been tried? The change is one line (`stage_layout` in `libs/truehd/src/encoder/encoder.cpp`) and
+`test_encoder.cpp` holds the two substreams.

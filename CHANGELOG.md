@@ -20,10 +20,12 @@ See [README.md](README.md) for the project overview and
   that every stream counted decodes to the source, and fails the pull-request flow's FFmpeg job if forge is larger than either on a committed source.
   The second times the two decoders and damages a stream eight ways: FFmpeg writes wrong audio with exit status 0 for a bit flipped in a payload,
   forge stops at the unit, and recovery after a lost unit is the same. A library test flips 48 bits and a strict decode refuses all 48. The page
-  says where forge is larger: 1.06 and 1.14 times FFmpeg's size at 192 kHz.
+  says where forge is larger: 1.06 and 1.15 times FFmpeg's size at 192 kHz.
 - **Added: TrueHD workloads at 7.1, 96 kHz and 192 kHz** (`truehd_71_*`, `truehd_51_96k_*`, `truehd_stereo_192k_*`, encode and decode) in `iclforge-perf`,
-  `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. FFmpeg 8.0.1's strict decode refuses the encoder's 192 kHz
-  streams of 3 or more channels, which have one substream as TH spec §9.6 says (`libs/truehd/ERRATA.md` question 90).
+  `iclforge-bench` and `iclforge-membench`, and in the badge, hero and card tables. The encoder
+  now writes 3 to 6 channels at 176.4 and 192 kHz as two substreams (2 and the rest, as at 48 kHz) where it wrote one, which TH spec §9.6's text asks
+  for and FFmpeg 8.0.1's strict decode refuses; FFmpeg's own encoder writes two, and its decode of forge's 192 kHz 5.1 programme is exact
+  (`libs/truehd/ERRATA.md` entry 90, provisional). The encoder fuzzer's 192 kHz cases, 10 of 110 failing before, pass (2,815 cases).
 - **Added: `forge decode ... strict` exits 2 when frames or units were lost after the first one decoded (option D of `planning/ac4.md`).** A
   decode that loses frames still exits 0 and warns where it always has; with `strict`, once everything that could be decoded is written
   (the output is the same), it exits 2 when an AC-4 frame waited for an I-frame after the first had decoded, when a frame or unit was

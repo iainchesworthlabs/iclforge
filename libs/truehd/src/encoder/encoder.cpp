@@ -79,10 +79,13 @@ struct StageSpec {
 
 // How the channels are spread over substreams (ERRATA.md entry 31): FFmpeg's TrueHD encoder puts
 // two channels in substream 0 and the rest in substream 1; a third substream takes the last two of
-// an eight channel stream. At 176.4 and 192 kHz TH spec §9.6 allows one substream only.
-[[nodiscard]] std::vector<StageSpec> stage_layout(int channels, unsigned ratebits,
+// an eight channel stream. At 176.4 and 192 kHz the text of TH spec §9.6 says a second substream
+// SHALL NOT be present, yet FFmpeg's encoder writes 2 + the rest there and its decoder refuses a
+// single substream of 3 or more channels, so the stream is laid out as at 48 kHz (ERRATA.md
+// entry 90, provisional); the rate caps the stream at 6 channels, so no third substream.
+[[nodiscard]] std::vector<StageSpec> stage_layout(int channels, unsigned /*ratebits*/,
                                                   std::uint32_t assignment) {
-    if (rate_factor(ratebits) >= 2 || channels <= 2) {
+    if (channels <= 2) {
         return {StageSpec{0, channels - 1}};
     }
     if (channels <= 6) {

@@ -59,11 +59,11 @@ recordings resampled by FFmpeg. Real 24-bit, 7.1, film and speech material is a 
 | ref-51-48-24 | 48000 | 6 | 24 | 1.5 | - | 352,378 | 298,558 | 0.847 | - | yes |
 | ref-51-48-16 | 48000 | 6 | 16 | 1.5 | - | 352,378 | 298,558 | 0.847 | - | yes |
 | ref-51-96-24 | 96000 | 6 | 24 | 1.5 | - | 1,210,068 | 1,159,498 | 0.958 | - | yes |
-| ref-51-192-24 | 192000 | 6 | 24 | 1.5 | - | 1,699,984 | 1,942,644 | 1.143 | - | forge yes, FFmpeg refuses (Q90) |
+| ref-51-192-24 | 192000 | 6 | 24 | 1.5 | - | 1,699,984 | 1,953,458 | 1.149 | - | yes |
 | ref-71-48-24 | 48000 | 8 | 24 | 1.5 | - | 731,874 * | 469,266 | - | - | yes |
 | ref-71-96-24 | 96000 | 8 | 24 | 1.5 | - | 1,111,560 * | 1,449,674 | - | - | yes |
 
-Over the 22 rows with FFmpeg's stream: forge 12,375,572 bytes, FFmpeg 12,978,598, ratio 0.954.
+Over the 22 rows with FFmpeg's stream: forge 12,386,386 bytes, FFmpeg 12,978,598, ratio 0.954.
 Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.734.
 
 \* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.
@@ -84,11 +84,11 @@ Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.73
   The DEE rows at 0.997 and 0.990 are ties, not wins.
 - **On the programme material forge is 0.85 to 0.96 of FFmpeg's size at 44.1 to 96 kHz** (0.954 over all 22 rows
   FFmpeg's stream is the source of, the 13 sources included).
-- **At 192 kHz forge is larger than FFmpeg: 1.064 stereo and 1.143 for 5.1.** The specification limits the filter
+- **At 192 kHz forge is larger than FFmpeg: 1.064 stereo and 1.149 for 5.1.** The specification limits the filter
   order there to 4 and FFmpeg's encoder writes order 7 ([ERRATA entry 35](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)). FFmpeg 8.0.1's
-  strict decode also refuses forge's 192 kHz streams of 3 or more channels, which have one substream as the specification
-  says; its own encoder writes two ([ERRATA question 90](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)). The row is marked and not counted as a
-  failure of forge, whose own decoder returns the source.
+  strict decode refused forge's 192 kHz streams of 3 or more channels while they had one substream, as the text of
+  the specification has it; its own encoder writes two, and so does forge now, with FFmpeg's decode of the 5.1 row exact
+  ([ERRATA entry 90](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md), provisional until the owner confirms).
 - **DEE's 96 kHz streams are not the source**: FFmpeg's strict decode of them differs from it (about -47 dB, [ERRATA entry 50](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)),
   so their sizes are not a size for the same audio and are not compared. Forge is 0.932 of FFmpeg's size on the
   96 kHz music, and the gap to DEE's smaller figure is not a gap in coding.

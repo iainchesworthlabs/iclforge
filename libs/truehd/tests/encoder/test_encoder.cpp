@@ -75,6 +75,31 @@ TEST_CASE("every rate, channel count and width comes back sample for sample",
     }
 }
 
+TEST_CASE("at 176.4 and 192 kHz three or more channels are two substreams",
+          "[truehd][encoder][roundtrip]") {
+    // TH spec section 9.6's text forbids a second substream there; FFmpeg 8.0.1's strict decode
+    // refuses one substream of 3 or more channels and reads 2 + the rest (ERRATA.md entry 90).
+    for (const std::uint32_t rate : {176400U, 192000U}) {
+        for (const int channels : {2, 3, 6}) {
+            CAPTURE(rate, channels);
+            EncoderConfig config;
+            config.sample_rate = rate;
+            config.channels = channels;
+            config.restart_interval_units = 8;
+            config.verify = true;
+            auto encoder = Encoder::create(config);
+            REQUIRE(encoder.has_value());
+            CHECK(encoder->substreams() == (channels > 2 ? 2 : 1));
+            const auto pcm = make_pcm(channels, static_cast<int>(rate / 16), 24,
+                                      static_cast<std::uint32_t>(channels + 5));
+            const Encoded encoded = encode_all(config, pcm);
+            REQUIRE(encoded.stats.verified_units == encoded.units.size());
+            const auto decoded = decode_all(encoded.units, 24, channels, Presentation::kBest);
+            REQUIRE(decoded == pcm);
+        }
+    }
+}
+
 TEST_CASE("the output does not depend on how the input is chunked",
           "[truehd][encoder][roundtrip]") {
     EncoderConfig config;
