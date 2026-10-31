@@ -48,6 +48,7 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
     test_output_policy.cpp
     test_tap_pool.cpp
     test_output_stage.cpp
+    test_output_stage_truehd.cpp
     test_engine_start.cpp
     test_nullsink_position.cpp
     test_platform_seams.cpp
@@ -82,6 +83,9 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
 # libs/ac3/tests/core/test_simd_kernels.cpp.
 if(ICLFORGE_IS_MSVC_LIKE)
     set_source_files_properties(test_engine_commands.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+    # test_output_stage_truehd.cpp reads ICLFORGE_CRUCIBLE_TRUEHD_DUMP_DIR with std::getenv, the
+    # same C4996 reasoning.
+    set_source_files_properties(test_output_stage_truehd.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
 # The null-sink driver's position clock (apps/crucible/windows/driver/Source/Main/
 # position.h) is a header with no kernel dependencies, kept that way so the
@@ -136,7 +140,8 @@ target_link_libraries(iclforge-crucible-tests
         iclforge::ac3
         iclforge::audio
         iclforge::containers
-        iclforge::ac4)
+        iclforge::ac4
+        iclforge::truehd)
 
 # test_translations.cpp reads the Crucible's six Qt Linguist catalogues as files (no Qt in this
 # target), on the same reasoning as the golden data's directories (tests/support/CMakeLists.txt): a

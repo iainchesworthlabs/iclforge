@@ -36,7 +36,7 @@ TestCase {
     }
 
     function test_pinnedModeRoundTrips() {
-        for (const mode of ["atmos", "ddplus", "dd", "pcm", "headphones", "stereo", "auto"]) {
+        for (const mode of ["atmos", "ddplus", "dd", "truehd", "pcm", "headphones", "stereo", "auto"]) {
             CrucibleController.pinned = mode;
             compare(CrucibleController.pinned, mode);
         }
@@ -62,7 +62,7 @@ TestCase {
         verify(pin, "the pin ComboBox carries objectName pinBox");
         compare(pin.indexOfValue("headphones") >= 0, CrucibleController.spatialAvailable,
                 "the headphones entry is offered exactly where the build has an object renderer");
-        compare(pin.count, CrucibleController.spatialAvailable ? 7 : 6,
+        compare(pin.count, CrucibleController.spatialAvailable ? 8 : 7,
                 "and it is the only entry the platform can take away");
         compare(CrucibleController.spatialAbsentReason.length > 0,
                 !CrucibleController.spatialAvailable,
