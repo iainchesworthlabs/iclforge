@@ -891,6 +891,15 @@ is not applied. The grammar of the term and the cause of the substream 3 check a
 (`forge decode DISC.thd out.wav truehd-presentation=all truehd-check=lenient`): the filter, channel-parameter and block-data sections after the matrices are
 the standard ones by TH spec v3.20, which this repository has not yet run on a real stream. Not changed: the encoder still writes an independent substream 3
 with `min_chan` 0 (question 63); the discs and DEE code channels 8 to 11 and let the matrices rebuild 0 to 7.
+**Second run (2026-10-31; lab builds d3bbef5, 34f2b6c, df9305c, 81544d7).** The second term read as one bit per matrix channel (variant 12) changes nothing. Two of the
+owner's files parse to the end (`EX_00002b.thd`, `z_short.mlp`; the DEE encodes stop at the first update) and substream 3's check still fails in both (243 of 244 and 18 of 18),
+while substreams 0 to 2 pass (732, 54, 927, 1,077 intervals over the files), so the fold formula is right for them. The fold scope is not the cause: the output of the coded channels alone, of the
+channels below them, of the coded samples before the matrices, and of the matrix channels from 1 to 8 up, each by two shift conventions, score at chance (0 to 3 in 244), and a search
+over every subset of the 24 per-channel folds (after and before the matrices) finds none above 3 of 12 intervals on `EX_00002b.thd` and 2 of 12 on `soll_sil6.mlp`. One result is not
+chance: on `z_short.mlp` (channels 2 to 10 silent) the stored byte of all 12 intervals equals the fold of the *pre-matrix* row 1 alone, with no contribution from rows 0 and 11, which
+carry small values (-1..1, -2..1). Read provisionally: what substream 3's check folds is not the output this decoder builds from the matrices, and in a stream with moving objects
+the difference is the whole check. Open: whether the objects' matrices add dither (`field_m4` as a noise shift is untried), and what the check covers. The controlled DEE encodes that
+would settle it are digital silence and a constant on one object with all others silent (DEE's licence ends 2026-11-06).
 
 ## Atmos, spec v3.6
 
