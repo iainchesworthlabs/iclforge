@@ -30,13 +30,22 @@ namespace iclforge::crucible {
 
 namespace {
 
+iclforge::audio::BitstreamFormat library_format(BurstFormat format) {
+    switch (format) {
+        case BurstFormat::kAc3: return iclforge::audio::BitstreamFormat::kAc3;
+        case BurstFormat::kEac3: return iclforge::audio::BitstreamFormat::kEac3;
+        case BurstFormat::kTrueHd: return iclforge::audio::BitstreamFormat::kMat;
+    }
+    return iclforge::audio::BitstreamFormat::kAc3;
+}
+
 class WasapiBurstSink final : public BurstSink {
 public:
     std::expected<void, std::string> start(const std::string& device_id, std::uint32_t sample_rate,
-                                           bool eac3) override {
-        const auto started = sink_.start(device_id, sample_rate,
-                                         eac3 ? iclforge::audio::BitstreamFormat::kEac3
-                                              : iclforge::audio::BitstreamFormat::kAc3);
+                                           BurstFormat format) override {
+        // The library's backends say for themselves whether they carry the
+        // format: PipeWire's does TrueHD, and every other refuses it.
+        const auto started = sink_.start(device_id, sample_rate, library_format(format));
         if (!started) {
             return std::unexpected(std::string(iclforge::audio::describe(started.error())));
         }
@@ -137,6 +146,7 @@ public:
                           .is_default = device.is_default,
                           .accepts_eac3 = device.supports_eac3_passthrough,
                           .accepts_ac3 = device.supports_ac3_passthrough,
+                          .accepts_truehd = device.supports_mat_passthrough,
                           .shared_channels = device.channels};
             if (const auto spatial = iclforge::audio::probe_spatial_capability(device.id);
                 spatial && spatial->available) {

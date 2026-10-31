@@ -6,7 +6,7 @@ Crucible: the Atmos monitoring bed and its virtual output device, for Windows, L
 
 A app.
 
-- **Uses:** `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `app-cdg-picture`, `app-preferences`, `app-theme`
+- **Uses:** `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `truehd`, `app-cdg-picture`, `app-preferences`, `app-theme`
 - **Used by:** nothing
 - **CI lanes:** windows, linux, macos
 

@@ -244,7 +244,7 @@ TEST_CASE("the report renders a busy engine: endpoints, placed and paired applic
     CHECK(has(report, "key source: ICLFORGE_SIGNING_KEY_FILE (path withheld)"));
     CHECK(has(report, "\"Headphones\"  id=hp"));
     CHECK(has(report, "spatial=yes (max 17 objects)"));
-    CHECK(has(report, "eac3=yes  ac3=yes  pcm=8ch  spatial=no"));
+    CHECK(has(report, "eac3=yes  ac3=yes  truehd=no  pcm=8ch  spatial=no"));
     CHECK(has(report, "game \"\": idle, packaged, session, not tapped, full-screen, slot 0"));
     CHECK(has(report, "width 2 size 0.00 pair "));
     CHECK(has(report, "width 2 size 0.00 custom pair "));

@@ -459,6 +459,7 @@ ApplicationWindow {
             Platform.MenuItem { text: qsTr("Atmos"); checkable: true; checked: CrucibleController.pinned === "atmos"; group: pinGroup; onTriggered: CrucibleController.pinned = "atmos" }
             Platform.MenuItem { text: qsTr("Dolby Digital Plus 5.1"); checkable: true; checked: CrucibleController.pinned === "ddplus"; group: pinGroup; onTriggered: CrucibleController.pinned = "ddplus" }
             Platform.MenuItem { text: qsTr("Dolby Digital 5.1"); checkable: true; checked: CrucibleController.pinned === "dd"; group: pinGroup; onTriggered: CrucibleController.pinned = "dd" }
+            Platform.MenuItem { text: qsTr("TrueHD 5.1"); checkable: true; checked: CrucibleController.pinned === "truehd"; group: pinGroup; onTriggered: CrucibleController.pinned = "truehd" }
             Platform.MenuItem { text: qsTr("PCM surround"); checkable: true; checked: CrucibleController.pinned === "pcm"; group: pinGroup; onTriggered: CrucibleController.pinned = "pcm" }
             // The same flag the Output page's mode list filters on. Without
             // it the tray offered a pin the page refuses to show, so on a

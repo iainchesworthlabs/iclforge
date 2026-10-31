@@ -36,7 +36,7 @@ target_compile_features(crucible_engine PUBLIC cxx_std_23)
 # (config-windows-llvm-coverage); then this library, the window and its
 # tests are the instrumented set tools/checks/coverage_crucible.ps1 reports.
 target_link_libraries(crucible_engine
-    PUBLIC iclforge::ac3 iclforge::audio iclforge::tracy
+    PUBLIC iclforge::ac3 iclforge::audio iclforge::truehd iclforge::tracy
     PRIVATE iclforge::warnings iclforge::coverage)
 
 # The platform half, selected the way apps/forge/cli/CMakeLists.txt selects its
@@ -260,6 +260,15 @@ add_executable(crucible-run runner/src/main.cpp)
 target_link_libraries(crucible-run PRIVATE iclforge::crucible_engine iclforge::warnings)
 target_compile_definitions(crucible-run PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 set_target_properties(crucible-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+# The bitstream probe: what each render endpoint accepts (AC-3, E-AC-3, TrueHD in MAT) and a file
+# streamed to one, for a receiver's own display to read. Not installed: it is for the person
+# taking a reading (docs/crucible/design/promotion.md), not for the people who run Crucible.
+add_executable(crucible-probe runner/src/bitstream_probe.cpp)
+target_link_libraries(crucible-probe PRIVATE iclforge::ac3 iclforge::audio iclforge::containers
+                                             iclforge::truehd iclforge::warnings)
+target_compile_definitions(crucible-probe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+set_target_properties(crucible-probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 # ---------------------------------------------------------------------------
 # The window: crucible, Qt Quick, module Crucible (Phase 3).

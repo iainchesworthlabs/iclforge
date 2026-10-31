@@ -119,77 +119,82 @@
 <context>
     <name>CrucibleController</name>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="115"/>
+        <location filename="../../src/crucible_controller.cpp" line="117"/>
         <source>Atmos</source>
         <translation>Atmos</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="116"/>
+        <location filename="../../src/crucible_controller.cpp" line="118"/>
         <source>Dolby Digital Plus 5.1</source>
         <translation>Dolby Digital Plus 5.1</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="117"/>
+        <location filename="../../src/crucible_controller.cpp" line="119"/>
         <source>Dolby Digital 5.1</source>
         <translation>Dolby Digital 5.1</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="118"/>
+        <location filename="../../src/crucible_controller.cpp" line="120"/>
+        <source>TrueHD 5.1</source>
+        <translation>TrueHD 5.1</translation>
+    </message>
+    <message>
+        <location filename="../../src/crucible_controller.cpp" line="121"/>
         <source>PCM surround</source>
         <translation>PCM היקפי</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="119"/>
+        <location filename="../../src/crucible_controller.cpp" line="122"/>
         <source>Headphones</source>
         <translation>אוזניות</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="120"/>
+        <location filename="../../src/crucible_controller.cpp" line="123"/>
         <source>Stereo</source>
         <translation>סטריאו</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="121"/>
+        <location filename="../../src/crucible_controller.cpp" line="124"/>
         <source>No output</source>
         <translation>אין פלט</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="770"/>
+        <location filename="../../src/crucible_controller.cpp" line="774"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>בנייה זו אינה נושאת קובץ הודעות מוטמע (:/notices/NOTICES.txt לא הודר לתוכה); קובץ NOTICES.txt שליד היישום וקובץ LICENSE שבמאגר אומרים מה היא כוללת.</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1265"/>
+        <location filename="../../src/crucible_controller.cpp" line="1269"/>
         <source>saved to %1</source>
         <translation>נשמר אל %1</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1268"/>
+        <location filename="../../src/crucible_controller.cpp" line="1272"/>
         <source>could not write %1: %2</source>
         <translation>לא ניתן היה לכתוב את %1: %2</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1056"/>
+        <location filename="../../src/crucible_controller.cpp" line="1060"/>
         <source>installing, answer the elevation prompt ...</source>
         <translation>מתקין, יש לענות לבקשת ההרשאות…</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1071"/>
+        <location filename="../../src/crucible_controller.cpp" line="1075"/>
         <source>removing, answer the elevation prompt ...</source>
         <translation>מסיר, יש לענות לבקשת ההרשאות…</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1091"/>
+        <location filename="../../src/crucible_controller.cpp" line="1095"/>
         <source>installed</source>
         <translation>הותקן</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1091"/>
+        <location filename="../../src/crucible_controller.cpp" line="1095"/>
         <source>removed</source>
         <translation>הוסר</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1095"/>
+        <location filename="../../src/crucible_controller.cpp" line="1099"/>
         <source>%1 failed (exit code %2)</source>
         <translation>%1 נכשל (קוד יציאה %2)</translation>
     </message>
@@ -660,61 +665,66 @@
     </message>
     <message>
         <location filename="../qml/Main.qml" line="462"/>
+        <source>TrueHD 5.1</source>
+        <translation>TrueHD 5.1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Main.qml" line="463"/>
         <source>PCM surround</source>
         <translation>PCM היקפי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="469"/>
+        <location filename="../qml/Main.qml" line="470"/>
         <source>Headphones</source>
         <translation>אוזניות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="470"/>
+        <location filename="../qml/Main.qml" line="471"/>
         <source>Stereo</source>
         <translation>סטריאו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="474"/>
+        <location filename="../qml/Main.qml" line="475"/>
         <source>Default output: %1</source>
         <translation>פלט ברירת המחדל: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="475"/>
+        <location filename="../qml/Main.qml" line="476"/>
         <source>Move default output to %1</source>
         <translation>העבירו את פלט ברירת המחדל אל %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="480"/>
+        <location filename="../qml/Main.qml" line="481"/>
         <source>previous default output</source>
         <translation>פלט ברירת המחדל הקודם</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="480"/>
+        <location filename="../qml/Main.qml" line="481"/>
         <source>Restore %1</source>
         <translation>שחזר את %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="485"/>
+        <location filename="../qml/Main.qml" line="486"/>
         <source>Objects on · key loaded</source>
         <translation>אובייקטים פעילים · מפתח נטען</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="485"/>
+        <location filename="../qml/Main.qml" line="486"/>
         <source>Objects off · no key</source>
         <translation>אובייקטים כבויים · אין מפתח</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="486"/>
+        <location filename="../qml/Main.qml" line="487"/>
         <source>Settings…</source>
         <translation>הגדרות…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="487"/>
+        <location filename="../qml/Main.qml" line="488"/>
         <source>About…</source>
         <translation>אודות…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="489"/>
+        <location filename="../qml/Main.qml" line="490"/>
         <source>Quit</source>
         <translation>יציאה</translation>
     </message>
@@ -722,305 +732,330 @@
 <context>
     <name>OutputPage</name>
     <message>
-        <location filename="../qml/OutputPage.qml" line="41"/>
+        <location filename="../qml/OutputPage.qml" line="42"/>
         <source>SIGNAL PATH</source>
         <translation>נתיב האות</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="44"/>
+        <location filename="../qml/OutputPage.qml" line="45"/>
         <source>two devices, two stages: applications play into one, you hear the result on the other</source>
         <translation>שני התקנים, שני שלבים: היישומים מנגנים לאחד, את התוצאה שומעים בשני</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="59"/>
+        <location filename="../qml/OutputPage.qml" line="60"/>
         <source>WHAT YOU HEAR IT AS</source>
         <translation>באיזו צורה שומעים אותו</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="48"/>
+        <location filename="../qml/OutputPage.qml" line="49"/>
         <source>Every application plays into the system default output. With the silent &quot;%1&quot; device as that default, nothing is heard from it; this app taps each application there, places it in the room, encodes the scene, and sends the result to the endpoint the pin and the hardware choose. That endpoint is the only thing you hear.</source>
         <translation>כל יישום מנגן לתוך פלט ברירת המחדל של המערכת. כאשר ההתקן השקט &quot;%1&quot; הוא ברירת המחדל הזו, דבר אינו נשמע ממנו; יישום זה לוכד שם כל יישום, ממקם אותו בחדר, מקודד את הסצנה, ושולח את התוצאה אל נקודת הקצה שההצמדה והחומרה בוחרות. נקודת קצה זו היא הדבר היחיד שאתם שומעים.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="70"/>
+        <location filename="../qml/OutputPage.qml" line="71"/>
         <source>%1 · E-AC-3 JOC over HDMI</source>
         <translation>%1 · E-AC-3 JOC מעל HDMI</translation>
     </message>
     <message>
         <location filename="../qml/OutputPage.qml" line="71"/>
+        <source>%1 · lossless bed in MAT over HDMI, no objects</source>
+        <translation>%1 · מיטה ללא אובדן ב-MAT מעל HDMI, ללא אובייקטים</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="72"/>
         <source>%1 The endpoint follows the hardware: pull HDMI and it moves to the next best one below.</source>
         <translation>%1 נקודת הקצה עוקבת אחר החומרה: נתקו את HDMI והיא עוברת אל הטובה הבאה שמתחת.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="79"/>
+        <location filename="../qml/OutputPage.qml" line="80"/>
         <source>PIN</source>
         <extracomment>Kicker over the pin control (the verb: pin the stream to this mode)</extracomment>
         <translation>הצמדה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="85"/>
+        <location filename="../qml/OutputPage.qml" line="86"/>
         <source>Pin</source>
         <translation>הצמדה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="102"/>
+        <location filename="../qml/OutputPage.qml" line="103"/>
         <source>Automatic · best the hardware can carry</source>
         <translation>אוטומטי · הטוב ביותר שהחומרה יכולה לשאת</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="103"/>
+        <location filename="../qml/OutputPage.qml" line="104"/>
         <source>Atmos</source>
         <translation>Atmos</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="104"/>
+        <location filename="../qml/OutputPage.qml" line="105"/>
         <source>Dolby Digital Plus 5.1</source>
         <translation>Dolby Digital Plus 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="105"/>
+        <location filename="../qml/OutputPage.qml" line="106"/>
         <source>Dolby Digital 5.1</source>
         <translation>Dolby Digital 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="106"/>
+        <location filename="../qml/OutputPage.qml" line="107"/>
+        <source>TrueHD 5.1</source>
+        <translation>TrueHD 5.1</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="108"/>
         <source>PCM surround</source>
         <translation>PCM היקפי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="107"/>
+        <location filename="../qml/OutputPage.qml" line="109"/>
         <source>Headphones · spatial sound</source>
         <translation>אוזניות · צליל מרחבי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="164"/>
+        <location filename="../qml/OutputPage.qml" line="166"/>
         <source>What the probe found on each render endpoint. &quot;Hear it here&quot; chooses one: it gets the best mode it can carry, the pin when it can, and &quot;Automatic&quot; hands the choice back (the best endpoint for the best mode, a receiver first). &quot;Send applications here&quot; is the other stage, the system default: on a real device you would hear every application directly, so the silent device is the one to send them to.</source>
         <translation>מה שהבדיקה מצאה בכל נקודת קצה של עיבוד. &quot;שמעו כאן&quot; בוחרת אחת: היא מקבלת את המצב הטוב ביותר שהיא יכולה לשאת, את ההצמדה כשהיא יכולה, ו&quot;אוטומטי&quot; מחזיר את הבחירה (נקודת הקצה הטובה ביותר עבור המצב הטוב ביותר, מקלט תחילה). &quot;שלחו יישומים לכאן&quot; הוא השלב האחר, ברירת המחדל של המערכת: בהתקן אמיתי הייתם שומעים כל יישום ישירות, ולכן ההתקן השקט הוא זה שאליו יש לשלוח אותם.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="176"/>
+        <location filename="../qml/OutputPage.qml" line="178"/>
         <source>Endpoints</source>
         <translation>נקודות קצה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="211"/>
+        <location filename="../qml/OutputPage.qml" line="193"/>
+        <source>TRUEHD</source>
+        <translation>TRUEHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="215"/>
         <source>no E-AC-3</source>
         <translation>אין E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="212"/>
+        <location filename="../qml/OutputPage.qml" line="216"/>
         <source>no AC-3</source>
         <translation>אין AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="213"/>
+        <location filename="../qml/OutputPage.qml" line="217"/>
+        <source>TrueHD</source>
+        <translation>TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="217"/>
+        <source>no TrueHD</source>
+        <translation>אין TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="218"/>
         <source>%1 PCM channels</source>
         <translation>%1 ערוצי PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="213"/>
+        <location filename="../qml/OutputPage.qml" line="218"/>
         <source>no PCM</source>
         <translation>אין PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="214"/>
+        <location filename="../qml/OutputPage.qml" line="219"/>
         <source>spatial</source>
         <translation>מרחבי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="275"/>
+        <location filename="../qml/OutputPage.qml" line="281"/>
         <source>the silent device · applications play here · never heard</source>
         <translation>ההתקן השקט · יישומים מנגנים כאן · לעולם לא נשמע</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="276"/>
+        <location filename="../qml/OutputPage.qml" line="282"/>
         <source>the silent device · never heard</source>
         <translation>ההתקן השקט · לעולם לא נשמע</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="321"/>
+        <location filename="../qml/OutputPage.qml" line="328"/>
         <source>Applications play to &lt;b&gt;%1&lt;/b&gt;, the system default output and the silent device: nothing is heard from it, and this app taps each application there.</source>
         <translation>יישומים מנגנים אל &lt;b&gt;%1&lt;/b&gt;, פלט ברירת המחדל של המערכת וההתקן השקט: דבר אינו נשמע ממנו, ויישום זה לוכד שם כל יישום.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="108"/>
+        <location filename="../qml/OutputPage.qml" line="110"/>
         <source>Stereo</source>
         <translation>סטריאו</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="137"/>
+        <location filename="../qml/OutputPage.qml" line="139"/>
         <source>A pin holds as long as some endpoint can carry it, then falls back and says why.</source>
         <translation>הצמדה מחזיקה כל עוד נקודת קצה כלשהי יכולה לשאת אותה, ואז נסוגה ומסבירה מדוע.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="147"/>
+        <location filename="../qml/OutputPage.qml" line="149"/>
         <source>No headphones entry here — %1.</source>
         <translation>אין כאן רשומת אוזניות — %1.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="158"/>
+        <location filename="../qml/OutputPage.qml" line="160"/>
         <source>ENDPOINTS · WHERE YOU CAN HEAR IT</source>
         <translation>נקודות קצה · היכן אפשר לשמוע אותו</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="251"/>
+        <location filename="../qml/OutputPage.qml" line="257"/>
         <source>Automatic</source>
         <translation>אוטומטי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="251"/>
+        <location filename="../qml/OutputPage.qml" line="257"/>
         <source>Hear it here</source>
         <translation>לשמוע כאן</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="261"/>
+        <location filename="../qml/OutputPage.qml" line="267"/>
         <source>Applications play here</source>
         <translation>היישומים מנגנים כאן</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="261"/>
+        <location filename="../qml/OutputPage.qml" line="267"/>
         <source>Send applications here</source>
         <translation>שלח את היישומים לכאן</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="273"/>
+        <location filename="../qml/OutputPage.qml" line="279"/>
         <source>your choice, but it cannot be used: see the reason above</source>
         <translation>הבחירה שלכם, אך אי אפשר להשתמש בה: ראו את הסיבה למעלה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="277"/>
+        <location filename="../qml/OutputPage.qml" line="283"/>
         <source>applications play here · a real device, so heard directly</source>
         <translation>היישומים מנגנים כאן · התקן אמיתי, ולכן נשמע ישירות</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="313"/>
+        <location filename="../qml/OutputPage.qml" line="320"/>
         <source>WHERE APPLICATIONS PLAY</source>
         <translation>היכן היישומים מנגנים</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="322"/>
+        <location filename="../qml/OutputPage.qml" line="329"/>
         <source>nothing</source>
         <translation>כלום</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="322"/>
+        <location filename="../qml/OutputPage.qml" line="329"/>
         <source>Applications play to &lt;b&gt;%1&lt;/b&gt;, the system default output, which is a real device: you hear each application directly as well as through this app, and a receiver on it cannot be opened exclusively while they do.</source>
         <translation>יישומים מנגנים אל &lt;b&gt;%1&lt;/b&gt;, פלט ברירת המחדל של המערכת, שהוא התקן אמיתי: אתם שומעים כל יישום ישירות וגם דרך יישום זה, ולא ניתן לפתוח באופן בלעדי מקלט שעליו בזמן שהם מנגנים.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="331"/>
+        <location filename="../qml/OutputPage.qml" line="338"/>
         <source>Restore %1</source>
         <translation>שחזר את %1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="331"/>
+        <location filename="../qml/OutputPage.qml" line="338"/>
         <source>the previous output</source>
         <translation>הפלט הקודם</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="331"/>
+        <location filename="../qml/OutputPage.qml" line="338"/>
         <source>Send applications to %1</source>
         <translation>שלח את היישומים אל %1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="160"/>
+        <location filename="../qml/OutputPage.qml" line="162"/>
         <source>re-probed on every device change</source>
         <translation>נבדק מחדש בכל שינוי התקן</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="187"/>
+        <location filename="../qml/OutputPage.qml" line="189"/>
         <source>ENDPOINT</source>
         <translation>נקודת קצה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="188"/>
-        <location filename="../qml/OutputPage.qml" line="211"/>
+        <location filename="../qml/OutputPage.qml" line="190"/>
+        <location filename="../qml/OutputPage.qml" line="215"/>
         <source>E-AC-3</source>
         <translation>E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="189"/>
-        <location filename="../qml/OutputPage.qml" line="212"/>
+        <location filename="../qml/OutputPage.qml" line="191"/>
+        <location filename="../qml/OutputPage.qml" line="216"/>
         <source>AC-3</source>
         <translation>AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="191"/>
+        <location filename="../qml/OutputPage.qml" line="195"/>
         <source>PCM CH</source>
         <translation>ערוצי PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="193"/>
+        <location filename="../qml/OutputPage.qml" line="197"/>
         <source>SPATIAL</source>
         <translation>מרחבי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="194"/>
+        <location filename="../qml/OutputPage.qml" line="198"/>
         <source>NOTE</source>
         <translation>הערה</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="278"/>
+        <location filename="../qml/OutputPage.qml" line="284"/>
         <source>spatial sound on · headphones fallback</source>
         <translation>צליל מרחבי פעיל · גיבוי אוזניות</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="279"/>
+        <location filename="../qml/OutputPage.qml" line="285"/>
         <source>surround PCM fallback</source>
         <translation>גיבוי PCM היקפי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="279"/>
+        <location filename="../qml/OutputPage.qml" line="285"/>
         <source>stereo fallback</source>
         <translation>גיבוי סטריאו</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="285"/>
+        <location filename="../qml/OutputPage.qml" line="292"/>
         <source>you hear it here · your choice · exclusive mode</source>
         <translation>אתם שומעים זאת כאן · הבחירה שלכם · מצב בלעדי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="286"/>
+        <location filename="../qml/OutputPage.qml" line="293"/>
         <source>you hear it here · your choice</source>
         <translation>אתם שומעים זאת כאן · הבחירה שלכם</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="288"/>
+        <location filename="../qml/OutputPage.qml" line="295"/>
         <source>you hear it here · automatic · exclusive mode</source>
         <translation>אתם שומעים זאת כאן · אוטומטי · מצב בלעדי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="289"/>
+        <location filename="../qml/OutputPage.qml" line="296"/>
         <source>you hear it here · automatic</source>
         <translation>אתם שומעים זאת כאן · אוטומטי</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="296"/>
+        <location filename="../qml/OutputPage.qml" line="303"/>
         <source>no render endpoints probed yet</source>
         <translation>עדיין לא נבדקו נקודות קצה לניגון</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="335"/>
+        <location filename="../qml/OutputPage.qml" line="342"/>
         <source>Open Sound settings</source>
         <translation>פתח את הגדרות הצליל</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="336"/>
+        <location filename="../qml/OutputPage.qml" line="343"/>
         <source>Re-probe</source>
         <translation>בדוק מחדש</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="347"/>
+        <location filename="../qml/OutputPage.qml" line="354"/>
         <source>CODEC PATH</source>
         <translation>נתיב הקודק</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="352"/>
+        <location filename="../qml/OutputPage.qml" line="359"/>
         <source>Bypass the codec on headphones and PCM</source>
         <translation>עקוף את הקודק באוזניות וב-PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="353"/>
+        <location filename="../qml/OutputPage.qml" line="360"/>
         <source>Off: headphones, PCM and stereo play a decode of the E-AC-3 stream, so what you hear went through the codec. On: headphones render the engine&apos;s own objects and PCM and stereo take its 5.1 bed, codec out of the loop.</source>
         <translation>כבוי: אוזניות, PCM וסטריאו מנגנים פענוח של זרם ה-E-AC-3, כך שמה שאתה שומע עבר דרך הקודק. פועל: האוזניות מעבדות את האובייקטים של המנוע עצמו ו-PCM וסטריאו לוקחים את מיטת ה-5.1 שלו, הקודק מחוץ ללולאה.</translation>
     </message>
@@ -1778,202 +1813,212 @@
         <translation>השהיה נמוכה מקצרת את מסגרת ה-E-AC-3 לבלוק אחד ומעלה את קצב הסיביות לכ-1.5 Mb/s כדי שהמטא-נתונים של חמישה עשר אובייקטים עדיין ייכנסו. עיכוב הפענוח של המקלט עצמו אינו משתנה. שינוי זה מפעיל מחדש את הזרם.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="333"/>
+        <location filename="../qml/SettingsPage.qml" line="328"/>
+        <source>Not applicable to TrueHD 5.1, which has no short-frame form: its encoder works in intervals of about a tenth of a second and the stream leaves in 20 ms bursts, so it adds that delay before the receiver&apos;s own. It has not been measured end to end.</source>
+        <translation>אינו חל על TrueHD 5.1, שאין לו צורת מסגרת קצרה: המקודד שלו פועל במרווחים של כעשירית שנייה והזרם יוצא בפרצים של 20 ms, ולכן הוא מוסיף השהיה זו לפני זו של המקלט עצמו. הוא לא נמדד מקצה לקצה.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="334"/>
         <source>CODEC</source>
         <translation>קודק</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="335"/>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="336"/>
+        <location filename="../qml/SettingsPage.qml" line="342"/>
         <source>Bitrate</source>
         <translation>קצב סיביות</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="345"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>automatic</source>
         <translation>אוטומטי</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="345"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>256 kb/s</source>
         <translation>256 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="345"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>384 kb/s</source>
         <translation>384 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="346"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>448 kb/s</source>
         <translation>448 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="346"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>640 kb/s</source>
         <translation>640 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="346"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>1024 kb/s</source>
         <translation>1024 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="347"/>
+        <location filename="../qml/SettingsPage.qml" line="348"/>
         <source>1536 kb/s</source>
         <translation>1536 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="347"/>
+        <location filename="../qml/SettingsPage.qml" line="348"/>
         <source>2048 kb/s</source>
         <translation>2048 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="372"/>
+        <location filename="../qml/SettingsPage.qml" line="373"/>
         <source>E-AC-3 · 5.1 bed + up to 15 objects · automatic is 448 kb/s, or 1536 kb/s in low latency</source>
         <translation>E-AC-3 · מיטת 5.1 + עד 15 אובייקטים · אוטומטי הוא 448 kb/s, או 1536 kb/s בהשהיה נמוכה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="374"/>
+        <location filename="../qml/SettingsPage.qml" line="375"/>
+        <source>Not applicable to TrueHD 5.1. It is lossless from the 24-bit values the mix is rounded to, and its rate follows the music, so there is no bitrate to set.</source>
+        <translation>אינו חל על TrueHD 5.1. הוא ללא אובדן החל מערכי 24 הסיביות שאליהם המיקס מעוגל, והקצב שלו עוקב אחר המוזיקה, ולכן אין קצב סיביות להגדיר.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="376"/>
         <source>Split stereo applications into two objects</source>
         <translation>פצל יישומי סטריאו לשני אובייקטים</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="447"/>
+        <location filename="../qml/SettingsPage.qml" line="449"/>
         <source>System follows the language the desktop is set to. The translations are machine-made and have not been read by a speaker.</source>
         <translation>מערכת עוקבת אחר השפה ששולחן העבודה מוגדר אליה. התרגומים נוצרו במכונה ולא נקראו בידי דובר.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="450"/>
-        <location filename="../qml/SettingsPage.qml" line="457"/>
+        <location filename="../qml/SettingsPage.qml" line="452"/>
+        <location filename="../qml/SettingsPage.qml" line="459"/>
         <source>Text size</source>
         <translation>גודל טקסט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="460"/>
+        <location filename="../qml/SettingsPage.qml" line="462"/>
         <source>Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%, so on a desktop whose base size is larger the window starts larger too.</source>
         <translation>כל גודל בחלון עוקב אחר זה; 100% הוא הגודל שבו הוא מצויר. מערכת לוקחת את גודל הטקסט ששולחן העבודה מדווח וסופרת 9 pt כ-100%, כך שבשולחן עבודה שגודל הבסיס שלו גדול יותר גם החלון מתחיל גדול יותר.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="463"/>
-        <location filename="../qml/SettingsPage.qml" line="469"/>
+        <location filename="../qml/SettingsPage.qml" line="465"/>
+        <location filename="../qml/SettingsPage.qml" line="471"/>
         <source>Motion</source>
         <translation>תנועה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="466"/>
+        <location filename="../qml/SettingsPage.qml" line="468"/>
         <source>Reduced</source>
         <translation>מופחתת</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="467"/>
+        <location filename="../qml/SettingsPage.qml" line="469"/>
         <source>Full</source>
         <translation>מלאה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="472"/>
+        <location filename="../qml/SettingsPage.qml" line="474"/>
         <source>Reduced stops the room&apos;s markers and level bars easing between readings: each shows the latest one at once. System follows the desktop&apos;s own setting for animation.</source>
         <translation>מופחתת מפסיקה את גלישת הסמנים בחדר ופסי הרמה בין קריאות: כל אחד מציג את הקריאה האחרונה מיד. מערכת עוקבת אחר הגדרת האנימציה של שולחן העבודה.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="512"/>
+        <location filename="../qml/SettingsPage.qml" line="514"/>
         <source>Show applications with no audio</source>
         <translation>הצג יישומים ללא שמע</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="513"/>
+        <location filename="../qml/SettingsPage.qml" line="515"/>
         <source>Running applications with a window but no audio session, greyed until they play. Off hides them unless they are placed.</source>
         <translation>יישומים פועלים עם חלון אך ללא הפעלת שמע, באפור עד שינגנו. כבוי מסתיר אותם אלא אם הוצבו.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="519"/>
+        <location filename="../qml/SettingsPage.qml" line="521"/>
         <source>Show background processes in the room</source>
         <translation>הצג תהליכי רקע בחדר</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="520"/>
+        <location filename="../qml/SettingsPage.qml" line="522"/>
         <source>Processes with sound but no window of their own (a virtual machine&apos;s backend, the text-input host). They stay in the bed either way.</source>
         <translation>תהליכים עם צליל אבל בלי חלון משלהם (המנוע של מכונה וירטואלית, מארח קלט הטקסט). הם נשארים במיטה בכל מקרה.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <location filename="../qml/SettingsPage.qml" line="534"/>
         <source>DIAGNOSTICS</source>
         <translation>אבחון</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="533"/>
+        <location filename="../qml/SettingsPage.qml" line="535"/>
         <source>A text file for a bug report: the version and platform, the engine&apos;s counters, the endpoints the probe found, the two devices of the signal path, this app&apos;s settings and its recent messages. It does not carry the signing key, the path to it, or any environment variable&apos;s value; it does name your audio devices and running applications, so read it before you attach it.</source>
         <translation>קובץ טקסט עבור דיווח על באג: הגרסה והפלטפורמה, מוני המנוע, נקודות הקצה שהבדיקה מצאה, שני ההתקנים של נתיב האות, ההגדרות של יישום זה וההודעות האחרונות שלו. הוא אינו נושא את מפתח החתימה, את הנתיב אליו, או את הערך של משתנה סביבה כלשהו; הוא כן מציין בשמם את התקני השמע שלכם ואת היישומים הפועלים, לכן קראו אותו לפני שתצרפו אותו.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <location filename="../qml/SettingsPage.qml" line="539"/>
         <source>Save diagnostics…</source>
         <translation>שמרו אבחון…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="548"/>
+        <location filename="../qml/SettingsPage.qml" line="550"/>
         <source>LYRIC EVENTS OUT</source>
         <translation>אירועי מילים (פלט)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="552"/>
+        <location filename="../qml/SettingsPage.qml" line="554"/>
         <source>Send the lyric strip&apos;s events over OSC</source>
         <translation>שליחת אירועי רצועת המילים דרך OSC</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="553"/>
+        <location filename="../qml/SettingsPage.qml" line="555"/>
         <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
         <translation>השורה והמילה המושרות, כהודעות OSC דרך UDP, עבור מערכת תאורה או בקרת הופעה שעוקבת אחריהן. כבוי עד שתפעילו אותו.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="560"/>
-        <location filename="../qml/SettingsPage.qml" line="563"/>
+        <location filename="../qml/SettingsPage.qml" line="562"/>
+        <location filename="../qml/SettingsPage.qml" line="565"/>
         <source>Send to</source>
         <translation>שליחה אל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="571"/>
-        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <location filename="../qml/SettingsPage.qml" line="573"/>
+        <location filename="../qml/SettingsPage.qml" line="576"/>
         <source>Port</source>
         <translation>פורט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <location filename="../qml/SettingsPage.qml" line="592"/>
         <source>Lines</source>
         <translation>שורות</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="598"/>
+        <location filename="../qml/SettingsPage.qml" line="600"/>
         <source>Words</source>
         <translation>מילים</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="606"/>
+        <location filename="../qml/SettingsPage.qml" line="608"/>
         <source>Position, ten times a second</source>
         <translation>מיקום, עשר פעמים בשנייה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="612"/>
+        <location filename="../qml/SettingsPage.qml" line="614"/>
         <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
         <translation>כל הודעה מתחילה בשם היישום. /crucible/lyrics/state אומר following, stopped או cleared; /line נותן את מספר השורה, הטקסט והזמנים שלה; /word את אותו הדבר למילה בשורה מתוזמנת-מילים; /position את מקום השיר באלפיות שנייה. הזמנים הם אלפיות שנייה מתחילת השיר.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="622"/>
+        <location filename="../qml/SettingsPage.qml" line="624"/>
         <source>ABOUT</source>
         <translation>אודות</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="623"/>
+        <location filename="../qml/SettingsPage.qml" line="625"/>
         <source>What this is, the version and build it came from, and the licences it carries.</source>
         <translation>מה זה, הגרסה והבנייה שממנה הגיע, והרישיונות שהוא נושא.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="627"/>
+        <location filename="../qml/SettingsPage.qml" line="629"/>
         <source>About Crucible…</source>
         <translation>אודות Crucible…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="374"/>
+        <location filename="../qml/SettingsPage.qml" line="376"/>
         <source>Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application&apos;s row can override it.</source>
         <translation>עולה שתי משבצות לכל יישום; הזוג יושב משני צדי המיקום שהצבת, ויישום שאינו מקבל שתי משבצות פנויות ממתין במיטה. חל על יישומים שהמנוע פוגש מעתה; השורה של כל יישום יכולה לעקוף זאת.</translation>
     </message>
@@ -2015,44 +2060,44 @@
         <translation>התקן שקט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
+        <location filename="../qml/SettingsPage.qml" line="382"/>
         <source>APPEARANCE</source>
         <translation>מראה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="382"/>
-        <location filename="../qml/SettingsPage.qml" line="386"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="388"/>
         <source>Theme</source>
         <translation>ערכת נושא</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
-        <location filename="../qml/SettingsPage.qml" line="393"/>
-        <location filename="../qml/SettingsPage.qml" line="414"/>
-        <location filename="../qml/SettingsPage.qml" line="455"/>
-        <location filename="../qml/SettingsPage.qml" line="466"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
+        <location filename="../qml/SettingsPage.qml" line="395"/>
+        <location filename="../qml/SettingsPage.qml" line="416"/>
+        <location filename="../qml/SettingsPage.qml" line="457"/>
+        <location filename="../qml/SettingsPage.qml" line="468"/>
         <source>System</source>
         <translation>מערכת</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Light</source>
         <translation>בהיר</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Dark</source>
         <translation>כהה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="406"/>
-        <location filename="../qml/SettingsPage.qml" line="410"/>
+        <location filename="../qml/SettingsPage.qml" line="408"/>
+        <location filename="../qml/SettingsPage.qml" line="412"/>
         <source>Language</source>
         <translation>שפה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="391"/>
-        <location filename="../qml/SettingsPage.qml" line="401"/>
+        <location filename="../qml/SettingsPage.qml" line="393"/>
+        <location filename="../qml/SettingsPage.qml" line="403"/>
         <source>Palette</source>
         <translation>פלטה</translation>
     </message>
@@ -2087,60 +2132,60 @@
         <translation>היכן נמצאים install.ps1, remove.ps1 והחבילה הבנויה: ליד היישום הזה כברירת מחדל, או apps/crucible/windows/driver בעץ מקור.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="395"/>
+        <location filename="../qml/SettingsPage.qml" line="397"/>
         <source>Signal</source>
         <extracomment>Palette name. A product name: leave it as it is unless the language has an established rendering of its own.</extracomment>
         <translation>אות</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="397"/>
+        <location filename="../qml/SettingsPage.qml" line="399"/>
         <source>Ink</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>דיו</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="399"/>
+        <location filename="../qml/SettingsPage.qml" line="401"/>
         <source>Console</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>קונסולה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="475"/>
+        <location filename="../qml/SettingsPage.qml" line="477"/>
         <source>3D layout</source>
         <translation>פריסת תלת־ממד</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="477"/>
+        <location filename="../qml/SettingsPage.qml" line="479"/>
         <source>Auto</source>
         <translation>אוטומטי</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="479"/>
+        <location filename="../qml/SettingsPage.qml" line="481"/>
         <source>3D reference layout</source>
         <translation>פריסת ייחוס תלת־ממד</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="482"/>
+        <location filename="../qml/SettingsPage.qml" line="484"/>
         <source>The speakers the 3D room draws for reference. Auto shows 5.1 while the stream is bed only and 7.1.4 once objects are on.</source>
         <translation>הרמקולים שהחדר התלת־ממדי מצייר לייחוס. אוטומטי מציג 5.1 כל עוד הזרם הוא מיטה בלבד ו־7.1.4 כשהאובייקטים פועלים.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="489"/>
+        <location filename="../qml/SettingsPage.qml" line="491"/>
         <source>BEHAVIOUR</source>
         <translation>התנהגות</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="492"/>
+        <location filename="../qml/SettingsPage.qml" line="494"/>
         <source>Move the default output to the silent device on launch</source>
         <translation>העבר את פלט ברירת המחדל להתקן השקט בהפעלה</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="493"/>
+        <location filename="../qml/SettingsPage.qml" line="495"/>
         <source>Restored to the previous device on quit.</source>
         <translation>משוחזר להתקן הקודם ביציאה.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="500"/>
+        <location filename="../qml/SettingsPage.qml" line="502"/>
         <source>Keep running in the tray when the window is closed</source>
         <translation>המשך לפעול במגש כשהחלון סגור</translation>
     </message>
