@@ -989,7 +989,7 @@ the start of its first payload id). It prints metadata only. The protection byte
 provisional: no stream the project holds carries an evolution frame (`libs/truehd/ERRATA.md`, "Atmos, spec v3.6", question 22), and
 this report is the check to run on a real Atmos track.
 
-`detail=evolution`, `detail=structure` and `detail=format` (both) are for the owner's check of a disc's stream and describe TrueHD and MLP
+`detail=evolution`, `detail=structure`, `detail=format` (both) and `detail=rate` are for the owner's check of a disc's stream and describe TrueHD and MLP
 streams only (any other stream is refused, exit status 1). `detail=evolution` lists the first frames one by one (the extra data's check
 nibble, framing and parity; the container's version, key id, each payload's id, size and configuration flags, the protection length
 codes), groups all the frames by shape (the payload ids, the protection codes and the reading) with how many frames and how large, and for a
@@ -1000,6 +1000,13 @@ the samples discarded: the lossless checks, the units that failed, the matrices 
 substream's segments (terminators and the end marker). Nothing derived from the audio, no payload byte and no digest, certificate,
 signature or protection byte is printed. `libs/truehd/ERRATA.md` ("Atmos, spec v3.6", section H) says which field answers which open
 question.
+
+`detail=rate` (TrueHD and MLP) runs the arrival model of TH spec §3.4 and §18 over the stream's access units and prints, for each restart
+interval, its bitrate (kbit/s), the rate of its largest access unit, the least headroom any unit has before it would arrive more than 75 ms
+after its slot (milliseconds, three decimals; negative means late) and how many units were late, after a summary line for the whole stream.
+The model runs at the rate the first major sync declares, or at `truehd-bitrate=KBPS`. `json=1` adds a `rate` member with the same figures
+in bits per second and microseconds. Integers only, so the output is the same on every run; counts and rates, never audio. The model is the
+encoder's reading of the specification and is provisional (`libs/truehd/ERRATA.md`, entry 71).
 
 A TrueHD or MLP stream, bare or in a container, is also read by `probe` (the container's own description of the track beside
 the stream's), `levels` (peak and RMS per channel of the 24-bit samples), `loudness` (integrated loudness and true peak, with
@@ -1035,6 +1042,9 @@ options, each only here:
 | `truehd-fir-order=N`, `truehd-matrix=on\|off` | the largest prediction order tried, 0 to 8, and whether channel pairs are decorrelated with a primitive matrix |
 | `truehd-stereo-mode=stereo\|ltrt\|headphone` | the 2 channel mode the stream declares |
 | `truehd-peak-rate=KBPS`, `truehd-rate-check=strict\|lenient` | the rate the stream is declared not to exceed (default 18000, Blu-ray's; at least 1000) and whether a stream that cannot be sent within it and TH spec §18's 75 ms is refused (exit 1) or written and counted |
+| `truehd-bitrate=KBPS` | hold the stream to this bitrate over any 75 ms (1000 to 100000; the arrival model of TH spec §3.4 and §18 run at it, as well as at the declared peak rate). Default: the declared peak rate. On `probe detail=rate` it is the rate the model runs at |
+| `truehd-rate-mode=strict\|shape`, `truehd-shape-bits=N` | `truehd-atmos` only. `strict` (the default) refuses a stream that does not fit; `shape` lets the object channels of substream 3 give up low bits, one at a time, in the restart intervals that do not fit, up to N (0 to 16, default 8). The 7.1 bed is never touched; the objects of a shaped interval are the input's rounded to a multiple of 2^k, so the encode is lossy for them there. Provisional |
+| `truehd-major-sync=N` | access units between major syncs: 0 (the default; one at every restart header) or a multiple of `truehd-restart=`. The restarts between two major syncs have a restart header in every substream and no major sync |
 | `verify` | decode every access unit with the library's decoder as it is coded and compare it with the input |
 | `truehd-dialnorm-2ch=`, `-6ch=`, `-8ch=` | the dialogue norm of the 2, 6 and 8 channel presentation (TH spec section 12.5): 0 to 63 for 2 channels, 0 to 31 for the others |
 | `truehd-mix-level-2ch=`, `-6ch=`, `-8ch=` | the mix level of each presentation, 0 to 63 (the specification gives no unit, so the number is written as it is) |
