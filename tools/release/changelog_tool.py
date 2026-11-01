@@ -8,10 +8,11 @@ the format; docs/releasing.md has the release step).
 
     changelog_tool.py assemble --version 0.11.0-beta.1 --date 2026-11-14 [--root .]
         Write "## [0.11.0-beta.1] - 2026-11-14" under "## [Unreleased]": the fragments grouped
-        under ### Added / Changed / Deprecated / Removed / Fixed / Security, then whatever the
-        hand-written "## [Unreleased]" held before fragments existed (kept as it was, so the
-        entries written before the migration are not rewritten). The fragments are deleted and
-        "## [Unreleased]" is left holding a pointer to changelog.d. Exit 1 when there is
+        whatever the hand-written "## [Unreleased]" held before fragments existed (kept as it
+        was, and first, so its introduction still opens the section), then the fragments
+        grouped under ### Added / Changed / Deprecated / Removed / Fixed / Security. The
+        fragments are deleted and "## [Unreleased]" is left holding a pointer to changelog.d.
+        Exit 1 when there is
         nothing to assemble or the version is already there.
 
     changelog_tool.py pending [--root .]
@@ -90,7 +91,10 @@ def assemble_text(text: str, groups: dict[str, list[str]], version: str, date: s
     legacy = body.replace(POINTER, "").strip("\n")
     if not any(groups.values()) and not legacy:
         raise ValueError("nothing to assemble: no fragments and nothing under '## [Unreleased]'")
-    pieces = [render_groups(groups).rstrip("\n"), legacy]
+    # The hand-written text goes first: its introduction ("This release adds:") is what
+    # render_release_notes.py keeps when a section is too long for a release page, and it ends
+    # before the first "### " heading. The fragments follow it.
+    pieces = [legacy, render_groups(groups).rstrip("\n")]
     section = f"## [{version}] - {date}\n\n" + "\n\n".join(p for p in pieces if p) + "\n\n"
     return head + "\n" + POINTER + "\n" + section + rest
 

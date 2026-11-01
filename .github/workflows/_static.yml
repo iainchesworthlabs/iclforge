@@ -200,6 +200,8 @@ jobs:
       # tools/pictures holds the scripts that take the documentation's pictures again from
       # tools/pictures/pictures.json: its suite holds how an entry becomes a command line and
       # an environment, and that the files the pictures play are made the same every time.
+      # tools/release holds what release.yml runs: its suite holds how a release body is cut
+      # from CHANGELOG.md, and that the newest section of the real file still fits a release page.
       - name: Oracle unit tests
         if: ${{ !cancelled() }}
         shell: bash
