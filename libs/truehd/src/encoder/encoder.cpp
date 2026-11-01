@@ -41,6 +41,8 @@ constexpr std::uint32_t kTerminatorA = 0xD234E;  // TH spec §16.5; ERRATA.md en
 constexpr int kMaxUnitWords = 4095;              // the 12 bit lengths of TH spec §3.1, §6.1
 constexpr int kFixedUnitBytes = 4;
 constexpr int kMaxShapeBits = 16;  // RateControl::max_shape_bits, the most a retry loop can cost
+// RateMode::kShape: an interval ends with at least 1/2 of the buffer free (see code_interval).
+constexpr std::int64_t kShapeReserveDivisor = 2;
 
 [[nodiscard]] constexpr EncodeError make_error(EncodeErrorKind kind, std::string_view detail) {
     return EncodeError{kind, detail};
@@ -1604,6 +1606,14 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
                     EncodeErrorKind::kRateExceeded,
                     "the stream cannot be sent within the peak data rate and 75 ms (TH spec §18)"));
             }
+        } else if (attempt.retry_possible && last &&
+                   budget_step.headroom < budget_model.latency_limit() / kShapeReserveDivisor) {
+            // An interval that only just fits leaves the buffer nearly full, and the next one is late
+            // in its first units however many bits it gives up: it takes longer to drain 75 ms of
+            // backlog than an interval lasts. So while the objects can still give up bits, an interval
+            // has to end with a part of the buffer free. Not a violation, a reason to try again.
+            return std::unexpected(make_error(EncodeErrorKind::kRateExceeded,
+                                              "the interval ends with the buffer nearly full"));
         }
         meter.add(total, nominal, step);
         stats.min_headroom_us =
