@@ -1038,6 +1038,15 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 state.running = false;
                 return std::unexpected(applied.error());
             }
+            if (state.context.object_matrices && counters.object_first_out.size() / 12 < 51200) {
+                DecoderCounters::ObjectBlock block;
+                block.sample = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
+                block.size = static_cast<std::uint16_t>(state.block_size);
+                block.carries = header->matrices.has_value();
+                block.matrices = header->matrices ? static_cast<std::uint8_t>(header->matrices->count) : 0;
+                block.extension = header->matrices && header->matrices->extension;
+                counters.object_blocks.push_back(block);
+            }
             if (header->matrices) {
                 ++counters.matrix_headers;
                 for (int m = 0; m < header->matrices->count; ++m) {

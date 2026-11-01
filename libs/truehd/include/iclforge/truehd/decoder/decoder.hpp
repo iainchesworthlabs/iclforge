@@ -216,6 +216,17 @@ struct DecoderCounters {
         std::vector<ObjectMatrixHeader> items;
     };
     std::vector<ObjectSection> object_sections;
+    // Every block of the object substream in the first ten intervals: the output sample it starts
+    // at, its size, whether its header carries matrices (and how many) and whether it has the
+    // extension (for the lab).
+    struct ObjectBlock {
+        std::uint32_t sample = 0;
+        std::uint16_t size = 0;
+        std::uint8_t matrices = 0;
+        bool carries = false;
+        bool extension = false;
+    };
+    std::vector<ObjectBlock> object_blocks;
     std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};
     // The first three intervals of the object substream, by matrix channel: the smallest and the
     // largest value and the number of samples that differ from the one before, in the rows as

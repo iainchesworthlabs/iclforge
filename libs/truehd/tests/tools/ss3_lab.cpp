@@ -299,6 +299,13 @@ void print_sections(const std::vector<std::byte>& stream, std::size_t from, std:
     const DecoderCounters& c = decoder.counters();
     std::printf("matrix sections of the first ten intervals sent at output samples %zu to %zu "
                 "(sample, extension flag, matrices):\n", from, to);
+    std::printf("blocks (sample:size, + marks a header with matrices, x the extension):");
+    for (const auto& b : c.object_blocks) {
+        if (b.sample >= from && b.sample < to) {
+            std::printf(" %u:%u%s%s", b.sample, b.size, b.carries ? "+" : "", b.extension ? "x" : "");
+        }
+    }
+    std::printf("\n");
     for (const auto& section : c.object_sections) {
         if (section.sample < from || section.sample >= to) {
             continue;
