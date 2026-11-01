@@ -12,8 +12,8 @@ Forge — the ICL Forge encoder tools: clean-room AC-3 / E-AC-3 (ATSC A/52) and 
 Usage:
   forge --version    print version and git provenance, then exit
   forge help [<command>|exit-codes]   this list, or one command's own help
-  forge silence       <out.ac3> [seconds] [bitrate_kbps]
-  forge sine          <out.ac3> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]
+  forge silence       <out.ac3|out.thd> [seconds] [bitrate_kbps]
+  forge sine          <out.ac3|out.thd> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]
   forge orbit         <out.ac3> [seconds] [bitrate_kbps] [orbit_seconds]
   forge atmos         <out.ec3> [seconds] [bitrate_kbps] [objects] [orbit_seconds] [mode]
   forge atmos-path    <out.ec3> <paths.txt> [seconds] [bitrate_kbps] [objects] (objects driven by an authored scene file instead of the built-in orbit)
@@ -35,7 +35,7 @@ Usage:
   forge ac4-verify    <in.ac4> [trust-anchor=<path>] [pin=<fingerprint>] (check a raw AC-4 stream's content signature: the digests, the ECDSA signature, the chain and its validity, and the leaf's title. Exit 0 only when it is valid and a trust-anchor= or pin= vouches for its certificates (unanchored-ok accepts one that checks but has no anchor); check-content prints the checks and exits 0 whatever they find, judging the certificates at the signed date unless verify-time= says otherwise; verify-content also refuses a signature whose signer nonce or publisher UUID is not as CS spec v2.6 section 5.3 asks (expect-publisher-uuid= names the publisher accounts to accept; the UUID is not in the certificate))
   forge decode        <in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> <out.wav> [objects_dir] [adm_out] (AC-3, E-AC-3 or AC-4, bare or inside a container; the stream decides. AC-4: every layout up to 7.1.4 and the immersive element in every codec mode; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded (7.1.4 by default), and syntax-trace=<file> writes what the decoder reads. objects_dir: export each object's own PCM as its own object_NN.wav there - JOC-reconstructed for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels pinned to their speaker, dynamic objects positioned by their own timeline)
   forge probe         <in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts> [json=1] [detail=frames|blocks] (inspect AC-3/E-AC-3 layout, substreams, metadata, objects, tools and CRC, or AC-4 TOC/presentations/substream groups, or a TrueHD/MLP stream's substreams, rate and parity and CRC checks (detail= is not read for it), bare or inside a container, and what the container says of its track; table or documented JSON)
-  forge transcode     <in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout] (decode and re-encode, carrying dialnorm, compr and the mix metadata across - the DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the programme, decoded without DRC and re-encoded with its drc_eac3_profile, dialnorm and downmix values; an AC-3 or E-AC-3 source's dialnorm and downmix values go to AC-4, and drc= names its DRC profile. The output codec comes from the output name's suffix, or from codec=; the bitrate defaults to 448 kbps, or 192 for AC-4)
+  forge transcode     <in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout] (decode and re-encode, carrying dialnorm, compr and the mix metadata across - the DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the programme, decoded without DRC and re-encoded with its drc_eac3_profile, dialnorm and downmix values; an AC-3 or E-AC-3 source's dialnorm and downmix values go to AC-4, and drc= names its DRC profile. The output codec comes from the output name's suffix, or from codec=; the bitrate defaults to 448 kbps, or 192 for AC-4)
   forge metadata      <in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>       (rewrite dialnorm/compr/bsmod/dsurmod on an existing stream and re-stamp its CRCs; the audio is copied through untouched, not re-encoded. A TrueHD stream's channel meaning (TH spec section 14: dialogue norm, mix level, source format and control bit per presentation, and the two DRC start-up gains) is set in every major sync, with its CRC, from truehd-dialnorm-6ch= and the options like it; provisional, no oracle until the DEE set)
   forge normalize     <in.ac3|in.ec3|in.thd> <out.ac3|out.ec3|out.thd>       (measure BS.1770-4 loudness and write the dialnorm it implies (ATSC A/85 §8), audio untouched. A TrueHD stream: each presentation's loudness (BS.1770-5 Annex 3) sets that presentation's dialogue norm in every major sync; no gain is applied, since the stream is lossless; provisional, no oracle until the DEE set)
   forge cut           <in.ac3|in.ec3> <out.ac3|out.ec3> [start_seconds] [duration_seconds] (extract on access-unit boundaries; nothing is re-encoded)
@@ -72,8 +72,8 @@ anything first.
 
 | Command | What it writes |
 |---|---|
-| `silence` | Silent AC-3 |
-| `sine` | A tone, one per speaker, AC-3. Append `c` to `[layout]` (e.g. `stereoc`) to turn on channel coupling. |
+| `silence` | Silent AC-3; with a `.thd` output, silent TrueHD (stereo) |
+| `sine` | A tone, one per speaker, AC-3. Append `c` to `[layout]` (e.g. `stereoc`) to turn on channel coupling. With a `.thd` output it is TrueHD, coded losslessly: the layout is mono, stereo, 51 or 71, the first channel carries `freq_hz` and each later one a quarter higher, and the bit rate and the metadata options have no meaning and are refused by name. |
 | `orbit` | AC-3 with a synthetic panned source circling the room (exercises the [spatial layer](../../library/spatial-and-atmos.md) — plain bed panning, no object metadata) |
 | `atmos` | E-AC-3 with synthetic orbiting Atmos objects — a 5.1 bed plus JOC + OAMD side data (TS 103 420) |
 | `atmos-path` | Same, but object motion comes from an authored scene file (keyframe columns or JSON) instead of the built-in orbit |
@@ -987,6 +987,15 @@ the start of its first payload id). It prints metadata only. The protection byte
 provisional: no stream the project holds carries an evolution frame (`libs/truehd/ERRATA.md`, "Atmos, spec v3.6", question 22), and
 this report is the check to run on a real Atmos track.
 
+`probe` of a TrueHD or MLP stream also reports, from the headers alone: the duration; the average bit rate and the largest unit's rate
+against the peak rate the major sync declares, with the count of units that would arrive more than 75 ms after their slot (TH spec
+section 18, the encoder's own model; `rate_model` under `truehd`); the presentations, with the speakers of each named (`presentations`);
+the word length (MLP sends two; a TrueHD decode delivers 24-bit words and the stream does not say the source's depth); and the
+restart spacing, the distance in units between one major sync and the next (`restart_spacing`). `detail=checks` decodes the stream,
+the samples discarded, for the lossless check of every restart interval (`lossless` under `truehd`; null otherwise) and exits 1
+when an interval fails: that is the cost of a decode, and the plain report stays a read of the headers. The `truehd` member keeps
+its keys and gains these (owner question 8). The report is `apps/shared/media/src/probe_truehd.cpp`, which Hearth and the window can call.
+
 `detail=evolution`, `detail=structure` and `detail=format` (both) are for the owner's check of a disc's stream and describe TrueHD and MLP
 streams only (any other stream is refused, exit status 1). `detail=evolution` lists the first frames one by one (the extra data's check
 nibble, framing and parity; the container's version, key id, each payload's id, size and configuration flags, the protection length
@@ -1008,12 +1017,18 @@ the last unit, and `ts` a Blu-ray transport stream (`stream_type` `0x83` under t
 profile writes that Blu-ray one for TrueHD and MLP, as it writes DVB's for AC-3, E-AC-3 and AC-4. `spdif` packs MAT 1.0 (24
 access units to a 61,440-byte burst of IEC 61937 data type 22) into an eight-channel PCM16 WAV at four times the stream's
 48 or 44.1 kHz family when the output ends in `.wav`, and as raw bursts, FFmpeg's `spdif` muxer's form, otherwise; `unspdif`
-reads either back. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut`, `cat`,
-`transcode`, `fmp4`, `monitor` and `play` do not read TrueHD and say so by name (exit status 1); `cut` and `cat` would start and join only
-at an access unit that carries a major sync. In a file with
+reads either back. `decode ... channels=2` writes the stream's own 2 channel presentation (the substream a stereo player reads, not a fold the decoder makes), as `truehd-presentation=2ch` does, and `channels=as-coded` is what a decode does; no other count or fold is taken. `loudness` of a TrueHD stream says the dialnorm the loudness implies (ATSC A/85 section 8) beside the one the stream stores for the presentation decoded. `metadata` and `normalize` set the channel meaning of a TrueHD stream, and `qc` checks one (below). `cut` and `cat`
+move whole access units and never change a byte: `cut in.thd out.thd [start] [duration]` starts at the first access unit that carries a
+major sync (the start of a restart interval, one in 128 by default) at or after the time asked, says which time it used, and ends on the
+unit boundary that covers the duration; `cat` joins streams of one shape (stream type, rate, substreams, channels, channel assignment) and
+refuses an input that does not open with a major sync at byte 0, one that differs in shape (the difference is named), or a damaged one
+(`cut` refuses a damaged stream too: `forge probe` it first). They take bare `.thd` and `.mlp` streams (`demux` a container first) and
+no options. FFmpeg's strict decode of a cut is the same slice of the whole decode, and of a join the two decodes in order; `forge`'s own
+strict decode stops at a join (`truehd-check=lenient` goes on; [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md)
+question 20 and entry 80). `record <out.thd> <seconds> <bitrate> <device> codec=truehd` takes a lossless stream of what the device hears (one to eight channels at 44.1, 48, 88.2, 96, 176.4 or 192 kHz, held as PCM for the take and coded when it ends, written as a bare `.thd`); `live` does not code TrueHD. `monitor` plays the decode of the presentation `truehd-presentation=` names, asking the output for the stream's own channel count and rate (a shared-mode device that does not take eight channels or 192 kHz says so, exit status 4). `transcode` reads a bare TrueHD or MLP stream (or a file with TrueHD alone) and writes AC-3 or E-AC-3: the decode of the presentation `truehd-presentation=` names, encoded as `encode` encodes a WAV, so the layout, the bitrate and the metadata mean what they mean there; the dialogue norm the stream stores for the presentation decoded is carried as the dialnorm (the 6 and 8 channel fields as they are, the 2 channel field less 6; a stream that stores 0, as FFmpeg's do, keeps the encoder's default), and `dialnorm=` or `dialnorm=auto` overrides it; it refuses AC-4, and nothing transcodes to TrueHD. `fmp4` and `play` do not read TrueHD and say so by name (exit status 1). In a file with
 several audio tracks the commands that read TrueHD take the first, and `transcode`, `qc`, `fmp4`, `monitor` and `play` take the
 first of another codec, so a Blu-ray remux with its TrueHD track first is read as its AC-3 or E-AC-3 track; a file with TrueHD
-alone is refused by `transcode`, `fmp4`, `monitor` and `play`, and read by `qc`. The layouts
+alone is read by `transcode` and `qc` and refused by `fmp4`, `monitor` and `play`. The layouts
 are FFmpeg's, a single oracle in each direction, and nothing has been played into a receiver or a disc player
 ([`libs/containers/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md)).
 
@@ -1593,8 +1608,8 @@ Everything above takes PCM. These five take an already-encoded AC-3/E-AC-3 eleme
 | `transcode` | Decode and re-encode. The only one here that re-encodes, because DD+ and DD are different codecs and nothing else bridges them — the route to an optical link or an AC-3-only HDMI sink, which had no route at all before. It also goes between AC-4 and AC-3 or E-AC-3, either way — see [below](#transcode-and-ac-4) |
 | `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs (a TrueHD stream takes the `truehd-` options of its [channel meaning](#truehd-and-mlp) instead). The audio bytes are copied through untouched. A field the stream does not transmit is refused, naming `insert`; with `insert` an E-AC-3 stream gets the field added to every independent substream, and each syncframe that gains one grows by a word or two (the rate rises by about 16 bits a frame at most). An AC-3 stream cannot take it, nor can a frame with block start information or auxiliary data |
 | `normalize` | The measurement-driven case of the above: decode to measure BS.1770-4 integrated loudness, write the `dialnorm` ATSC A/85 §8 implies, change nothing else (for a TrueHD stream, [see below](#truehd-and-mlp)) |
-| `cut` | Extract on access-unit boundaries |
-| `cat` | Join streams end to end |
+| `cut` | Extract on access-unit boundaries (a TrueHD or MLP stream: from the first major sync at or after the start) |
+| `cat` | Join streams end to end (TrueHD or MLP: each input must open with a major sync and match in shape) |
 
 ```bash
 forge transcode programme.ec3 programme.ac3 448
@@ -1715,7 +1730,7 @@ practice; `dsurmod` additionally exists only for coding mode 2/0 (§5.4.2.7).
 
 | Command | What it does |
 |---|---|
-| `project` | Encodes what a Forge project file (`.forgeproj`, [the format](../gui/projects.md)) says: the sources, the channel plan, the assignments and the encode settings, by running the commands they stand for. `forge project song.forgeproj` writes the stream (or the container's file) beside the project, named for it; `forge project song.forgeproj out.ac3` says where, and `print` shows the commands it would run and runs none of them |
+| `project` | Encodes what a Forge project file (`.forgeproj`, [the format](../gui/projects.md)) says: the sources, the channel plan, the assignments and the encode settings, by running the commands they stand for. `forge project song.forgeproj` writes the stream (or the container's file) beside the project, named for it; `forge project song.forgeproj out.ac3` says where, and `print` shows the commands it would run and runs none of them. A project of codec `truehd` runs `forge truehd-encode` (and `mkv`, `mp4`, `ts` or `spdif` for a container) |
 
 ```bash
 forge project examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj out.ac3

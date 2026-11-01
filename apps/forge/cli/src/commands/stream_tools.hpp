@@ -118,11 +118,12 @@ int run_normalize(std::string_view in_path, std::string_view out_path,
 // access-unit boundaries - an E-AC-3 access unit being an independent
 // substream plus its dependents, never one syncframe.
 int run_cut(std::string_view in_path, std::string_view out_path, std::string_view start_seconds,
-            std::string_view duration_seconds);
+            std::string_view duration_seconds, const forge_cli::Options& meta);
 
 // Concatenation, output path FIRST because the input list is variadic.
 // Refuses inputs whose codec, sample rate, layout or substream structure
 // differ - a decoder cannot follow a stream that changes those mid-file.
-int run_cat(std::string_view out_path, std::span<const std::string_view> in_paths);
+int run_cat(std::string_view out_path, std::span<const std::string_view> in_paths,
+            const forge_cli::Options& meta);
 
 }  // namespace forge_cli::commands

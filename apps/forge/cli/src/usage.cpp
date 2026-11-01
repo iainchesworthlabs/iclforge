@@ -578,8 +578,11 @@ void print_truehd_topic() {
     fmt::println("       stream declares) and meters each presentation, shows the dialogue norm");
     fmt::println("       it carries beside the measurement, and judges preset= on the presentation");
     fmt::println("       truehd-presentation= names (the largest by default); exit 6 when a gate");
-    fmt::println("       fails. cut, cat, transcode, fmp4, play and monitor do not read TrueHD or");
-    fmt::println("       MLP and say so.");
+    fmt::println("       fails. monitor plays the decode of the presentation truehd-presentation=");
+    fmt::println("       names. cut starts at the first access unit with a major sync at or after");
+    fmt::println("       the time asked and says the time it used; cat joins streams of one shape,");
+    fmt::println("       each opening with a major sync, and no byte is changed. fmp4 and play do");
+    fmt::println("       not read TrueHD or MLP and say so.");
 }
 
 void print_ac4_decode_topic() {
@@ -776,10 +779,12 @@ void print_probe_topic() {
     fmt::println("       each presentation (id, name, language, level, channels, substreams)");
     fmt::println("       and the selected one's dialnorm, loudness, DRC modes, dialogue");
     fmt::println("       enhancement and stereo downmix values.");
-    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the rate,");
+    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the duration,");
+    fmt::println("       the rate and the bit rate it measures (TH spec section 18), the restart spacing,");
     fmt::println("       the substreams and their channels, and how many segments pass their");
-    fmt::println("       parity and CRC; detail=frames and detail=blocks are refused for it, since");
-    fmt::println("       it has no such dump, and detail=evolution, structure and format are its own.");
+    fmt::println("       parity and CRC; detail=blocks is refused for it, since it has no blocks to");
+    fmt::println("       dump, detail=frames lists every access unit, and detail=evolution, structure,");
+    fmt::println("       format and checks are its own.");
 }
 
 void print_mkv_topic() {
@@ -1139,6 +1144,8 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
         fmt::println("                    headers, a decode check, what follows each last block");
         fmt::println("  detail=format     both; metadata only, no content");
+        fmt::println("  detail=checks     TrueHD and MLP: decode the stream for the lossless check of every");
+        fmt::println("                    restart interval (the cost of a decode); exit 1 when one fails");
     }
     if ((mask & topic::kContentSignature) != 0) {
         fmt::println("");

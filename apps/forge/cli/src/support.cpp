@@ -2421,7 +2421,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         // TrueHD and MLP, which 'decode', 'levels' and 'loudness' read; each says when the input is
         // something else.
         const bool reads_truehd = command == "decode" || command == "levels" ||
-                                  command == "loudness" || command == "qc";
+                                  command == "loudness" || command == "qc" ||
+                                  command == "transcode" || command == "monitor";
         if (reads_truehd && key == "truehd-presentation") {
             if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
                 fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
@@ -3298,6 +3299,19 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.take_layout = std::string{value};
             continue;
         }
+        if (key == "codec" && value == "truehd") {
+            // A lossless take of what the device hears, written as a bare .thd: record only (a live
+            // session sends what it encodes to an output as it goes, and nothing here sends TrueHD).
+            if (command != "record") {
+                fmt::println(stderr,
+                             "error: {} does not code TrueHD; codec=truehd is for record, which "
+                             "writes a bare .thd",
+                             command);
+                return false;
+            }
+            out.take_truehd = true;
+            continue;
+        }
         if (key == "codec") {
             out.take_codec = plan::parse_codec(value);
             if (!out.take_codec.has_value()) {
@@ -3443,10 +3457,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "detail") {
-            if (value != "frames" && value != "blocks" && value != "evolution" &&
+            if (value != "frames" && value != "blocks" && value != "evolution" && value != "checks" &&
                 value != "structure" && value != "format") {
                 fmt::println(stderr,
-                             "error: detail must be frames, blocks, evolution, structure or format "
+                             "error: detail must be frames, blocks, evolution, structure, format or checks "
                              "(got '{}')",
                              token);
                 return false;

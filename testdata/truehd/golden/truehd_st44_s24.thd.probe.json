@@ -1,0 +1,93 @@
+{
+  "container": null,
+  "schema": "iclforge.probe/1",
+  "truehd": {
+    "ac3_core_frames": 0,
+    "access_units": 276,
+    "average_bit_rate_bps": 1325365,
+    "bytes": 41474,
+    "channel_meaning": {
+      "distinct_in_stream": 1,
+      "drc_start_up_gain": 0,
+      "heavy_drc_start_up_gain": 0,
+      "presentations": {
+        "2ch": {
+          "control_enabled": false,
+          "dialogue_norm": 0,
+          "dialogue_norm_dbfs": 0,
+          "in_stream": true,
+          "mix_level": 0
+        },
+        "6ch": {
+          "control_enabled": false,
+          "dialogue_norm": 0,
+          "dialogue_norm_dbfs": 0,
+          "in_stream": false,
+          "mix_level": 0,
+          "source_format": 0
+        },
+        "8ch": {
+          "control_enabled": false,
+          "dialogue_norm": 0,
+          "dialogue_norm_dbfs": 0,
+          "in_stream": false,
+          "mix_level": 0,
+          "source_format": 0
+        }
+      },
+      "provisional": true,
+      "question": "libs/truehd/ERRATA.md, questions 51 to 55"
+    },
+    "channels": [
+      2
+    ],
+    "codec": "truehd",
+    "duration_seconds": 0.25034,
+    "evolution": {
+      "provisional": true,
+      "question": "libs/truehd/ERRATA.md, Atmos spec v3.6, question 22",
+      "regions": 0
+    },
+    "extra_data_units": 0,
+    "leading_bytes": 0,
+    "lossless": null,
+    "major_syncs": 18,
+    "object_substream": false,
+    "peak_data_rate": 3482,
+    "peak_data_rate_bps": 9597263,
+    "presentations": [
+      {
+        "channels": 2,
+        "layout": [
+          "L",
+          "R"
+        ],
+        "name": "2ch",
+        "substream": 0
+      }
+    ],
+    "rate_model": {
+      "declared_bps": 9597263,
+      "latency_limit_ms": 75.0,
+      "max_unit_rate_bps": 2257920,
+      "violations": 0,
+      "worst_latency_ms": 0.227
+    },
+    "restart_spacing": {
+      "major_syncs": 18,
+      "max_units": 16,
+      "min_units": 16
+    },
+    "sample_rate": 44100,
+    "samples_per_access_unit": 40,
+    "segment_failures": 0,
+    "segments_checked": 276,
+    "skipped_bytes": 0,
+    "substreams": 1,
+    "unreadable_units": 0,
+    "variable_rate": true,
+    "word_length": {
+      "decoded_bits": 24
+    }
+  }
+}

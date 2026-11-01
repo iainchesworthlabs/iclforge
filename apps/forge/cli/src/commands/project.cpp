@@ -56,7 +56,24 @@ std::string sentence(const project::Message& m) {
         return fmt::format("source '{}' was not found", arg(0));
     }
     if (m.code == "unknown-codec") {
-        return fmt::format("codec '{}' is not one of ac3, eac3, ac4", arg(0));
+        return fmt::format("codec '{}' is not one of ac3, eac3, ac4, truehd", arg(0));
+    }
+    if (m.code == "truehd-no-atmos") {
+        return "a TrueHD project cannot be an Atmos one: TrueHD Atmos is not written";
+    }
+    if (m.code == "truehd-no-fmp4") {
+        return "TrueHD has no fragmented MP4, HLS or DASH signalling here; use elementary, "
+               "matroska, spdif, mp4 or mpegts";
+    }
+    if (m.code == "truehd-one-source") {
+        return fmt::format("a TrueHD project codes one WAV, and this one has {}", arg(0));
+    }
+    if (m.code == "truehd-no-assignments") {
+        return "a TrueHD project routes no channels: the WAV's channel mask names its speakers";
+    }
+    if (m.code == "truehd-no-options") {
+        return "the AC-3 family's metadata options do not apply to a TrueHD encode; the project's "
+               "'options' must be empty (the TrueHD options are in encode.truehd)";
     }
     if (m.code == "unknown-container") {
         return fmt::format(

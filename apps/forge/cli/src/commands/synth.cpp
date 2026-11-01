@@ -1,4 +1,5 @@
 #include "synth.hpp"
+#include "truehd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -74,6 +75,9 @@ std::uint64_t frame_count(std::uint32_t seconds) {
 }  // namespace
 
 int run_silence(std::string_view out_path, std::uint32_t seconds, std::uint32_t bitrate) {
+    if (out_path.ends_with(".thd")) {
+        return run_truehd_synth(out_path, seconds, /*sine=*/false, 0, 0, {}, Options{});
+    }
     const auto frame = iclforge::ac3::build_silent_stereo_frame({.bitrate_kbps = bitrate});
     if (!frame) {
         fmt::println(stderr, "error: bitrate must be one of the 19 legal AC-3 rates");
@@ -90,6 +94,10 @@ int run_silence(std::string_view out_path, std::uint32_t seconds, std::uint32_t 
 int run_sine(std::string_view out_path, std::uint32_t seconds, std::uint32_t bitrate,
              std::uint32_t freq_hz, std::uint32_t amplitude_pct, std::string_view layout,
              bool couple_flag, const Options& meta) {
+    if (out_path.ends_with(".thd")) {
+        return run_truehd_synth(out_path, seconds, /*sine=*/true, freq_hz, amplitude_pct, layout,
+                                meta);
+    }
     // A layout may be suffixed with "c" to turn channel coupling on (51c). A
     // bare 'couple' token does the same, so the flag that works for 'encode'
     // is not silently ignored here. Only the suffix is stripped: the bare

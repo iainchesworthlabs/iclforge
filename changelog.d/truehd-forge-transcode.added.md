@@ -1,0 +1,1 @@
+**`forge transcode` reads a TrueHD or MLP stream and writes AC-3 or E-AC-3.** The decode of the presentation `truehd-presentation=` names is encoded as the target codec's WAV encode does; the dialogue norm the stream stores for the presentation decoded is carried as the dialnorm (the 6 and 8 channel fields as they are, the 2 channel one less 6). AC-4 is refused.
