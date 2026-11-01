@@ -496,6 +496,9 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                 // Lab modes: 1 no refinement; 2 and 7 and 8 by 2^-width; 3 for the sending block
                 // only; 4 and 7 grow over the block by (i + 1) / block, 5 and 8 by i / block.
                 plan.fine_bits = spec.ext_width + (mode == 2 || mode >= 7 ? 0 : 1) + config.lab.object_extension_bias;
+                if (config.lab.object_extension_fixed != 0) {
+                    plan.fine_bits = config.lab.object_extension_fixed - 16;
+                }
                 plan.fine_pre = plan.fine_bits < 1 ? 1 - plan.fine_bits : 0;
                 plan.fine_bits = std::max(plan.fine_bits, 1);
                 plan.fine_ramp = mode == 4 || mode == 7 ? 1 : mode == 5 || mode == 8 ? 2 : 0;

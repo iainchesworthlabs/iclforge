@@ -89,6 +89,8 @@ struct DecoderLab {
     // weighs the deltas more), and whether their sign is turned over.
     int object_extension_bias = 0;
     bool object_extension_negate = false;
+    // When not 0, the deltas are read at 2^-(this - 16) below their last place whatever their width.
+    int object_extension_fixed = 0;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;

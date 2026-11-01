@@ -512,6 +512,24 @@ int main(int argc, char** argv) {
             settings.push_back({bias_names.back().c_str(), weighted});
         }
     }
+    static std::vector<std::string> combo_names;
+    combo_names.reserve(32);
+    for (int bias : {-2, -3}) {
+        for (int mode : {3, 4, 5}) {
+            DecoderLab combined = base;
+            combined.object_extension_bias = bias;
+            combined.object_extension = mode;
+            combo_names.push_back("extension: weighted 2^-(width+1" + std::to_string(bias) + ") with mode " +
+                                  std::to_string(mode));
+            settings.push_back({combo_names.back().c_str(), combined});
+        }
+    }
+    for (int bits : {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8}) {
+        DecoderLab fixed = base;
+        fixed.object_extension_fixed = bits + 16;
+        combo_names.push_back("extension: deltas at a fixed 2^-" + std::to_string(bits));
+        settings.push_back({combo_names.back().c_str(), fixed});
+    }
     {
         DecoderLab negated = base;
         negated.object_extension_negate = true;
