@@ -27,7 +27,7 @@ END_MARKER = 0xD234E  # TH spec 16.5 terminatorA, ERRATA 14
 TERMINATOR_A = (0xD234E, 0x348D3)  # TH spec 16.5.1: both are accepted
 NOISE_CHANNELS = 2
 MATRIX_SHIFT = 15  # coefficients are scaled to 2^-15 (ERRATA 60); frac_bits runs to 15
-RAMP_BITS = 3  # the ramp reading of the extension: a delta is eighths of the last place
+OBJECT_SHIFT = 18  # the object matrices' coefficients are at 2^-18 (ERRATA 69)
 
 # TH spec 17.4: generator 1's noise table, indexed by the seed's bits 15 to 22.
 NOISE_TABLE = (
@@ -257,12 +257,10 @@ class Substream:
         self.noise_type = False
         self.object_matrices = False
         self.object_set = []
-        self.fine = []
-        # How the extension's deltas act (ERRATA 69; SUBSTREAM3.md section 6): "flat" is the rule in
-        # force, base + delta / 2^(width + 1) for the whole block; "ramp_end" and "ramp_start" are
-        # the provisional reading of ctl_c, base + delta / 8 * (i + 1) / size or * i / size across
-        # the block of `size` samples.
-        self.extension = "flat"
+        self.object_extension = False
+        self.object_ramp = []
+        self.rate_shift = 0  # 0 at 48 and 44.1 kHz, 1 at 96 and 88.2, 2 at 192 and 176.4
+        self.unit_size = 40  # samples in an access unit: 40 << rate_shift
         self.interval = None  # the fold of the output since the last restart
         self.noise_buffer = None  # generator 1's values for this access unit (TH spec 17.3)
         self.noise_size = 64  # access_unit_size_pow2: 64, 128 or 256 (ERRATA, noise generator 1)
@@ -311,8 +309,9 @@ class Substream:
         self.flags = 0xFF
         self.block_size = 8
         self.matrices = []
-        self.object_set = []  # the last object matrix set, headers, widths and deltas (ERRATA 69)
-        self.fine = []
+        self.object_set = []  # the last object matrix set, headers, widths and state (ERRATA 69)
+        self.object_extension = False
+        self.object_ramp = []
         self.output_shift = [0] * (self.max_matrix_chan + 1)
         self.quant = [0] * (self.max_chan + 1)
         self.channels = [Channel() for _ in range(self.max_chan + 1)]
@@ -350,19 +349,20 @@ class Substream:
             channel.huff_lsbs = bits.read(5)
 
     def read_object_matrices(self, bits):
-        """TH spec 10.2.1a (ERRATA 69). A: the matrices change (0: the last set stands, with its
-        deltas); B: new headers follow (0: the last set's headers stand and only coefficients are
-        sent); with B the count less one and the header of every matrix (output channel, frac_bits,
-        f_shift + 1, 2 bits of LSB bypass, a 4 bit noise shift, a presence mask), then every
-        matrix's coefficients. Then the extension: A2, B2, C2 (each inside the one before); with
-        C2 a width (4 bits) and 2 bits nothing reads for each matrix, else the last widths stand;
-        then a signed delta of width + 1 bits for each coefficient of each matrix whose width is
-        not 0. New headers keep the width of the matrix at the same place in the last set; new
-        coefficients clear the deltas; a restart clears the set.
+        """TH spec 10.2.1a (ERRATA 69). A: coefficients are sent (0: the matrices stand as they
+        are, running coefficients included); B: new headers follow (0: the last set's headers
+        stand and only coefficients are sent); with B the count less one and the header of every
+        matrix (output channel, frac_bits, f_shift + 1, 2 bits of LSB bypass, a 4 bit noise shift,
+        a presence mask), then every matrix's coefficients. Then the extension: A2, B2, C2 (each
+        inside the one before). Without A2 the extension is off and every delta is cleared; with
+        A2 and without B2 the deltas stand; with B2 every delta is replaced: C2 has a width
+        (4 bits) and ext_field2 (2 bits) for each matrix, else the last ones stand, then a signed
+        delta of width + 1 bits for each present channel of each matrix whose width is not 0 (the
+        others are 0). New headers keep the width, ext_field2 and deltas of the matrix at the
+        same place in the last set; a restart clears the set.
 
-        The coefficient is base + delta / 2^(width + 1), in units of the base's last place. The
-        reader leaves the base coefficients in the matrix tuples and the deltas, scaled as the base
-        is (to 2^-15), with their bit count in `self.fine`, which decode_block applies."""
+        A matrix keeps its coefficients `c` at 2^-18 (the noise channels follow the matrix
+        channels, with coefficient 0) and its deltas `d`, which decode_block runs."""
         channels = self.max_matrix_chan + 1
         previous = self.object_set
         if bits.read(1):
@@ -379,48 +379,50 @@ class Substream:
                         ),  # the bits a sample of the LSB bypass (ERRATA 69, provisional)
                         "noise_shift": bits.read(4),
                         "mask": bits.read(channels),
-                        "width": previous[place]["width"] if place < len(previous) else 0,
                     }
+                    old = previous[place] if place < len(previous) else None
+                    matrix["width"] = old["width"] if old else 0
+                    matrix["field2"] = old["field2"] if old else 0
+                    matrix["d"] = list(old["d"]) if old else [0] * (channels + NOISE_CHANNELS)
                     if matrix["frac_bits"] - matrix["f_shift"] > MATRIX_SHIFT:
                         raise StreamError("matrix coefficients finer than 2^-15")
                     current.append(matrix)
             else:
                 if not previous:
                     raise StreamError("object matrices reuse headers none were sent for")
-                current = [dict(matrix) for matrix in previous]
+                current = [{**matrix, "d": list(matrix["d"])} for matrix in previous]
             for matrix in current:
-                matrix["base"] = {}
-                matrix["delta"] = {}
+                scale = OBJECT_SHIFT - matrix["frac_bits"] + matrix["f_shift"]
+                matrix["c"] = [0] * (channels + NOISE_CHANNELS)
                 for channel in range(channels):
                     if matrix["mask"] >> channel & 1:
-                        matrix["base"][channel] = bits.signed(matrix["frac_bits"] + 2)
+                        matrix["c"][channel] = bits.signed(matrix["frac_bits"] + 2) << scale
         else:
-            current = [dict(matrix) for matrix in previous]
-        if bits.read(1) and bits.read(1):
+            current = previous
+        self.object_extension = bool(bits.read(1))
+        if not self.object_extension:
+            for matrix in current:
+                matrix["d"] = [0] * (channels + NOISE_CHANNELS)
+        elif bits.read(1):
             if bits.read(1):
                 for matrix in current:
                     matrix["width"] = bits.read(4)
-                    bits.read(2)
+                    matrix["field2"] = bits.read(2)
             for matrix in current:
+                matrix["d"] = [0] * (channels + NOISE_CHANNELS)
                 if matrix["width"]:
                     for channel in range(channels):
                         if matrix["mask"] >> channel & 1:
-                            matrix["delta"][channel] = bits.signed(matrix["width"] + 1)
+                            matrix["d"][channel] = bits.signed(matrix["width"] + 1)
         self.object_set = current
-        self.fine = []
-        matrices = []
-        for matrix in current:
-            scale = MATRIX_SHIFT - matrix["frac_bits"] + matrix["f_shift"]
-            coeffs = [0] * (channels + NOISE_CHANNELS)
-            deltas = [0] * (channels + NOISE_CHANNELS)
-            for channel, raw in matrix["base"].items():
-                coeffs[channel] = raw << scale
-            for channel, delta in matrix["delta"].items():
-                deltas[channel] = delta << scale
-            matrices.append((matrix["out"], coeffs, matrix["bypass"], matrix["noise_shift"]))
-            fine_bits = RAMP_BITS if self.extension != "flat" else matrix["width"] + 1
-            self.fine.append((deltas, fine_bits if matrix["width"] else 0))
-        return matrices
+        self.object_ramp = [
+            self.object_ramp[place] if place < len(self.object_ramp) else 0
+            for place in range(len(current))
+        ]
+        return [
+            (matrix["out"], matrix["c"], matrix["bypass"], matrix["noise_shift"])
+            for matrix in current
+        ]
 
     def read_matrices(self, bits):
         if self.object_matrices:
@@ -526,33 +528,43 @@ def decode_block(sub, bits, rows, first):
             seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
         sub.noise_seed = seed
     # The primitive matrices (ERRATA 8).
+    shift = OBJECT_SHIFT if sub.object_matrices else MATRIX_SHIFT
+    if sub.object_matrices and first == 0:
+        sub.object_ramp = [0] * len(sub.object_set)  # the ramps restart with the access unit
     for index, (out, coeffs, _lsb_bypass, noise_shift) in enumerate(sub.matrices):
         keep = s32((-1 << sub.quant[out]) & 0xFFFFFFFF) if out <= sub.max_chan else -1
         # Generator 1's noise (TH spec 17.3): the matrix starts the unit at the index of the
         # matrices left (this one included) and steps by twice that, plus one, a sample.
         left = len(sub.matrices) - index
-        deltas, fine_bits = sub.fine[index] if index < len(sub.fine) else (None, 0)
+        extension = sub.object_matrices and sub.object_extension
+        if extension:
+            state = sub.object_set[index]
+            present = [c for c in range(sub.max_matrix_chan + 1) if state["mask"] >> c & 1]
+            fine_shift = state["field2"] - state["f_shift"] + state["frac_bits"]
         for i in range(size):
             row = rows[first + i]
             total = sum(row[c] * coeffs[c] for c in range(sub.max_matrix_chan + 1))
             for noise in range(NOISE_CHANNELS):  # the noise channels follow the matrix channels
                 total += row[16 + noise] * coeffs[sub.max_matrix_chan + 1 + noise]
+            if extension:
+                # The deltas' share (ERRATA 69): the sum of rows times deltas, scaled by the
+                # matrix's shift, grows by the ramp over the access unit; the coefficients take
+                # the deltas up at its end.
+                fine = sum(row[c] * state["d"][c] for c in present)
+                step = fine >> fine_shift if fine_shift >= 0 else fine << -fine_shift
+                total += s32(step) * sub.object_ramp[index]
+                sub.object_ramp[index] += (0x666 >> sub.rate_shift) * 4
             if noise_shift:
                 slot = (left + (first + i) * (2 * left + 1)) % sub.noise_size
-                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7 + MATRIX_SHIFT - 14))
-            shift = MATRIX_SHIFT
-            if fine_bits:
-                # The extension (ERRATA 69): base + delta / 2^fine_bits for each coefficient, so
-                # the sum of the base coefficients and the noise is lifted by fine_bits places and
-                # the products with the deltas, which are in the same units, are added.
-                finer = sum(row[c] * deltas[c] for c in range(sub.max_matrix_chan + 1))
-                if sub.extension != "flat":
-                    # across the block; the product is divided toward zero
-                    product = finer * (i + 1 if sub.extension == "ramp_end" else i)
-                    finer = product // size if product >= 0 else -(-product // size)
-                total = (total << fine_bits) + finer
-                shift += fine_bits
+                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7 + shift - 14))
             row[out] = s32(((total >> shift) & keep) + bypass[i][index])
+    if sub.object_matrices and sub.object_extension and first + size == sub.unit_size:
+        for state in sub.object_set:
+            up = OBJECT_SHIFT - (state["field2"] - state["f_shift"] + state["frac_bits"])
+            for c in range(sub.max_matrix_chan + 1):
+                if state["mask"] >> c & 1:
+                    delta = state["d"][c] << up if up >= 0 else state["d"][c] >> -up
+                    state["c"][c] = s32(state["c"][c] + delta)
     # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
     # output shift of that matrix channel (TH spec 7.3, ERRATA 12): the shifts are listed by matrix
     # channel.
@@ -667,13 +679,9 @@ def major_sync_size(unit, offset):
     raise StreamError("major sync CRC")
 
 
-def decode_stream(data, presentation="best", extension="flat"):
-    """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count).
-    `extension` is how the object matrices' deltas act ("flat", "ramp_end", "ramp_start";
-    Substream.extension)."""
+def decode_stream(data, presentation="best"):
+    """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count)."""
     substreams = [Substream(i) for i in range(4)]
-    for substream in substreams:
-        substream.extension = extension
     count = 0
     rate = 0
     pcm = []
@@ -686,6 +694,8 @@ def decode_stream(data, presentation="best", extension="flat"):
             rate = (48000 << ratebits) if ratebits <= 2 else (44100 << (ratebits - 8))
             for substream in substreams:
                 substream.noise_size = 64 << (ratebits & 3)
+                substream.rate_shift = ratebits & 3
+                substream.unit_size = 40 << (ratebits & 3)
             count = unit[offset + 16] >> 4
             offset += size
         directory_start = offset

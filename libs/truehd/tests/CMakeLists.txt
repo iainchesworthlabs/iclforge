@@ -18,19 +18,23 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     decoder/test_object_robustness.cpp
     encoder/test_coded_bits_simd.cpp
     decoder/test_substream3.cpp
+    encoder/test_cluster_elements.cpp
     encoder/test_coding.cpp
     encoder/test_downmix.cpp
     encoder/test_encoder.cpp
     encoder/test_encoder_atmos.cpp
     encoder/test_encoder_object_bed.cpp
     encoder/test_encoder_object_motion.cpp
+    encoder/test_render_bed.cpp
     encoder/test_signals.cpp
     fuzz/test_truehd_mutator.cpp)
 
-# iclforge::objects only for test_evolution.cpp, which holds this library's reading of the evolution
-# frame to the EMDF container reader E-AC-3 streams go through (libs/truehd itself links base alone).
+# iclforge::objects for test_evolution.cpp, which holds this library's reading of the evolution
+# frame to the EMDF container reader E-AC-3 streams go through, and iclforge::render for
+# test_render_bed.cpp, which holds the bed panner to libs/render's (libs/truehd itself links base
+# alone).
 target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::base_headers iclforge::json
-    iclforge::objects)
+    iclforge::objects iclforge::render)
 # fuzz/test_truehd_mutator.cpp includes libs/truehd/fuzz/truehd_mutator.hpp, the repair half of the
 # libFuzzer custom mutator. The mutator itself builds only under Clang with -fsanitize=fuzzer, but
 # the header's restamp_truehd_checks is portable C++ over the library's own check routines, and
@@ -40,8 +44,9 @@ target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::b
 target_include_directories(iclforge-truehd-tests PRIVATE ../fuzz)
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
 # build), so the tests that exercise them compile coding.cpp themselves and see src/. The same goes
-# for the object substream's matrix planner (object_bed.cpp).
-target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp ../src/encoder/object_bed.cpp)
+# for the object substream's matrix planner (object_bed.cpp) and the render and clustering code.
+target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp
+    ../src/encoder/object_bed.cpp ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp)
 target_include_directories(iclforge-truehd-tests PRIVATE ../src)
 
 # The AVX2 kernel of src/internal/avx2, compiled a second time into this binary for the reason

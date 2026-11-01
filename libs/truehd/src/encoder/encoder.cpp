@@ -629,14 +629,6 @@ struct Encoder::Impl {
             verifier = std::make_unique<Decoder>(decoder_config);
             if (config.object_channels > 0) {
                 decoder_config.presentation = Presentation::kAll;
-                // The ramp is a reading only the decoder's lab settings have (object_paths.hpp):
-                // 4 and 5 ramp over the block by (i + 1) / size and i / size, and a fixed place
-                // of 19 reads the delta in eighths.
-                if (config.object_ramp != ObjectRamp::kNone) {
-                    decoder_config.lab.object_extension =
-                        config.object_ramp == ObjectRamp::kEnd ? 4 : 5;
-                    decoder_config.lab.object_extension_fixed = 19;
-                }
                 object_verifier = std::make_unique<Decoder>(decoder_config);
             }
         }
@@ -726,8 +718,9 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
             if (config.object_update_units < 1) {
                 return "object_update_units must be at least 1";
             }
-            if (config.object_ramp != ObjectRamp::kNone && config.object_update_units != 1) {
-                return "an object ramp needs an update at every block: object_update_units 1";
+            if (config.object_extension != ObjectExtension::kNone &&
+                config.object_update_units != 1) {
+                return "the object slopes need an update at every unit: object_update_units 1";
             }
             for (const ObjectPath& path : config.object_paths) {
                 if (const std::string_view problem =
@@ -1203,7 +1196,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             request.bypass_bits = config.object_lsb_bypass ? config.object_bypass_bits : 0;
             request.mix_step = step;
             request.paths = config.object_paths;
-            request.ramp = config.object_ramp;
+            request.extension = config.object_extension;
             request.update_units = config.object_update_units;
             request.drop_idle = config.object_drop_idle_matrices;
             request.split_mixes = config.object_split_mixes;

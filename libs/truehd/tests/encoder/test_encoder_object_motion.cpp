@@ -25,10 +25,9 @@
 // Moving objects in the object substream (EncoderConfig::object_paths, ERRATA.md entries 69 and
 // 70, libs/truehd/notes/feature-truehd-atmos-encoder-matrices.md): the matrices that mix the
 // objects into the bed change from block to block, the sections that say so are written in the
-// cheapest form that gets the decoder there, and the optional extension ramps each coefficient
-// across the block. Agreement with this library's decoder is not agreement with Dolby's: nothing
-// outside this repository reads the sections, and the ramp is a reading of one controlled encode
-// (SUBSTREAM3.md section 6), so the stream only decodes under the decoder's lab settings for it.
+// cheapest form that gets the decoder there, and with the extension the coefficients slide with
+// the slopes of SUBSTREAM3.md section 3. Agreement with this library's decoder is not agreement
+// with Dolby's: nothing outside this repository reads the sections.
 
 namespace {
 
@@ -55,22 +54,22 @@ std::vector<std::pair<std::size_t, int>> interval_blocks(int units) {
 // Object k sits on its own bed row for a stretch of samples, then on the next object's,
 // alternating: a straight line from one to the other or a step ("jump"). The encode tool has the
 // same rule.
-std::vector<ObjectPath> moving_paths(int objects, std::size_t frames, std::int64_t kStretch,
-                                     bool jump) {
+std::vector<ObjectPath> moving_paths(int objects, std::size_t frames, std::int64_t stretch,
+                                     bool jump, int moving = 8) {
     constexpr int kRowOfObject[8] = {0, 1, 2, 4, 5, 6, 7, 3};
     std::vector<ObjectPath> paths;
-    for (int k = 0; k + kBed < objects; ++k) {
+    for (int k = 0; k + kBed < objects && k < moving; ++k) {
         ObjectPath path;
         path.object = kBed + k;
-        const auto stretches = static_cast<std::int64_t>(frames) / kStretch + 2;
+        const auto stretches = static_cast<std::int64_t>(frames) / stretch + 2;
         for (std::int64_t n = 0; n < stretches; ++n) {
             ObjectGainKnot knot;
-            knot.sample = n * kStretch;
+            knot.sample = n * stretch;
             knot.gain[static_cast<std::size_t>(kRowOfObject[(k + static_cast<int>(n % 2)) % 8])] =
                 kGain;
             path.knots.push_back(knot);
             if (jump) {
-                knot.sample = (n + 1) * kStretch;
+                knot.sample = (n + 1) * stretch;
                 path.knots.push_back(knot);
             }
         }
@@ -126,14 +125,14 @@ TEST_CASE(
     CHECK(value(1, 60) == 0.0);      // another row
 }
 
-// One object (channel 8) whose gain into the left row falls from 1 to 0 over 4,000 samples. Its
-// coefficient is minus the gain at 2^-12: -4096 at the start.
-d::ObjectTimelineRequest falling_object(ObjectRamp ramp) {
+// One object (channel 8) whose gain into the left row falls from 1 to 0 over 4,000 samples, eight
+// access units of the interval. Its coefficient is minus the gain: -4096 raw, -262,144 at 2^-18.
+d::ObjectTimelineRequest falling_object(ObjectExtension extension) {
     d::ObjectTimelineRequest request;
     request.objects = 9;
-    request.ramp = ramp;
+    request.extension = extension;
     request.nominal = kNominal;
-    request.blocks = {{0, 8}, {8, 32}, {40, 40}};
+    request.blocks = interval_blocks(8);
     ObjectPath path;
     path.object = 8;
     ObjectGainKnot first;
@@ -145,71 +144,62 @@ d::ObjectTimelineRequest falling_object(ObjectRamp ramp) {
     return request;
 }
 
-TEST_CASE("the trajectory gives the raw coefficient and the delta that reach the end of the block",
+TEST_CASE("a coefficient slides on its slope, and a section is sent where the slope stops reaching",
           "[truehd][encoder][atmos][object-motion]") {
-    const auto timeline = d::build_object_timeline(falling_object(ObjectRamp::kEnd));
+    const auto timeline = d::build_object_timeline(falling_object(ObjectExtension::kSlopes));
     REQUIRE(timeline.has_value());
-    REQUIRE(timeline->blocks.size() == 3);
-    // matrices: the sign flip of row 8, then the one mixing object 8 into the left row
-    const auto mix = [&](std::size_t block) -> const MatrixSpec& {
-        REQUIRE(timeline->blocks[block].matrices.size() == 2);
-        return timeline->blocks[block].matrices[1];
-    };
-    // With the ramp ending on the block's last sample the coefficient starts from the gain one
-    // sample before the block and ends on the gain at its last sample. The gain at sample s is
-    // 1 - s / 4000, so (times 4096, less the rounding):
-    //   block 0: raw -4096 (sample -1 holds the first knot), end at 7:  -4088.832, delta 8 * 7.168
-    //   = 57.3 -> 57 block 1: raw -4089 (4088.832), end at 39: -4056.064, delta 8 * 32.936 = 263.5
-    //   -> 263 block 2: raw -4056 (4056.064), end at 79: -4015.104, delta 8 * 40.896 = 327.2 -> 327
-    CHECK(mix(0).coeff[8] == -4096);
-    CHECK(mix(0).ext_value[8] == 57);
-    CHECK(mix(1).coeff[8] == -4089);
-    CHECK(mix(1).ext_value[8] == 263);
-    CHECK(mix(2).coeff[8] == -4056);
-    CHECK(mix(2).ext_value[8] == 327);
-    // the widest delta, 327, takes 9 bits and one for the sign: width 9, the same all interval
-    CHECK(mix(0).ext_width == 9);
-    CHECK(mix(2).ext_width == 9);
-    // the own coefficient is 1.0 and has no delta
-    CHECK(mix(1).coeff[0] == 4096);
-    CHECK(mix(1).ext_value[0] == 0);
-
-    // the first block sends the headers with their widths and the deltas; a later block, whose
-    // coefficients have changed, sends the coefficients on the headers that stand, and the deltas
-    const ObjectSectionForm first = timeline->blocks[0].section.form;
-    CHECK(timeline->blocks[0].send);
-    CHECK(first.change);
-    CHECK(first.headers);
-    CHECK(first.widths);
-    CHECK(first.deltas);
-    const ObjectSectionForm later = timeline->blocks[1].section.form;
-    CHECK(timeline->blocks[1].send);
-    CHECK(later.change);
-    CHECK_FALSE(later.headers);
-    CHECK_FALSE(later.widths);
-    CHECK(later.deltas);
-}
-
-TEST_CASE("a ramp that starts on the block's first sample anchors the block at its own ends",
-          "[truehd][encoder][atmos][object-motion]") {
-    const auto timeline = d::build_object_timeline(falling_object(ObjectRamp::kStart));
-    REQUIRE(timeline.has_value());
-    const auto mix = [&](std::size_t block) -> const MatrixSpec& {
-        return timeline->blocks[block].matrices[1];
-    };
-    // block 0: raw -4096, end at 8: -4087.808, delta 8 * 8.192 = 65.5 -> 66
-    // block 1: raw -4088 (4087.808), end at 40: -4055.04, delta 8 * 32.96 = 263.7 -> 264
-    CHECK(mix(0).coeff[8] == -4096);
-    CHECK(mix(0).ext_value[8] == 66);
-    CHECK(mix(1).coeff[8] == -4088);
-    CHECK(mix(1).ext_value[8] == 264);
+    REQUIRE(timeline->blocks.size() == 9);  // the first unit is two blocks
+    // The coefficient 4096 * (1 - t / 4000) falls by 2621.44 units of 2^-18 in a unit of 40
+    // samples. At 12 fractional bits and ext_field2 3 a delta of 1 is 8 units a unit (S = 15), so
+    // the first slope is round(2621 / 8) = 328 (2624 units); the coefficient at the start of
+    // unit u is then -262144 + 2624 u while the path's is -262144 + 2621.44 u. The unit end the
+    // slope reaches stays within the slope tolerance of 16 units of the path's until unit 6
+    // (block 7), where the slope would be 18 units off: the section there replaces the slope
+    // alone, the move to the path's end of that unit being 2606 units, a delta of 326.
+    std::vector<std::size_t> sections;
+    for (std::size_t b = 0; b < timeline->blocks.size(); ++b) {
+        if (timeline->blocks[b].send) {
+            sections.push_back(b);
+        }
+    }
+    REQUIRE(sections.size() == 2);
+    CHECK(sections.front() == 0);
+    CHECK(sections.back() == 7);
+    const d::ObjectBlock& first = timeline->blocks[0];
+    REQUIRE(first.matrices.size() == 2);      // the sign flip and the mixing matrix
+    CHECK(first.matrices[1].ext_width == 9);  // 332 needs 9 bits and a sign
+    CHECK(first.matrices[1].ext_field2 == 3);
+    CHECK(first.section.items[1].coeff[8] == -4096);
+    CHECK(first.section.items[1].ext_value[8] == 328);
+    CHECK(first.section.items[1].coeff[0] == 4096);  // its own coefficient, 1.0
+    CHECK(first.section.items[1].ext_value[0] == 0);
+    const ObjectSectionForm& form = first.section.form;
+    CHECK(form.change);
+    CHECK(form.headers);
+    CHECK(form.extension);
+    CHECK(form.deltas);
+    CHECK(form.widths);
+    // the running coefficient at the start of each unit (blocks 0 and 1 are unit 0)
+    CHECK(timeline->blocks[1].run[1].coeff[8] == -262144);
+    CHECK(timeline->blocks[2].run[1].coeff[8] == -262144 + 2624);
+    CHECK(timeline->blocks[3].run[1].coeff[8] == -262144 + 2 * 2624);
+    CHECK(timeline->blocks[2].run[1].slope[8] == 328);
+    CHECK(timeline->blocks[2].run[1].scale == 15);
+    // the second section changes the slope alone: A clear, A2 and B2 set, no C2
+    const d::ObjectBlock& later = timeline->blocks[7];
+    CHECK_FALSE(later.section.form.change);
+    CHECK(later.section.form.extension);
+    CHECK(later.section.form.deltas);
+    CHECK_FALSE(later.section.form.widths);
+    CHECK(later.section.items[1].ext_value[8] == 326);
+    CHECK(later.run[1].slope[8] == 326);
 }
 
 TEST_CASE(
-    "without a ramp a coefficient holds from one update to the next, and a held block sends "
+    "without slopes a coefficient holds from one update to the next, and a held block sends "
     "nothing",
     "[truehd][encoder][atmos][object-motion]") {
-    d::ObjectTimelineRequest request = falling_object(ObjectRamp::kNone);
+    d::ObjectTimelineRequest request = falling_object(ObjectExtension::kNone);
     request.blocks = {{0, 8}, {8, 32}, {40, 40}, {80, 40}, {120, 40}};
     request.update_units = 2;  // updates at the restart and at units 2, 4, ...
     const auto timeline = d::build_object_timeline(request);
@@ -219,144 +209,66 @@ TEST_CASE(
     for (std::size_t b = 0; b < 5; ++b) {
         CAPTURE(b);
         CHECK(timeline->blocks[b].send == sent[b]);
-        raw.push_back(timeline->blocks[b].matrices[1].coeff[8]);
-        CHECK(timeline->blocks[b].matrices[1].ext_width == 0);
+        // the raw coefficient in force, from the decoder's running value at 2^-18
+        raw.push_back(timeline->blocks[b].run[1].coeff[8] / 64);
+        CHECK_FALSE(timeline->blocks[b].run[1].extension);
     }
     // 4096 * (1 - s / 4000) at the blocks' own first samples: 0 and 80 (4014.08); the others hold
     CHECK(raw == std::vector<std::int32_t>{-4096, -4096, -4096, -4014, -4014});
     CHECK(timeline->blocks[3].section.form.change);
     CHECK_FALSE(timeline->blocks[3].section.form.headers);
-    CHECK_FALSE(timeline->blocks[3].section.form.deltas);
+    CHECK_FALSE(timeline->blocks[3].section.form.extension);
 }
 
-TEST_CASE("an extension ramp goes from raw to raw plus an eighth of the delta across the block",
+TEST_CASE("a slope adds its share across the access unit and moves the coefficient at its end",
           "[truehd][encoder][atmos][object-motion]") {
-    // Row 0 reads row 8 (1 << 20) at raw 100 with delta 37 over a block of 8. In real numbers the
-    // coefficient is (100 + 37 / 8 * (i + 1) / 8) / 4096, so row 0 gets 2^20 / 4096 * (100 +
-    // 4.625 * (i + 1) / 8) = 25600 + 148 * (i + 1); a ramp that started on the first sample gets
-    // 25600 + 148 * i. A scale other than an eighth moves every one of these.
-    for (const ObjectRamp ramp : {ObjectRamp::kEnd, ObjectRamp::kStart}) {
-        CAPTURE(static_cast<int>(ramp));
-        MatrixSpec matrix;
-        matrix.out_ch = 0;
-        matrix.frac_bits = 12;
-        matrix.ext_width = 6;
-        matrix.present[0] = true;
-        matrix.coeff[0] = 4096;
-        matrix.present[8] = true;
-        matrix.coeff[8] = 100;
-        matrix.ext_value[8] = 37;
-        d::ObjectTimeline timeline;
-        timeline.ramp = ramp;
-        d::ObjectBlock block;
-        block.size = 8;
-        block.matrices = {matrix};
-        timeline.blocks = {block};
-        d::ObjectChainShape shape;
-        shape.units = 1;
-        shape.nominal = 8;
-        std::vector<d::ObjectPlane> rows(9, d::ObjectPlane(8, 0));
-        rows[8].assign(8, 1 << 20);
-        d::apply_object_timeline(timeline, shape, {}, rows);
-        for (int i = 0; i < 8; ++i) {
-            CAPTURE(i);
-            CHECK(rows[0][static_cast<std::size_t>(i)] ==
-                  25600 + 148 * (ramp == ObjectRamp::kEnd ? i + 1 : i));
-        }
-        // and backwards: from those outputs the rows the decoder starts from
-        d::ObjectBypass bypass;
-        REQUIRE(d::invert_object_timeline(timeline, shape, rows, bypass));
-        CHECK(rows[0] == d::ObjectPlane(8, 0));
-    }
+    // Row 0 reads row 8 (1 << 20) at raw 100 (6,400 at 2^-18) with a delta of 40 at ext_field2 3
+    // (S = 15): fine = 2^20 * 40, shared = fine >> 15 = 1,280, and the share of sample i is
+    // 1,280 * 6,552 * i >> 18 on top of 2^20 * 6,400 >> 18 = 25,600. At the end of the unit the
+    // coefficient moves by 40 << 3 = 320, to 105 raw places: the next unit starts at 26,880.
+    MatrixSpec matrix;
+    matrix.out_ch = 0;
+    matrix.frac_bits = 12;
+    matrix.ext_width = 6;
+    matrix.ext_field2 = 3;
+    matrix.present[0] = true;
+    matrix.present[8] = true;
+    d::ObjectBlock block;
+    block.size = kNominal;
+    block.matrices = {matrix};
+    d::ObjectRun run;
+    run.coeff[0] = 4096 << 6;
+    run.coeff[8] = 100 << 6;
+    run.slope[8] = 40;
+    run.scale = 15;
+    run.extension = true;
+    block.run = {run};
+    d::ObjectTimeline timeline;
+    timeline.blocks.push_back(block);
+    d::ObjectBlock second = block;
+    second.start = kNominal;
+    second.run[0].coeff[8] = 105 << 6;
+    timeline.blocks.push_back(second);
+    d::ObjectChainShape shape;
+    shape.units = 2;
+    shape.nominal = kNominal;
+    std::vector<d::ObjectPlane> rows(9, d::ObjectPlane(80, 0));
+    rows[8].assign(80, 1 << 20);
+    d::apply_object_timeline(timeline, shape, {}, rows);
+    CHECK(rows[0][0] == 25600);
+    CHECK(rows[0][1] == 25631);
+    CHECK(rows[0][2] == 25663);
+    CHECK(rows[0][10] == 25919);
+    CHECK(rows[0][39] == 26847);
+    CHECK(rows[0][40] == 26880);
+    // and backwards: from those outputs the rows the decoder starts from
+    d::ObjectBypass bypass;
+    REQUIRE(d::invert_object_timeline(timeline, shape, rows, bypass));
+    CHECK(rows[0] == d::ObjectPlane(80, 0));
 }
 
 // --- sections
 // ---------------------------------------------------------------------------------------
-
-// A random list of matrices (not primitive: this is for the syntax) with every kind of field.
-std::vector<MatrixSpec> random_list(std::mt19937& rng, std::size_t count, bool deltas) {
-    const auto pick = [&](std::uint32_t n) { return static_cast<int>(rng() % n); };
-    std::vector<MatrixSpec> list;
-    for (std::size_t m = 0; m < count; ++m) {
-        MatrixSpec matrix;
-        matrix.out_ch = static_cast<std::uint8_t>(pick(16));
-        matrix.frac_bits = static_cast<std::uint8_t>(5 + pick(9));  // 5..13
-        matrix.f_shift = static_cast<std::int8_t>(pick(4) - 1);     // -1..2
-        matrix.field_2b = static_cast<std::uint8_t>(pick(4));
-        matrix.lsb_bypass = matrix.field_2b != 0;
-        matrix.field_m4 = static_cast<std::uint8_t>(pick(16));
-        matrix.ext_width = static_cast<std::uint8_t>(deltas ? pick(4) * 3 : 0);
-        for (int c = 0; c < 16; ++c) {
-            if (pick(3) == 0) {
-                continue;
-            }
-            const auto at = static_cast<std::size_t>(c);
-            const int limit = 1 << (matrix.frac_bits + 1);
-            matrix.present[at] = true;
-            matrix.coeff[at] = pick(2 * limit) - limit;
-            if (matrix.ext_width != 0) {
-                const int reach = 1 << matrix.ext_width;
-                matrix.ext_value[at] = pick(2 * reach) - reach;
-            }
-        }
-        list.push_back(matrix);
-    }
-    return list;
-}
-
-bool same_held(const std::vector<MatrixSpec>& a, const std::vector<MatrixSpec>& b) {
-    if (a.size() != b.size()) {
-        return false;
-    }
-    for (std::size_t m = 0; m < a.size(); ++m) {
-        MatrixSpec x = a[m];
-        MatrixSpec y = b[m];
-        if (x.ext_width == 0) {
-            x.ext_value = {};
-        }
-        if (y.ext_width == 0) {
-            y.ext_value = {};
-        }
-        if (x != y) {
-            return false;
-        }
-    }
-    return true;
-}
-
-MatrixSet set_of(const std::vector<MatrixSpec>& list) {
-    MatrixSet set;
-    set.count = static_cast<std::uint8_t>(list.size());
-    for (std::size_t m = 0; m < list.size(); ++m) {
-        set.items[m] = list[m];
-    }
-    return set;
-}
-
-// Writes the section as the block header carries it and reads it back with the reader, which
-// keeps `before` as the matrices in force.
-std::vector<MatrixSpec> through_the_reader(const std::vector<MatrixSpec>& before,
-                                           const MatrixSet& section, int channels) {
-    BlockContext context;
-    context.min_chan = 16 - channels;
-    context.max_chan = 15;
-    context.max_matrix_chan = 15;
-    context.object_matrices = true;
-    BlockHeaderSpec header;
-    header.matrices = section;
-    iclforge::BitWriter writer;
-    write_block_header(writer, context, header);
-    const std::vector<std::byte> bytes = writer.take();
-    const MatrixSet previous = set_of(before);
-    context.object_previous = before.empty() ? nullptr : &previous;
-    iclforge::BitReader reader(bytes);
-    const auto read = read_block_header(reader, context);
-    REQUIRE(read.has_value());
-    REQUIRE(read->matrices.has_value());
-    std::vector<MatrixSpec> out(read->matrices->items.begin(),
-                                read->matrices->items.begin() + read->matrices->count);
-    return out;
-}
 
 // The bits a block header that sends only `section` carries for it: the header less the new-flags
 // and block-size bits before the matrices-present bit, and after the section the output-shift and
@@ -382,248 +294,284 @@ std::string section_bits_of(const MatrixSet& section, int objects) {
     return bits.substr(3, bits.size() - 3 - tail);
 }
 
-MatrixSpec two_coefficient_matrix(std::int32_t at_0, std::int32_t at_8, int width = 0,
-                                  std::int32_t delta_0 = 0, std::int32_t delta_8 = 0) {
+MatrixSet one_matrix_set(std::int32_t at_0, std::int32_t at_8, int width, int field2,
+                         std::int32_t delta_0, std::int32_t delta_8, ObjectSectionForm form) {
     MatrixSpec matrix;
     matrix.out_ch = 9;
     matrix.frac_bits = 12;
     matrix.ext_width = static_cast<std::uint8_t>(width);
+    matrix.ext_field2 = static_cast<std::uint8_t>(field2);
     matrix.present[0] = true;
     matrix.present[8] = true;
     matrix.coeff[0] = at_0;
     matrix.coeff[8] = at_8;
     matrix.ext_value[0] = delta_0;
     matrix.ext_value[8] = delta_8;
-    return matrix;
+    MatrixSet set;
+    set.count = 1;
+    set.items[0] = matrix;
+    set.form = form;
+    return set;
 }
 
 TEST_CASE("sections are written bit for bit as worked out by hand",
           "[truehd][encoder][atmos][object-motion]") {
-    SECTION("new deltas on the set that stands: A clear, A2 B2, no C2, a delta of 4 bits each") {
-        const auto [send, section] = d::plan_object_section(
-            {two_coefficient_matrix(5, 1, 3, 0, 0)}, {two_coefficient_matrix(5, 1, 3, -2, 5)});
-        REQUIRE(send);
-        CHECK(section_bits_of(section, 12) ==
-              "0110"
+    SECTION("new slopes on the set that stands: A clear, A2, B2, no C2, a delta of 4 bits each") {
+        ObjectSectionForm form;
+        form.change = false;
+        form.extension = true;
+        form.deltas = true;
+        CHECK(section_bits_of(one_matrix_set(5, 1, 3, 0, -2, 5, form), 12) ==
+              "0"
+              "1"
+              "1"
+              "0"
               "1110"
               "0101");
     }
-    SECTION("new coefficients on the headers that stand: A set, B clear, 14 bits each") {
-        const auto [send, section] =
-            d::plan_object_section({two_coefficient_matrix(1, 1)}, {two_coefficient_matrix(5, -3)});
-        REQUIRE(send);
-        CHECK(section_bits_of(section, 12) ==
+    SECTION(
+        "new coefficients on the headers that stand, the extension off: A, no B, 14 bits each") {
+        ObjectSectionForm form;
+        form.headers = false;
+        CHECK(section_bits_of(one_matrix_set(5, -3, 0, 0, 0, 0, form), 12) ==
               "10"
               "00000000000101"
               "11111111111101"
               "0");
     }
-    SECTION("nothing changes: nothing is sent") {
-        CHECK_FALSE(
-            d::plan_object_section({two_coefficient_matrix(5, 1)}, {two_coefficient_matrix(5, 1)})
-                .first);
+    SECTION("new coefficients with the standing slopes: A, no B, A2 and no B2") {
+        ObjectSectionForm form;
+        form.headers = false;
+        form.extension = true;
+        CHECK(section_bits_of(one_matrix_set(5, -3, 3, 1, 9, 9, form), 12) ==
+              "10"
+              "00000000000101"
+              "11111111111101"
+              "1"
+              "0");
+    }
+    SECTION(
+        "new widths and scales with their slopes: A clear, A2, B2, C2, width and scale 6 bits") {
+        ObjectSectionForm form;
+        form.change = false;
+        form.extension = true;
+        form.deltas = true;
+        form.widths = true;
+        CHECK(section_bits_of(one_matrix_set(5, 1, 3, 2, -2, 5, form), 12) ==
+              "0"
+              "111"
+              "0011"
+              "10"
+              "1110"
+              "0101");
     }
 }
 
-TEST_CASE("a planned section gets the decoder from one set of matrices to the next",
+// Writes the section as a block header carries it and reads it back with the reader, which keeps
+// `previous` as the matrices in force.
+MatrixSet through_the_reader(const MatrixSet& section, const MatrixSet* previous, int channels) {
+    BlockContext context;
+    context.min_chan = 16 - channels;
+    context.max_chan = 15;
+    context.max_matrix_chan = 15;
+    context.object_matrices = true;
+    BlockHeaderSpec header;
+    header.matrices = section;
+    iclforge::BitWriter writer;
+    write_block_header(writer, context, header);
+    const std::vector<std::byte> bytes = writer.take();
+    context.object_previous = previous;
+    iclforge::BitReader reader(bytes);
+    const auto read = read_block_header(reader, context);
+    REQUIRE(read.has_value());
+    REQUIRE(read->matrices.has_value());
+    return *read->matrices;
+}
+
+TEST_CASE("every form of section is read back as written",
           "[truehd][encoder][atmos][object-motion]") {
     std::mt19937 rng(20261101);
-    int forms_seen[5] = {};  // keep, coefficients only, new headers, with widths, with deltas
-    for (int trial = 0; trial < 300; ++trial) {
-        std::vector<MatrixSpec> before = random_list(rng, 1 + rng() % 16, rng() % 2 != 0);
-        if (trial % 7 == 0) {
-            before.clear();  // a restart: nothing in force
+    const auto pick = [&](std::uint32_t n) { return static_cast<int>(rng() % n); };
+    for (int trial = 0; trial < 400; ++trial) {
+        // a set in force: 1 to 16 matrices of random headers, widths and scales
+        MatrixSet before;
+        before.count = static_cast<std::uint8_t>(1 + pick(16));
+        for (std::size_t m = 0; m < before.count; ++m) {
+            MatrixSpec& matrix = before.items[m];
+            matrix.out_ch = static_cast<std::uint8_t>(pick(16));
+            matrix.frac_bits = static_cast<std::uint8_t>(5 + pick(9));
+            matrix.f_shift = static_cast<std::int8_t>(pick(4) - 1);
+            matrix.field_2b = static_cast<std::uint8_t>(pick(4));
+            matrix.lsb_bypass = matrix.field_2b != 0;
+            matrix.field_m4 = static_cast<std::uint8_t>(pick(16));
+            matrix.ext_width = static_cast<std::uint8_t>(pick(4) * 4);
+            matrix.ext_field2 = static_cast<std::uint8_t>(pick(4));
+            for (std::size_t c = 0; c < 16; ++c) {
+                matrix.present[c] = pick(3) != 0;
+            }
         }
-        std::vector<MatrixSpec> after = before;
-        const auto which = rng() % 6;
-        switch (which) {
-            case 0:  // the same
-                break;
-            case 1:  // new coefficients on the same headers
-                for (MatrixSpec& m : after) {
-                    for (std::size_t c = 0; c < m.present.size(); ++c) {
-                        if (m.present[c]) {
-                            m.coeff[c] =
-                                std::clamp(m.coeff[c] + static_cast<std::int32_t>(rng() % 5) - 2,
-                                           -(1 << (m.frac_bits + 1)), (1 << (m.frac_bits + 1)) - 1);
-                        }
-                    }
+        ObjectSectionForm form;
+        form.change = pick(2) != 0;
+        form.headers = form.change && pick(2) != 0;
+        form.extension = pick(3) != 0;
+        form.deltas = form.extension && pick(2) != 0;
+        form.widths = form.deltas && pick(2) != 0;
+        MatrixSet section = before;
+        if (form.headers) {
+            section.count = static_cast<std::uint8_t>(1 + pick(16));
+            for (std::size_t m = 0; m < section.count; ++m) {
+                MatrixSpec& matrix = section.items[m];
+                matrix = MatrixSpec{};
+                matrix.out_ch = static_cast<std::uint8_t>(pick(16));
+                matrix.frac_bits = static_cast<std::uint8_t>(5 + pick(9));
+                matrix.f_shift = static_cast<std::int8_t>(pick(4) - 1);
+                matrix.field_2b = static_cast<std::uint8_t>(pick(4));
+                matrix.lsb_bypass = matrix.field_2b != 0;
+                matrix.field_m4 = static_cast<std::uint8_t>(pick(16));
+                for (std::size_t c = 0; c < 16; ++c) {
+                    matrix.present[c] = pick(3) != 0;
                 }
-                break;
-            case 2:  // new deltas, the set standing
-                for (MatrixSpec& m : after) {
-                    for (std::size_t c = 0; c < m.ext_value.size(); ++c) {
-                        if (m.present[c] && m.ext_width != 0) {
-                            m.ext_value[c] = static_cast<std::int32_t>(rng() % 7) - 3;
-                        }
-                    }
+                // widths stand by place unless C2 sends them
+                if (m < before.count) {
+                    matrix.ext_width = before.items[m].ext_width;
+                    matrix.ext_field2 = before.items[m].ext_field2;
                 }
-                break;
-            case 3:  // new widths (with their deltas)
-                for (MatrixSpec& m : after) {
-                    m.ext_width = static_cast<std::uint8_t>(rng() % 12);
-                    m.ext_value = {};
-                    for (std::size_t c = 0; c < m.ext_value.size() && m.ext_width != 0; ++c) {
-                        m.ext_value[c] =
-                            m.present[c] ? static_cast<std::int32_t>(rng() % 3) - 1 : 0;
-                    }
-                }
-                break;
-            case 4:  // a different list
-                after = random_list(rng, 1 + rng() % 16, rng() % 2 != 0);
-                break;
-            default:  // one header changes
-                if (!after.empty()) {
-                    after[rng() % after.size()].field_m4 ^= 5;
-                }
-                break;
+            }
         }
-        CAPTURE(trial, before.size(), after.size());
-        const auto [send, section] = d::plan_object_section(before, after);
-        CAPTURE(which, send, section.form.change, section.form.headers, section.form.widths,
-                section.form.deltas);
-        if (!send) {
-            CHECK(same_held(before, after));
-            continue;
+        for (std::size_t m = 0; m < section.count; ++m) {
+            MatrixSpec& matrix = section.items[m];
+            if (form.widths) {
+                matrix.ext_width = static_cast<std::uint8_t>(pick(4) * 4);
+                matrix.ext_field2 = static_cast<std::uint8_t>(pick(4));
+            }
+            for (std::size_t c = 0; c < 16; ++c) {
+                matrix.coeff[c] = 0;
+                matrix.ext_value[c] = 0;
+                if (!matrix.present[c]) {
+                    continue;
+                }
+                const int limit = 1 << (matrix.frac_bits + 1);
+                matrix.coeff[c] = form.change ? pick(2 * limit) - limit : 0;
+                if (form.deltas && matrix.ext_width != 0) {
+                    const int reach = 1 << matrix.ext_width;
+                    matrix.ext_value[c] = pick(2 * reach) - reach;
+                }
+            }
         }
-        // the encoder's model of the decoder, and the decoder's reader, both give `after`
-        CHECK(same_held(d::apply_object_section(before, section), after));
-        CHECK(same_held(through_the_reader(before, section, 8), after));
-        const ObjectSectionForm& form = section.form;
-        forms_seen[0] += form.change ? 0 : 1;
-        forms_seen[1] += form.change && !form.headers ? 1 : 0;
-        forms_seen[2] += form.change && form.headers ? 1 : 0;
-        forms_seen[3] += form.widths ? 1 : 0;
-        forms_seen[4] += form.deltas ? 1 : 0;
-    }
-    // every form came up, so each was held to the reader
-    for (const int seen : forms_seen) {
-        CHECK(seen > 0);
+        section.form = form;
+        CAPTURE(trial, form.change, form.headers, form.extension, form.deltas, form.widths);
+        const MatrixSet read = through_the_reader(section, &before, 8);
+        CHECK(read.coeffs_sent == form.change);
+        CHECK(read.extension == form.extension);
+        CHECK(read.deltas_sent == form.deltas);
+        REQUIRE(read.count == section.count);
+        for (std::size_t m = 0; m < section.count; ++m) {
+            const MatrixSpec& want = section.items[m];
+            const MatrixSpec& got = read.items[m];
+            CHECK(got.out_ch == want.out_ch);
+            CHECK(got.frac_bits == want.frac_bits);
+            CHECK(got.f_shift == want.f_shift);
+            CHECK(got.field_m4 == want.field_m4);
+            CHECK(got.present == want.present);
+            CHECK(got.ext_width == want.ext_width);
+            CHECK(got.ext_field2 == want.ext_field2);
+            for (std::size_t c = 0; c < 16; ++c) {
+                if (form.change) {
+                    CHECK(got.coeff[c] == want.coeff[c]);
+                }
+                if (form.deltas && want.ext_width != 0 && want.present[c]) {
+                    CHECK(got.ext_value[c] == want.ext_value[c]);
+                }
+            }
+        }
     }
 }
 
-// --- sixteen matrices, changing list, ramp, noise, bypass
-// --------------------------------------------
-
-TEST_CASE("sixteen matrices that change from block to block run backwards and forwards exactly",
+TEST_CASE("the model of the decoder applies a section the way the decoder's rules say",
           "[truehd][encoder][atmos][object-motion]") {
-    const ObjectRamp ramp = GENERATE(ObjectRamp::kNone, ObjectRamp::kEnd, ObjectRamp::kStart);
-    CAPTURE(static_cast<int>(ramp));
+    // one matrix, 12 fractional bits, own channel 9, coefficients on 0 and 9
+    d::ObjectState state;
+    ObjectSectionForm full;
+    full.extension = true;
+    full.deltas = true;
+    full.widths = true;
+    MatrixSet first = one_matrix_set(100, 4096, 6, 3, 40, 0, full);
+    first.items[0].coeff[9] = 4096;
+    first.items[0].present[9] = true;
+    state = d::apply_object_section(state, first);
+    REQUIRE(state.run.size() == 1);
+    CHECK(state.run[0].coeff[0] == 100 << 6);
+    CHECK(state.run[0].coeff[9] == 4096 << 6);
+    CHECK(state.run[0].slope[0] == 40);
+    CHECK(state.run[0].extension);
+    CHECK(state.run[0].scale == 15);  // ext_field2 3 - f_shift 0 + frac_bits 12
+    CHECK(state.matrices[0].ext_width == 6);
+    // A clear, A2 only: the coefficients run on (here something moved them) and the slopes stand
+    state.run[0].coeff[0] += 320;
+    ObjectSectionForm keep;
+    keep.change = false;
+    keep.extension = true;
+    MatrixSet standing = first;
+    standing.form = keep;
+    state = d::apply_object_section(state, standing);
+    CHECK(state.run[0].coeff[0] == (100 << 6) + 320);
+    CHECK(state.run[0].slope[0] == 40);
+    // A set, B clear, no A2: the coefficients are the raw values again and every slope is cleared
+    ObjectSectionForm off;
+    off.headers = false;
+    MatrixSet fresh = one_matrix_set(7, 4096, 6, 3, 99, 0, off);
+    fresh.items[0].coeff[9] = 4096;
+    fresh.items[0].present[9] = true;
+    state = d::apply_object_section(state, fresh);
+    CHECK(state.run[0].coeff[0] == 7 << 6);
+    CHECK(state.run[0].slope[0] == 0);
+    CHECK_FALSE(state.run[0].extension);
+}
+
+// --- sixteen matrices, a list that changes, slopes
+// -------------------------------------------------
+
+TEST_CASE("sixteen matrices run backwards and forwards exactly, with or without slopes",
+          "[truehd][encoder][atmos][object-motion]") {
+    const ObjectExtension extension = GENERATE(ObjectExtension::kNone, ObjectExtension::kSlopes);
+    CAPTURE(static_cast<int>(extension));
+    // 16 objects: six of them move between two bed rows and have a matrix on each (split), the
+    // other two one each: 14 mixing matrices, the sign flip and the bypass matrix
+    d::ObjectTimelineRequest request;
+    request.objects = 16;
+    request.noise_shift = 3;
+    request.bypass_bits = 2;
+    request.extension = extension;
+    request.split_mixes = true;
+    request.nominal = kNominal;
+    request.paths = moving_paths(16, 4 * 8 * kNominal, 160, extension == ObjectExtension::kNone, 6);
+    request.blocks = interval_blocks(kUnitsPerInterval);
+    const auto timeline = d::build_object_timeline(request);
+    REQUIRE(timeline.has_value());
+    CHECK(d::object_matrices_used(*timeline) == 16);
+
     std::mt19937 rng(77);
-    const auto pick = [&](int n) { return static_cast<int>(rng() % static_cast<unsigned>(n)); };
-
-    // sixteen primitive matrices: 0 to 7 write the bed rows and 8 to 15 the coded rows, each reads
-    // two other rows at about 0.05; the 13th (row 12) has two bypass bits and is 4.0 on itself
-    const auto make_list = [&](int width, bool all) {
-        std::vector<MatrixSpec> list;
-        for (int m = 0; m < 16; ++m) {
-            if (!all && (m == 3 || m == 9)) {
-                continue;
-            }
-            MatrixSpec matrix;
-            matrix.out_ch = static_cast<std::uint8_t>(m);
-            matrix.frac_bits = 12;
-            matrix.field_m4 = static_cast<std::uint8_t>(m % 5);
-            matrix.present[matrix.out_ch] = true;
-            matrix.coeff[matrix.out_ch] = m % 3 == 0 ? -4096 : 4096;
-            if (m == 12) {
-                matrix.f_shift = 2;
-                matrix.field_2b = 2;
-                matrix.lsb_bypass = true;
-                matrix.coeff[matrix.out_ch] = 4096;
-            }
-            matrix.ext_width = static_cast<std::uint8_t>(ramp == ObjectRamp::kNone ? 0 : width);
-            for (int k = 0; k < 2; ++k) {
-                const int c = (m + 1 + pick(14)) % 16;
-                if (c == m) {
-                    continue;
-                }
-                const auto at = static_cast<std::size_t>(c);
-                matrix.present[at] = true;
-                matrix.coeff[at] = pick(401) - 200;
-                matrix.ext_value[at] =
-                    matrix.ext_width != 0 ? pick(1 << width) - (1 << (width - 1)) : 0;
-            }
-            list.push_back(matrix);
-        }
-        return list;
-    };
-
-    // blocks: 8 + 32 + 40 + 40 + 20 + 20 samples over four access units, and the matrices in each
-    const std::vector<std::pair<std::size_t, int>> bounds{{0, 8},   {8, 32},   {40, 40},
-                                                          {80, 40}, {120, 20}, {140, 20}};
-    std::vector<std::vector<MatrixSpec>> lists;
-    lists.push_back(make_list(6, true));
-    lists.push_back(lists.back());        // the same headers...
-    for (MatrixSpec& m : lists.back()) {  // ...new coefficients and deltas
-        for (std::size_t c = 0; c < 16; ++c) {
-            if (m.present[c] && c != m.out_ch) {
-                m.coeff[c] += pick(21) - 10;
-                m.ext_value[c] = m.ext_width != 0 ? pick(40) - 20 : 0;
-            }
-        }
-    }
-    lists.push_back(lists.back());         // held: nothing is sent
-    lists.push_back(make_list(6, false));  // two matrices fewer: new headers
-    lists.push_back(lists.back());
-    for (MatrixSpec& m : lists.back()) {  // narrower deltas on the same set: new widths
-        if (m.ext_width != 0) {
-            m.ext_width = 3;
-            for (std::size_t c = 0; c < 16; ++c) {
-                m.ext_value[c] = m.present[c] && c != m.out_ch ? pick(8) - 4 : 0;
-            }
-        }
-    }
-    lists.push_back(make_list(5, true));  // back to sixteen
-
-    d::ObjectTimeline timeline;
-    timeline.ramp = ramp;
-    int new_headers = 0;
-    int keeps = 0;
-    for (std::size_t b = 0; b < bounds.size(); ++b) {
-        d::ObjectBlock block;
-        block.start = bounds[b].first;
-        block.size = bounds[b].second;
-        block.matrices = lists[b];
-        const std::vector<MatrixSpec> none;
-        auto [send, section] = d::plan_object_section(b == 0 ? none : lists[b - 1], lists[b]);
-        block.send = send;
-        block.section = section;
-        new_headers += send && section.form.change && section.form.headers ? 1 : 0;
-        keeps += send ? 0 : 1;
-        if (send) {
-            CHECK(same_held(d::apply_object_section(b == 0 ? none : lists[b - 1], section),
-                            lists[b]));
-        }
-        timeline.blocks.push_back(std::move(block));
-    }
-    CHECK(new_headers >=
-          3);  // the restart, the list that loses two matrices, the one that regains them
-    CHECK(keeps >= 1);
-    CHECK(d::object_matrices_used(timeline) == 16);
-
     d::ObjectChainShape shape;
-    shape.units = 4;
+    shape.units = kUnitsPerInterval;
     shape.nominal = kNominal;
-    std::vector<d::ObjectPlane> rows(16, d::ObjectPlane(160));
+    std::vector<d::ObjectPlane> rows(16, d::ObjectPlane(kUnitsPerInterval * kNominal));
     for (d::ObjectPlane& plane : rows) {
         for (std::int32_t& v : plane) {
-            v = pick(1 << 17) - (1 << 16);
+            v = static_cast<std::int32_t>(rng() % (1U << 18)) - (1 << 17);
         }
     }
     const std::vector<d::ObjectPlane> outputs = rows;
     d::ObjectBypass bypass;
-    REQUIRE(d::invert_object_timeline(timeline, shape, rows, bypass));
+    REQUIRE(d::invert_object_timeline(*timeline, shape, rows, bypass));
     CHECK(rows != outputs);
-    d::apply_object_timeline(timeline, shape, bypass, rows);
+    d::apply_object_timeline(*timeline, shape, bypass, rows);
     CHECK(rows == outputs);
-    // the matrix with two bypass bits sent them
     REQUIRE(bypass.size() == 1);
     CHECK(std::ranges::any_of(bypass[0], [](std::uint8_t v) { return v >= 2; }));
     CHECK(std::ranges::all_of(bypass[0], [](std::uint8_t v) { return v < 4; }));
 }
 
-TEST_CASE("a matrix list that loses a matrix in a block sends new headers and gets it back",
+TEST_CASE("a matrix list that loses a matrix in a unit sends new headers and gets it back",
           "[truehd][encoder][atmos][object-motion]") {
     // Two objects trade a bed row: object 8 is on the left row for the first 80 samples and
     // object 9 on the right; then the first moves to the right too and leaves the left row idle.
@@ -651,18 +599,29 @@ TEST_CASE("a matrix list that loses a matrix in a block sends new headers and ge
     b_right.gain[1] = kGain;
     b.knots = {b_right};
     request.paths = {a, b};
-    const auto timeline = d::build_object_timeline(request);
-    REQUIRE(timeline.has_value());
-    std::vector<std::size_t> sizes;
-    std::vector<bool> headers;
-    for (const d::ObjectBlock& block : timeline->blocks) {
-        sizes.push_back(block.matrices.size());
-        headers.push_back(block.send && block.section.form.change && block.section.form.headers);
+    for (const ObjectExtension extension : {ObjectExtension::kNone, ObjectExtension::kSlopes}) {
+        request.extension = extension;
+        const auto timeline = d::build_object_timeline(request);
+        REQUIRE(timeline.has_value());
+        std::vector<std::size_t> sizes;
+        std::vector<bool> headers;
+        for (const d::ObjectBlock& block : timeline->blocks) {
+            sizes.push_back(block.matrices.size());
+            headers.push_back(block.send && block.section.form.change &&
+                              block.section.form.headers);
+        }
+        // the sign flip and the matrix of the right row always; the left row's matrix only while
+        // object 8 is on it: blocks 0-2 (to sample 79) have both, 3 and 4 do not, 5 has it back.
+        // With slopes the matrix is back a unit early, in the unit that ends where the object does
+        // (a coefficient that is to reach a value by the end of the unit has to be in the list).
+        if (extension == ObjectExtension::kNone) {
+            CHECK(sizes == std::vector<std::size_t>{3, 3, 3, 2, 2, 3});
+            CHECK(headers == std::vector<bool>{true, false, false, true, false, true});
+        } else {
+            CHECK(sizes == std::vector<std::size_t>{3, 3, 3, 2, 3, 3});
+            CHECK(headers == std::vector<bool>{true, false, false, true, true, false});
+        }
     }
-    // the sign flip and the matrix of the right row always; the left row's matrix only while
-    // object 8 is on it: blocks 0-2 (to sample 79) have both, 3 and 4 do not, 5 has it back
-    CHECK(sizes == std::vector<std::size_t>{3, 3, 3, 2, 2, 3});
-    CHECK(headers == std::vector<bool>{true, false, false, true, false, true});
 }
 
 // --- whole streams
@@ -671,7 +630,7 @@ TEST_CASE("a matrix list that loses a matrix in a block sends new headers and ge
 struct Case {
     const char* name;
     std::int64_t stretch;  // samples a path stays on a bed row
-    ObjectRamp ramp;
+    bool slopes;
     int update_units;
     bool jump;
     int noise;
@@ -693,27 +652,18 @@ EncoderConfig motion_config(const Case& c, int objects, std::size_t frames) {
     config.object_meaning.dyn_object_only = true;
     config.object_meaning.lfe_present = true;
     config.object_paths = moving_paths(objects, frames, c.stretch, c.jump);
-    config.object_ramp = c.ramp;
+    config.object_extension = c.slopes ? ObjectExtension::kSlopes : ObjectExtension::kNone;
     config.object_update_units = c.update_units;
     config.object_drop_idle_matrices = c.drop_idle;
-    config.verify = true;  // the encoder's own strict decode, with the lab settings for a ramp
-    return config;
-}
-
-DecoderConfig decoder_for(ObjectRamp ramp, Presentation presentation) {
-    DecoderConfig config;
-    config.presentation = presentation;
-    if (ramp != ObjectRamp::kNone) {
-        config.lab.object_extension = ramp == ObjectRamp::kEnd ? 4 : 5;
-        config.lab.object_extension_fixed = 19;
-    }
+    config.verify = true;  // the encoder's own strict decode
     return config;
 }
 
 // Substream 3's output, 24 bit samples, `objects` to a frame.
-std::vector<std::int32_t> decode_objects(const std::vector<EncodedAccessUnit>& units, int objects,
-                                         ObjectRamp ramp) {
-    Decoder decoder(decoder_for(ramp, Presentation::kAll));
+std::vector<std::int32_t> decode_objects(const std::vector<EncodedAccessUnit>& units, int objects) {
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    Decoder decoder(config);
     std::vector<std::int32_t> out;
     for (const EncodedAccessUnit& unit : units) {
         auto decoded = decoder.decode(unit.bytes);
@@ -754,7 +704,8 @@ std::uint8_t interval_check(std::span<const std::int32_t> pcm, int objects, bool
 }
 
 // The bed the paths ask for, in real numbers: object row r plus every object above the bed times
-// its gain into r at that sample. `bound` is the same shape with each object's magnitude.
+// its gain into r at that sample. `reach` has, for each sample and row, the sum of the magnitudes
+// of the objects that reach the row.
 void ideal_bed(std::span<const std::int32_t> objects_pcm, int objects,
                const std::vector<ObjectPath>& paths, std::vector<double>& bed,
                std::vector<double>& reach) {
@@ -805,22 +756,17 @@ std::size_t samples_off(std::span<const std::int32_t> bed, const std::vector<dou
 TEST_CASE("moving objects come back exactly and the bed follows their paths",
           "[truehd][encoder][atmos][object-motion]") {
     const Case c = GENERATE(
-        // a path that goes 2,896 places in 800 samples moves 145 places in a unit; one that takes
-        // 8,000 samples moves 14.5. A coefficient held for a unit is that far off at the end of it.
-        Case{"fast, hold per unit", 800, ObjectRamp::kNone, 1, false, 0, 0, false, 146.0, 0.0},
-        Case{"fast, hold three units", 800, ObjectRamp::kNone, 3, false, 0, 0, false, 436.0, 0.0},
-        Case{"slow, hold per unit", 8000, ObjectRamp::kNone, 1, false, 0, 0, false, 16.0, 0.0},
-        Case{"jumps on unit boundaries", 800, ObjectRamp::kNone, 5, true, 2, 0, false, 0.5625, 8.0},
-        // a block that starts on a knot, where the path turns, is anchored one sample early: it is
-        // off by up to the path's step of 3.6 places a sample twice over
-        Case{"fast, ramp to the last sample", 800, ObjectRamp::kEnd, 1, false, 0, 0, false, 8.0,
-             0.0},
-        Case{"fast, ramp from the first sample", 800, ObjectRamp::kStart, 1, false, 0, 0, false,
-             0.5625, 0.0},
-        Case{"slow, ramp, noise, two bypass bits, idle matrices dropped", 8000, ObjectRamp::kEnd, 1,
-             false, 3, 2, true, 0.5625, 8.0},
-        Case{"jumps, three bypass bits, idle matrices dropped", 800, ObjectRamp::kNone, 5, true, 1,
-             3, true, 0.5625, 4.0});
+        // a path that goes 2,896 places in 1,200 samples moves 97 places in a unit; one that takes
+        // 12,000 samples moves 9.7. A coefficient held for a unit is that far off at the end of it.
+        Case{"fast, hold per unit", 1200, false, 1, false, 0, 0, false, 98.0, 0.0},
+        Case{"fast, hold three units", 1200, false, 3, false, 0, 0, false, 292.0, 0.0},
+        Case{"slow, hold per unit", 12000, false, 1, false, 0, 0, false, 11.0, 0.0},
+        Case{"jumps on unit boundaries", 800, false, 5, true, 2, 0, false, 0.5625, 8.0},
+        Case{"fast, slopes", 1200, true, 1, false, 0, 0, false, 0.75, 0.0},
+        Case{"slow, slopes, noise, two bypass bits, idle matrices dropped", 12000, true, 1, false,
+             3, 2, true, 0.75, 8.0},
+        Case{"jumps with slopes, three bypass bits, idle matrices dropped", 800, true, 1, true, 1,
+             3, true, 0.75, 4.0});
     constexpr int kObjects = 12;
     const int frames = 40 * kUnitsPerInterval * 6 + 17;  // six intervals and a part
     CAPTURE(c.name);
@@ -832,7 +778,7 @@ TEST_CASE("moving objects come back exactly and the bed follows their paths",
     CHECK(encoded.stats.object_mix_reduced_intervals == 0);
 
     // substream 3 outputs the objects as they went in
-    const std::vector<std::int32_t> objects = decode_objects(encoded.units, kObjects, c.ramp);
+    const std::vector<std::int32_t> objects = decode_objects(encoded.units, kObjects);
     CHECK(objects == pcm);
 
     // the stored lossless check of every interval but the last is the fold of the decoded objects
@@ -859,31 +805,51 @@ TEST_CASE("moving objects come back exactly and the bed follows their paths",
     CHECK(samples_off(bed, ideal, reach, c.places, c.extra) == 0);
     EncoderConfig fixed = config;
     fixed.object_paths.clear();
-    fixed.object_ramp = ObjectRamp::kNone;
+    fixed.object_extension = ObjectExtension::kNone;
     fixed.object_update_units = 1;
     CHECK(decode_all(encode_all(fixed, pcm).units, 24, kBed) != bed);
 }
 
-TEST_CASE("a ramp follows the path where a hold per block cannot",
+TEST_CASE("slopes follow the path where a coefficient held for the unit cannot",
           "[truehd][encoder][atmos][object-motion]") {
-    // The ramp is within 8 places of the path (half a place, and the turns of the path at its
-    // knots); a coefficient held for the block is up to 145 places off in the same stream.
+    // The slopes keep the bed within three quarters of a place of the path's (the coefficient is
+    // sent again where it drifts, the slope where the path turns); held for the unit it is up to
+    // 97 places off in the same stream.
     constexpr int kObjects = 12;
     const int frames = 40 * kUnitsPerInterval * 6;
     const std::vector<std::int32_t> pcm = quiet_objects(kObjects, frames);
-    const Case ramp{"ramp", 800, ObjectRamp::kEnd, 1, false, 0, 0, false, 8.0, 0.0};
-    const Case hold{"hold", 800, ObjectRamp::kNone, 1, false, 0, 0, false, 8.0, 0.0};
+    const Case slopes{"slopes", 1200, true, 1, false, 0, 0, false, 0.75, 0.0};
+    const Case hold{"hold", 1200, false, 1, false, 0, 0, false, 0.75, 0.0};
     std::vector<double> ideal;
     std::vector<double> reach;
-    ideal_bed(pcm, kObjects, moving_paths(kObjects, static_cast<std::size_t>(frames), 800, false),
+    ideal_bed(pcm, kObjects, moving_paths(kObjects, static_cast<std::size_t>(frames), 1200, false),
               ideal, reach);
     const auto off = [&](const Case& c) {
         const Encoded encoded =
             encode_all(motion_config(c, kObjects, static_cast<std::size_t>(frames)), pcm);
         return samples_off(decode_all(encoded.units, 24, kBed), ideal, reach, c.places, 0.0);
     };
-    CHECK(off(ramp) == 0);
+    CHECK(off(slopes) == 0);
     CHECK(off(hold) > 100);
+}
+
+TEST_CASE("a moving object with slopes costs a section when its path turns, not in every unit",
+          "[truehd][encoder][atmos][object-motion]") {
+    // The stream with slopes is smaller than the one that sends new coefficients in every unit.
+    constexpr int kObjects = 12;
+    const int frames = 40 * kUnitsPerInterval * 6;
+    const std::vector<std::int32_t> pcm = quiet_objects(kObjects, frames);
+    const Case slopes{"slopes", 4800, true, 1, false, 0, 0, false, 0.75, 0.0};
+    const Case hold{"hold", 4800, false, 1, false, 0, 0, false, 0.75, 0.0};
+    const auto bytes = [&](const Case& c) {
+        std::uint64_t total = 0;
+        for (const EncodedAccessUnit& unit :
+             encode_all(motion_config(c, kObjects, static_cast<std::size_t>(frames)), pcm).units) {
+            total += unit.bytes.size();
+        }
+        return total;
+    };
+    CHECK(bytes(slopes) < bytes(hold));
 }
 
 TEST_CASE("moving objects do not depend on how the input is chunked",
@@ -891,7 +857,7 @@ TEST_CASE("moving objects do not depend on how the input is chunked",
     constexpr int kObjects = 12;
     const int frames = 40 * kUnitsPerInterval * 3 + 11;
     const std::vector<std::int32_t> pcm = quiet_objects(kObjects, frames);
-    const Case c{"ramp", 800, ObjectRamp::kEnd, 1, false, 2, 1, true, 0.0, 0.0};
+    const Case c{"slopes", 800, true, 1, false, 2, 1, true, 0.0, 0.0};
     const EncoderConfig config = motion_config(c, kObjects, static_cast<std::size_t>(frames));
     const Encoded whole = encode_all(config, pcm);
     const Encoded pieces = encode_all(config, pcm, 37);
@@ -928,6 +894,13 @@ TEST_CASE("paths that put every object where the fixed render has it are the fix
     for (std::size_t u = 0; u < fixed.units.size(); ++u) {
         CHECK(fixed.units[u].bytes == explicit_paths.units[u].bytes);
     }
+    // and with the slopes on, a path that does not move sends no slope at all
+    config.object_extension = ObjectExtension::kSlopes;
+    const Encoded still = encode_all(config, pcm);
+    REQUIRE(fixed.units.size() == still.units.size());
+    for (std::size_t u = 0; u < fixed.units.size(); ++u) {
+        CHECK(fixed.units[u].bytes == still.units[u].bytes);
+    }
 }
 
 TEST_CASE("object paths and extension settings the stream cannot carry are refused",
@@ -935,12 +908,12 @@ TEST_CASE("object paths and extension settings the stream cannot carry are refus
     const auto refusal = [](const EncoderConfig& config) {
         return std::string(Encoder::refusal_reason(config));
     };
-    const Case plain{"plain", 800, ObjectRamp::kNone, 1, false, 0, 0, false, 0, 0};
+    const Case plain{"plain", 800, false, 1, false, 0, 0, false, 0, 0};
     const EncoderConfig good = motion_config(plain, 12, 4000);
     CHECK(refusal(good).empty());
-    SECTION("a ramp between updates further apart than a block") {
+    SECTION("slopes between updates further apart than a unit") {
         EncoderConfig config = good;
-        config.object_ramp = ObjectRamp::kEnd;
+        config.object_extension = ObjectExtension::kSlopes;
         config.object_update_units = 2;
         CHECK(refusal(config).find("object_update_units") != std::string::npos);
     }

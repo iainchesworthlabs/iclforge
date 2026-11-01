@@ -3,11 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "decoder/kernels.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/encoder/object_paths.hpp"
@@ -16,15 +16,16 @@
 // entry 69, 70): substream 3 codes the channels from 8 up and its primitive matrices rebuild the
 // output channels from the 7.1 bed rows of substreams 0 to 2 and those coded channels. The encoder
 // runs the matrices backwards over the object signals it is given, in integer arithmetic that
-// includes the matrices' noise, LSB bypass and (provisionally) coefficient ramps, and so finds the
-// rows it has to code.
+// includes the matrices' noise, LSB bypass and slopes, and so finds the rows it has to code.
 //
 // The matrices change from block to block. A *timeline* holds, for each block of a restart
-// interval, the matrices in force and the section that block's header sends to get there (nothing,
-// new coefficients, new deltas, or new headers); the same timeline drives the backward run, the
-// forward check and the block data's bypass bits. Everything here is a pure function of its
-// arguments. Agreement with this library's decoder is not agreement with Dolby's: the sections are
-// read back by this library's reader and the arithmetic mirrors this library's kernels.
+// interval, the matrices in force, the decoder's running state for them at the block's first
+// sample (the coefficients move with the slopes, SUBSTREAM3.md section 3), and the section that
+// block's header sends to get there (nothing, new coefficients, new slopes, or new headers); the
+// same timeline drives the backward run, the forward check and the block data's bypass bits.
+// Everything here is a pure function of its arguments. Agreement with this library's decoder is not
+// agreement with Dolby's: the sections are read back by this library's reader and the arithmetic
+// mirrors this library's kernels.
 
 namespace iclforge::truehd::detail {
 
@@ -44,16 +45,21 @@ inline constexpr int kObjectMixSteps = 4;
 // 2^-kObjectGainBits.
 inline constexpr std::int32_t kDefaultMixGain = 46341;
 
-// The extension's delta is read in eighths of the coefficient's last place (SUBSTREAM3.md section
-// 6, provisional); it is added across the block by a ramp.
-inline constexpr int kRampScaleBits = 3;
-
-// The widest delta the extension carries: width 15 is 16 bits, signed.
-inline constexpr int kMaxDeltaWidth = 15;
-
 // The longest stretch of samples between two knots of a path (keeps the integer arithmetic of the
 // trajectory in 64 bits).
 inline constexpr std::int64_t kMaxKnotSpan = std::int64_t{1} << 26;
+
+// The slopes' scale the encoder writes (ext_field2: a delta is worth 2^-3 raw places a unit, the
+// finest the 2 bits give), the widest delta (width 15 is 16 bits, signed), and the tolerances of
+// the generator in units of 2^-18 of a coefficient: a coefficient further than the jump tolerance
+// from its path is sent again (half a raw place at 12 fractional bits), a slope whose unit end is
+// further than the slope tolerance from the path's is replaced, and a move of more than the step
+// limit in a unit (a quarter of a gain of 1.0) is a step of the path, not a slope.
+inline constexpr int kSlopeScaleField = 3;
+inline constexpr int kMaxDeltaWidth = 15;
+inline constexpr std::int32_t kJumpTolerance = 32;
+inline constexpr std::int32_t kSlopeTolerance = 16;
+inline constexpr std::int32_t kStepLimit = 1 << 16;
 
 // The bed row (L R C LFE Ls Rs Lrs Rrs) each object above the bed is mixed into when it has no
 // path: object 8 into L, 9 into R, 10 into C, and so on round the surrounds, the LFE last. A
@@ -82,20 +88,25 @@ struct GainFraction {
 
 // --- the plan -----------------------------------------------------------------------------------
 
-// One block of an interval: where it is, the matrices in force while it plays (raw coefficients in
-// `coeff`, the extension's widths in `ext_width` and its deltas in `ext_value`), and the section
-// its header sends, if any.
+// The decoder's running state of one object matrix (kernels.hpp): the coefficients at 2^-18, the
+// slopes as sent, the ramp inside the access unit, the scale of the slopes and whether the
+// extension is on.
+using ObjectRun = kernels::ObjectMatrixState;
+
+// One block of an interval: where it is, the matrices in force while it plays (headers, and the
+// widths and scales of the slopes in `ext_width` and `ext_field2`), the decoder's state for each
+// at the block's first sample after the section, and the section the block's header sends, if any.
 struct ObjectBlock {
     std::size_t start = 0;  // first sample, counted from the interval's
     int size = 0;
     std::vector<MatrixSpec> matrices;
+    std::vector<ObjectRun> run;
     bool send = false;  // the header carries `section`
     MatrixSet section;
 };
 
 struct ObjectTimeline {
     std::vector<ObjectBlock> blocks;
-    ObjectRamp ramp = ObjectRamp::kNone;
 };
 
 // What the encoder asks of the plan.
@@ -105,8 +116,8 @@ struct ObjectTimelineRequest {
     int bypass_bits = 0;  // 0: no LSB bypass matrix; 1 to 3: its bits a sample
     int mix_step = 0;     // 0 to kObjectMixSteps - 1: the gains halved this many times, none at 3
     std::vector<ObjectPath> paths;
-    ObjectRamp ramp = ObjectRamp::kNone;
-    int update_units = 1;  // updates every this many access units (without a ramp)
+    ObjectExtension extension = ObjectExtension::kNone;
+    int update_units = 1;  // updates every this many access units (without slopes)
     bool drop_idle = false;
     bool split_mixes = false;  // one mixing matrix for each object a bed row takes, not one a row
     std::int64_t first_sample = 0;  // the stream's sample the interval starts at
@@ -125,18 +136,20 @@ struct ObjectTimelineRequest {
 
 // --- sections -----------------------------------------------------------------------------------
 
-// What the decoder holds after a section, from what it held before (empty after a restart): this
-// library's reading of ERRATA.md entry 69 (new headers keep the widths of the matrix at the same
-// place, new coefficients clear the deltas, A clear keeps the set and its deltas, C2 replaces the
-// widths, B2 the deltas).
-[[nodiscard]] std::vector<MatrixSpec> apply_object_section(const std::vector<MatrixSpec>& before,
-                                                           const MatrixSet& section);
+// What the decoder holds for the object matrices: the headers of the list in force and each
+// matrix's running state.
+struct ObjectState {
+    std::vector<MatrixSpec> matrices;
+    std::vector<ObjectRun> run;
+};
 
-// The section that takes the decoder from `before` (empty at a restart) to `after`, or nothing to
-// send when they are the same. The cheapest form that does it: new deltas on the set that stands
-// (A clear), new coefficients on the headers that stand (B clear), or new headers.
-[[nodiscard]] std::pair<bool, MatrixSet> plan_object_section(const std::vector<MatrixSpec>& before,
-                                                             const std::vector<MatrixSpec>& after);
+// What the decoder holds after a section, from what it held before (empty after a restart): this
+// library's decoder, which the section's forms drive (SUBSTREAM3.md section 2): A sets every
+// coefficient from the raw values (clear, they run on), B sends new headers (the widths and
+// scales of the matrix at the same place stand), A2 turns the extension on (clear, every slope is
+// cleared), B2 replaces the slopes (clear, they stand, also across new headers), C2 replaces the
+// widths and scales.
+[[nodiscard]] ObjectState apply_object_section(const ObjectState& before, const MatrixSet& section);
 
 // --- running the matrices -----------------------------------------------------------------------
 
@@ -166,6 +179,13 @@ using ObjectBypass = std::vector<std::vector<std::uint8_t>>;
 // rows back.
 void apply_object_timeline(const ObjectTimeline& timeline, const ObjectChainShape& shape,
                            const ObjectBypass& bypass, std::vector<ObjectPlane>& rows);
+
+// The same for one chain of matrices with fixed coefficients (no slopes) over the whole of `rows`.
+[[nodiscard]] bool invert_object_chain(const std::vector<MatrixSpec>& chain,
+                                       const ObjectChainShape& shape,
+                                       std::vector<ObjectPlane>& rows, ObjectBypass& bypass);
+void apply_object_chain(const std::vector<MatrixSpec>& chain, const ObjectChainShape& shape,
+                        const ObjectBypass& bypass, std::vector<ObjectPlane>& rows);
 
 // The bypass bits of sample `i` of block `block`, in the order of the matrices that have them
 // (first bit of each value first), as the block data carries them ahead of the residuals.

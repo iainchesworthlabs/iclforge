@@ -15,10 +15,10 @@ the LSB bypass) the stream the encoder tool writes must
 
 Moving objects (EncoderConfig::object_paths; the notes in libs/truehd/notes) are held the same way.
 For each of MOTION_CONFIGURATIONS (a slow path and a step path; the matrices'
-coefficients held between updates, or ramped across each block by the provisional extension, which
-the reference reads under `extension`) the stream the encoder tool writes must decode, by the
-reference, to the objects, and its bed must be within the tolerance the configuration allows of the
-bed the paths ask for, computed here in real numbers. And with --plan-tool the encoder's planner and
+coefficients held between updates, or sliding with the extension's slopes) the stream the encoder
+tool writes must decode, by the reference, to the objects, and its bed must be within the
+tolerance the configuration allows of the bed the paths ask for, computed here in real numbers. And
+with --plan-tool the encoder's planner and
 the Python reference writer (tools/references/truehd_writer.py, which plans the same way from the
 same integers) are held to each other on streams the writer makes: the same sections, bit for bit,
 the same rows the decoder starts from, and this library's decoder reads the writer's streams to the
@@ -48,17 +48,17 @@ MIX_RAW = -2896  # -1/sqrt(2) at frac_bits 12, the gain the encoder starts from
 # (objects, noise shift, bypass)
 CONFIGURATIONS = ((12, 0, 0), (12, 1, 0), (12, 3, 1), (14, 1, 1), (16, 2, 0))
 
-# (objects, noise shift, bypass bits (0: none), motion, ramp, update units, stretch, drop idle,
+# (objects, noise shift, bypass bits (0: none), motion, slopes, update units, stretch, drop idle,
 # split): the encode tool's object-motion presets, with the stretch in samples (the file is 12,000
 # frames)
 MOTION_CONFIGURATIONS = (
-    (12, 0, 0, "slow", "none", 1, 1200, False, False),
-    (12, 3, 2, "slow", "end", 1, 1200, True, False),
-    (12, 1, 1, "slow", "start", 1, 1200, False, False),
-    (14, 2, 0, "jump", "none", 5, 1200, True, False),
-    (16, 1, 3, "jump", "none", 3, 1200, True, True),
+    (12, 0, 0, "slow", False, 1, 1200, False, False),
+    (12, 3, 2, "slow", True, 1, 1200, True, False),
+    (12, 1, 1, "slow", True, 1, 2400, False, False),
+    (14, 2, 0, "jump", False, 5, 1200, True, False),
+    (14, 1, 1, "jump", True, 1, 1200, True, False),
+    (16, 1, 3, "jump", False, 3, 1200, True, True),
 )
-EXTENSION = {"none": "flat", "end": "ramp_end", "start": "ramp_start"}
 
 
 def read_wav(path):
@@ -152,20 +152,16 @@ def check_configuration(encoder, scratch, objects, noise, bypass):
     return failures
 
 
-def motion_tolerance(ramp, update_units, stretch, jump):
+def motion_tolerance(slopes, update_units, stretch, jump):
     """How far, in the last places of a coefficient at 2^-12, the bed's mix may be from the path's:
-    half a place of rounding; with a ramp to the last sample twice the path's step a sample for a
-    block that starts on a knot (it is anchored one sample early); with the coefficients held, how
-    far the path moves in the samples they are held (none for a step that falls on an update)."""
+    half a place of rounding; with the slopes a little more (a coefficient is sent again where it
+    is half a place off, a slope where it would end a quarter of a place off); with the
+    coefficients held, how far the path moves in the samples they are held (none for a step that
+    falls on an update)."""
     slope = truehd_writer.DEFAULT_GAIN / (1 << 16) * 4096 / stretch  # places a sample
-    places = 0.5625
-    if ramp == "end":
-        places += 2 * slope
-    elif ramp == "start":
-        places += slope
-    elif not jump:
-        places += slope * 40 * update_units
-    return places
+    if slopes:
+        return 0.75
+    return 0.5625 if jump else 0.5625 + slope * 40 * update_units
 
 
 def expected_motion_bed(rows, paths):
@@ -188,15 +184,15 @@ def expected_motion_bed(rows, paths):
 
 def check_motion_configuration(encoder, scratch, configuration):
     """The failures of one moving-object configuration, as sentences."""
-    objects, noise, bypass_bits, motion, ramp, update, stretch, drop, split = configuration
+    objects, noise, bypass_bits, motion, slopes, update, stretch, drop, split = configuration
     label = (
-        f"{objects} objects moving {motion}, ramp {ramp}, update {update}, noise {noise}, "
+        f"{objects} objects moving {motion}, slopes {int(slopes)}, update {update}, noise {noise}, "
         f"bypass bits {bypass_bits}, drop {int(drop)}, split {int(split)}"
     )
     rows = object_rows(objects)
     source = scratch / f"motion{objects}.wav"
     write_wav(source, rows)
-    stream = scratch / f"motion_{objects}_{motion}_{ramp}_{update}_{noise}_{bypass_bits}.thd"
+    stream = scratch / f"motion_{objects}_{motion}_{int(slopes)}_{update}_{noise}_{bypass_bits}.thd"
     options = [
         "object-bed=1",
         f"object-noise={noise}",
@@ -204,7 +200,7 @@ def check_motion_configuration(encoder, scratch, configuration):
         f"object-bypass-bits={max(bypass_bits, 1)}",
         f"object-motion={motion}",
         f"object-stretch={stretch}",
-        f"object-ramp={ramp}",
+        f"object-slopes={int(slopes)}",
         f"object-update={update}",
         f"object-drop={int(drop)}",
         f"object-split={int(split)}",
@@ -214,9 +210,7 @@ def check_motion_configuration(encoder, scratch, configuration):
     run([encoder, source, stream, *options])
     data = stream.read_bytes()
     try:
-        all_rows, _rate, channels = truehd_syntax.decode_stream(
-            data, "all", extension=EXTENSION[ramp]
-        )
+        all_rows, _rate, channels = truehd_syntax.decode_stream(data, "all")
         best_rows, _rate, _channels = truehd_syntax.decode_stream(data, "best")
     except truehd_syntax.StreamError as error:
         return [f"{label}: the reference refuses the stream: {error}"]
@@ -224,7 +218,7 @@ def check_motion_configuration(encoder, scratch, configuration):
         return [f"{label}: the reference's object channels are not the objects"]
     paths = truehd_writer.moving_gain_knots(objects, len(rows), stretch, motion == "jump")
     ideal, reach = expected_motion_bed(rows, paths)
-    places = motion_tolerance(ramp, update, stretch, motion == "jump")
+    places = motion_tolerance(slopes, update, stretch, motion == "jump")
     extra = 127 * (1 << (noise + 8)) / 32768 if noise else 0.0
     off = sum(
         1
@@ -245,7 +239,7 @@ def check_plan_agreement(plan_tool, scratch):
     directory = scratch / "moving"
     truehd_writer.write_moving(directory)
     failures = []
-    for name, case in truehd_writer.MOTION_CASES.items():
+    for name in truehd_writer.MOTION_CASES:
         expect = (directory / f"{name}.expect").read_text().splitlines()
         planned = run(
             [plan_tool, "plan", directory / f"{name}.request", directory / f"{name}.objects"]
@@ -261,13 +255,11 @@ def check_plan_agreement(plan_tool, scratch):
             )
             failures.append(f"{name}: the encoder's plan differs from the writer's ({first})")
         wanted = next(line for line in expect if line.startswith("pcm "))
-        decoded = run(
-            [plan_tool, "decode", directory / f"{name}.thd", f"ramp={case['ramp']}"]
-        ).stdout.strip()
+        decoded = run([plan_tool, "decode", directory / f"{name}.thd"]).stdout.strip()
         if decoded != wanted:
             failures.append(f"{name}: this library's decoder does not read the writer's stream")
         rows, _rate, _channels = truehd_syntax.decode_stream(
-            (directory / f"{name}.thd").read_bytes(), "all", extension=EXTENSION[case["ramp"]]
+            (directory / f"{name}.thd").read_bytes(), "all"
         )
         flat = b"".join(struct.pack("<i", v) for row in rows for v in row)
         if f"pcm {truehd_writer.fnv1a(flat):016x}" != wanted:
