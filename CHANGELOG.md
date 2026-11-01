@@ -10,12 +10,6 @@ See [README.md](README.md) for the project overview and
 
 ## [Unreleased]
 
-- **Changed: TrueHD as MAT is marked run on ALSA and PipeWire, after a run on a receiver.** On 2026-11-01 a Raspberry Pi 4B played TrueHD to an Onkyo TX-RZ740 through
-  this library's passthrough sink on ALSA and on PipeWire (and, with `aplay` and `forge spdif`'s WAV, at 48 kHz and 96 kHz content), and the receiver's
-  status reported TrueHD; its display showed "DTHD". `apps/hearth/engine/src/mat_status.hpp` marks the two platforms run, so the output decision chooses MAT
-  for them where the player can send it (it cannot yet), and the Output picker shows "TrueHD (MAT) ✓" for them. WASAPI, Core Audio and Android are
-  not run. The receiver took 1.5 to 4.8 seconds to lock from the start of the carrier.
-
 - **Added: `iclforge-wasm-decoder/truehd` decodes TrueHD and MLP in the browser and in Node (WP7).** A fourth Embind module,
   `iclforge_wasm_truehd` (`apps/demos/wasm/truehd_bindings.cpp`), wraps the decode side of `iclforge::truehd` (probe, the scan into access
   units, the scan of a whole stream for its length and restarts, and the decoder), and `bindings/js/src/truehd.ts` is the typed wrapper:
