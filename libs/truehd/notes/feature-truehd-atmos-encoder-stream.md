@@ -74,6 +74,9 @@ build.
   The `extra_data` callback may therefore be called more than once for a unit. The decoder (`verify`) now sees an interval after it is
   accepted, not unit by unit. The segment sealing, directory entry and extra data framing call `layout_*`. Rebase conflicts with the matrices
   session are most likely in the AU loop at the end of `code_interval` and in the `Impl` members.
+- Shaping keeps a reserve: while the objects can still give up bits, an interval that ends with less than half of the 75 ms buffer free
+  is coded again with one more bit, because an interval that only just fits leaves the next one late in its first units however much it
+  gives up (found by the 2 minute run: second 103 of the mixed signal failed without it).
 - Shaping rounds the object planes in `code_interval` right after the input is copied, before `object_bed` or the program's `prepare`, so
   both object layouts see already-rounded objects and the chain's self-check still holds.
 - `EncoderConfig::peak_data_rate_bps` is now taken through `declared_peak_rate_bps()` (what a reader gets back from the major sync field),
