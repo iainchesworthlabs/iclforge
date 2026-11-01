@@ -326,10 +326,10 @@ void print_sections(const std::vector<std::byte>& stream, std::size_t from, std:
     }
 }
 
-// Every matrix channel against a sine of the given frequency whose amplitude, sign and place are
-// fitted on the quiet part of the stream (samples 20000 to 40000): the misses per interval.
-void sine_fit(const std::vector<std::byte>& stream, const DecoderLab& lab, double hz, std::int64_t threshold,
-              std::size_t interval) {
+// Every matrix channel against the sum of two sines (hz and hz2, each with a fitted amplitude and
+// phase) fitted on the quiet part of the stream (samples 20000 to 24000): the misses per interval.
+void sine_fit(const std::vector<std::byte>& stream, const DecoderLab& lab, double hz, double hz2,
+              std::int64_t threshold, std::size_t interval) {
     DecoderConfig config;
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
@@ -342,38 +342,57 @@ void sine_fit(const std::vector<std::byte>& stream, const DecoderLab& lab, doubl
     const DecoderCounters& c = decoder.counters();
     const std::size_t samples = c.object_first_out.size() / 12;
     const double pi = 3.14159265358979323846;
-    const auto unit_sine = [&](std::int64_t n) { return std::sin(2.0 * pi * hz * static_cast<double>(n) / 48000.0); };
+    const auto basis = [&](std::size_t i, int k) {
+        const double w = 2.0 * pi * (k < 2 ? hz : hz2) * static_cast<double>(i) / 48000.0;
+        return (k & 1) == 0 ? std::sin(w) : std::cos(w);
+    };
     std::int64_t total = 0;
     std::printf("misses in interval %zu by channel:", interval);
     for (int ch = 0; ch < 12; ++ch) {
         const auto value = [&](std::size_t i) {
             return static_cast<double>(c.object_first_out[i * 12 + static_cast<std::size_t>(ch)]);
         };
-        double best_cost = 1e300;
-        double best_amplitude = 0;
-        std::int64_t best_offset = 0;
-        for (std::int64_t offset = -400; offset <= 400; ++offset) {
-            double dot = 0;
-            double norm = 0;
-            for (std::size_t i = 20000; i < 22000 && i < samples; ++i) {
-                const double s = unit_sine(static_cast<std::int64_t>(i) + offset);
-                dot += value(i) * s;
-                norm += s * s;
+        double m[4][5] = {};
+        for (std::size_t i = 20000; i < 24000 && i < samples; ++i) {
+            for (int r = 0; r < 4; ++r) {
+                for (int q = 0; q < 4; ++q) {
+                    m[r][q] += basis(i, r) * basis(i, q);
+                }
+                m[r][4] += basis(i, r) * value(i);
             }
-            const double amplitude = norm > 0 ? dot / norm : 0;
-            double cost = 0;
-            for (std::size_t i = 20000; i < 22000 && i < samples; ++i) {
-                cost += std::fabs(value(i) - amplitude * unit_sine(static_cast<std::int64_t>(i) + offset));
+        }
+        for (int r = 0; r < 4; ++r) {  // Gauss-Jordan with a pivot search
+            int pivot = r;
+            for (int q = r + 1; q < 4; ++q) {
+                if (std::fabs(m[q][r]) > std::fabs(m[pivot][r])) {
+                    pivot = q;
+                }
             }
-            if (cost < best_cost) {
-                best_cost = cost;
-                best_amplitude = amplitude;
-                best_offset = offset;
+            for (int k = 0; k < 5; ++k) {
+                std::swap(m[r][k], m[pivot][k]);
             }
+            if (std::fabs(m[r][r]) < 1e-9) {
+                continue;
+            }
+            for (int q = 0; q < 4; ++q) {
+                if (q != r) {
+                    const double f = m[q][r] / m[r][r];
+                    for (int k = r; k < 5; ++k) {
+                        m[q][k] -= f * m[r][k];
+                    }
+                }
+            }
+        }
+        double coef[4] = {};
+        for (int r = 0; r < 4; ++r) {
+            coef[r] = std::fabs(m[r][r]) < 1e-9 ? 0 : m[r][4] / m[r][r];
         }
         std::int64_t misses = 0;
         for (std::size_t i = interval * 5120; i < (interval + 1) * 5120 && i < samples; ++i) {
-            const double expected = best_amplitude * unit_sine(static_cast<std::int64_t>(i) + best_offset);
+            double expected = 0;
+            for (int k = 0; k < 4; ++k) {
+                expected += coef[k] * basis(i, k);
+            }
             if (std::fabs(value(i) - std::round(expected)) >= static_cast<double>(threshold)) {
                 ++misses;
             }
@@ -481,7 +500,7 @@ int main(int argc, char** argv) {
     if (argc != 2 && argc != 5 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ THRESHOLD INTERVAL\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
+                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ HZ2 THRESHOLD INTERVAL\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -670,12 +689,12 @@ int main(int argc, char** argv) {
                        static_cast<std::size_t>(std::atoll(argv[4])));
         return 0;
     }
-    if (argc == 6 && std::strcmp(argv[2], "sinefit") == 0) {
-        // sinefit HZ THRESHOLD INTERVAL _ : every channel against its own fitted sine, per switch
+    if (argc == 7 && std::strcmp(argv[2], "sinefit") == 0) {
+        // sinefit HZ HZ2 THRESHOLD INTERVAL: every channel against its own fitted sines, per switch
         for (const Setting& setting : settings) {
             std::printf("%-52s ", setting.name);
-            sine_fit(stream, setting.lab, std::atof(argv[3]), std::atoll(argv[4]),
-                     static_cast<std::size_t>(std::atoll(argv[5])));
+            sine_fit(stream, setting.lab, std::atof(argv[3]), std::atof(argv[4]), std::atoll(argv[5]),
+                     static_cast<std::size_t>(std::atoll(argv[6])));
         }
         return 0;
     }
