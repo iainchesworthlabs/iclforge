@@ -94,6 +94,8 @@ struct DecoderLab {
     // The object matrices' noise index: bit 0 counts the samples from the start of the block, not
     // of the access unit; bit 1 numbers the matrices from the first, not from the last.
     int object_noise_index = 0;
+    int object_noise_cap = 0;          // the matrix number in the noise index is at most this
+    int object_noise_stride_mask = 0;  // the noise stride is masked with this (0 no mask)
     int object_noise_left = 0;  // 1: only the matrices that draw noise count towards a start index
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };

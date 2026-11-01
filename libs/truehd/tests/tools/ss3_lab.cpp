@@ -319,6 +319,22 @@ int main(int argc, char** argv) {
         scaled.object_noise_scale = mode;
         settings.push_back({kScaleNames[mode], scaled});
     }
+    for (int cap = 3; cap <= 8; ++cap) {
+        static std::vector<std::string> cap_names;
+        cap_names.reserve(8);
+        DecoderLab capped = base;
+        capped.object_noise_cap = cap;
+        cap_names.push_back("noise number capped at " + std::to_string(cap));
+        settings.push_back({cap_names.back().c_str(), capped});
+    }
+    for (int mask : {15, 31}) {
+        static std::vector<std::string> mask_names;
+        mask_names.reserve(4);
+        DecoderLab masked = base;
+        masked.object_noise_stride_mask = mask;
+        mask_names.push_back("noise stride masked with " + std::to_string(mask));
+        settings.push_back({mask_names.back().c_str(), masked});
+    }
     DecoderLab noisy_only = base;
     noisy_only.object_noise_left = 1;
     settings.push_back({"noise start index: noisy matrices only", noisy_only});

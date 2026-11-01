@@ -753,6 +753,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 auto first = static_cast<unsigned>(
                     lab_index && (config.lab.object_noise_index & 2) != 0 ? m + 1
                                                                           : state.matrix_count - m);
+                if (object && config.lab.object_noise_cap > 0) {
+                    first = std::min(first, static_cast<unsigned>(config.lab.object_noise_cap));
+                }
                 if (object && config.lab.object_noise_left == 1) {
                     // Lab: the matrices that draw no noise do not count.
                     first = 0;
@@ -763,6 +766,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 noise.buffer = state.noise_buffer.data();
                 noise.shift = plan.noise_shift;
                 noise.stride = 2U * first + 1U;
+                if (object && config.lab.object_noise_stride_mask > 0) {
+                    noise.stride &= static_cast<unsigned>(config.lab.object_noise_stride_mask);
+                }
                 const bool from_block = lab_index && (config.lab.object_noise_index & 1) != 0;
                 noise.first = first + (from_block ? 0U : noise.stride * static_cast<unsigned>(position));
                 noise.mask = static_cast<unsigned>(noise_size - 1U);
