@@ -66,56 +66,11 @@ enum class Strictness : std::uint8_t {
                // restart interval of a stream, which no restart header follows
 };
 
-// Switches for trials on the points of the object substream (restart sync 0x31EC) that no stream
-// has settled (ERRATA.md entry 69). All off is the decoder. A stream whose lossless checks pass
-// only with one on says what the point is; nothing else should set them.
+// Settings for the lab tool (iclforge-truehd-ss3-lab); the decoder does not use them otherwise.
 struct DecoderLab {
-    // The object substream reads the bed rows as the substream before it output them, after that
-    // substream's matrices, not before.
-    bool lower_rows_after_matrices = false;
-    bool no_quantiser_mask = false;  // the object matrices do not mask their output's low bits
-    bool reverse_matrices = false;   // the object matrices run last to first
-    bool inverse_f_shift = false;    // the coefficient is raw / 2^(frac_bits + f_shift)
-    // What the object substream's lossless check folds: 0 the output of every matrix channel;
-    // 1 and 2 the output of the coded channels (shifted left by the matrix channel, or by its
-    // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
-    // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
-    int fold_scope = 0;
-    // The extension's deltas: 0 refine the coefficients by 2^-(width + 1) of their last place; 1 not
-    // at all; 2 by 2^-width; 3 for the block that sends them only; 4 and 5 with a ramp over the
-    // block, (i + 1) / block or i / block; 7 and 8 the same with 2^-width.
-    int object_extension = 0;
-    // Added to the number of bits the deltas are read below their last place (a negative number
-    // weighs the deltas more), and whether their sign is turned over.
-    int object_extension_bias = 0;
-    bool object_extension_negate = false;
-    // When not 0, the deltas are read at 2^-(this - 16) below their last place whatever their width.
-    int object_extension_fixed = 0;
-    // The place the deltas count from: 0 their coefficient's last place; 1 2^-frac; 2 to 5 one
-    // absolute place for every matrix (2^-13, 2^-14, 2^-15, 2^-12).
-    int object_extension_unit = 0;
-    // The deltas add up block after block from the block that sends them.
-    int object_extension_cumulative = 0;  // 1 per block, 2 by the samples since the block that sent them
     // The output sample from which the lab keeps the first 51,200 samples of the object substream
-    // (object_first_out); 0 keeps the first ones.
+    // (DecoderCounters::object_first_out); 0 keeps the first ones.
     std::uint64_t record_from = 0;
-    // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
-    // 3 rounds every sum to nearest (a control).
-    int object_tie_mode = 0;
-    // The object matrices' noise draw is shifted by: 1 minus the output shift; 2 minus the
-    // quantiser step; 3 minus both; 4 plus the output shift (of the matrix's output row).
-    int object_noise_scale = 0;
-    // The rows whose matrix output the quantiser step masks: 0 all, 1 the coded rows only (8 and
-    // up), 2 the bed rows only.
-    int mask_rows = 0;
-    bool object_restart_clears = false;  // an object restart clears the filter histories
-    // The object matrices' noise index: bit 0 counts the samples from the start of the block, not
-    // of the access unit; bit 1 numbers the matrices from the first, not from the last; bit 2
-    // fills the noise buffer again for every block, not once for the access unit.
-    int object_noise_index = 0;
-    int object_noise_cap = 0;          // the matrix number in the noise index is at most this
-    int object_noise_stride_mask = 0;  // the noise stride is masked with this (0 no mask)
-    int object_noise_left = 0;  // 1: only the matrices that draw noise count towards a start index
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };
 

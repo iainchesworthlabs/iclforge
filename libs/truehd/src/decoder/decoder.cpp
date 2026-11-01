@@ -74,13 +74,8 @@ struct MatrixPlan {
     // channels, then the two noise channels (columns kMaxChannels and kMaxChannels + 1).
     std::array<std::uint8_t, kRowStride> channel{};
     std::array<std::int32_t, kRowStride> coeff{};
-    // The extension's finer part of each coefficient, scaled to 2^-15 and read as 2^-fine_bits.
-    std::array<std::int32_t, kRowStride> fine{};
-    int fine_bits = 0;
-    int fine_ramp = 0;
-    mutable int fine_age = 0;  // lab: blocks since the matrices were sent
-    mutable int fine_elapsed = 0;  // lab: samples since the matrices were sent
-    int fine_pre = 0;  // lab: deltas shifted left when the bias asks for more than a whole last place
+    // The object-audio matrices' running coefficients, slopes and ramp (ERRATA.md entry 69).
+    kernels::ObjectMatrixState object;
 };
 
 struct SubstreamState {
@@ -397,8 +392,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
     // not running (the first restart, or the first after an error) starts from zero.
     const auto previous = state.channels;
-    const bool carry_history =
-        state.running && !(header->sync == kRestartSyncAtmos && config.lab.object_restart_clears);
+    const bool carry_history = state.running;
     state = SubstreamState{};
     if (carry_history) {
         for (std::size_t c = 0; c < kMaxChannels; ++c) {
@@ -482,70 +476,57 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
     }
     if (header.matrices) {
         state.matrix_count = header.matrices->count;
+        const bool object = restart.sync == kRestartSyncAtmos;
         for (int m = 0; m < header.matrices->count; ++m) {
             const MatrixSpec& spec = header.matrices->items[static_cast<std::size_t>(m)];
             MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
+            // The object matrices keep their running coefficients and deltas between sections
+            // (ERRATA.md entry 69).
+            const kernels::ObjectMatrixState running = plan.object;
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
-            plan.bypass_bits = restart.sync == kRestartSyncAtmos ? std::max<int>(spec.field_2b, 1) : 1;
-            plan.noise_shift = spec.noise_shift;
-            // The extension's deltas refine the coefficients by 2^-(width + 1) of their last place
-            // (ERRATA.md entry 69).
-            const int mode = restart.sync == kRestartSyncAtmos ? config.lab.object_extension : 0;
-            const bool use_fine = restart.sync == kRestartSyncAtmos && spec.ext_width != 0 &&
-                                  mode != 1 && (mode != 3 || header.matrices->extension);
-            if (use_fine) {
-                // Lab modes: 1 no refinement; 2 and 7 and 8 by 2^-width; 3 for the sending block
-                // only; 4 and 7 grow over the block by (i + 1) / block, 5 and 8 by i / block.
-                plan.fine_bits = spec.ext_width + (mode == 2 || mode >= 7 ? 0 : 1) + config.lab.object_extension_bias;
-                if (config.lab.object_extension_fixed != 0) {
-                    plan.fine_bits = config.lab.object_extension_fixed - 16;
+            plan.bypass_bits = object ? std::max<int>(spec.field_2b, 1) : 1;
+            plan.noise_shift = object ? spec.field_m4 : spec.noise_shift;
+            if (object) {
+                plan.object = running;
+                kernels::ObjectMatrixState& run = plan.object;
+                const MatrixSet& set = *header.matrices;
+                if (set.coeffs_sent) {
+                    run.coeff = {};
+                    const int up = kernels::kObjectShift - spec.frac_bits + spec.f_shift;
+                    for (int c = 0; c < restart.matrix_channels(); ++c) {
+                        const auto index = static_cast<std::size_t>(c);
+                        if (spec.present[index]) {
+                            run.coeff[index] = spec.coeff[index] * (1 << std::max(up, 0));
+                        }
+                    }
                 }
-                plan.fine_pre = plan.fine_bits < 1 ? 1 - plan.fine_bits : 0;
-                plan.fine_bits = std::max(plan.fine_bits, 1);
-                plan.fine_ramp = mode == 4 || mode == 7 ? 1 : mode == 5 || mode == 8 ? 2 : 0;
-            }
-            if (restart.sync == kRestartSyncAtmos) {
-                plan.noise_shift = spec.field_m4;
+                if (!set.extension) {
+                    run.slope = {};
+                } else if (set.deltas_sent) {
+                    run.slope = {};
+                    for (int c = 0; c < restart.matrix_channels(); ++c) {
+                        const auto index = static_cast<std::size_t>(c);
+                        if (spec.present[index] && spec.ext_width != 0) {
+                            run.slope[index] = spec.ext_value[index];
+                        }
+                    }
+                }
+                run.extension = set.extension;
+                run.scale = spec.ext_field2 - spec.f_shift + spec.frac_bits;
             }
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
                 const auto index = static_cast<std::size_t>(c);
-                // A present coefficient of base 0 stays when its delta is not 0: the finer part
-                // refines it from nothing (ERRATA.md entry 69).
-                if (spec.present[index] &&
-                    (spec.coeff[index] != 0 || (use_fine && spec.ext_value[index] != 0))) {
+                if (spec.present[index] && (object || spec.coeff[index] != 0)) {
                     const auto slot = static_cast<std::size_t>(plan.count++);
                     const int column = c < restart.matrix_channels()
                                            ? c
                                            : kMaxChannels + (c - restart.matrix_channels());
                     plan.channel[slot] = static_cast<std::uint8_t>(column);
-                    const int scale = config.lab.inverse_f_shift
-                                          ? kMatrixShift - spec.frac_bits - spec.f_shift
-                                          : kMatrixShift - spec.frac_bits + spec.f_shift;
-                    plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
-                    // A 16 bit delta at a coefficient place of 2^21 needs 37 bits.
-                    // Lab units: 0 the coefficient's last place; 1 2^-frac; 2 to 5 the same absolute
-                    // place for every matrix (2^-13, 2^-14, 2^-15, 2^-12).
-                    static constexpr int kUnitPlace[] = {0, 0, 13, 14, 15, 12};
-                    const int unit = config.lab.object_extension_unit;
-                    const int fine_scale =
-                        unit == 0 ? scale
-                        : unit == 1 ? kMatrixShift - spec.frac_bits
-                                    : kMatrixShift - kUnitPlace[std::min(unit, 5)];
-                    const std::int64_t fine =
-                        use_fine ? (std::int64_t{config.lab.object_extension_negate ? -spec.ext_value[index]
-                                                                                     : spec.ext_value[index]}
-                                    << (std::max(fine_scale, 0) + plan.fine_pre))
-                                 : 0;
-                    if (fine != std::int64_t{static_cast<std::int32_t>(fine)}) {
-                        return std::unexpected(make_error(
-                            ErrorKind::kBadParameter,
-                            "an extension delta beyond 32 bits at its coefficient's scale"));
-                    }
-                    plan.fine[slot] = static_cast<std::int32_t>(fine);
+                    plan.coeff[slot] = spec.coeff[index] * (1 << std::max(kMatrixShift - spec.frac_bits + spec.f_shift, 0));
                 }
             }
         }
@@ -726,8 +707,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         if (!state.context.noise_type) {
             kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base,
                                     kRowStride, kMaxChannels);
-        } else if (!state.noise_filled ||
-                   (state.context.object_matrices && (config.lab.object_noise_index & 4) != 0)) {
+        } else if (!state.noise_filled) {
             state.noise_seed =
                 detail::fill_noise_buffer(state.noise_seed, noise_size, state.noise_buffer.data());
             state.noise_filled = true;
@@ -739,75 +719,43 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     // before its matrices, as FFmpeg's decoder gives them (ERRATA.md entry 34).
     std::int32_t* const matrix_base =
         matrixed.data() + static_cast<std::ptrdiff_t>(position) * kRowStride;
-    if (config.lab.lower_rows_after_matrices && index == kObjectSubstream) {
-        // Lab: the object matrices read the bed as the substream before output it, after that
-        // substream's matrices, which still lie in `matrix_base` for these positions.
-        for (int i = 0; i < block; ++i) {
-            const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
-            std::copy_n(matrix_base + at, state.context.min_chan, rows_base + at);
-        }
-    }
     std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_matrices");
         const bool object = state.context.object_matrices;
-        for (int step = 0; step < state.matrix_count; ++step) {
-            const int m = object && config.lab.reverse_matrices ? state.matrix_count - 1 - step : step;
-            const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
+        const int rate_shift = major_sync ? std::max(rate_factor(major_sync->ratebits()), 0) : 0;
+        const int unit_size = 40 << rate_shift;
+        // The ramp of the object matrices' slopes grows by 0x666 >> r, four times, a sample
+        // (ERRATA.md entry 69): 6552 at 48 kHz, where the access unit holds 40 samples.
+        const int ramp_step = (0x666 >> rate_shift) * 4;
+        for (int m = 0; m < state.matrix_count; ++m) {
+            MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
             const std::uint32_t keep =
-                plan.out <= max_chan && !(object && config.lab.no_quantiser_mask) &&
-                        !(object && config.lab.mask_rows == 1 && plan.out < state.context.min_chan) &&
-                        !(object && config.lab.mask_rows == 2 && plan.out >= state.context.min_chan)
+                plan.out <= max_chan
                     ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) -
                         1U)
                     : 0xFFFFFFFFU;
             // TH spec §17.3: the matrix draws noise at a stride of 2 * index + 1 from the index
             // (the number of matrices left, this one included) it starts the access unit at.
             kernels::NoiseDraw noise;
-            noise.tie_mode = object ? config.lab.object_tie_mode : 0;
-            if (object) {
-                const int shift_out = state.output_shift[static_cast<std::size_t>(plan.out)];
-                const int step_out = state.quant_step[static_cast<std::size_t>(plan.out)];
-                switch (config.lab.object_noise_scale) {
-                case 1: noise.extra_shift = -shift_out; break;
-                case 2: noise.extra_shift = -step_out; break;
-                case 3: noise.extra_shift = -(shift_out + step_out); break;
-                case 4: noise.extra_shift = shift_out; break;
-                default: break;
-                }
-            }
             if (plan.noise_shift != 0 && state.context.noise_type) {
-                const bool lab_index = object && config.lab.object_noise_index != 0;
-                auto first = static_cast<unsigned>(
-                    lab_index && (config.lab.object_noise_index & 2) != 0 ? m + 1
-                                                                          : state.matrix_count - m);
-                if (object && config.lab.object_noise_cap > 0) {
-                    first = std::min(first, static_cast<unsigned>(config.lab.object_noise_cap));
-                }
-                if (object && config.lab.object_noise_left == 1) {
-                    // Lab: the matrices that draw no noise do not count.
-                    first = 0;
-                    for (int j = m; j < state.matrix_count; ++j) {
-                        first += state.matrices[static_cast<std::size_t>(j)].noise_shift != 0 ? 1U : 0U;
-                    }
-                }
+                const auto first = static_cast<unsigned>(state.matrix_count - m);
                 noise.buffer = state.noise_buffer.data();
                 noise.shift = plan.noise_shift;
                 noise.stride = 2U * first + 1U;
-                if (object && config.lab.object_noise_stride_mask > 0) {
-                    noise.stride &= static_cast<unsigned>(config.lab.object_noise_stride_mask);
-                }
-                const bool from_block = lab_index && (config.lab.object_noise_index & 1) != 0;
-                noise.first = first + (from_block ? 0U : noise.stride * static_cast<unsigned>(position));
+                noise.first = first + noise.stride * static_cast<unsigned>(position);
                 noise.mask = static_cast<unsigned>(noise_size - 1U);
             }
-            kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
-                                  plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
-                                  kRowStride, noise, kernels::FineTerms{plan.fine.data(), plan.fine_bits, plan.fine_ramp,
-                                                     config.lab.object_extension_cumulative == 1 ? plan.fine_age : -1,
-                                                     config.lab.object_extension_cumulative == 2 ? plan.fine_elapsed : -1});
-            ++plan.fine_age;
-            plan.fine_elapsed += block;
+            if (object) {
+                kernels::apply_object_matrix(block, position == 0, position + block == unit_size,
+                                             ramp_step, plan.count, plan.channel.data(),
+                                             plan.object, plan.out, keep, plan.lsb_bypass, m,
+                                             bypass.data(), matrix_base, kRowStride, noise);
+            } else {
+                kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
+                                      plan.out, keep, plan.lsb_bypass, m, bypass.data(),
+                                      matrix_base, kRowStride, noise);
+            }
         }
     }
 
@@ -866,7 +814,6 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         ICLFORGE_ZONE_SCOPED_N("truehd_output");
         std::int32_t* const pcm_base =
             pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
-        const std::uint32_t fold_before = state.interval_fold;
         state.interval_fold = kernels::assign_output(
             block, out_channels, state.output_source.data(), state.output_shift.data(), matrix_base,
             kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
@@ -889,35 +836,6 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                         static_cast<unsigned>(c));
                 }
             }
-        }
-        if (index == kObjectSubstream && config.lab.fold_scope != 0) {
-            // Lab: fold other samples than the output of every matrix channel (ERRATA.md entry 69).
-            const int scope = config.lab.fold_scope;
-            const bool upward = scope >= 10;
-            const int first = upward                   ? scope - 10
-                              : scope >= 3 && scope <= 4 ? 0
-                                                         : state.context.min_chan;
-            const int last = upward                    ? state.context.max_matrix_chan
-                             : scope >= 3 && scope <= 4 ? state.context.min_chan - 1
-                                                        : state.context.max_chan;
-            const bool coded = scope >= 5 && !upward;
-            const bool relative = !upward && (scope == 2 || scope == 4 || scope == 6);
-            std::uint32_t fold = fold_before;
-            for (int i = 0; i < block; ++i) {
-                const std::int32_t* const row =
-                    (coded ? rows_base : matrix_base) + static_cast<std::ptrdiff_t>(i) * kRowStride;
-                for (int c = first; c <= last; ++c) {
-                    const std::int32_t source = row[c];
-                    const int shift = coded ? 0 : state.output_shift[static_cast<std::size_t>(c)];
-                    const std::int32_t output =
-                        shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source)
-                                                               << shift)
-                                   : source >> -shift;
-                    fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output),
-                                              static_cast<unsigned>(relative ? c - first : c));
-                }
-            }
-            state.interval_fold = fold;
         }
     }
     state.interval_open = true;

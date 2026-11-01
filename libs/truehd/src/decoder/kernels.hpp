@@ -10,10 +10,10 @@
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/format.hpp"
 
-// The decoder's inner loops, one function each, as the scalar reference. Decoder::decode_block calls
-// them in the order below; libs/truehd's tests and tests/performance/kernel_bench.cpp call them on
-// their own. Every one is exact integer arithmetic: the products are 32 bit by 32 bit into 64 bits
-// (the filters' coefficients are at most 16 bits wide and their history 24, the matrices'
+// The decoder's inner loops, one function each, as the scalar reference. Decoder::decode_block
+// calls them in the order below; libs/truehd's tests and tests/performance/kernel_bench.cpp call
+// them on their own. Every one is exact integer arithmetic: the products are 32 bit by 32 bit into
+// 64 bits (the filters' coefficients are at most 16 bits wide and their history 24, the matrices'
 // coefficients are scaled to 2^-15), the sums are 64 bit, and the shifts are by amounts the stream
 // sends, so a kernel that gives other bits than these is wrong rather than approximate. A variant
 // of a kernel for a wider vector unit has to give the same samples for every input, which
@@ -29,10 +29,10 @@ namespace iclforge::truehd::kernels {
 // first sample of its block (TH spec §9.3).
 inline constexpr int kHistoryPad = kMaxFirOrder;
 
-// The matrices' coefficients are scaled to 2^-15 (ERRATA.md entry 60): a sum is shifted down by this
-// much. frac_bits runs to 15 in substream 3, so 2^-14 cannot hold every coefficient; a coefficient
-// of frac_bits 14 or less, scaled to 2^-15 instead, gives the same samples (the sum is twice as
-// large and shifted one more).
+// The matrices' coefficients are scaled to 2^-15 (ERRATA.md entry 60): a sum is shifted down by
+// this much. frac_bits runs to 15 in substream 3, so 2^-14 cannot hold every coefficient; a
+// coefficient of frac_bits 14 or less, scaled to 2^-15 instead, gives the same samples (the sum is
+// twice as large and shifted one more).
 inline constexpr int kMatrixShift = 15;
 // The matrix noise of TH spec §17.3 was defined against a sum at 2^-14.
 inline constexpr int kNoiseScaleShift = 7 + (kMatrixShift - 14);
@@ -138,16 +138,14 @@ inline void generate_noise(int block, std::uint32_t& seed_state, int noise_shift
 
 // TH spec §17.3: what a matrix draws from generator 1's noise buffer. The matrix with a non-zero
 // `shift` adds buffer[index] * 2^(shift + 7) to its sum at 2^-14 (twice that at 2^-15), for the
-// sample at position i of the block the index (first + i * stride) & mask (the stride and the first index are those of the
-// matrix: ERRATA.md, noise generator 1). `shift` 0 draws nothing.
+// sample at position i of the block the index (first + i * stride) & mask (the stride and the first
+// index are those of the matrix: ERRATA.md, noise generator 1). `shift` 0 draws nothing.
 struct NoiseDraw {
     const std::int8_t* buffer = nullptr;
     int shift = 0;
     unsigned first = 0;
     unsigned stride = 1;
     unsigned mask = 0;
-    int tie_mode = 0;  // lab: how a sum exactly between two outputs rounds (0 down)
-    int extra_shift = 0;  // lab: the draw is shifted by this much more (negative: down)
 };
 
 // TH spec §10: one primitive matrix over one block. Row[out] becomes the sum over the `count`
@@ -155,21 +153,10 @@ struct NoiseDraw {
 // matrix's noise (TH spec §17.3) if it draws any, shifted down by 14, with the quantiser step's low
 // bits cleared (`keep`); with LSB bypass the bit the stream sent for this matrix (`bypass`, bit
 // `matrix_index`) is added back.
-// The extension of an object matrix (ERRATA.md entry 69): `delta[k]` is the finer part of coefficient
-// k, in units of 2^-`bits` of the coefficient's own last place and already scaled to 2^-15.
-struct FineTerms {
-    const std::int32_t* delta = nullptr;
-    int bits = 0;
-    int ramp = 0;  // lab: 0 the same for the block; 1 grows by (i + 1) / block; 2 by i / block
-    int age = -1;  // lab: when not -1, the deltas add up over this many blocks since they were sent
-    int elapsed = -1;  // lab: when not -1, the deltas grow with the samples since they were sent, 40 to the step
-};
-
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                          const std::int32_t* coeff, int out, std::uint32_t keep, bool lsb_bypass,
                          int matrix_index, const std::uint64_t* bypass, std::int32_t* rows,
-                         std::ptrdiff_t stride, const NoiseDraw& noise = {},
-                         const FineTerms& fine = {}) {
+                         std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
     const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + kNoiseScaleShift);
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
@@ -178,52 +165,87 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
             sum += std::int64_t{row[channel[k]]} * coeff[k];
         }
         if (noise.shift != 0) {
-            std::int64_t draw = std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
-                                                          noise.mask]} *
-                                noise_scale;
-            if (noise.extra_shift < 0) {
-                draw >>= -noise.extra_shift;
-            } else if (noise.extra_shift > 0) {
-                draw <<= noise.extra_shift;
-            }
-            sum += draw;
+            sum +=
+                std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
+                                          noise.mask]} *
+                noise_scale;
         }
-        if (noise.tie_mode != 0) {
-            const std::int64_t low = sum & ((std::int64_t{1} << kMatrixShift) - 1);
-            const std::int64_t half = std::int64_t{1} << (kMatrixShift - 1);
-            if (noise.tie_mode == 3 || (low == half && (noise.tie_mode == 1 ||
-                                                         (noise.tie_mode == 2 && ((sum >> kMatrixShift) & 1) != 0)))) {
-                sum += half;
-            }
-        }
-        int shift = kMatrixShift;
-        if (fine.bits != 0) {
-            // Rows of 32 bits and deltas of 32 bits can leave 64 bits in a sum of products: the
-            // sum is kept as unsigned, which wraps.
-            std::uint64_t finer = 0;
-            for (int k = 0; k < count; ++k) {
-                finer += static_cast<std::uint64_t>(std::int64_t{row[channel[k]]} * fine.delta[k]);
-            }
-            if (fine.elapsed >= 0) {
-                const std::int64_t numerator = std::int64_t{fine.elapsed} + (fine.ramp == 1 ? i + 1 : fine.ramp == 2 ? i : 0);
-                finer = static_cast<std::uint64_t>(static_cast<std::int64_t>(finer) * numerator / 40);
-            } else if (fine.ramp != 0 || fine.age >= 0) {
-                std::int64_t numerator = fine.ramp == 1 ? i + 1 : fine.ramp == 2 ? i : block;
-                if (fine.age >= 0) {
-                    numerator += std::int64_t{fine.age} * block;
-                }
-                finer = static_cast<std::uint64_t>(static_cast<std::int64_t>(finer) * numerator /
-                                                   block);
-            }
-            sum = static_cast<std::int64_t>((static_cast<std::uint64_t>(sum) << fine.bits) + finer);
-            shift += fine.bits;
-        }
-        std::uint32_t value = static_cast<std::uint32_t>(sum >> shift) & keep;
+        std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
         if (lsb_bypass) {
             const std::uint64_t sent = bypass[static_cast<std::size_t>(i)];
             value += static_cast<std::uint32_t>((sent >> (4 * matrix_index)) & 0xFU);
         }
         row[out] = static_cast<std::int32_t>(value);
+    }
+}
+
+// The object-audio matrices (restart sync 0x31EC; ERRATA.md entry 69). The coefficients run at
+// 2^-18 and move between sections: `slope` is the extension's delta of each coefficient, and
+// every access unit the coefficient grows by slope * 2^(18 - scale). Inside the access unit the
+// matrix adds the slope's share as a ramp, which starts at 0 with the unit and grows by `ramp_step`
+// a sample (6552 at 48 kHz); the share of the sample is (sum of channel times slope) >> `scale`
+// times the ramp, at 2^-18.
+inline constexpr int kObjectShift = 18;
+
+struct ObjectMatrixState {
+    std::array<std::int32_t, 16> coeff{};  // running, at 2^-18, by matrix channel
+    std::array<std::int32_t, 16> slope{};  // the deltas as sent
+    std::int32_t ramp = 0;
+    int scale = 0;  // ext_field2 - f_shift + frac_bits
+    bool extension = false;
+};
+
+inline void apply_object_matrix(int block, bool starts_unit, bool ends_unit, int ramp_step,
+                                int count, const std::uint8_t* channel, ObjectMatrixState& state,
+                                int out, std::uint32_t keep, bool lsb_bypass, int matrix_index,
+                                const std::uint64_t* bypass, std::int32_t* rows,
+                                std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
+    if (starts_unit) {
+        state.ramp = 0;
+    }
+    const int noise_shift = noise.shift + kObjectShift - kMatrixShift + kNoiseScaleShift;
+    for (int i = 0; i < block; ++i) {
+        std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
+        std::int64_t sum = 0;
+        for (int k = 0; k < count; ++k) {
+            sum += std::int64_t{row[channel[k]]} * state.coeff[channel[k]];
+        }
+        if (state.extension) {
+            std::int64_t fine = 0;
+            for (int k = 0; k < count; ++k) {
+                fine += std::int64_t{row[channel[k]]} * state.slope[channel[k]];
+            }
+            const std::int64_t shared =
+                state.scale >= 0
+                    ? fine >> state.scale
+                    : static_cast<std::int64_t>(static_cast<std::uint64_t>(fine) << -state.scale);
+            sum += std::int64_t{static_cast<std::int32_t>(shared)} * state.ramp;
+            state.ramp += ramp_step;
+        }
+        if (noise.shift != 0) {
+            sum +=
+                std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
+                                          noise.mask]} *
+                (std::int64_t{1} << noise_shift);
+        }
+        std::uint32_t value = static_cast<std::uint32_t>(sum >> kObjectShift);
+        if (lsb_bypass) {
+            const std::uint64_t sent = bypass[static_cast<std::size_t>(i)];
+            value += static_cast<std::uint32_t>((sent >> (4 * matrix_index)) & 0xFU);
+        } else {
+            value &= keep;
+        }
+        row[out] = static_cast<std::int32_t>(value);
+    }
+    if (ends_unit && state.extension) {
+        const int up = kObjectShift - state.scale;
+        for (int k = 0; k < count; ++k) {
+            std::int32_t& c = state.coeff[channel[k]];
+            const std::int32_t slope = state.slope[channel[k]];
+            c = static_cast<std::int32_t>(static_cast<std::uint32_t>(c) +
+                                          (up >= 0 ? static_cast<std::uint32_t>(slope) << up
+                                                   : static_cast<std::uint32_t>(slope >> -up)));
+        }
     }
 }
 
@@ -233,11 +255,10 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
 
 // The output of a block: each output channel from the matrix channel `source_channel` names for it
 // (the decoder builds that from ch_assign, which assigns matrix channels to output channels:
-// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is indexed
-// by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the lossless
-// check (TH spec §7.3)
-// and, when `pcm` is not null, written as 24 bit samples, `out_channels` to a sample time. Returns
-// the new fold.
+// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is
+// indexed by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the
+// lossless check (TH spec §7.3) and, when `pcm` is not null, written as 24 bit samples,
+// `out_channels` to a sample time. Returns the new fold.
 [[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
                                                  const std::uint8_t* source_channel,
                                                  const std::int8_t* output_shift,

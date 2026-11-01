@@ -103,6 +103,7 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
     MatrixSet set;
     const int channels = context.max_matrix_chan + 1;
     const bool changed = reader.read(1) != 0;
+    set.coeffs_sent = changed;
     if (changed) {
         const bool headers = reader.read(1) != 0;
         if (headers) {
@@ -144,6 +145,8 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
                 matrix.ext_value = {};
             }
             set.extension = false;
+            set.coeffs_sent = true;
+            set.deltas_sent = false;
         }
         for (unsigned m = 0; m < set.count; ++m) {
             MatrixSpec& matrix = set.items[m];
@@ -159,17 +162,20 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
             }
         }
     } else if (context.object_previous != nullptr) {
-        set = *context.object_previous;  // the deltas stand with the matrices
+        set = *context.object_previous;  // the matrices and their running state stand
         set.extension = false;
+        set.coeffs_sent = false;
+        set.deltas_sent = false;
     }
-    // The extension (A2, B2, C2; ERRATA.md entry 69): per-block deltas to the coefficients, for a
-    // moving object. A2 says there is one; B2 that this block has deltas; C2 that the width of the
-    // deltas of every matrix follows (4 bits, then 2 bits the decoder does not use), else the last
-    // widths stand. A matrix with width w sends a delta of w + 1 bits for each coefficient it has;
+    // The extension (A2, B2, C2; ERRATA.md entry 69): slopes of the coefficients, for a moving
+    // object. A2 says the extension is on; B2 that this section replaces the deltas (else the deltas
+    // stand); C2 that the width of the deltas of every matrix follows (4 bits, then 2 bits that
+    // scale the delta), else the last widths stand. A matrix with width w sends a delta of w + 1 bits for each coefficient it has;
     // a matrix of width 0 sends none.
     if (reader.read(1) != 0) {
         set.extension = true;
         if (reader.read(1) != 0) {
+            set.deltas_sent = true;
             if (reader.read(1) != 0) {
                 for (unsigned m = 0; m < set.count; ++m) {
                     MatrixSpec& matrix = set.items[m];

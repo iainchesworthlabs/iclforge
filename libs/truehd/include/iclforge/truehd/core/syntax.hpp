@@ -135,9 +135,9 @@ struct MatrixSpec {
     std::int8_t f_shift = 0;
     std::uint8_t field_2b = 0;  // 2 bits
     std::uint8_t field_m4 = 0;  // 4 bits
-    // The second precision term of the object-audio matrices (TH spec §10.2.1a; ERRATA.md entry
-    // 69): a width, two more bits and one value for each present coefficient. Parsed and carried; the
-    // owner's DEE streams set it where the objects move, and what it does to the samples is open.
+    // The extension of the object-audio matrices (ERRATA.md entry 69): a width, a scale
+    // (ext_field2) and one delta for each present coefficient. The delta is the slope of the
+    // coefficient, a change of delta / 2^ext_field2 raw places in every access unit.
     std::uint8_t ext_width = 0;   // 4 bits
     std::uint8_t ext_field2 = 0;  // 2 bits
     std::array<std::int32_t, kMaxChannels> ext_value{};
@@ -149,7 +149,9 @@ struct MatrixSpec {
 struct MatrixSet {
     std::array<MatrixSpec, kMaxObjectMatrices> items{};
     std::uint8_t count = 0;
-    bool extension = false;  // object-audio matrices: a second precision term followed
+    bool extension = false;  // object-audio matrices: the section has the extension (A2)
+    bool coeffs_sent = false;  // object-audio matrices: the section sends coefficients (A)
+    bool deltas_sent = false;  // object-audio matrices: the section replaces the deltas (A2 and B2)
     friend bool operator==(const MatrixSet&, const MatrixSet&) = default;
 };
 
