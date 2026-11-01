@@ -239,15 +239,18 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
 // is seconds), written as a bare .thd. The channels are the device's, in its order, and the stream
 // carries as many as the device has (one to eight); the rate is the device's, which TrueHD takes at
 // 44.1, 48, 88.2, 96, 176.4 and 192 kHz (planning/truehd-parity-forge.md, row P7).
-int record_truehd(std::string_view out_path, std::uint32_t seconds, const auto& device,
-                  const Options& meta) {
+// What a TrueHD take refuses is refused before a device is asked for: the options it does not
+// apply, an output that is not a .thd, a take of no seconds.
+int check_truehd_take(std::string_view out_path, std::uint32_t seconds, const Options& meta) {
     if (const int refused =
             check_options_applied(meta, {"codec=truehd", "watchdog=", "device="});
         refused != kExitOk) {
         return refused;
     }
     if (!is_stdio_path(out_path) && !out_path.ends_with(".thd")) {
-        fmt::println(stderr, "error: record codec=truehd writes a bare stream: name the output .thd (got '{}')",
+        fmt::println(stderr,
+                     "error: record codec=truehd writes a bare stream: name the output .thd "
+                     "(got '{}')",
                      out_path);
         return kExitUsage;
     }
@@ -255,6 +258,12 @@ int record_truehd(std::string_view out_path, std::uint32_t seconds, const auto& 
         fmt::println(stderr, "error: a take of no seconds has nothing to code");
         return kExitUsage;
     }
+    return kExitOk;
+}
+
+int record_truehd(std::string_view out_path, std::uint32_t seconds, const auto& device,
+                  const Options& meta) {
+    (void)meta;  // its options were checked before a device was asked for (check_truehd_take)
     iclforge::audio::Capture capture;
     const auto started = capture.start(device.id, device.kind);
     if (!started.has_value()) {
@@ -335,6 +344,11 @@ int record_truehd(std::string_view out_path, std::uint32_t seconds, const auto& 
 
 int run_record(std::string_view out_path, std::uint32_t seconds, std::uint32_t bitrate,
                int device_index, const Options& meta) {
+    if (meta.take_truehd) {
+        if (const int refused = check_truehd_take(out_path, seconds, meta); refused != kExitOk) {
+            return refused;
+        }
+    }
     const auto devices = iclforge::audio::enumerate_devices();
     if (!devices.has_value()) {
         fmt::println(stderr, "error: {}", iclforge::audio::describe(devices.error()));
