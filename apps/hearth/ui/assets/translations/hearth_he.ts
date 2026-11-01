@@ -1022,22 +1022,22 @@
         <location filename="../qml/DecoderTruehd.qml" line="111"/>
         <location filename="../qml/DecoderTruehd.qml" line="132"/>
         <source>Track</source>
-        <translation type="unfinished">רצועה</translation>
+        <translation>רצועה</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="116"/>
         <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
-        <translation type="unfinished"></translation>
+        <translation>קובץ יכול להכיל רצועת TrueHD ורצועת AC-3, E-AC-3 או AC-4, כמו ברימיקס של Blu-ray. Hearth מפענח את ה-TrueHD בעצמו ועדיין אינו יכול לשלוח אותו כמות שהוא. אוטומטי מנגן את רצועת AC-3, E-AC-3 או AC-4 כאשר היציאה מקבלת אותה כזרם סיביות, כמו מקלט, ואת רצועת ה-TrueHD בכל מקום אחר. TrueHD מנגן תמיד את רצועת ה-TrueHD, ו״דחוס״ מנגן תמיד את הרצועה האחרת. שינוי חל מהפריט הבא.</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="135"/>
         <source>Automatic</source>
-        <translation type="unfinished">אוטומטי</translation>
+        <translation>אוטומטי</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="137"/>
         <source>Compressed</source>
-        <translation type="unfinished"></translation>
+        <translation>דחוס</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="146"/>

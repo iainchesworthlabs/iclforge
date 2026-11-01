@@ -1022,22 +1022,22 @@
         <location filename="../qml/DecoderTruehd.qml" line="111"/>
         <location filename="../qml/DecoderTruehd.qml" line="132"/>
         <source>Track</source>
-        <translation type="unfinished">المسار</translation>
+        <translation>المسار</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="116"/>
         <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
-        <translation type="unfinished"></translation>
+        <translation>يمكن أن يحتوي الملف على مسار TrueHD ومسار AC-3 أو E-AC-3 أو AC-4، كما في ريمكس Blu-ray. يفكّ Hearth ترميز TrueHD بنفسه ولا يستطيع إرساله كما هو بعد. يشغّل الوضع التلقائي مسار AC-3 أو E-AC-3 أو AC-4 حيث يقبله المخرج كتدفق بتات، مثل جهاز استقبال، ومسار TrueHD في كل مكان آخر. يشغّل TrueHD دائمًا مسار TrueHD، ويشغّل «مضغوط» دائمًا المسار الآخر. يسري التغيير من العنصر التالي.</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="135"/>
         <source>Automatic</source>
-        <translation type="unfinished">تلقائي</translation>
+        <translation>تلقائي</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="137"/>
         <source>Compressed</source>
-        <translation type="unfinished"></translation>
+        <translation>مضغوط</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="146"/>

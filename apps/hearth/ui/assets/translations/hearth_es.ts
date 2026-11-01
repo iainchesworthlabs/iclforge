@@ -1022,22 +1022,22 @@
         <location filename="../qml/DecoderTruehd.qml" line="111"/>
         <location filename="../qml/DecoderTruehd.qml" line="132"/>
         <source>Track</source>
-        <translation type="unfinished">Pista</translation>
+        <translation>Pista</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="116"/>
         <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
-        <translation type="unfinished"></translation>
+        <translation>Un archivo puede contener una pista TrueHD y una pista AC-3, E-AC-3 o AC-4, como un remux de Blu-ray. Hearth decodifica el TrueHD por sí mismo y todavía no puede enviarlo tal cual. Automático reproduce la pista AC-3, E-AC-3 o AC-4 cuando la salida la acepta como flujo de bits, como un receptor, y la pista TrueHD en cualquier otro caso. TrueHD reproduce siempre la pista TrueHD y Comprimida siempre la otra pista. Un cambio se aplica desde el siguiente elemento.</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="135"/>
         <source>Automatic</source>
-        <translation type="unfinished">Automático</translation>
+        <translation>Automático</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="137"/>
         <source>Compressed</source>
-        <translation type="unfinished"></translation>
+        <translation>Comprimida</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="146"/>

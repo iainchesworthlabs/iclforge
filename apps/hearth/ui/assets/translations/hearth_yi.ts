@@ -1022,22 +1022,22 @@
         <location filename="../qml/DecoderTruehd.qml" line="111"/>
         <location filename="../qml/DecoderTruehd.qml" line="132"/>
         <source>Track</source>
-        <translation type="unfinished">שפּור</translation>
+        <translation>שפּור</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="116"/>
         <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
-        <translation type="unfinished"></translation>
+        <translation>א טעקע קען אַנטהאַלטן א TrueHD שפּור און א AC-3, E-AC-3 אָדער AC-4 שפּור, ווי א Blu-ray רעמיקס. Hearth דעקאָדירט דעם TrueHD אַליין און קען אים נאָך נישט שיקן ווי ער איז. אויטאָמאַטיש שפּילט די AC-3, E-AC-3 אָדער AC-4 שפּור וווּ דער אויסגאַנג נעמט עס אָן ווי א ביטשטראָם, ווי א ריסיווער, און די TrueHD שפּור אומעטום אַנדערש. TrueHD שפּילט תּמיד די TrueHD שפּור, און קאָמפּרעסירט תּמיד די אַנדערע שפּור. א ענדערונג גילט פון דעם קומענדיקן אייטעם.</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="135"/>
         <source>Automatic</source>
-        <translation type="unfinished">אויטאָמאַטיש</translation>
+        <translation>אויטאָמאַטיש</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="137"/>
         <source>Compressed</source>
-        <translation type="unfinished"></translation>
+        <translation>קאָמפּרעסירט</translation>
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="146"/>
