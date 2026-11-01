@@ -30,10 +30,12 @@
 #include "iclforge/objects/scene.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/encoder/layout.hpp"
 #include "truehd.hpp"
 #include "truehd_encode.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_objects.hpp"
+#include "truehd_rate.hpp"
 #include "truehd_render.hpp"
 
 namespace forge_cli::commands {
@@ -46,9 +48,9 @@ namespace oba = iclforge::objects::oba;
 constexpr std::size_t kBedChannels = 8;
 // The cadence of the object audio metadata: one frame of E-AC-3's length, as the owner's discs have
 // it (libs/truehd/ERRATA.md question 62), where TH spec §15.5.3 says one a 40 sample access unit.
-constexpr std::uint64_t kFrameSamples = 1536;
-constexpr std::uint64_t kUnitSamples = 40;
-constexpr std::uint64_t kBlockOffsetUnit = 32;  // TS 103 420 §5.5.7
+// Where a frame goes in the access units is libs/truehd/layout.hpp's.
+constexpr std::uint64_t kFrameSamples = th::kOamdFrameSamples;
+constexpr int kUnitSamples = 40;
 constexpr double kFullScale = 8388608.0;
 constexpr std::string_view kBedLayout = "L,R,C,LFE,Ls,Rs,Lrs,Rrs";
 
@@ -168,23 +170,6 @@ std::vector<std::byte> evolution_frame_of(std::span<const std::byte> oamd) {
     return container;
 }
 
-// Frame k of the metadata starts at sample 1536 k, in the access unit that holds that sample, at
-// `offset` samples into it. The payload says it with its update's sample offset (0 to 31) and the
-// offset factor of its block (32 samples a unit), which is how the reader adds them back.
-struct FrameAt {
-    std::uint64_t frame = 0;
-    int offset = 0;
-};
-
-std::optional<FrameAt> frame_in_unit(std::uint64_t unit) {
-    const std::uint64_t frame = (unit * kUnitSamples + kFrameSamples - 1) / kFrameSamples;
-    const std::uint64_t start = frame * kFrameSamples;
-    if (start >= (unit + 1) * kUnitSamples) {
-        return std::nullopt;
-    }
-    return FrameAt{frame, static_cast<int>(start - unit * kUnitSamples)};
-}
-
 }  // namespace
 
 int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
@@ -194,6 +179,10 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
                                                          "truehd-restart=",
                                                          "truehd-peak-rate=",
                                                          "truehd-rate-check=",
+                                                         "truehd-rate-mode=",
+                                                         "truehd-shape-bits=",
+                                                         "truehd-bitrate=",
+                                                         "truehd-major-sync=",
                                                          "truehd-fir-order=",
                                                          "truehd-matrix=",
                                                          "truehd-stereo-mode=",
@@ -356,9 +345,13 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
     // The object audio metadata of frame k, starting `offset` samples into its access unit.
     const auto payload_of_frame = [&](std::uint64_t frame, int offset) {
         const std::vector<oba::DynamicObject> objects = objects_of_frame(frame);
+        // Frame k starts at sample 1536 k, `offset` samples into its access unit; the payload says
+        // it with its update's sample offset and its block's offset factor (32 samples a unit),
+        // which is how the reader adds them back.
+        const th::OamdOffset split = th::split_oamd_offset(offset);
         const oba::ObjectUpdate update{
-            .sample_offset = offset % static_cast<int>(kBlockOffsetUnit),
-            .block_offset_factor = offset / static_cast<int>(kBlockOffsetUnit),
+            .sample_offset = split.sample_offset,
+            .block_offset_factor = split.block_offset_factor,
             .ramp_duration = static_cast<int>(kFrameSamples),
             .objects = objects};
         return oba::build_payload_updates(program, {&update, 1});
@@ -385,6 +378,18 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
         config.peak_data_rate_bps = *opts.peak_rate_kbps * 1000U;
     }
     config.allow_rate_violations = opts.rate_lenient;
+    if (opts.bitrate_kbps) {
+        config.rate_control.target_bitrate_bps = *opts.bitrate_kbps * 1000U;
+    }
+    if (opts.shape) {
+        config.rate_control.mode = th::RateMode::kShape;
+    }
+    if (opts.shape_bits) {
+        config.rate_control.max_shape_bits = *opts.shape_bits;
+    }
+    if (opts.major_sync_units) {
+        config.major_sync_interval_units = *opts.major_sync_units;
+    }
     if (opts.fir_order) {
         config.max_fir_order = *opts.fir_order;
     }
@@ -397,13 +402,11 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
     }
     config.verify = meta.verify;
     // The evolution frame of the access unit that holds the start of a metadata frame.
-    config.extra_data = [&](std::uint64_t unit) -> std::vector<std::byte> {
-        const auto at = frame_in_unit(unit);
-        if (!at) {
-            return {};
-        }
-        return evolution_frame_of(payload_of_frame(at->frame, at->offset));
-    };
+    config.extra_data = th::oamd_extra_data(
+        [&](std::uint64_t frame, int offset) {
+            return evolution_frame_of(payload_of_frame(frame, offset));
+        },
+        kUnitSamples, static_cast<int>(kFrameSamples));
 
     auto encoder = th::Encoder::create(config);
     if (!encoder) {
@@ -510,6 +513,18 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
                 status,
                 "warning: {} access unit(s) exceed the peak rate (truehd-rate-check=lenient)",
                 stats.rate_violations);
+        }
+        if (opts.bitrate_kbps || opts.shape) {
+            status_println(status, "  rate: held to {} kbit/s over {} ms; least headroom {} ms",
+                           opts.bitrate_kbps ? *opts.bitrate_kbps : config.peak_data_rate_bps / 1000U,
+                           th::kRateLatencyMs, format_headroom_ms(stats.min_headroom_us));
+        }
+        if (stats.shaped_intervals != 0) {
+            status_println(status,
+                           "warning: {} restart interval(s) of {} gave up up to {} low bit(s) of the "
+                           "object channels to fit the rate (truehd-rate-mode=shape); the objects "
+                           "are no longer the input's there, the 7.1 bed is",
+                           stats.shaped_intervals, stats.restart_intervals, stats.max_shape_bits);
         }
         if (config.verify) {
             status_println(status, "verified: {} access units decode to the input",

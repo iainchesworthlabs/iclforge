@@ -31,6 +31,7 @@
 #include "truehd.hpp"
 #include "truehd_encode.hpp"
 #include "truehd_meaning.hpp"
+#include "truehd_rate.hpp"
 
 namespace forge_cli::commands {
 
@@ -224,7 +225,9 @@ void report_encode_error(std::string_view command, const th::EncodeError& error)
     if (error.kind == th::EncodeErrorKind::kRateExceeded) {
         fmt::println(stderr,
                      "  the stream cannot be sent within the peak rate and TH spec §18's 75 ms: "
-                     "raise truehd-peak-rate= or write it anyway with truehd-rate-check=lenient");
+                     "raise truehd-peak-rate= or write it anyway with truehd-rate-check=lenient "
+                     "(truehd-atmos can also let the objects give up low bits with "
+                     "truehd-rate-mode=shape)");
     }
 }
 
@@ -259,6 +262,9 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
                                                          "truehd-restart=",
                                                          "truehd-peak-rate=",
                                                          "truehd-rate-check=",
+                                                         "truehd-rate-mode=",
+                                                         "truehd-bitrate=",
+                                                         "truehd-major-sync=",
                                                          "truehd-fir-order=",
                                                          "truehd-matrix=",
                                                          "truehd-stereo-mode=",
@@ -325,6 +331,12 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         config.peak_data_rate_bps = *opts.peak_rate_kbps * 1000U;
     }
     config.allow_rate_violations = opts.rate_lenient;
+    if (opts.bitrate_kbps) {
+        config.rate_control.target_bitrate_bps = *opts.bitrate_kbps * 1000U;
+    }
+    if (opts.major_sync_units) {
+        config.major_sync_interval_units = *opts.major_sync_units;
+    }
     if (opts.fir_order) {
         config.max_fir_order = *opts.fir_order;
     }
@@ -388,6 +400,11 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
                 status,
                 "warning: {} access unit(s) exceed the peak rate (truehd-rate-check=lenient)",
                 stats.rate_violations);
+        }
+        if (opts.bitrate_kbps) {
+            status_println(status, "  rate: held to {} kbit/s over {} ms; least headroom {} ms",
+                           *opts.bitrate_kbps, th::kRateLatencyMs,
+                           format_headroom_ms(stats.min_headroom_us));
         }
         if (stats.downmix_reduced_intervals != 0) {
             status_println(

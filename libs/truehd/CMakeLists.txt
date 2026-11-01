@@ -20,8 +20,12 @@ iclforge_add_library(truehd
         src/encoder/cluster_elements.cpp
         src/encoder/coding.cpp
         src/encoder/encoder.cpp
+        src/encoder/layout_cadence.cpp
+        src/encoder/layout_oamd.cpp
         src/encoder/object_bed.cpp
         src/encoder/render_bed.cpp
+        src/encoder/ratectl_model.cpp
+        src/encoder/ratectl_shape.cpp
         src/io/access_unit.cpp
         src/io/elementary.cpp
         src/io/evolution.cpp

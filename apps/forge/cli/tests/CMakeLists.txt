@@ -26,6 +26,7 @@ iclforge_add_test_binary(iclforge-forge-cli-tests PROJECT forge-cli SOURCES
     test_cli_inspect_edges.cpp test_cli_atmos_edges.cpp test_cli_karaoke_example.cpp
     test_cli_karaoke_duet_example.cpp test_cli_project.cpp test_cli_lyrics.cpp
     test_cli_truehd.cpp test_cli_truehd_meta.cpp test_cli_truehd_objects.cpp
+    test_cli_truehd_rate.cpp
     test_cli_decode_strict.cpp
     test_cli_content_signature.cpp)
 # The same device-facing commands with a device to find: software ALSA

@@ -9,11 +9,14 @@
 #include "core/noise.hpp"
 #include "encoder/coding.hpp"
 #include "encoder/object_bed.hpp"
+#include "encoder/ratectl_shape.hpp"
 #include "encoder/verify.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
+#include "iclforge/truehd/encoder/layout.hpp"
+#include "iclforge/truehd/encoder/ratectl.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 
 namespace iclforge::truehd {
@@ -35,10 +38,11 @@ constexpr int kMatrixFracBits = 4;  // a coefficient is sent in 1/16 steps, 6 bi
 constexpr int kMaxOutputShift = 7;  // TH spec §8.2: output_shift is a signed 4 bit field
 constexpr int kMaxQuantStep = 15;
 constexpr std::uint32_t kTerminatorA = 0xD234E;  // TH spec §16.5; ERRATA.md entry 14
-constexpr std::uint8_t kExtraDataSeed = 0xA9;    // TH spec §16.4
 constexpr int kMaxUnitWords = 4095;              // the 12 bit lengths of TH spec §3.1, §6.1
 constexpr int kFixedUnitBytes = 4;
-constexpr int kLatencyMs = 75;  // TH spec §3.4, §18.1
+constexpr int kMaxShapeBits = 16;  // RateControl::max_shape_bits, the most a retry loop can cost
+// RateMode::kShape: an interval ends with at least 1/2 of the buffer free (see code_interval).
+constexpr std::int64_t kShapeReserveDivisor = 2;
 
 [[nodiscard]] constexpr EncodeError make_error(EncodeErrorKind kind, std::string_view detail) {
     return EncodeError{kind, detail};
@@ -601,6 +605,17 @@ std::uint32_t default_channel_assignment(int channels) noexcept {
     }
 }
 
+namespace {
+
+// The rate of the budget model: the bitrate the caller chose, held to the declared peak rate.
+[[nodiscard]] std::uint64_t budget_rate_of(const EncoderConfig& config) noexcept {
+    const std::uint64_t peak = declared_peak_rate_bps(config.peak_data_rate_bps, config.sample_rate);
+    const std::uint64_t chosen = config.rate_control.target_bitrate_bps;
+    return chosen == 0 ? peak : std::min<std::uint64_t>(chosen, peak);
+}
+
+}  // namespace
+
 struct Encoder::Impl {
     explicit Impl(const EncoderConfig& configuration)
         : config(configuration),
@@ -611,7 +626,12 @@ struct Encoder::Impl {
           ratebits(ratebits_of(configuration.sample_rate)),
           nominal(nominal_samples_per_access_unit(ratebits)),
           interval_units(configuration.restart_interval_units),
-          stages(stage_layout(configuration.channels, ratebits, assignment)) {
+          stages(stage_layout(configuration.channels, ratebits, assignment)),
+          cadence{configuration.restart_interval_units, configuration.major_sync_interval_units},
+          peak_model(configuration.sample_rate, nominal,
+                     declared_peak_rate_bps(configuration.peak_data_rate_bps,
+                                            configuration.sample_rate)),
+          budget_model(configuration.sample_rate, nominal, budget_rate_of(configuration)) {
         previous_check.assign(stages.size() + (configuration.object_channels > 0 ? 1U : 0U), 0);
         // One restart interval of input is what the encoder holds before it writes anything: take
         // the room once, so that a caller giving it an access unit a call allocates nothing
@@ -640,15 +660,20 @@ struct Encoder::Impl {
     int interval_units;
     std::vector<StageSpec> stages;
     DownmixPlan downmix_plan;
+    LayoutCadence cadence;
+    // The arrival model at the declared peak data rate, and at the bitrate the caller chose (the
+    // same model when none was chosen), TH spec §3.4 and §18 (libs/truehd/ratectl.hpp).
+    RateModel peak_model;
+    RateModel budget_model;
 
     std::vector<std::int32_t> pending;  // interleaved, in the 24 bit domain
     std::size_t pending_start = 0;      // index of the first unread value
     std::uint64_t unit_index = 0;       // access units written in this stream
     std::uint64_t sample_position = 0;  // samples per channel written in this stream
+    std::uint64_t interval_index = 0;   // restart intervals written in this stream
     std::vector<std::uint8_t> previous_check;
-    std::int64_t last_start = 0;
-    std::int64_t last_arrival_end = 0;
     EncoderStats stats;
+    std::vector<IntervalRate> interval_log;
     std::unique_ptr<Decoder> verifier;
     std::unique_ptr<Decoder> object_verifier;  // Presentation::kAll, for substream 3
 
@@ -667,10 +692,17 @@ struct Encoder::Impl {
         return static_cast<std::size_t>(interval_units) * static_cast<std::size_t>(nominal);
     }
 
+    // What one try at an interval learned (the rate loop in process_interval()).
+    struct IntervalAttempt {
+        bool retry_possible = false;  // giving up more bits of the objects could still help
+        int dropped_bits = 0;         // the low bits the objects gave up, over what they had clear
+    };
+
     [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> process_interval(
         std::size_t valid_frames, int units);
+    [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> code_interval(
+        std::size_t valid_frames, int units, int drop_bits, IntervalAttempt& attempt);
     [[nodiscard]] MajorSync make_major_sync() const;
-    [[nodiscard]] std::vector<std::byte> frame_extra_data(std::span<const std::byte> payload) const;
     void reset_stream();
 };
 
@@ -722,11 +754,21 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
     if (config.channel_assignment >= (1U << kChannelAssignmentBits)) {
         return "channel_assignment is wider than 13 bits (TH spec §13.1)";
     }
-    if (config.restart_interval_units != 1 && config.restart_interval_units < 8) {
-        return "the restart interval must be 1 or at least 8 access units (TH spec §7.5)";
+    if (const std::string_view problem = layout_cadence_problem(
+            LayoutCadence{config.restart_interval_units, config.major_sync_interval_units});
+        !problem.empty()) {
+        return problem;
     }
-    if (config.restart_interval_units > 4096) {
-        return "restart_interval_units above 4096";
+    if (config.rate_control.target_bitrate_bps != 0 &&
+        config.rate_control.target_bitrate_bps < 1'000'000) {
+        return "rate_control.target_bitrate_bps below 1 Mbps";
+    }
+    if (config.rate_control.max_shape_bits < 0 ||
+        config.rate_control.max_shape_bits > kMaxShapeBits) {
+        return "rate_control.max_shape_bits must be 0..16";
+    }
+    if (config.rate_control.mode == RateMode::kShape && config.object_channels == 0) {
+        return "RateMode::kShape gives up bits of the object channels: it needs object_channels";
     }
     if (config.max_fir_order < 0 || config.max_fir_order > kMaxFirOrder) {
         return "max_fir_order must be 0..8 (TH spec §9.3)";
@@ -786,6 +828,10 @@ const EncoderStats& Encoder::stats() const noexcept {
     return impl_->stats;
 }
 
+std::span<const IntervalRate> Encoder::interval_rates() const noexcept {
+    return impl_->interval_log;
+}
+
 int Encoder::samples_per_access_unit() const noexcept {
     return impl_->nominal;
 }
@@ -797,9 +843,10 @@ int Encoder::substreams() const noexcept {
 void Encoder::Impl::reset_stream() {
     unit_index = 0;
     sample_position = 0;
+    interval_index = 0;
     std::fill(previous_check.begin(), previous_check.end(), std::uint8_t{0});
-    last_start = 0;
-    last_arrival_end = 0;
+    peak_model.reset();
+    budget_model.reset();
     if (verifier) {
         verifier->reset();
     }
@@ -861,30 +908,6 @@ MajorSync Encoder::Impl::make_major_sync() const {
     }
     sync.size_bytes = kMajorSyncBaseBytes;
     return sync;
-}
-
-std::vector<std::byte> Encoder::Impl::frame_extra_data(std::span<const std::byte> payload) const {
-    // TH spec §16.1: check nibble and length (in 16-bit words, less one), evo_reserved and the
-    // payload length, the payload, zero padding to a whole word, and the parity byte (§16.4).
-    const std::size_t content = 4 + payload.size() + 1;
-    const std::size_t words = (content + 1) / 2;
-    const std::size_t total = words * 2;
-    std::vector<std::byte> out(total, std::byte{0});
-    const auto length = static_cast<std::uint32_t>(words - 1);
-    const auto word0 = static_cast<std::uint32_t>(
-        (std::uint32_t{extra_data_check_nibble(length)} << 12U) | (length & 0xFFFU));
-    out[0] = static_cast<std::byte>(word0 >> 8U);
-    out[1] = static_cast<std::byte>(word0 & 0xFFU);
-    const auto size = static_cast<std::uint32_t>(payload.size());
-    out[2] = static_cast<std::byte>((size >> 8U) & 0xFU);
-    out[3] = static_cast<std::byte>(size & 0xFFU);
-    std::copy(payload.begin(), payload.end(), out.begin() + 4);
-    unsigned accumulator = size ^ kExtraDataSeed;
-    for (std::size_t i = 4; i + 1 < total; ++i) {
-        accumulator ^= std::to_integer<unsigned>(out[i]);
-    }
-    out[total - 1] = static_cast<std::byte>(((accumulator >> 8U) ^ accumulator) & 0xFFU);
-    return out;
 }
 
 std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
@@ -961,8 +984,42 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::flush() {
     return out;
 }
 
+// Rate control (libs/truehd/ratectl.hpp). The interval is coded as it is; if some unit of it would
+// arrive late under the declared peak rate or the chosen bitrate, and RateMode::kShape allows it, the
+// object channels give up one more low bit and the interval is coded again, until it fits or there is
+// nothing left to give. The stream's state (the counters, the arrival models, the clock) goes back to
+// what it was before each try, so that a try that is thrown away leaves nothing behind.
 std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::process_interval(
     std::size_t valid_frames, int units) {
+    for (int drop = 0;; ++drop) {
+        const EncoderStats saved_stats = stats;
+        const std::uint64_t saved_unit = unit_index;
+        const std::uint64_t saved_sample = sample_position;
+        const RateModel saved_peak = peak_model;
+        const RateModel saved_budget = budget_model;
+        IntervalAttempt attempt;
+        auto coded = code_interval(valid_frames, units, drop, attempt);
+        if (coded) {
+            if (drop > 0) {
+                ++stats.shaped_intervals;
+                stats.max_shape_bits = std::max(stats.max_shape_bits, attempt.dropped_bits);
+            }
+            return coded;
+        }
+        if (coded.error().kind != EncodeErrorKind::kRateExceeded || !attempt.retry_possible) {
+            return std::unexpected(coded.error());
+        }
+        stats = saved_stats;
+        unit_index = saved_unit;
+        sample_position = saved_sample;
+        peak_model = saved_peak;
+        budget_model = saved_budget;
+        ++stats.shape_retries;
+    }
+}
+
+std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_interval(
+    std::size_t valid_frames, int units, int drop_bits, IntervalAttempt& attempt) {
     const int channels = config.channels;
     const int objects = config.object_channels;
     const auto width = static_cast<std::size_t>(frame_width());
@@ -983,6 +1040,22 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         for (std::size_t c = 0; c < width; ++c) {
             input[first_given + c][t] = pending[pending_start + t * width + c];
         }
+    }
+    // Rate control's one lever: the object channels give up `drop_bits` low bits (ratectl_shape.hpp).
+    // Whether another bit could still shrink them is what lets the caller try again.
+    if (config.rate_control.mode == RateMode::kShape && objects > 0) {
+        const std::span<Plane> object_planes(input.data() + channels,
+                                             static_cast<std::size_t>(objects));
+        const int limit = bed_chain && config.object_lsb_bypass
+                              ? kMaxOutputShift
+                              : kMaxOutputShift + kMaxQuantStep;
+        const int clear = detail::common_zero_bits(object_planes);
+        if (drop_bits > 0) {
+            const int step = detail::shape_planes(object_planes, drop_bits, limit);
+            attempt.dropped_bits = step - clear;
+        }
+        attempt.retry_possible = clear < 24 && drop_bits < config.rate_control.max_shape_bits &&
+                                 clear + drop_bits < limit;
     }
     const std::size_t stage_count = stages.size() + (objects > 0 ? 1U : 0U);
     std::vector<StageWork> work;
@@ -1362,6 +1435,8 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     // --- the access units --------------------------------------------------------------------
     std::vector<EncodedAccessUnit> units_out;
     units_out.reserve(static_cast<std::size_t>(units));
+    IntervalMeter meter(config.sample_rate, nominal);
+    meter.begin(unit_index);
     for (int au = 0; au < units; ++au) {
         const bool first = au == 0;
         const bool last = au == units - 1;
@@ -1482,26 +1557,26 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                 w.put(static_cast<std::uint32_t>(padding), 12);
             }
             std::vector<std::byte> payload = w.take();
-            const std::uint8_t parity = substream_parity(payload);
-            const std::uint8_t crc = substream_crc(payload);
-            payload.push_back(static_cast<std::byte>(parity));
-            payload.push_back(static_cast<std::byte>(crc));
+            layout_seal_segment(payload);
             words += payload.size() / 2;
-            SubstreamEntry& entry = entries[s];
-            entry.restart_nonexistent = !first;
-            entry.crc_present = true;
-            entry.end_ptr = static_cast<std::uint16_t>(words);
+            const auto entry = layout_directory_entry(first, words);
+            if (!entry) {
+                return std::unexpected(make_error(EncodeErrorKind::kRateExceeded,
+                                                  "an access unit longer than 4095 words"));
+            }
+            entries[s] = *entry;
             segments.push_back(std::move(payload));
         }
         std::vector<std::byte> extra;
         if (config.extra_data) {
             const std::vector<std::byte> payload = config.extra_data(this_unit);
             if (!payload.empty()) {
-                extra = frame_extra_data(payload);
+                extra = layout_frame_extra_data(payload);
             }
         }
+        const bool major_here = first && layout_has_major_sync(cadence, interval_index);
         const std::optional<MajorSync> major_sync =
-            first ? std::optional<MajorSync>(make_major_sync()) : std::nullopt;
+            major_here ? std::optional<MajorSync>(make_major_sync()) : std::nullopt;
         std::size_t sync_bytes = 0;
         if (major_sync) {
             const auto written = write_major_sync(*major_sync);
@@ -1518,36 +1593,40 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                                               "an access unit longer than 4095 words"));
         }
 
-        // The rate model: the unit may start to arrive when its slot opens, when the previous unit
-        // has arrived and no sooner than one unit duration after the previous start (TH spec §3.4).
-        const std::int64_t slot = static_cast<std::int64_t>(first_sample) - nominal;
-        std::int64_t start = slot;
-        if (this_unit > 0) {
-            start = std::max({slot, last_arrival_end, last_start + nominal});
-        }
-        const std::int64_t arrival =
-            static_cast<std::int64_t>((static_cast<std::uint64_t>(total) * 8U * config.sample_rate +
-                                       config.peak_data_rate_bps - 1U) /
-                                      config.peak_data_rate_bps);
-        const std::int64_t latency_limit =
-            static_cast<std::int64_t>(config.sample_rate) * kLatencyMs / 1000;
-        if (start + arrival - slot > latency_limit) {
+        // The rate model (ratectl.hpp): at the declared peak rate, and at the chosen bitrate when
+        // there is one. A unit late under either is a violation; if the caller lets the objects give
+        // up bits (attempt.retry_possible) it is not an error yet, but a reason to try again.
+        const RateStep step = peak_model.admit(static_cast<std::int64_t>(first_sample), total);
+        const RateStep budget_step =
+            budget_model.admit(static_cast<std::int64_t>(first_sample), total);
+        if (step.late() || budget_step.late()) {
             ++stats.rate_violations;
-            if (!config.allow_rate_violations) {
+            if (attempt.retry_possible || !config.allow_rate_violations) {
                 return std::unexpected(make_error(
                     EncodeErrorKind::kRateExceeded,
                     "the stream cannot be sent within the peak data rate and 75 ms (TH spec §18)"));
             }
+        } else if (attempt.retry_possible && last &&
+                   budget_step.headroom < budget_model.latency_limit() / kShapeReserveDivisor) {
+            // An interval that only just fits leaves the buffer nearly full, and the next one is late
+            // in its first units however many bits it gives up: it takes longer to drain 75 ms of
+            // backlog than an interval lasts. So while the objects can still give up bits, an interval
+            // has to end with a part of the buffer free. Not a violation, a reason to try again.
+            return std::unexpected(make_error(EncodeErrorKind::kRateExceeded,
+                                              "the interval ends with the buffer nearly full"));
         }
-        last_start = start;
-        last_arrival_end = start + arrival;
+        meter.add(total, nominal, step);
+        stats.min_headroom_us =
+            stats.access_units == 0
+                ? samples_to_us(step.headroom, config.sample_rate)
+                : std::min(stats.min_headroom_us, samples_to_us(step.headroom, config.sample_rate));
         stats.max_unit_bytes =
             std::max<std::uint32_t>(stats.max_unit_bytes, static_cast<std::uint32_t>(total));
         stats.max_unit_rate_bps = std::max<std::uint64_t>(
             stats.max_unit_rate_bps, static_cast<std::uint64_t>(total) * 8U * config.sample_rate /
                                          static_cast<std::uint64_t>(nominal));
         const auto input_timing =
-            static_cast<std::uint16_t>(static_cast<std::uint64_t>(start) & 0xFFFFU);
+            static_cast<std::uint16_t>(static_cast<std::uint64_t>(step.start) & 0xFFFFU);
 
         auto prefix = write_access_unit_prefix(
             major_sync, std::span<const SubstreamEntry>(entries.data(), stage_count), input_timing,
@@ -1564,13 +1643,19 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
         unit.bytes.insert(unit.bytes.end(), extra.begin(), extra.end());
         unit.samples = nominal;
         unit.padding_samples = last ? padding : 0;
-        unit.has_major_sync = first;
+        unit.has_major_sync = major_here;
         stats.bytes += unit.bytes.size();
         ++stats.access_units;
         ++unit_index;
         sample_position += static_cast<std::uint64_t>(nominal);
+        units_out.push_back(std::move(unit));
+    }
 
-        if (verifier) {
+    // The interval fits (or may be written as it is): the decoder sees it now, and not before, so
+    // that a try that was thrown away never reached it.
+    if (verifier) {
+        for (int au = 0; au < units; ++au) {
+            const EncodedAccessUnit& unit = units_out[static_cast<std::size_t>(au)];
             auto decoded = verifier->decode(unit.bytes);
             if (!decoded || !*decoded) {
                 return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed,
@@ -1603,12 +1688,13 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             }
             ++stats.verified_units;
         }
-        units_out.push_back(std::move(unit));
     }
     for (std::size_t s = 0; s < stage_count; ++s) {
         previous_check[s] = work[s].check;
     }
     ++stats.restart_intervals;
+    ++interval_index;
+    interval_log.push_back(meter.finish());
     return units_out;
 }
 
