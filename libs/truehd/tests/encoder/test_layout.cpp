@@ -18,10 +18,11 @@
 #include "iclforge/truehd/encoder/layout.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 
-// The container of the stream the encoder writes (libs/truehd/layout.hpp, ERRATA.md entry 71): where
-// restart headers and major syncs fall, how segments are closed and listed, and how the object audio
-// metadata is cut into extra data. What the decoder checks is held to the bytes: [no-external-oracle]
-// for the four substream layout, which no decoder outside this repository reads.
+// The container of the stream the encoder writes (libs/truehd/layout.hpp, ERRATA.md entry 71):
+// where restart headers and major syncs fall, how segments are closed and listed, and how the
+// object audio metadata is cut into extra data. What the decoder checks is held to the bytes:
+// [no-external-oracle] for the four substream layout, which no decoder outside this repository
+// reads.
 
 namespace {
 
@@ -47,8 +48,8 @@ TEST_CASE("a cadence is refused unless a major sync can open a restart interval"
     CHECK_FALSE(layout_cadence_problem({7, 0}).empty());
     CHECK_FALSE(layout_cadence_problem({0, 0}).empty());
     CHECK_FALSE(layout_cadence_problem({4097, 0}).empty());
-    CHECK_FALSE(layout_cadence_problem({128, 100}).empty());   // not a multiple
-    CHECK_FALSE(layout_cadence_problem({128, 64}).empty());    // shorter than the interval
+    CHECK_FALSE(layout_cadence_problem({128, 100}).empty());  // not a multiple
+    CHECK_FALSE(layout_cadence_problem({128, 64}).empty());   // shorter than the interval
     CHECK_FALSE(layout_cadence_problem({128, -128}).empty());
     // The encoder says the same.
     EncoderConfig config;
@@ -76,7 +77,8 @@ TEST_CASE("which restart intervals open with a major sync", "[truehd][layout]") 
 
 TEST_CASE("a segment is closed with its parity and CRC bytes and listed with its end",
           "[truehd][layout]") {
-    std::vector<std::byte> segment{std::byte{0x12}, std::byte{0x34}, std::byte{0xAB}, std::byte{0xCD}};
+    std::vector<std::byte> segment{std::byte{0x12}, std::byte{0x34}, std::byte{0xAB},
+                                   std::byte{0xCD}};
     const std::vector<std::byte> payload = segment;
     layout_seal_segment(segment);
     REQUIRE(segment.size() == payload.size() + 2);
@@ -223,7 +225,8 @@ TEST_CASE("the audit finds what a decoder would refuse", "[truehd][layout][atmos
     REQUIRE(parsed.has_value());
     const auto segment = parsed->segments[3];  // the object substream's
     REQUIRE(segment.size() > 4);
-    const std::size_t tail = unit_start + offset_of(out.units[bad_unit].bytes, segment) + segment.size();
+    const std::size_t tail =
+        unit_start + offset_of(out.units[bad_unit].bytes, segment) + segment.size();
 
     SECTION("a wrong parity byte") {
         std::vector<std::byte> bytes = out.bytes;
@@ -253,13 +256,14 @@ TEST_CASE("the audit finds what a decoder would refuse", "[truehd][layout][atmos
         // restart flag turned round.
         std::array<SubstreamEntry, kMaxSubstreams> entries = parsed->entries;
         entries[2].restart_nonexistent = !entries[2].restart_nonexistent;
-        auto prefix = write_access_unit_prefix(parsed->major_sync,
-                                               std::span<const SubstreamEntry>(entries.data(), 4),
-                                               parsed->input_timing, out.units[bad_unit].bytes.size());
+        auto prefix = write_access_unit_prefix(
+            parsed->major_sync, std::span<const SubstreamEntry>(entries.data(), 4),
+            parsed->input_timing, out.units[bad_unit].bytes.size());
         REQUIRE(prefix.has_value());
         std::vector<std::byte> unit = *prefix;
         const std::size_t body = unit.size();
-        unit.insert(unit.end(), out.units[bad_unit].bytes.begin() + static_cast<std::ptrdiff_t>(body),
+        unit.insert(unit.end(),
+                    out.units[bad_unit].bytes.begin() + static_cast<std::ptrdiff_t>(body),
                     out.units[bad_unit].bytes.end());
         REQUIRE(unit.size() == out.units[bad_unit].bytes.size());
         std::vector<std::byte> bytes(out.bytes.begin(),
@@ -274,9 +278,9 @@ TEST_CASE("the audit finds what a decoder would refuse", "[truehd][layout][atmos
         CHECK(audit.problem.find("restart together") != std::string::npos);
     }
     SECTION("a stream that does not begin with a major sync") {
-        const std::vector<std::byte> bytes(out.bytes.begin() +
-                                               static_cast<std::ptrdiff_t>(out.units[0].bytes.size()),
-                                           out.bytes.end());
+        const std::vector<std::byte> bytes(
+            out.bytes.begin() + static_cast<std::ptrdiff_t>(out.units[0].bytes.size()),
+            out.bytes.end());
         const LayoutAudit audit = audit_layout(bytes);
         CHECK_FALSE(audit.ok);
         CHECK(audit.problem.find("access unit 0") != std::string::npos);
@@ -317,7 +321,7 @@ TEST_CASE("one metadata frame starts every 1536 samples, in the unit that holds 
     // Another unit length: 80 samples at 96 kHz.
     CHECK(oamd_frame_in_unit(0, 80).has_value());
     CHECK_FALSE(oamd_frame_in_unit(1, 80).has_value());
-    CHECK(oamd_frame_in_unit(19, 80).has_value());   // 19 * 80 = 1520, frame 1 at 1536
+    CHECK(oamd_frame_in_unit(19, 80).has_value());  // 19 * 80 = 1520, frame 1 at 1536
     CHECK(oamd_frame_in_unit(19, 80)->offset == 16);
     CHECK_FALSE(oamd_frame_in_unit(5, 0).has_value());
 }

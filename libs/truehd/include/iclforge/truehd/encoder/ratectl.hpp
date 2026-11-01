@@ -13,14 +13,14 @@
 // figures it keeps per restart interval, and a reader that works the same figures out of a stream
 // that is already written (`forge probe detail=rate`).
 //
-// The model is TH spec §3.4 and §18: a unit may start to arrive when its slot opens (one unit before
-// its first sample) and the unit before it has arrived; it arrives at the declared peak data rate;
-// and a decoder with 75 ms of buffer has the whole unit in time only if its arrival ends within 75 ms
-// of its slot. A unit that arrives in less than its own duration takes back time a longer one lost.
-// The distance to that limit is the unit's headroom. A stream whose units all have headroom of 0 or
-// more can be sent at
-// the declared peak rate. PROVISIONAL: the model is the encoder's reading of the specification and no
-// stream of the owner's has been checked against it (libs/truehd/ERRATA.md, entry 37).
+// The model is TH spec §3.4 and §18: a unit may start to arrive when its slot opens (one unit
+// before its first sample) and the unit before it has arrived; it arrives at the declared peak data
+// rate; and a decoder with 75 ms of buffer has the whole unit in time only if its arrival ends
+// within 75 ms of its slot. A unit that arrives in less than its own duration takes back time a
+// longer one lost. The distance to that limit is the unit's headroom. A stream whose units all have
+// headroom of 0 or more can be sent at the declared peak rate. PROVISIONAL: the model is the
+// encoder's reading of the specification and no stream of the owner's has been checked against it
+// (libs/truehd/ERRATA.md, entry 37).
 //
 // A second model of the same shape runs at the bitrate the caller chose, which may be below the
 // declared peak rate: a stream within it never needs more than 75 ms of buffering at that rate, so
@@ -44,8 +44,8 @@ struct RateStep {
 // The arrival model at one rate. A value type: copy it to try a unit without committing it.
 class ICLFORGE_TRUEHD_EXPORT RateModel {
    public:
-    // `nominal_samples` is the samples in a full access unit (40, 80 or 160), `rate_bps` the rate the
-    // units arrive at.
+    // `nominal_samples` is the samples in a full access unit (40, 80 or 160), `rate_bps` the rate
+    // the units arrive at.
     RateModel(std::uint32_t sample_rate, int nominal_samples, std::uint64_t rate_bps) noexcept;
 
     // Takes the next unit, whose first sample is `first_sample` on the stream's clock, `unit_bytes`
@@ -78,11 +78,12 @@ struct IntervalRate {
     std::uint64_t units = 0;
     std::uint64_t samples = 0;  // per channel, padding included
     std::uint64_t bytes = 0;
-    std::uint32_t bitrate_bps = 0;       // bytes of the interval over its duration, rounded down
-    std::uint32_t peak_unit_bps = 0;     // the largest unit's bytes over one unit's duration
+    std::uint32_t bitrate_bps = 0;    // bytes of the interval over its duration, rounded down
+    std::uint32_t peak_unit_bps = 0;  // the largest unit's bytes over one unit's duration
     std::uint32_t max_unit_bytes = 0;
-    std::int64_t min_headroom_us = 0;    // under the declared peak rate, in microseconds, rounded down
-    std::uint32_t late_units = 0;        // units whose headroom is below 0
+    std::int64_t min_headroom_us =
+        0;                         // under the declared peak rate, in microseconds, rounded down
+    std::uint32_t late_units = 0;  // units whose headroom is below 0
     friend bool operator==(const IntervalRate&, const IntervalRate&) = default;
 };
 
@@ -115,7 +116,7 @@ struct RateReport {
     std::vector<IntervalRate> intervals;
     std::uint64_t units = 0;
     std::uint64_t bytes = 0;
-    std::uint32_t bitrate_bps = 0;       // the whole stream
+    std::uint32_t bitrate_bps = 0;  // the whole stream
     std::uint32_t peak_unit_bps = 0;
     std::int64_t min_headroom_us = 0;
     std::uint32_t late_units = 0;

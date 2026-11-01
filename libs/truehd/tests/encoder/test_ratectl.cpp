@@ -16,9 +16,9 @@
 #include "iclforge/truehd/encoder/ratectl.hpp"
 
 // Rate control (libs/truehd/ratectl.hpp, ERRATA.md entry 71): the arrival model, the figures kept
-// for each restart interval and read back from a stream, and RateMode::kShape, which lets the object
-// channels give up low bits so that the stream fits a chosen bitrate. The model is the encoder's
-// reading of TH spec §3.4 and §18: [no-external-oracle].
+// for each restart interval and read back from a stream, and RateMode::kShape, which lets the
+// object channels give up low bits so that the stream fits a chosen bitrate. The model is the
+// encoder's reading of TH spec §3.4 and §18: [no-external-oracle].
 
 namespace {
 
@@ -45,7 +45,8 @@ TEST_CASE("the arrival model gives the figures worked out by hand", "[truehd][ra
     CHECK(b.arrival == 80);
     CHECK(b.headroom == 3600 - 80);
 
-    // Unit 2 (slot 40): it has to wait for unit 1, which ends at 80, so the queue is 40 samples long.
+    // Unit 2 (slot 40): it has to wait for unit 1, which ends at 80, so the queue is 40 samples
+    // long.
     const RateStep c = model.admit(80, kBytesFor40Samples);
     CHECK(c.start == 80);
     CHECK(c.arrival == 40);
@@ -67,7 +68,7 @@ TEST_CASE("the arrival model gives the figures worked out by hand", "[truehd][ra
     CHECK(e.late());
     CHECK(samples_to_us(e.headroom, 48000) == -16000);
     CHECK(samples_to_us(d.headroom, 48000) == 72062);  // 3459 / 48000 s, rounded down
-    CHECK(samples_to_us(-1, 48000) == -21);             // toward minus infinity, not toward 0
+    CHECK(samples_to_us(-1, 48000) == -21);            // toward minus infinity, not toward 0
 
     // reset() starts a stream again: the first unit starts at its slot.
     model.reset();
@@ -125,8 +126,8 @@ TEST_CASE("an interval meter keeps the figures of its units", "[truehd][rate][ra
     CHECK(r.samples == 120);
     CHECK(r.bytes == 205'625);
     CHECK(r.max_unit_bytes == 200'000);
-    CHECK(r.bitrate_bps == 658'000'000U);  // 205,625 bytes in 120 samples
-    CHECK(r.peak_unit_bps == 1'920'000'000U);               // 200,000 bytes in 40 samples
+    CHECK(r.bitrate_bps == 658'000'000U);      // 205,625 bytes in 120 samples
+    CHECK(r.peak_unit_bps == 1'920'000'000U);  // 200,000 bytes in 40 samples
     CHECK(r.min_headroom_us == -16000);
     CHECK(r.late_units == 1);
 
@@ -139,7 +140,8 @@ TEST_CASE("an interval meter keeps the figures of its units", "[truehd][rate][ra
 
 TEST_CASE("the figures of a stream read back are the figures the encoder kept",
           "[truehd][rate][ratectl]") {
-    // Two shapes: stereo with a last interval that is not whole, and an Atmos stream with substream 3.
+    // Two shapes: stereo with a last interval that is not whole, and an Atmos stream with
+    // substream 3.
     for (const bool atmos : {false, true}) {
         EncoderConfig config = atmos ? atmos_config(12) : EncoderConfig{};
         config.restart_interval_units = atmos ? 128 : 16;
@@ -215,7 +217,8 @@ TEST_CASE("a stream with no major sync has no rate figures", "[truehd][rate][rat
 // A bitrate a fifth below the most any restart interval of the signal's lossless stream needs, so
 // that the loud intervals do not fit it and the quiet ones do. The signal is the first 3 seconds
 // (its six phases); the bed alone is far below it.
-std::uint32_t tight_target(const MixedSignal& signal, const EncoderConfig& lossless_config = atmos_config(12)) {
+std::uint32_t tight_target(const MixedSignal& signal,
+                           const EncoderConfig& lossless_config = atmos_config(12)) {
     const StreamOut lossless = encode_signal(lossless_config, signal, 48000 * 3);
     std::uint32_t most = 0;
     for (const IntervalRate& interval : lossless.intervals) {
@@ -234,7 +237,8 @@ EncoderConfig shaped_config(std::uint32_t target, int objects = 12) {
 TEST_CASE("a stream that does not fit the chosen bitrate is kRateExceeded in strict mode",
           "[truehd][rate][ratectl]") {
     EncoderConfig config = atmos_config(12);
-    config.rate_control.target_bitrate_bps = tight_target(MixedSignal{.object_noise_bits = 15});  // RateMode::kStrict
+    config.rate_control.target_bitrate_bps =
+        tight_target(MixedSignal{.object_noise_bits = 15});  // RateMode::kStrict
     const MixedSignal signal{.object_noise_bits = 15};
     auto encoder = Encoder::create(config);
     REQUIRE(encoder.has_value());
@@ -258,7 +262,8 @@ TEST_CASE("RateMode::kShape fits the chosen bitrate and leaves the bed alone",
     const std::uint32_t target = tight_target(MixedSignal{.object_noise_bits = 15});
     const EncoderConfig config = shaped_config(target);
     const MixedSignal signal{.object_noise_bits = 15};
-    const std::uint64_t frames = 48000 * 7 / 2;  // seven phases: quiet, mid, noise, silence, loud, bed noise, quiet
+    const std::uint64_t frames =
+        48000 * 7 / 2;  // seven phases: quiet, mid, noise, silence, loud, bed noise, quiet
     const StreamOut out = encode_signal(config, signal, frames, 48000, true);
 
     // It was necessary and it did something, in some intervals and not all.
@@ -383,7 +388,8 @@ TEST_CASE("the shaping stops where nothing more can be given up", "[truehd][rate
     CHECK(*failure == EncodeErrorKind::kRateExceeded);
 }
 
-TEST_CASE("rate control refuses configurations it cannot honour", "[truehd][rate][ratectl][config]") {
+TEST_CASE("rate control refuses configurations it cannot honour",
+          "[truehd][rate][ratectl][config]") {
     EncoderConfig stereo;
     stereo.rate_control.mode = RateMode::kShape;
     CHECK_FALSE(Encoder::refusal_reason(stereo).empty());  // no object channels to shape
@@ -455,9 +461,10 @@ Acceptance run_acceptance(EncoderConfig config, const MixedSignal& signal, std::
     std::int64_t min_headroom = 0;
     const auto take = [&](const std::vector<EncodedAccessUnit>& units) {
         for (const EncodedAccessUnit& unit : units) {
-            const RateStep step = model.admit(static_cast<std::int64_t>(result.units) * 40,
-                                              unit.bytes.size());
-            min_headroom = result.units == 0 ? step.headroom : std::min(min_headroom, step.headroom);
+            const RateStep step =
+                model.admit(static_cast<std::int64_t>(result.units) * 40, unit.bytes.size());
+            min_headroom =
+                result.units == 0 ? step.headroom : std::min(min_headroom, step.headroom);
             result.late += step.late() ? 1U : 0U;
             bytes += unit.bytes.size();
             ++result.units;
@@ -466,12 +473,12 @@ Acceptance run_acceptance(EncoderConfig config, const MixedSignal& signal, std::
     for (std::uint64_t second = 0; second < seconds; ++second) {
         auto units = encoder->encode(signal.frames(second * 48000, 48000));
         if (!units) {
-            UNSCOPED_INFO("encode failed at second " << second << ": " << to_string(units.error().kind)
-                                                     << ": " << units.error().detail
-                                                     << " (shaped intervals so far "
-                                                     << encoder->stats().shaped_intervals << ", retries "
-                                                     << encoder->stats().shape_retries << ", max bits "
-                                                     << encoder->stats().max_shape_bits << ")");
+            UNSCOPED_INFO("encode failed at second "
+                          << second << ": " << to_string(units.error().kind) << ": "
+                          << units.error().detail << " (shaped intervals so far "
+                          << encoder->stats().shaped_intervals << ", retries "
+                          << encoder->stats().shape_retries << ", max bits "
+                          << encoder->stats().max_shape_bits << ")");
         }
         REQUIRE(units.has_value());
         take(*units);
@@ -520,8 +527,7 @@ TEST_CASE("2 minutes of a mixed signal stay inside the budget", "[.long][truehd]
     accept_duration(120);
 }
 
-TEST_CASE("20 minutes of a mixed signal stay inside the budget",
-          "[.long][truehd][rate][ratectl]") {
+TEST_CASE("20 minutes of a mixed signal stay inside the budget", "[.long][truehd][rate][ratectl]") {
     accept_duration(1200);
 }
 

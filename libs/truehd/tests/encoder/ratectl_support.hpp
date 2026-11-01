@@ -23,7 +23,8 @@ namespace iclforge::truehd::testing {
 // One cycle of the signal is six phases of half a second each; every channel has a tone of its own
 // and noise from a generator of its own, and the phases change what dominates:
 //   0 quiet tones, 1 the objects take a mid tone with a little noise, 2 the objects take noise of
-//   `object_noise_bits`, 3 silence, 4 the objects take a loud tone, 5 the bed takes noise of 11 bits.
+//   `object_noise_bits`, 3 silence, 4 the objects take a loud tone, 5 the bed takes noise of 11
+//   bits.
 // Values are 24 bit.
 struct MixedSignal {
     int bed = 8;
@@ -42,7 +43,8 @@ struct MixedSignal {
         constexpr double kFull = 8388607.0;
         for (int i = 0; i < count; ++i) {
             const std::uint64_t t = first + static_cast<std::uint64_t>(i);
-            const auto phase = static_cast<int>((t / static_cast<std::uint64_t>(phase_frames)) % 6U);
+            const auto phase =
+                static_cast<int>((t / static_cast<std::uint64_t>(phase_frames)) % 6U);
             for (int c = 0; c < width(); ++c) {
                 // A noise value that is a function of (t, c, seed) alone.
                 std::uint64_t h = (t * 0x9E3779B97F4A7C15ULL) ^
@@ -111,8 +113,8 @@ inline StreamOut encode_signal(const EncoderConfig& config, const MixedSignal& s
         }
     };
     for (std::uint64_t at = 0; at < frames; at += static_cast<std::uint64_t>(chunk)) {
-        const int n = static_cast<int>(std::min<std::uint64_t>(static_cast<std::uint64_t>(chunk),
-                                                                frames - at));
+        const int n = static_cast<int>(
+            std::min<std::uint64_t>(static_cast<std::uint64_t>(chunk), frames - at));
         auto units = encoder->encode(signal.frames(at, n));
         if (!units) {
             UNSCOPED_INFO("encode failed: " << to_string(units.error().kind) << ": "

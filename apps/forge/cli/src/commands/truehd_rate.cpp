@@ -69,8 +69,8 @@ void RateSurvey::print_text() const {
         "rate model", r.peak_data_rate_bps / 1000, th::kRateLatencyMs, r.intervals.size(),
         r.bitrate_bps / 1000, r.peak_unit_bps / 1000, format_headroom_ms(r.min_headroom_us),
         r.late_units);
-    fmt::println("  {:>8} {:>10} {:>6} {:>12} {:>12} {:>12} {:>5}", "interval", "first unit", "units",
-                 "kbit/s", "peak kbit/s", "headroom ms", "late");
+    fmt::println("  {:>8} {:>10} {:>6} {:>12} {:>12} {:>12} {:>5}", "interval", "first unit",
+                 "units", "kbit/s", "peak kbit/s", "headroom ms", "late");
     std::size_t number = 0;
     for (const th::IntervalRate& interval : r.intervals) {
         fmt::println("  {:>8} {:>10} {:>6} {:>12} {:>12} {:>12} {:>5}", number++,

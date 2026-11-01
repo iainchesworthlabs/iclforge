@@ -20,16 +20,17 @@
 
 namespace iclforge::truehd {
 
-// --- restart intervals and the major sync cadence (TH spec §4, §6, §7.5) ----------------------------
+// --- restart intervals and the major sync cadence (TH spec §4, §6, §7.5)
+// ----------------------------
 
 struct LayoutCadence {
     // The access units between restart headers: 1, or 8 to 4096. Every substream restarts together.
     int restart_units = 128;
     // The access units between major syncs. 0 puts one at every restart (a restart interval is then
     // what a random access can start from, as in FFmpeg's streams). Otherwise a multiple of
-    // `restart_units`: the restarts between two major syncs carry a restart header in each substream's
-    // first block and no major sync. A decoder that joins a stream waits for the next major sync, and
-    // the major sync's bytes are paid less often.
+    // `restart_units`: the restarts between two major syncs carry a restart header in each
+    // substream's first block and no major sync. A decoder that joins a stream waits for the next
+    // major sync, and the major sync's bytes are paid less often.
     int major_sync_units = 0;
 };
 
@@ -42,7 +43,8 @@ struct LayoutCadence {
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT bool layout_has_major_sync(const LayoutCadence& cadence,
                                                                 std::uint64_t interval) noexcept;
 
-// --- the substream segments and the directory (TH spec §6.1, §6.2) ----------------------------------
+// --- the substream segments and the directory (TH spec §6.1, §6.2)
+// ----------------------------------
 
 // Closes a segment: pads `payload` (a whole number of 16-bit words) with the parity byte and the
 // CRC byte of TH spec §6.2. The segment is then a whole number of words again.
@@ -54,15 +56,16 @@ void ICLFORGE_TRUEHD_EXPORT layout_seal_segment(std::vector<std::byte>& payload)
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<SubstreamEntry, Error> layout_directory_entry(
     bool restart, std::size_t end_word);
 
-// --- audit ----------------------------------------------------------------------------------------
+// --- audit
+// ----------------------------------------------------------------------------------------
 
 struct LayoutAudit {
     bool ok = true;
     std::string problem;  // the first thing wrong, with its access unit's number; empty when ok
     std::uint64_t units = 0;
-    std::uint64_t restarts = 0;     // units that start a restart interval
+    std::uint64_t restarts = 0;  // units that start a restart interval
     std::uint64_t major_syncs = 0;
-    std::uint64_t segments = 0;     // segments whose parity and CRC were checked
+    std::uint64_t segments = 0;  // segments whose parity and CRC were checked
     std::uint64_t extra_data_units = 0;
 };
 
@@ -72,10 +75,11 @@ struct LayoutAudit {
 // substream and that every substream of a unit restarts together. Stops at the first fault.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT LayoutAudit audit_layout(std::span<const std::byte> stream);
 
-// --- the object audio metadata in the extra data (TH spec §15.5.3, §16; ERRATA.md entries 62 to 64) -
+// --- the object audio metadata in the extra data (TH spec §15.5.3, §16; ERRATA.md entries 62 to
+// 64) -
 
-// The metadata is cut at the cadence of the owner's discs: one frame of 1536 samples, E-AC-3's, where
-// §15.5.3 says one a 40 sample unit.
+// The metadata is cut at the cadence of the owner's discs: one frame of 1536 samples, E-AC-3's,
+// where §15.5.3 says one a 40 sample unit.
 inline constexpr int kOamdFrameSamples = 1536;
 
 // The frame whose first sample falls in access unit `unit` (of `unit_samples` samples) and where.
@@ -105,8 +109,8 @@ using OamdFrameSource = std::function<std::vector<std::byte>(std::uint64_t frame
 // An EncoderConfig::extra_data that gives `source`'s frame to the unit that holds its first sample
 // and nothing to the others. The encoder frames what it returns (TH spec §16.1, §16.4) and counts
 // its bytes in the unit's size, so the rate control sees them.
-[[nodiscard]] ICLFORGE_TRUEHD_EXPORT ExtraDataSource oamd_extra_data(
-    OamdFrameSource source, int unit_samples, int frame_samples = kOamdFrameSamples);
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT ExtraDataSource
+oamd_extra_data(OamdFrameSource source, int unit_samples, int frame_samples = kOamdFrameSamples);
 
 // TH spec §16.1 and §16.4: the extra data region of `payload`: check nibble and length (in 16-bit
 // words, less one), evo_reserved and the payload length, the payload, zero padding to a whole word
