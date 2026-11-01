@@ -77,6 +77,7 @@ struct MatrixPlan {
     std::array<std::int32_t, kRowStride> fine{};
     int fine_bits = 0;
     int fine_ramp = 0;
+    mutable int fine_age = 0;  // lab: blocks since the matrices were sent
     int fine_pre = 0;  // lab: deltas shifted left when the bias asks for more than a whole last place
 };
 
@@ -800,7 +801,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             }
             kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
                                   plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
-                                  kRowStride, noise, kernels::FineTerms{plan.fine.data(), plan.fine_bits, plan.fine_ramp});
+                                  kRowStride, noise, kernels::FineTerms{plan.fine.data(), plan.fine_bits, plan.fine_ramp,
+                                                     config.lab.object_extension_cumulative ? plan.fine_age : -1});
+            ++plan.fine_age;
         }
     }
 

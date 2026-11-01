@@ -553,7 +553,7 @@ int main(int argc, char** argv) {
         }
     }
     static std::vector<std::string> combo_names;
-    combo_names.reserve(64);
+    combo_names.reserve(96);
     for (int bias : {-2, -3}) {
         for (int mode : {3, 4, 5}) {
             DecoderLab combined = base;
@@ -578,6 +578,19 @@ int main(int argc, char** argv) {
             combo_names.push_back("extension: place " + std::to_string(unit) + ", deltas at a fixed 2^-" +
                                   std::to_string(bits));
             settings.push_back({combo_names.back().c_str(), placed});
+        }
+    }
+    for (int bits : {3, 4}) {
+        for (int mode : {0, 4, 5}) {
+            for (bool cumulative : {false, true}) {
+                DecoderLab ramped = base;
+                ramped.object_extension_fixed = bits + 16;
+                ramped.object_extension = mode;
+                ramped.object_extension_cumulative = cumulative;
+                combo_names.push_back(std::string("extension: 2^-") + std::to_string(bits) + (mode == 4 ? ", ramp (i+1)/block" : mode == 5 ? ", ramp i/block" : ", flat") +
+                                      (cumulative ? ", adding up per block" : ", one block"));
+                settings.push_back({combo_names.back().c_str(), ramped});
+            }
         }
     }
     {

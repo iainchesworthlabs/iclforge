@@ -94,6 +94,8 @@ struct DecoderLab {
     // The place the deltas count from: 0 their coefficient's last place; 1 2^-frac; 2 to 5 one
     // absolute place for every matrix (2^-13, 2^-14, 2^-15, 2^-12).
     int object_extension_unit = 0;
+    // The deltas add up block after block from the block that sends them.
+    bool object_extension_cumulative = false;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;
