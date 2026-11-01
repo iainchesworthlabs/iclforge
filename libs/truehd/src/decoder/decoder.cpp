@@ -77,6 +77,7 @@ struct MatrixPlan {
     std::array<std::int32_t, kRowStride> fine{};
     int fine_bits = 0;
     int fine_ramp = 0;
+    int fine_pre = 0;  // lab: deltas shifted left when the bias asks for more than a whole last place
 };
 
 struct SubstreamState {
@@ -494,7 +495,9 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             if (use_fine) {
                 // Lab modes: 1 no refinement; 2 and 7 and 8 by 2^-width; 3 for the sending block
                 // only; 4 and 7 grow over the block by (i + 1) / block, 5 and 8 by i / block.
-                plan.fine_bits = spec.ext_width + (mode == 2 || mode >= 7 ? 0 : 1);
+                plan.fine_bits = spec.ext_width + (mode == 2 || mode >= 7 ? 0 : 1) + config.lab.object_extension_bias;
+                plan.fine_pre = plan.fine_bits < 1 ? 1 - plan.fine_bits : 0;
+                plan.fine_bits = std::max(plan.fine_bits, 1);
                 plan.fine_ramp = mode == 4 || mode == 7 ? 1 : mode == 5 || mode == 8 ? 2 : 0;
             }
             if (restart.sync == kRestartSyncAtmos) {
@@ -519,7 +522,10 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                     plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
                     // A 16 bit delta at a coefficient place of 2^21 needs 37 bits.
                     const std::int64_t fine =
-                        use_fine ? std::int64_t{spec.ext_value[index]} << std::max(scale, 0) : 0;
+                        use_fine ? (std::int64_t{config.lab.object_extension_negate ? -spec.ext_value[index]
+                                                                                     : spec.ext_value[index]}
+                                    << (std::max(scale, 0) + plan.fine_pre))
+                                 : 0;
                     if (fine != std::int64_t{static_cast<std::int32_t>(fine)}) {
                         return std::unexpected(make_error(
                             ErrorKind::kBadParameter,

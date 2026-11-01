@@ -85,6 +85,10 @@ struct DecoderLab {
     // at all; 2 by 2^-width; 3 for the block that sends them only; 4 and 5 with a ramp over the
     // block, (i + 1) / block or i / block; 7 and 8 the same with 2^-width.
     int object_extension = 0;
+    // Added to the number of bits the deltas are read below their last place (a negative number
+    // weighs the deltas more), and whether their sign is turned over.
+    int object_extension_bias = 0;
+    bool object_extension_negate = false;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;

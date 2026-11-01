@@ -500,6 +500,23 @@ int main(int argc, char** argv) {
         refined.object_extension = mode;
         settings.push_back({kExtensionNames[mode], refined});
     }
+    static std::vector<std::string> bias_names;
+    bias_names.reserve(16);
+    for (int bias : {-6, -5, -4, -3, -2, 1, 2}) {
+        for (bool negate : {false, true}) {
+            DecoderLab weighted = base;
+            weighted.object_extension_bias = bias;
+            weighted.object_extension_negate = negate;
+            bias_names.push_back("extension: deltas read at 2^-(width+1" + std::string(bias < 0 ? "" : "+") +
+                                 std::to_string(bias) + ")" + (negate ? ", negated" : ""));
+            settings.push_back({bias_names.back().c_str(), weighted});
+        }
+    }
+    {
+        DecoderLab negated = base;
+        negated.object_extension_negate = true;
+        settings.push_back({"extension: deltas negated", negated});
+    }
     static const char* const kUpwardNames[] = {
         "fold: matrix channels 1 up", "fold: matrix channels 2 up", "fold: matrix channels 3 up",
         "fold: matrix channels 4 up", "fold: matrix channels 5 up", "fold: matrix channels 6 up",
