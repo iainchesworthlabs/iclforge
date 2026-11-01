@@ -97,10 +97,10 @@ public:
         const std::lock_guard lock(mutex_);
         planner_ = std::move(planner);
     }
-    [[nodiscard]] std::vector<iclforge::render::OutputLayout> plan(
+    [[nodiscard]] iclforge::hearth::GroupPlan plan(
         const iclforge::hearth::GroupPlanRequest& request) const {
         const std::lock_guard lock(mutex_);
-        return planner_ ? planner_(request) : std::vector<iclforge::render::OutputLayout>{};
+        return planner_ ? planner_(request) : iclforge::hearth::GroupPlan{};
     }
 
     // What tells a group's members that decode for themselves how to reproduce a karaoke stream,

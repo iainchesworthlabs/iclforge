@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -498,4 +499,120 @@ TEST_CASE("chunks: AC-4 burst chunk errors", "[sendspin][chunks][ac4]") {
     ac3_sync[1] = std::byte{0x77};
     CHECK(parse_burst_chunk(burst_chunk(0, 0, 0x0D18, bits, ac3_sync)).error() ==
           ChunkError::kNoSyncword);
+}
+
+namespace {
+
+// The access units of a TrueHD stream FFmpeg made, by the length each opens with (TH spec section
+// 3.1): a check nibble, then 12 bits counting the unit in 16-bit words.
+std::vector<std::vector<std::byte>> truehd_units_of(const std::string& name) {
+    const std::vector<std::byte> stream = read_file(std::string{ICLFORGE_GOLDEN_TRUEHD_DIR} + "/" + name);
+    std::vector<std::vector<std::byte>> units;
+    std::size_t at = 0;
+    while (at + 4 <= stream.size()) {
+        const std::size_t words =
+            ((std::to_integer<std::size_t>(stream[at]) & 0x0FU) << 8U) | std::to_integer<std::size_t>(stream[at + 1]);
+        const std::size_t size = words * 2;
+        if (size < 4 || at + size > stream.size()) {
+            break;
+        }
+        units.emplace_back(stream.begin() + static_cast<std::ptrdiff_t>(at),
+                           stream.begin() + static_cast<std::ptrdiff_t>(at + size));
+        at += size;
+    }
+    return units;
+}
+
+std::vector<std::byte> concatenated(const std::vector<std::vector<std::byte>>& units, std::size_t first,
+                                    std::size_t count) {
+    std::vector<std::byte> out;
+    for (std::size_t i = first; i < first + count; ++i) {
+        out.insert(out.end(), units[i].begin(), units[i].end());
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("chunks: a TrueHD burst chunk carries whole access units, Pc 22 and a Pd in bytes",
+          "[sendspin][chunks][truehd]") {
+    using iclforge::sendspin::count_truehd_units;
+    using iclforge::sendspin::parse_burst_chunk;
+    const auto units = truehd_units_of("truehd_m51_s24.thd");
+    REQUIRE(units.size() > 60);
+    constexpr std::uint16_t kPc = 22;
+
+    for (const std::size_t count : {std::size_t{1}, std::size_t{7}, std::size_t{24}}) {
+        CAPTURE(count);
+        const std::vector<std::byte> payload = concatenated(units, 3, count);
+        const std::vector<std::uint8_t> message =
+            burst_chunk(1000000, 180000, kPc, static_cast<std::uint16_t>(payload.size()), payload);
+        const auto chunk = parse_burst_chunk(message);
+        REQUIRE(chunk.has_value());
+        CHECK(chunk->data_type() == BurstDataType::kTruehd);
+        CHECK(chunk->pd == payload.size());
+        CHECK(chunk->chunk.data.size() == payload.size());
+        CHECK(count_truehd_units(chunk->chunk.data) == count);
+    }
+    CHECK(iclforge::sendspin::burst_length_code(BurstDataType::kTruehd, 12345) == 12345);
+
+    SECTION("a chunk of 25 units is more than a MAT frame's worth") {
+        const std::vector<std::byte> payload = concatenated(units, 0, 25);
+        const auto chunk = parse_burst_chunk(
+            burst_chunk(0, 0, kPc, static_cast<std::uint16_t>(payload.size()), payload));
+        REQUIRE_FALSE(chunk.has_value());
+        CHECK(chunk.error() == ChunkError::kNotWholeUnits);
+    }
+    SECTION("a payload cut inside a unit is not whole units") {
+        std::vector<std::byte> payload = concatenated(units, 0, 3);
+        payload.resize(payload.size() - 2);
+        const auto chunk = parse_burst_chunk(
+            burst_chunk(0, 0, kPc, static_cast<std::uint16_t>(payload.size()), payload));
+        REQUIRE_FALSE(chunk.has_value());
+        CHECK(chunk.error() == ChunkError::kNotWholeUnits);
+    }
+    SECTION("a unit whose length is under its own header is refused") {
+        const std::vector<std::byte> payload(8, std::byte{0});
+        const auto chunk = parse_burst_chunk(burst_chunk(0, 0, kPc, 8, payload));
+        REQUIRE_FALSE(chunk.has_value());
+        CHECK(chunk.error() == ChunkError::kNotWholeUnits);
+    }
+    SECTION("a Pd that is not the payload's bytes is a length mismatch") {
+        const std::vector<std::byte> payload = concatenated(units, 0, 4);
+        const auto chunk = parse_burst_chunk(
+            burst_chunk(0, 0, kPc, static_cast<std::uint16_t>(payload.size() * 8), payload));
+        REQUIRE_FALSE(chunk.has_value());
+        CHECK(chunk.error() == ChunkError::kLengthMismatch);
+    }
+    SECTION("Pc bits 5 and 6 are reserved on a TrueHD burst as on AC-3's") {
+        const std::vector<std::byte> payload = concatenated(units, 0, 2);
+        const auto chunk = parse_burst_chunk(
+            burst_chunk(0, 0, 22 | 0x20, static_cast<std::uint16_t>(payload.size()), payload));
+        REQUIRE_FALSE(chunk.has_value());
+        CHECK(chunk.error() == ChunkError::kReservedBits);
+    }
+    SECTION("the longest chunk is the MAT frame's payload") {
+        CHECK(iclforge::sendspin::max_burst_payload(BurstDataType::kTruehd) == 61424);
+        CHECK(iclforge::sendspin::kTruehdUnitsPerChunk == 24);
+    }
+}
+
+TEST_CASE("chunks: the access units of every committed TrueHD fixture fit a chunk by 24",
+          "[sendspin][chunks][truehd]") {
+    // The largest a group of 24 gets in the fixtures is far under the chunk limit; the encoder's
+    // 18 Mbit/s peak (45 KB for 24 units) is under it too, which is checked as arithmetic.
+    for (const char* name : {"truehd_st48_s24.thd", "truehd_m51_s24.thd", "truehd_st192_s24.thd",
+                             "truehd_st96_s24.thd", "mlp_m51_s24.mlp"}) {
+        CAPTURE(name);
+        const auto units = truehd_units_of(name);
+        REQUIRE(units.size() >= 24);
+        std::size_t most = 0;
+        for (std::size_t first = 0; first + 24 <= units.size(); ++first) {
+            most = std::max(most, concatenated(units, first, 24).size());
+        }
+        CHECK(most <= iclforge::sendspin::kMaxTruehdChunkBytes);
+    }
+    constexpr std::size_t kPeakKbit = 18000;
+    constexpr std::size_t kBytesIn20Ms = kPeakKbit * 1000 / 8 / 50;
+    CHECK(kBytesIn20Ms + iclforge::sendspin::kBurstChunkHeaderBytes < 65518);
 }

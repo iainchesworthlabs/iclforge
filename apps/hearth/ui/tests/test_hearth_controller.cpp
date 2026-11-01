@@ -1531,6 +1531,32 @@ TEST_CASE("decoder settings: the TrueHD presentation and strictness round-trip, 
     CHECK(iclforge::hearth::ui::decoder_settings_to_map(settings)
               .value(QStringLiteral("truehdPresentation")).toString().toStdString() == "best");
 
+    // Which track of a file with several plays: automatic unless it is chosen, and kept by a map
+    // that does not carry it.
+    DecoderSettings track;
+    CHECK(iclforge::hearth::ui::decoder_settings_to_map(track).value(QStringLiteral("track")).toString() ==
+          QStringLiteral("automatic"));
+    for (const auto choice : {iclforge::hearth::TrackPreference::kBest,
+                              iclforge::hearth::TrackPreference::kCompressed,
+                              iclforge::hearth::TrackPreference::kAutomatic}) {
+        track.track = choice;
+        const QVariantMap map = iclforge::hearth::ui::decoder_settings_to_map(track);
+        CHECK(iclforge::hearth::ui::decoder_settings_from_map(map, DecoderSettings{}).track == choice);
+    }
+    DecoderSettings chosen;
+    chosen.track = iclforge::hearth::TrackPreference::kCompressed;
+    CHECK(iclforge::hearth::ui::decoder_settings_from_map(QVariantMap{}, chosen).track ==
+          iclforge::hearth::TrackPreference::kCompressed);
+    QVariantMap unknown;
+    CHECK(iclforge::hearth::ui::decoder_settings_to_map([] {
+              DecoderSettings s;
+              s.track = iclforge::hearth::TrackPreference::kBest;
+              return s;
+          }()).value(QStringLiteral("track")).toString() == QStringLiteral("truehd"));
+    unknown.insert(QStringLiteral("track"), QStringLiteral("nonsense"));
+    CHECK(iclforge::hearth::ui::decoder_settings_from_map(unknown, chosen).track ==
+          iclforge::hearth::TrackPreference::kAutomatic);
+
     // A map that carries neither key keeps the base's.
     DecoderSettings base;
     base.truehd.presentation = iclforge::truehd::Presentation::k6ch;

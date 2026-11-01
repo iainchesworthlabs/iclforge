@@ -450,6 +450,9 @@ struct ReaderState {
     // leaves this empty and walks the caller's buffer directly, which is
     // what makes it zero-copy.
     std::vector<std::byte> buffer;
+    // The offset in the pushed input of buffer[0]: every byte before it has been parsed and
+    // dropped. Lets push_at() say where in the file a frame lies.
+    std::uint64_t buffer_start = 0;
 };
 
 }  // namespace detail
@@ -769,6 +772,7 @@ Reader::~Reader() = default;
 const ReadTrack& Reader::track() const { return state_->track; }
 bool Reader::track_found() const { return state_->track_found; }
 std::size_t Reader::frames_read() const { return state_->frames_read; }
+const std::vector<SkippedTrack>& Reader::skipped() const { return state_->skipped; }
 
 std::expected<void, DemuxError> Reader::push(std::span<const std::byte> chunk,
                                              const FrameFn& on_frame) {
@@ -783,6 +787,26 @@ std::expected<void, DemuxError> Reader::push(std::span<const std::byte> chunk,
     // max_element_bytes, since anything larger was refused rather than
     // buffered.
     s.buffer.erase(s.buffer.begin(), s.buffer.begin() + static_cast<std::ptrdiff_t>(*consumed));
+    s.buffer_start += *consumed;
+    return {};
+}
+
+std::expected<void, DemuxError> Reader::push_at(std::span<const std::byte> chunk,
+                                                const FrameAtFn& on_frame) {
+    auto& s = *state_;
+    s.buffer.insert(s.buffer.end(), chunk.begin(), chunk.end());
+    // Every frame is a view into s.buffer, which walk() does not change, so a frame's place in
+    // the input is where the buffer starts in it plus how far into the buffer the frame lies.
+    const std::byte* const base = s.buffer.data();
+    const std::uint64_t start = s.buffer_start;
+    const auto consumed = walk(s, s.buffer, [&](std::span<const std::byte> frame) {
+        on_frame(frame, start + static_cast<std::uint64_t>(frame.data() - base));
+    });
+    if (!consumed.has_value()) {
+        return std::unexpected(consumed.error());
+    }
+    s.buffer.erase(s.buffer.begin(), s.buffer.begin() + static_cast<std::ptrdiff_t>(*consumed));
+    s.buffer_start += *consumed;
     return {};
 }
 

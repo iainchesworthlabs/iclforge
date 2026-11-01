@@ -6,7 +6,7 @@ The media code the programs compile in: container input, stream playback, record
 
 A app library, internal to the repository.
 
-- **Uses:** `ac3`, `ac4`, `containers`, `objects`, `render`
+- **Uses:** `ac3`, `ac4`, `containers`, `objects`, `render`, `truehd`
 - **Used by:** `forge`, `hearth`
 - **CI lanes:** windows, linux, macos
 

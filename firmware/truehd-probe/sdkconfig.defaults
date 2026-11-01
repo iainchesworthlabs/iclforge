@@ -1,0 +1,21 @@
+# The probe's settings every chip shares (README.md has the commands).
+#
+# The partition table is the hearth sink's, so that the probe image, written to ota_0 over USB with
+# an empty otadata, boots on a board that runs the sink without touching its bootloader, its NVS (name,
+# network, pairings) or its other slot: the board is put back by writing back the bytes the probe
+# replaced (README.md).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../hearth-sink/partitions.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_LIBC_STDOUT_LINE_ENDING_LF=y
+# A decode of a fixture runs for seconds at priority 5 with nothing yielding: the watchdog would
+# reset the board in the middle of a measurement.
+CONFIG_ESP_TASK_WDT_EN=n
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
+# Size-optimised, as the firmware is; the decoder's own sources are -O2 (main/CMakeLists.txt).
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_FREERTOS_HZ=1000
+# The interrupt watchdog is off for the same reason (it panics when the tick interrupt is not served
+# for 300 ms).
+CONFIG_ESP_INT_WDT=n

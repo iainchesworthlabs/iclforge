@@ -106,7 +106,43 @@ ScrollView {
         }
 
         Card {
+            objectName: "truehdTrack"
             ordinal: "03"
+            title: qsTr("Track")
+            framed: true
+
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray "
+                          + "remux does. Hearth decodes the TrueHD itself and cannot send it on as it is "
+                          + "yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes "
+                          + "that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD "
+                          + "always plays the TrueHD, and Compressed always the other track. A change "
+                          + "applies from the next item.")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.gap
+                Text { text: qsTr("Plays"); color: Theme.text; font.pixelSize: Theme.fontNormal
+                       elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
+                SegmentedControl {
+                    accessibleName: qsTr("Track")
+                    currentValue: root.settings.track ?? "automatic"
+                    model: [
+                        { value: "automatic", label: qsTr("Automatic") },
+                        { value: "truehd", label: qsTr("TrueHD") },
+                        { value: "compressed", label: qsTr("Compressed") }
+                    ]
+                    onSelected: function(value) { root.set("track", value); }
+                }
+            }
+        }
+
+        Card {
+            ordinal: "04"
             title: qsTr("Level")
             framed: true
 
@@ -124,7 +160,7 @@ ScrollView {
 
         Card {
             objectName: "truehdThisStream"
-            ordinal: "04"
+            ordinal: "05"
             title: qsTr("This stream")
             framed: true
             flat: true
