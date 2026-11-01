@@ -162,6 +162,7 @@ struct FineTerms {
     int bits = 0;
     int ramp = 0;  // lab: 0 the same for the block; 1 grows by (i + 1) / block; 2 by i / block
     int age = -1;  // lab: when not -1, the deltas add up over this many blocks since they were sent
+    int elapsed = -1;  // lab: when not -1, the deltas grow with the samples since they were sent, 40 to the step
 };
 
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
@@ -203,7 +204,10 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
             for (int k = 0; k < count; ++k) {
                 finer += static_cast<std::uint64_t>(std::int64_t{row[channel[k]]} * fine.delta[k]);
             }
-            if (fine.ramp != 0 || fine.age >= 0) {
+            if (fine.elapsed >= 0) {
+                const std::int64_t numerator = std::int64_t{fine.elapsed} + (fine.ramp == 1 ? i + 1 : fine.ramp == 2 ? i : 0);
+                finer = static_cast<std::uint64_t>(static_cast<std::int64_t>(finer) * numerator / 40);
+            } else if (fine.ramp != 0 || fine.age >= 0) {
                 std::int64_t numerator = fine.ramp == 1 ? i + 1 : fine.ramp == 2 ? i : block;
                 if (fine.age >= 0) {
                     numerator += std::int64_t{fine.age} * block;

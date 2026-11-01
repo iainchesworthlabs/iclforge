@@ -13,8 +13,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -28,10 +28,12 @@ namespace {
 
 using namespace iclforge::truehd;
 
-// SS3_LAB_FROM=N keeps the 51,200 samples from output sample N for the sine modes and the value tables.
+// A last argument from=N keeps the 51,200 samples from output sample N for the sine modes and the
+// value tables.
+std::uint64_t g_record_from = 0;
+
 std::uint64_t lab_record_from() {
-    const char* text = std::getenv("SS3_LAB_FROM");
-    return text == nullptr ? 0 : static_cast<std::uint64_t>(std::atoll(text));
+    return g_record_from;
 }
 
 struct Setting {
@@ -228,6 +230,11 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
     if (!c.object_error_context.empty()) {
         std::printf("    %s\n", c.object_error_context.c_str());
     }
+    std::printf("    checks: ");
+    for (const std::uint8_t entry : c.object_interval_log) {
+        std::printf("%c", (entry & 1U) != 0 ? 'o' : 'F');
+    }
+    std::printf("\n");
     if (brief) {
         return;
     }
@@ -511,10 +518,14 @@ void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, boo
 }
 
 int main(int argc, char** argv) {
+    if (argc > 2 && std::strncmp(argv[argc - 1], "from=", 5) == 0) {
+        g_record_from = static_cast<std::uint64_t>(std::atoll(argv[argc - 1] + 5));
+        --argc;
+    }
     if (argc != 2 && argc != 5 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ HZ2 THRESHOLD INTERVAL\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
+                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ HZ2 THRESHOLD INTERVAL\n       (add from=N as the last argument to record 51,200 samples from output sample N)\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -644,7 +655,7 @@ int main(int argc, char** argv) {
         }
     }
     static std::vector<std::string> combo_names;
-    combo_names.reserve(96);
+    combo_names.reserve(128);
     for (int bias : {-2, -3}) {
         for (int mode : {3, 4, 5}) {
             DecoderLab combined = base;
@@ -673,7 +684,7 @@ int main(int argc, char** argv) {
     }
     for (int bits : {3, 4}) {
         for (int mode : {0, 4, 5}) {
-            for (bool cumulative : {false, true}) {
+            for (int cumulative : {0, 1}) {
                 DecoderLab ramped = base;
                 ramped.object_extension_fixed = bits + 16;
                 ramped.object_extension = mode;
@@ -682,6 +693,16 @@ int main(int argc, char** argv) {
                                       (cumulative ? ", adding up per block" : ", one block"));
                 settings.push_back({combo_names.back().c_str(), ramped});
             }
+        }
+    }
+    for (int bits : {2, 3, 4}) {
+        for (int mode : {4, 5}) {
+            DecoderLab timed = base;
+            timed.object_extension_fixed = bits + 16;
+            timed.object_extension = mode;
+            timed.object_extension_cumulative = 2;
+            combo_names.push_back(std::string("extension: 2^-") + std::to_string(bits) + (mode == 4 ? ", ramp (i+1)" : ", ramp i") + " over 40 samples, from the sending block on");
+            settings.push_back({combo_names.back().c_str(), timed});
         }
     }
     {

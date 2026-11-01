@@ -95,7 +95,7 @@ struct DecoderLab {
     // absolute place for every matrix (2^-13, 2^-14, 2^-15, 2^-12).
     int object_extension_unit = 0;
     // The deltas add up block after block from the block that sends them.
-    bool object_extension_cumulative = false;
+    int object_extension_cumulative = 0;  // 1 per block, 2 by the samples since the block that sent them
     // The output sample from which the lab keeps the first 51,200 samples of the object substream
     // (object_first_out); 0 keeps the first ones.
     std::uint64_t record_from = 0;
