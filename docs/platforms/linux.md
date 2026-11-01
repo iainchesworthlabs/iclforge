@@ -130,9 +130,12 @@ stream; that is tested on synthetic carriers, and no capture device or receiver 
 
 ### TrueHD (MAT)
 
-!!! warning "Not run on any platform"
-    TrueHD over HDMI (MAT) has been **built, and tested against software devices, and has not been run against a receiver on
-    Linux, ALSA or PipeWire**. Nothing here says a receiver names the stream TrueHD. The code does what the carrier decision of 2026-10-29
+!!! warning "One receiver reported and displayed TrueHD; the library's own sink is not run"
+    On 2026-11-01 a WAV made by `forge spdif` and played with `aplay` on a Raspberry Pi 4B (vc4hdmi0, ALSA) into an Onkyo TX-RZ740 was reported as
+    TrueHD by the receiver's eISCP status ("Dolby Audio - TrueHD, 48 kHz, 5.1 ch"), and its LCD showed "DD DTHD 2.0" (the receiver's abbreviation, to be confirmed
+    by the owner), at 48 kHz and 96 kHz content. The carrier below worked for that receiver.
+    The library's `PassthroughSink` path and PipeWire have **not been run against a receiver**, and the receiver took 1.5 to 4.5 seconds to lock
+    from the start of the carrier. The code does what the carrier decision of 2026-10-29
     says, which is itself provisional ([libs/containers/ERRATA.md](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md),
     question 7): eight channels of 16 bits at 192 kHz for content in the 48 kHz family and 176.4 kHz for the 44.1 kHz family,
     3,840 frames to a 61,440-byte burst. The list of what has been run is `apps/hearth/engine/src/mat_status.hpp`, and

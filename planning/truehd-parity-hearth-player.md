@@ -615,6 +615,25 @@ one; `follow=off`, or no output that can take PCM, refuses. It is carried in `Ou
      (`aplay -D "hdmi:CARD=<card>,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e" mat.wav`; untried here); then Windows; Core Audio last.
      WP6's session was said to be producing MAT bursts for the Shield and the Onkyo: its branch (`feature/truehd-validation`) held none when this was
      written, so the bursts for the first run are `forge spdif` of the 25 fixtures.
+     **2026-11-01, first run (step A, `aplay` of `forge spdif`'s WAV): the receiver's status reported TrueHD and, on the repeat, its LCD showed "DD DTHD 2.0".**
+     Raspberry Pi 4B, vc4hdmi0, ALSA, into the Onkyo
+     TX-RZ740, with the owner present and the volume at 0. `forge spdif` of `truehd_m51_s16.thd` made an 8-channel 16-bit 192,000 Hz WAV; played with
+     `aplay -D "hdmi:CARD=vc4hdmi0,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e"`, the receiver's eISCP status (IFAQSTN) said "Dolby Audio - TrueHD, 48 kHz,
+     5.1 ch" from about 4.4 s to 26.7 s, twice; `truehd_cat_st48_s24.thd` said "Dolby TrueHD SUR, 48 kHz, 2.0 ch". The owner's photos show the Dolby logo and
+     the right speakers lit. **The first time the owner saw no format word on the LCD** (Direct mode, the display line showing only the input name "AUX" and the
+     volume). **The repeat, with the volume at -50 dB and the owner pressing through the display pages, showed:** "fs: 96kHz" while a 96 kHz stream played, and
+     "DD DTHD 2.0" (a Dolby double-D glyph, "DTHD", the channels) while a stereo stream played, with HDMI and the Dolby logo lit; `IFAQSTN` said "TrueHD, 48 kHz,
+     2.0 ch" and "TrueHD, 96 kHz, 2.0 ch" at the same times and agreed with the display. The LCD never spelled "TrueHD" in full: "DTHD" is read here as the
+     receiver's abbreviation of Dolby TrueHD, and **the owner is to confirm that reading**. Which run each photo came from was not recorded. No Atmos label was expected: these fixtures are not Atmos. The 5.1 fixture is 0.26 s and the Pi session's loop restarts it about
+     No Atmos label was expected: these fixtures are not Atmos. The 5.1 fixture is 0.26 s and the Pi session's loop restarts it about four times a second,
+     so the "pulsing" the owner heard from it is not read as a decode fault. No `dmesg` audio errors, no throttling.
+     **What it shows:** eight channels of 16 bits at 192 kHz with the non-audio channel status is a carrier this Onkyo reports and displays as TrueHD, at 48 kHz
+     content and at 96 kHz content (which uses the same 192 kHz link), pending the owner's reading of "DTHD" (question 7 of `libs/containers/ERRATA.md`;
+     176.4 kHz is still unseen). **What it does not show:** the library's own path. Steps B
+     (`PassthroughSink` with `BitstreamFormat::kMat`) and C (PipeWire, and `pw-dump` of the stream for entry 123) have not been run, so ALSA stays "not run" in
+     `mat_status.hpp`. **Two findings for the player:** the fixtures are 8 and 13 bursts (0.2 s), too short for the receiver to lock; and lock took 1.5 to 4.5 s
+     from the start of the carrier, with the HDMI label flashing meanwhile, so the link must start before the first burst and the player must not
+     expect sound in its first seconds.
 121. **A platform marked "not run" is never chosen automatically.** The user can pin Bitstream to try it. *Recommend:* keep, and flip a platform to
      "run" only in the commit that records a run that passed (the table has a test that pins it).
 122. **WASAPI's MLP format fields.** `dwEncodedSamplesPerSec` is the content rate and `dwEncodedChannelCount` 8, as the other two families have
