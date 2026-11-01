@@ -1026,7 +1026,19 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     std::to_string(state.context.max_chan) + " of " +
                     std::to_string(state.context.max_matrix_chan + 1) + ", error \"" +
                     std::string(decoded.error().detail) +
-                    "\"; blocks of the segment: " + segment_trace;
+                    "\"; data check " + std::to_string(state.restart.data_check_present ? 1 : 0) +
+                    "; channels:";
+                for (int ch = state.context.min_chan; ch <= state.context.max_chan; ++ch) {
+                    const ChannelState& channel = state.channels[static_cast<std::size_t>(ch)];
+                    counters.object_error_context +=
+                        " [" + std::to_string(ch) + ": type " + std::to_string(channel.huff_type) +
+                        " lsbs " + std::to_string(channel.huff_lsbs) + " offset " +
+                        std::to_string(channel.huff_offset) + " step " +
+                        std::to_string(state.quant_step[static_cast<std::size_t>(ch)]) +
+                        " fir " + std::to_string(channel.fir.order) + " iir " +
+                        std::to_string(channel.iir.order) + "]";
+                }
+                counters.object_error_context += "; blocks of the segment: " + segment_trace;
             }
             state.running = false;
             return std::unexpected(decoded.error());
