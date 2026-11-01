@@ -32,7 +32,10 @@ feeds every unit to an independent `RateModel`:
   shaped interval.
 
 10 s runs in the default test set. 2 min and 20 min are tagged `[.long]` (run them with `iclforge-truehd-tests "[.long]"`):
-RESULTS_PLACEHOLDER
+on a Release build (MSVC, one core each, `verify` on, both configurations in each run) 2 min took 66 s and 20 min 631 s, with every
+unit checked by the encoder's own decoder, no late unit under the model at the declared or the chosen rate, and the shaped
+configuration shaping. A Debug build takes about 14 times as long. The first 2 min run (before the reserve below) failed at second 103
+of the shaped configuration: an interval that only just fit left the next one late.
 
 ## Questions for the owner (numbered after ERRATA's 60 to 79; the decoder session owns ERRATA.md, so these wait here)
 
