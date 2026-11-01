@@ -523,9 +523,11 @@ struct StageWork {
     bool noise = false;
     std::uint32_t noise_seed = 0;      // the restart header's, which generator 1 starts from
     std::vector<MatrixSpec> matrices;  // in the order the decoder applies them
-    // For each matrix with the LSB bypass, in order, the bit it sends for every sample of the
-    // interval (sent ahead of the sample's residuals).
-    std::vector<std::vector<std::uint8_t>> bypass;
+    // The object stage's matrices block by block (object_bed.hpp), and for each matrix with the
+    // LSB bypass the bits it sends for every sample of the interval (ahead of the residuals).
+    bool object_plan = false;
+    detail::ObjectTimeline timeline;
+    detail::ObjectBypass bypass;
     std::vector<Plane> coded;     // the rows this stage codes, before its matrices
     std::vector<Plane> outputs;   // the stage's output rows, in the 24 bit domain
     std::vector<FilterSpec> fir;  // per coded row
@@ -741,6 +743,23 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
             }
             if (config.object_noise_shift < 0 || config.object_noise_shift > 15) {
                 return "object_noise_shift must be 0..15 (a 4 bit field)";
+            }
+            if (config.object_bypass_bits < 1 || config.object_bypass_bits > 3) {
+                return "object_bypass_bits must be 1..3 (the 2 bits of field_2b)";
+            }
+            if (config.object_update_units < 1) {
+                return "object_update_units must be at least 1";
+            }
+            if (config.object_extension != ObjectExtension::kNone &&
+                config.object_update_units != 1) {
+                return "the object slopes need an update at every unit: object_update_units 1";
+            }
+            for (const ObjectPath& path : config.object_paths) {
+                if (const std::string_view problem =
+                        detail::object_path_problem(path, config.object_channels);
+                    !problem.empty()) {
+                    return problem;
+                }
             }
         }
     }
@@ -1212,10 +1231,11 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
     int bed_zero_bits = -1;
     int chain_shift = 0;
     detail::ObjectChainShape chain_shape;
-    std::vector<MatrixSpec> chain;
+    detail::ObjectTimeline timeline;
     std::vector<Plane> chain_rows;      // the rows before the matrices
     std::vector<Plane> object_outputs;  // the rows after them: the objects, in units of 2^quant
-    std::vector<std::vector<std::uint8_t>> chain_bypass;
+    detail::ObjectBypass chain_bypass;
+    const auto bounds = block_bounds(shape);
     if (bed_chain) {
         std::uint32_t seen = 0;
         for (std::size_t k = 0; k < static_cast<std::size_t>(objects); ++k) {
@@ -1227,7 +1247,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
             seen == 0 ? 0 : std::min(std::countr_zero(seen), kMaxOutputShift + kMaxQuantStep);
         chain_shift = std::min(zero_bits, kMaxOutputShift);
         // The doubled bypass matrix cannot keep a quantiser step's cleared bits (see
-        // invert_object_chain).
+        // invert_object_timeline).
         chain_shape.quant = config.object_lsb_bypass ? 0 : zero_bits - chain_shift;
         chain_shape.units = units;
         chain_shape.nominal = nominal;
@@ -1243,10 +1263,27 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
         // step mixes nothing, which always does).
         bool fitted = false;
         for (int step = 0; step < detail::kObjectMixSteps && !fitted; ++step) {
-            chain = detail::make_object_bed_chain(objects, step, config.object_noise_shift,
-                                                  config.object_lsb_bypass);
+            detail::ObjectTimelineRequest request;
+            request.objects = objects;
+            request.noise_shift = config.object_noise_shift;
+            request.bypass_bits = config.object_lsb_bypass ? config.object_bypass_bits : 0;
+            request.mix_step = step;
+            request.paths = config.object_paths;
+            request.extension = config.object_extension;
+            request.update_units = config.object_update_units;
+            request.drop_idle = config.object_drop_idle_matrices;
+            request.split_mixes = config.object_split_mixes;
+            request.first_sample = static_cast<std::int64_t>(sample_position);
+            request.nominal = nominal;
+            request.blocks = bounds;
+            auto planned = detail::build_object_timeline(request);
+            if (!planned) {
+                return std::unexpected(
+                    make_error(EncodeErrorKind::kInvalidConfig, planned.error()));
+            }
+            timeline = std::move(*planned);
             chain_rows = object_outputs;
-            if (!detail::invert_object_chain(chain, chain_shape, chain_rows, chain_bypass)) {
+            if (!detail::invert_object_timeline(timeline, chain_shape, chain_rows, chain_bypass)) {
                 return std::unexpected(make_error(EncodeErrorKind::kInternal,
                                                   "the object matrices cannot be run backwards"));
             }
@@ -1259,7 +1296,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
             }
         }
         std::vector<Plane> forward = chain_rows;
-        detail::apply_object_chain(chain, chain_shape, chain_bypass, forward);
+        detail::apply_object_timeline(timeline, chain_shape, chain_bypass, forward);
         if (!fitted || forward != object_outputs) {
             return std::unexpected(make_error(EncodeErrorKind::kInternal,
                                               "the object matrices do not give back the objects"));
@@ -1285,11 +1322,12 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
         stage.quant = chain_shape.quant;
         stage.sync = kRestartSyncAtmos;
         stage.noise_seed = chain_shape.noise_seed;
-        stage.matrices = chain;
-        stage.bypass = chain_bypass;
+        stage.object_plan = true;
+        stage.timeline = std::move(timeline);
+        stage.bypass = std::move(chain_bypass);
         stage.outputs = object_outputs;
         stage.coded.assign(chain_rows.begin() + detail::kBedChannels, chain_rows.end());
-        stats.matrices_used += chain.size();
+        stats.matrices_used += detail::object_matrices_used(stage.timeline);
     } else if (objects > 0) {
         if (auto atmos = prepare({static_cast<std::size_t>(channels), objects, &object_stages,
                                   &no_layout, &no_downmix, false, true});
@@ -1319,7 +1357,6 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
     }
 
     // --- the blocks of each stage: coding choices and headers --------------------------------
-    const auto bounds = block_bounds(shape);
     for (StageWork& stage : work) {
         const auto coded = static_cast<std::size_t>(stage.spec.coded());
         bool retry = true;
@@ -1338,6 +1375,10 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
                 if (plan.size != current_size) {
                     header.block_size = static_cast<std::uint16_t>(plan.size);
                     current_size = plan.size;
+                    any = true;
+                }
+                if (stage.object_plan && stage.timeline.blocks[b].send) {
+                    header.matrices = stage.timeline.blocks[b].section;
                     any = true;
                 }
                 if (b == 0) {
@@ -1531,8 +1572,9 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
                     const std::size_t t = plan.start + static_cast<std::size_t>(i);
                     // The bits that put back what the LSB bypass matrices drop come first
                     // (TH spec §10.2.1, kernels::read_residuals).
-                    for (const std::vector<std::uint8_t>& bits : stage.bypass) {
-                        w.put(bits[t], 1);
+                    if (stage.object_plan) {
+                        detail::put_object_bypass(w, stage.timeline, stage.bypass, first_block + bi,
+                                                  i);
                     }
                     for (std::size_t k = 0; k < in_force.size(); ++k) {
                         detail::put_residual(w, stage.residual[k][t], stage.quant, in_force[k]);

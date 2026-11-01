@@ -201,40 +201,77 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 }
 
 void write_object_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
-    if (set.count == 0) {
+    const ObjectSectionForm& form = set.form;
+    if (set.count == 0 && form.change) {
         put_field(writer, 0, 1);  // A: no change
         put_field(writer, 0, 1);  // no second precision term
         return;
     }
-    put_field(writer, 1, 1);  // A
-    put_field(writer, 1, 1);  // B: the headers follow
-    put_field(writer, set.count - 1U, 4);
     const int channels = context.max_matrix_chan + 1;
-    for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
-        const MatrixSpec& matrix = set.items[m];
-        std::uint32_t mask = 0;
-        for (int c = 0; c < channels; ++c) {
-            if (matrix.present[static_cast<std::size_t>(c)]) {
-                mask |= 1U << c;
+    const auto count = std::min<std::size_t>(set.count, set.items.size());
+    put_field(writer, form.change ? 1U : 0U, 1);  // A
+    if (form.change) {
+        put_field(writer, form.headers ? 1U : 0U, 1);  // B
+        if (form.headers) {
+            put_field(writer, set.count - 1U, 4);
+            for (std::size_t m = 0; m < count; ++m) {
+                const MatrixSpec& matrix = set.items[m];
+                std::uint32_t mask = 0;
+                for (int c = 0; c < channels; ++c) {
+                    if (matrix.present[static_cast<std::size_t>(c)]) {
+                        mask |= 1U << c;
+                    }
+                }
+                put_field(writer, matrix.out_ch, 4);
+                put_field(writer, matrix.frac_bits, 4);
+                put_field(writer, static_cast<unsigned>(matrix.f_shift + 1), 3);
+                // field_2b is the number of bypass bits a sample (ERRATA.md entry 69); a bypass
+                // without a count sends one.
+                put_field(
+                    writer,
+                    matrix.lsb_bypass ? std::max<unsigned>(matrix.field_2b, 1U) : matrix.field_2b,
+                    2);
+                put_field(writer, matrix.field_m4, 4);
+                put_field(writer, mask, channels);
             }
         }
-        put_field(writer, matrix.out_ch, 4);
-        put_field(writer, matrix.frac_bits, 4);
-        put_field(writer, static_cast<unsigned>(matrix.f_shift + 1), 3);
-        put_field(writer, matrix.field_2b | (matrix.lsb_bypass ? 1U : 0U), 2);
-        put_field(writer, matrix.field_m4, 4);
-        put_field(writer, mask, channels);
+        for (std::size_t m = 0; m < count; ++m) {
+            const MatrixSpec& matrix = set.items[m];
+            for (int c = 0; c < channels; ++c) {
+                const auto index = static_cast<std::size_t>(c);
+                if (matrix.present[index]) {
+                    put_signed(writer, matrix.coeff[index], matrix.frac_bits + 2);
+                }
+            }
+        }
     }
-    for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
+    put_field(writer, form.extension ? 1U : 0U, 1);  // A2
+    if (!form.extension) {
+        return;
+    }
+    put_field(writer, form.deltas ? 1U : 0U, 1);  // B2
+    if (!form.deltas) {
+        return;
+    }
+    put_field(writer, form.widths ? 1U : 0U, 1);  // C2
+    if (form.widths) {
+        for (std::size_t m = 0; m < count; ++m) {
+            put_field(writer, set.items[m].ext_width, 4);
+            put_field(writer, set.items[m].ext_field2, 2);
+        }
+    }
+    for (std::size_t m = 0; m < count; ++m) {
         const MatrixSpec& matrix = set.items[m];
+        if (matrix.ext_width == 0) {
+            continue;
+        }
         for (int c = 0; c < channels; ++c) {
             const auto index = static_cast<std::size_t>(c);
             if (matrix.present[index]) {
-                put_signed(writer, matrix.coeff[index], matrix.frac_bits + 2);
+                put_signed(writer, matrix.ext_value[index], matrix.ext_width + 1);
             }
         }
     }
-    put_field(writer, 0, 1);  // no second precision term
 }
 
 [[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,

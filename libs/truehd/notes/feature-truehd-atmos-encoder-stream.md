@@ -32,7 +32,10 @@ feeds every unit to an independent `RateModel`:
   shaped interval.
 
 10 s runs in the default test set. 2 min and 20 min are tagged `[.long]` (run them with `iclforge-truehd-tests "[.long]"`):
-RESULTS_PLACEHOLDER
+on a Release build (MSVC, one core each, `verify` on, both configurations in each run) 2 min took 66 s and 20 min 631 s, with every
+unit checked by the encoder's own decoder, no late unit under the model at the declared or the chosen rate, and the shaped
+configuration shaping. A Debug build takes about 14 times as long. The first 2 min run (before the reserve below) failed at second 103
+of the shaped configuration: an interval that only just fit left the next one late.
 
 ## Questions for the owner (numbered after ERRATA's 60 to 79; the decoder session owns ERRATA.md, so these wait here)
 
@@ -89,3 +92,16 @@ build.
 - Round trip with the matrices session's chain: nothing in rate control depends on the chain, but "run the whole round trip" waits for that
   branch to land.
 - `forge probe` does not yet report the model at the chosen bitrate next to the declared one in one run (two runs do).
+
+## Round trip with the matrices branch (feature/truehd-atmos-encoder-matrices, tip 050ea7a73)
+
+Replayed on top of the matrices branch's tip 050ea7a73, which has merged atmos-bed with the decoder's slope rule (the old ramp options are gone;
+a moving object is `ObjectExtension::kSlopes`). The conflicts were the include list of `encoder.hpp` and the two CMake source lists;
+`encoder.cpp` merged by itself, because the retry loop wraps the old interval body and the matrices work changed the object stage inside
+it. On the replayed tree all of `[encoder]`, the matrices session's object-motion tests, the layout and rate tests and the CLI rate tests
+pass, and `test_ratectl_motion.cpp` adds the one case that needs both: moving objects (`object_paths`, without the extension and with
+the slopes), shaped to a bitrate, decoded by the encoder's own `verify`, no late unit, four checked segments in every unit. Rate control
+does not depend on the matrix chain: shaping rounds the object planes before the chain is built from them, and the retry restores the
+stream's counters, so the matrices session's two counters are not counted twice.
+Merging the matrices branch with atmos-bed directly is not this session's: the replayed branch is
+`feature/truehd-atmos-encoder-stream-on-matrices`.
