@@ -524,10 +524,18 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
                                           : kMatrixShift - spec.frac_bits + spec.f_shift;
                     plan.coeff[slot] = spec.coeff[index] * (1 << std::max(scale, 0));
                     // A 16 bit delta at a coefficient place of 2^21 needs 37 bits.
+                    // Lab units: 0 the coefficient's last place; 1 2^-frac; 2 to 5 the same absolute
+                    // place for every matrix (2^-13, 2^-14, 2^-15, 2^-12).
+                    static constexpr int kUnitPlace[] = {0, 0, 13, 14, 15, 12};
+                    const int unit = config.lab.object_extension_unit;
+                    const int fine_scale =
+                        unit == 0 ? scale
+                        : unit == 1 ? kMatrixShift - spec.frac_bits
+                                    : kMatrixShift - kUnitPlace[std::min(unit, 5)];
                     const std::int64_t fine =
                         use_fine ? (std::int64_t{config.lab.object_extension_negate ? -spec.ext_value[index]
                                                                                      : spec.ext_value[index]}
-                                    << (std::max(scale, 0) + plan.fine_pre))
+                                    << (std::max(fine_scale, 0) + plan.fine_pre))
                                  : 0;
                     if (fine != std::int64_t{static_cast<std::int32_t>(fine)}) {
                         return std::unexpected(make_error(

@@ -513,7 +513,7 @@ int main(int argc, char** argv) {
         }
     }
     static std::vector<std::string> combo_names;
-    combo_names.reserve(32);
+    combo_names.reserve(64);
     for (int bias : {-2, -3}) {
         for (int mode : {3, 4, 5}) {
             DecoderLab combined = base;
@@ -529,6 +529,16 @@ int main(int argc, char** argv) {
         fixed.object_extension_fixed = bits + 16;
         combo_names.push_back("extension: deltas at a fixed 2^-" + std::to_string(bits));
         settings.push_back({combo_names.back().c_str(), fixed});
+    }
+    for (int unit = 1; unit <= 5; ++unit) {
+        for (int bits : {3, 4, 5}) {
+            DecoderLab placed = base;
+            placed.object_extension_unit = unit;
+            placed.object_extension_fixed = bits + 16;
+            combo_names.push_back("extension: place " + std::to_string(unit) + ", deltas at a fixed 2^-" +
+                                  std::to_string(bits));
+            settings.push_back({combo_names.back().c_str(), placed});
+        }
     }
     {
         DecoderLab negated = base;
