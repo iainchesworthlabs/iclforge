@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reads the probe's console from a board's USB-Serial/JTAG port until it prints "result=", and writes it.
+"""Reads the probe's console from a board's USB-Serial/JTAG port until it prints "result=".
 
     python capture.py COM16 [--seconds 300] [--out file]
 
@@ -7,6 +7,7 @@ The port is opened with DTR and RTS held low (a pulse would reset the board) and
 chip re-enumerates after a reset. Needs pyserial (the ESP-IDF environment has it).
 """
 import argparse
+import contextlib
 import sys
 import time
 
@@ -36,10 +37,8 @@ def main() -> int:
             raw = handle.readline()
         except (serial.SerialException, OSError):
             if handle is not None:
-                try:
+                with contextlib.suppress(OSError):
                     handle.close()
-                except OSError:
-                    pass
             handle = None
             time.sleep(0.3)
             continue

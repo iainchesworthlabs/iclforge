@@ -224,7 +224,7 @@ TEST_CASE("an ExtentMap joins what follows on and reads across its runs", "[cont
     Bytes all(39);
     REQUIRE(map.read(source, 0, all) == 39);
     Bytes expected;
-    for (const auto [from, count] : {std::pair{100, 15}, std::pair{200, 20}, std::pair{220, 4}}) {
+    for (const auto& [from, count] : {std::pair{100, 15}, std::pair{200, 20}, std::pair{220, 4}}) {
         expected.insert(expected.end(), file.begin() + from, file.begin() + from + count);
     }
     CHECK(all == expected);
