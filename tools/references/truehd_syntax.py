@@ -27,6 +27,7 @@ END_MARKER = 0xD234E  # TH spec 16.5 terminatorA, ERRATA 14
 TERMINATOR_A = (0xD234E, 0x348D3)  # TH spec 16.5.1: both are accepted
 NOISE_CHANNELS = 2
 MATRIX_SHIFT = 15  # coefficients are scaled to 2^-15 (ERRATA 60); frac_bits runs to 15
+RAMP_BITS = 3  # the ramp reading of the extension: a delta is eighths of the last place
 
 # TH spec 17.4: generator 1's noise table, indexed by the seed's bits 15 to 22.
 NOISE_TABLE = (
@@ -257,6 +258,11 @@ class Substream:
         self.object_matrices = False
         self.object_set = []
         self.fine = []
+        # How the extension's deltas act (ERRATA 69; SUBSTREAM3.md section 6): "flat" is the rule in
+        # force, base + delta / 2^(width + 1) for the whole block; "ramp_end" and "ramp_start" are
+        # the provisional reading of ctl_c, base + delta / 8 * (i + 1) / size or * i / size across
+        # the block of `size` samples.
+        self.extension = "flat"
         self.interval = None  # the fold of the output since the last restart
         self.noise_buffer = None  # generator 1's values for this access unit (TH spec 17.3)
         self.noise_size = 64  # access_unit_size_pow2: 64, 128 or 256 (ERRATA, noise generator 1)
@@ -412,7 +418,8 @@ class Substream:
             for channel, delta in matrix["delta"].items():
                 deltas[channel] = delta << scale
             matrices.append((matrix["out"], coeffs, matrix["bypass"], matrix["noise_shift"]))
-            self.fine.append((deltas, matrix["width"] + 1 if matrix["width"] else 0))
+            fine_bits = RAMP_BITS if self.extension != "flat" else matrix["width"] + 1
+            self.fine.append((deltas, fine_bits if matrix["width"] else 0))
         return matrices
 
     def read_matrices(self, bits):
@@ -538,9 +545,12 @@ def decode_block(sub, bits, rows, first):
                 # The extension (ERRATA 69): base + delta / 2^fine_bits for each coefficient, so
                 # the sum of the base coefficients and the noise is lifted by fine_bits places and
                 # the products with the deltas, which are in the same units, are added.
-                total = (total << fine_bits) + sum(
-                    row[c] * deltas[c] for c in range(sub.max_matrix_chan + 1)
-                )
+                finer = sum(row[c] * deltas[c] for c in range(sub.max_matrix_chan + 1))
+                if sub.extension != "flat":
+                    # across the block; the product is divided toward zero
+                    product = finer * (i + 1 if sub.extension == "ramp_end" else i)
+                    finer = product // size if product >= 0 else -(-product // size)
+                total = (total << fine_bits) + finer
                 shift += fine_bits
             row[out] = s32(((total >> shift) & keep) + bypass[i][index])
     # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
@@ -657,9 +667,13 @@ def major_sync_size(unit, offset):
     raise StreamError("major sync CRC")
 
 
-def decode_stream(data, presentation="best"):
-    """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count)."""
+def decode_stream(data, presentation="best", extension="flat"):
+    """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count).
+    `extension` is how the object matrices' deltas act ("flat", "ramp_end", "ramp_start";
+    Substream.extension)."""
     substreams = [Substream(i) for i in range(4)]
+    for substream in substreams:
+        substream.extension = extension
     count = 0
     rate = 0
     pcm = []

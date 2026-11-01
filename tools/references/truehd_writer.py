@@ -19,6 +19,8 @@ agree, that the features work together, and that nothing regresses.
 
     truehd_writer.py generate [--out DIR]    # write the streams and the manifest
     truehd_writer.py check [DIR]             # decode them with truehd_syntax.py and compare
+    truehd_writer.py generate-moving --out DIR   # the moving-object streams of
+                                                 # tools/checks/verify_truehd_object_bed.py
 
 Not written: restart_header's heavy DRC (TH spec 12.2, 7.1), whose place among the header's bits
 the streams do not show (ERRATA 7)."""
@@ -105,6 +107,7 @@ class Substream:
         matrix_noise_shift=0,
         ch_assign_cycle=None,
         sections=None,
+        object_bypass=None,
     ):
         self.min_chan, self.max_chan, self.mm = min_chan, max_chan, mm
         self.channels = channels  # {ch: Channel}
@@ -130,6 +133,10 @@ class Substream:
         # {first sample of a block: ObjectSection}: the object matrix section that block sends
         # (sync 0x31EC), in place of `matrices`; every restart block needs one.
         self.sections = sections or {}
+        # A function of the sample's place in the stream giving the bypass bits the object matrices
+        # in force there send: [(value, bits), ...] in the order of the matrices that have them. It
+        # stands in for `bypass` when the matrix list changes from block to block.
+        self.object_bypass = object_bypass
 
 
 class ObjectSection:
@@ -178,15 +185,17 @@ def resolve_sections(sections, restarts):
             fresh = []
             for place, coeffs in enumerate(section.coeffs):
                 if section.b:
-                    out, frac_bits, f_shift, noise_shift = section.headers[place]
+                    out, frac_bits, f_shift, noise_shift, *more = section.headers[place]
+                    bypass = more[0] if more else 0  # the bits a sample of the LSB bypass
                     width = state[place]["width"] if place < len(state) else 0
                 else:
                     last = state[place]
-                    out, frac_bits, f_shift, noise_shift, width = (
+                    out, frac_bits, f_shift, noise_shift, bypass, width = (
                         last["out"],
                         last["frac_bits"],
                         last["f_shift"],
                         last["noise_shift"],
+                        last["bypass"],
                         last["width"],
                     )
                     if set(coeffs) != set(last["raw"]):
@@ -197,6 +206,7 @@ def resolve_sections(sections, restarts):
                         "frac_bits": frac_bits,
                         "f_shift": f_shift,
                         "noise_shift": noise_shift,
+                        "bypass": bypass,
                         "raw": dict(coeffs),
                         "width": width,
                         "delta": {},
@@ -230,7 +240,7 @@ def write_object_section(w, sub, section):
                 w.put(matrix["out"], 4)
                 w.put(matrix["frac_bits"], 4)
                 w.put(matrix["f_shift"] + 1, 3)
-                w.put(0, 2)  # no LSB bypass
+                w.put(matrix["bypass"], 2)  # the bits a sample of the LSB bypass (0: none)
                 w.put(matrix["noise_shift"], 4)
                 w.put(mask, channels)
         for matrix in section.resolved:
@@ -577,8 +587,11 @@ def build_stream(stream):
                     write_light_block_header(w, sub, size, sub.sections.get(position))
                 body = BitWriter()
                 for i in range(position, position + size):
+                    if sub.object_bypass is not None:
+                        for value, bits in sub.object_bypass(i):
+                            body.put(value, bits)
                     for m, matrix in enumerate(sub.matrices):
-                        if matrix[2]:
+                        if matrix[2] and sub.object_bypass is None:
                             body.put(sub.bypass[m][i], int(matrix[2]))
                     for ch in range(sub.min_chan, sub.max_chan + 1):
                         lsbs, offset = coding[ch]
@@ -1691,6 +1704,551 @@ def case_noise1_bypass():
     return Stream([sub], n), description, ["noise_type_1", "lsb_bypass", "matrix_noise_shift"]
 
 
+# --- moving objects: the object substream's matrices change from block to block -----------------
+#
+# The arithmetic of libs/truehd/src/encoder/object_bed.cpp, written again from the notes
+# (libs/truehd/notes/feature-truehd-atmos-encoder-matrices.md): an object's gain into each bed row
+# is a path of integer knots; the coefficient of its mixing matrix is minus the gain at 2^-12; the
+# sections are planned in the cheapest form that gets the decoder to the matrices wanted; the rows
+# the decoder starts from are found by running the matrices backwards sample by sample. Agreement
+# with this library's decoder is not agreement with Dolby's: nothing outside the repository reads
+# restart sync 0x31EC, and the ramp (SUBSTREAM3.md section 6) is a reading of one controlled encode.
+
+GAIN_BITS = 16
+MIX_FRAC_BITS = 12
+DEFAULT_GAIN = 46341  # -3 dB, in units of 2^-16
+RAMP_BITS = 3
+FIRST_CODED = 8
+MAX_DELTA = (1 << 15) - 1
+MIN_DELTA = -(1 << 15)
+MIX_STEPS = 4
+BED_ROW_OF_OBJECT = (0, 1, 2, 4, 5, 6, 7, 3)  # L R C LFE Ls Rs Lrs Rrs
+
+
+def round_div(numerator, denominator):
+    """The nearest whole number to numerator / denominator, halves away from zero."""
+    quotient = (2 * abs(numerator) + denominator) // (2 * denominator)
+    return -quotient if numerator < 0 else quotient
+
+
+def path_gain(knots, row, sample):
+    """A path's gain into a bed row at a sample, as (numerator, denominator) in units of 2^-16:
+    linear between knots (sample, [gain of each of the 8 rows]), holding outside them, and the later
+    knot of a repeated sample holding from there."""
+    last = -1
+    for place, (at, _gains) in enumerate(knots):
+        if at <= sample:
+            last = place
+    if last < 0:
+        return knots[0][1][row], 1
+    if last == len(knots) - 1:
+        return knots[last][1][row], 1
+    (first_at, first), (second_at, second) = knots[last], knots[last + 1]
+    span = second_at - first_at
+    return first[row] * span + (second[row] - first[row]) * (sample - first_at), span
+
+
+def trajectory_coefficient(start, end, mix_step, ramp):
+    """(raw, delta) of a mixing matrix's coefficient on an object for a gain that is `start` at the
+    block's first anchor and `end` at its second: raw is minus the gain at 2^-12 rounded, and with a
+    ramp delta is eight times how far the end is from raw, rounded, so that raw + delta / 8 is the
+    end. The gains are halved `mix_step` times; the last step mixes nothing."""
+    if mix_step >= MIX_STEPS - 1:
+        return 0, 0
+    places = 1 << MIX_FRAC_BITS
+    halves = 1 << mix_step
+    raw = round_div(-start[0] * places, start[1] * (1 << GAIN_BITS) * halves)
+    delta = 0
+    if ramp:
+        denominator = end[1] * (1 << GAIN_BITS) * halves
+        eighths = 1 << RAMP_BITS
+        delta = round_div(-eighths * end[0] * places - eighths * raw * denominator, denominator)
+        delta = max(MIN_DELTA, min(MAX_DELTA, delta))
+    return raw, delta
+
+
+def width_of(deltas):
+    """The smallest width whose deltas (width + 1 bits, signed) hold all of these; 0 for none."""
+    width = 0
+    for d in deltas:
+        if d:
+            width = max(width, 1, (d if d >= 0 else -d - 1).bit_length())
+    return width
+
+
+def moving_matrix(out, frac_bits, f_shift, noise_shift, bypass, raw, width=0, delta=None):
+    return {
+        "out": out,
+        "frac_bits": frac_bits,
+        "f_shift": f_shift,
+        "noise_shift": noise_shift,
+        "bypass": bypass,
+        "raw": dict(raw),
+        "width": width,
+        "delta": dict(delta or {}),
+    }
+
+
+def held_matrix(matrix):
+    """The matrix as the decoder holds it: the deltas of a matrix with no width are not used."""
+    return {**matrix, "delta": matrix["delta"] if matrix["width"] else {}}
+
+
+def same_set(before, after):
+    return len(before) == len(after) and all(
+        held_matrix(a) == held_matrix(b) for a, b in zip(before, after, strict=True)
+    )
+
+
+def same_headers(a, b):
+    keys = ("out", "frac_bits", "f_shift", "noise_shift", "bypass")
+    return all(a[k] == b[k] for k in keys) and set(a["raw"]) == set(b["raw"])
+
+
+def plan_object_section(before, after):
+    """The ObjectSection that takes the decoder from the matrices `before` (none after a restart)
+    to `after`, or None when they are the same: new deltas on the set that stands (A clear), new
+    coefficients on the headers that stand (B clear), or new headers."""
+    if same_set(before, after):
+        return None
+    headers_same = (
+        bool(before)
+        and len(before) == len(after)
+        and all(same_headers(b, a) for b, a in zip(before, after, strict=True))
+    )
+
+    def widths_differ(reference):
+        return any(
+            (reference[place]["width"] if place < len(reference) else 0) != m["width"]
+            for place, m in enumerate(after)
+        )
+
+    has_delta = any(m["width"] and any(m["delta"].values()) for m in after)
+    keep = headers_same and all(b["raw"] == a["raw"] for b, a in zip(before, after, strict=True))
+    headers = not headers_same
+    widths = widths_differ(before)
+    deltas = True if keep else (widths or has_delta)
+    return ObjectSection(
+        coeffs=[] if keep else [m["raw"] for m in after],
+        headers=(
+            [(m["out"], m["frac_bits"], m["f_shift"], m["noise_shift"], m["bypass"]) for m in after]
+            if headers
+            else []
+        ),
+        a=not keep,
+        b=headers,
+        a2=deltas,
+        b2=deltas,
+        c2=widths,
+        widths=[m["width"] for m in after] if widths else [],
+        deltas=[m["delta"] if m["width"] else {} for m in after] if deltas else [],
+    )
+
+
+def interval_bounds(p):
+    """The blocks of a restart interval: the first access unit is cut after 8 samples."""
+    nominal = p["nominal"]
+    bounds = [(0, 8), (8, nominal - 8)]
+    return bounds + [(u * nominal, nominal) for u in range(1, p["interval_units"])]
+
+
+def motion_blocks(p, first_sample, bounds):
+    """The blocks of one restart interval, as the encoder plans them: {start, size, matrices,
+    section} with the matrices in force and the ObjectSection the block's header sends (or None).
+    `p` is a request (moving_params)."""
+    objects, above = p["objects"], p["objects"] - FIRST_CODED
+    ramp = p["ramp"] != "none"
+    paths = {}
+    for k in range(above):
+        default = [0] * 8
+        default[BED_ROW_OF_OBJECT[k]] = DEFAULT_GAIN
+        paths[k] = p["paths"].get(FIRST_CODED + k) or [(0, default)]
+    mixes = []
+    if p["mix_step"] < MIX_STEPS - 1:
+        for k in range(above):
+            for row in range(8):
+                if not any(gains[row] for _at, gains in paths[k]):
+                    continue
+                for mix in mixes:
+                    if mix["row"] == row and not p["split"]:
+                        mix["objects"].append(k)
+                        break
+                else:
+                    mixes.append({"row": row, "objects": [k], "width": 0})
+    coefficients = []
+    for place, (start, size) in enumerate(bounds):
+        absolute = first_sample + start
+        update = (
+            ramp
+            or place == 0
+            or (
+                absolute % p["nominal"] == 0 and (absolute // p["nominal"]) % p["update_units"] == 0
+            )
+        )
+        if not update:
+            coefficients.append(coefficients[-1])
+            continue
+        end_anchored = p["ramp"] == "end"
+        anchor_start = absolute - 1 if end_anchored else absolute
+        anchor_end = absolute + size - 1 if end_anchored else absolute + size
+        coefficients.append(
+            [
+                [
+                    trajectory_coefficient(
+                        path_gain(paths[k], mix["row"], anchor_start),
+                        path_gain(paths[k], mix["row"], anchor_end),
+                        p["mix_step"],
+                        ramp,
+                    )
+                    for k in mix["objects"]
+                ]
+                for mix in mixes
+            ]
+        )
+    if ramp:
+        for index, mix in enumerate(mixes):
+            mix["width"] = width_of([c[1] for block in coefficients for c in block[index]])
+    blocks = []
+    for place, (start, size) in enumerate(bounds):
+        matrices = [moving_matrix(FIRST_CODED, 0, -1, 0, 0, {FIRST_CODED: -2})]
+        n = p["bypass_bits"]
+        if n:
+            matrices.append(
+                moving_matrix(objects - 1, MIX_FRAC_BITS, n, p["noise"], n, {objects - 1: 1 << 12})
+            )
+        for index, mix in enumerate(mixes):
+            raw = {mix["row"]: 1 << MIX_FRAC_BITS}
+            delta = {mix["row"]: 0}
+            idle = True
+            for k, (value, step) in zip(mix["objects"], coefficients[place][index], strict=True):
+                raw[FIRST_CODED + k] = value
+                delta[FIRST_CODED + k] = step if mix["width"] else 0
+                idle = idle and value == 0 and step == 0
+            if not (idle and p["drop_idle"]):
+                matrices.append(
+                    moving_matrix(
+                        mix["row"],
+                        MIX_FRAC_BITS,
+                        0,
+                        p["noise"],
+                        0,
+                        raw,
+                        mix["width"],
+                        delta if mix["width"] else {},
+                    )
+                )
+        if len(matrices) > 16:
+            raise ValueError("more than 16 object matrices")
+        before = [] if place == 0 else blocks[-1]["matrices"]
+        blocks.append(
+            {
+                "start": start,
+                "size": size,
+                "matrices": matrices,
+                "section": plan_object_section(before, matrices),
+            }
+        )
+    return blocks
+
+
+def moving_gain_knots(objects, frames, stretch, jump, moving=None):
+    """The preset paths of the encode tool (object-motion): object k sits on its own bed row for a
+    stretch of samples, then on the next object's, alternating; a straight line from one to the
+    other, or a step (`jump`). {channel: [(sample, [8 gains])]} for the first `moving` objects."""
+    paths = {}
+    for k in range(objects - FIRST_CODED if moving is None else moving):
+        knots = []
+        for n in range(frames // stretch + 2):
+            gains = [0] * 8
+            gains[BED_ROW_OF_OBJECT[(k + n % 2) % 8]] = DEFAULT_GAIN
+            knots.append((n * stretch, gains))
+            if jump:
+                knots.append(((n + 1) * stretch, gains))
+        paths[FIRST_CODED + k] = knots
+    return paths
+
+
+def fnv1a(data, state=0xCBF29CE484222325):
+    for byte in data:
+        state = ((state ^ byte) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return state
+
+
+def moving_value(m, row, phase, size, ramp, skip_own, noise):
+    """The matrix's value for a row of samples before the mask and the bypass bits (the decoder's
+    kernel): the products at 2^-15, with the ramp's part at 3 places finer when it has a width."""
+    scale = 15 - m["frac_bits"] + m["f_shift"]
+    fine = ramp != "none" and m["width"] != 0
+    total, finer = noise, 0
+    for channel, raw in m["raw"].items():
+        if skip_own and channel == m["out"]:
+            continue
+        total += row[channel] * (raw << scale)
+        if fine:
+            finer += row[channel] * (m["delta"].get(channel, 0) << scale)
+    if not fine:
+        return total >> 15
+    product = finer * (phase + 1 if ramp == "end" else phase)
+    finer = product // size if product >= 0 else -(-product // size)
+    return ((total << RAMP_BITS) + finer) >> (15 + RAMP_BITS)
+
+
+def moving_noise_buffers(units, size, seed):
+    buffers, state = [], seed
+    for _ in range(units):
+        buffer = []
+        for _ in range(size):
+            index = (state >> 15) & 0xFF
+            buffer.append(ref.NOISE_TABLE[index])
+            state = ((state << 8) ^ index ^ (index << 5)) & 0xFFFFFFFF
+        buffers.append(buffer)
+    return buffers
+
+
+def moving_plan(p, sources):
+    """Everything the writer needs for the objects `sources` (a list of channels): the sections
+    {first sample: ObjectSection}, the rows the decoder starts from (the bed and the coded
+    channels), the bypass bits of every sample, and the digests the C++ planner is held to."""
+    interval = p["interval_units"] * p["nominal"]
+    samples = len(sources[0])
+    assert samples % interval == 0
+    sections, restarts, bypass, sent = {}, set(), [], []
+    start_rows = [[0] * samples for _ in sources]
+    for index in range(samples // interval):
+        first = index * interval
+        blocks = motion_blocks(p, first, interval_bounds(p))
+        buffers = moving_noise_buffers(p["interval_units"], p["noise_size"], p["seed"])
+        restarts.add(first)
+        for block in blocks:
+            if block["section"] is not None:
+                sections[first + block["start"]] = block["section"]
+            matrices = block["matrices"]
+            count = len(matrices)
+            for i in range(block["size"]):
+                t = block["start"] + i
+                row = [channel[first + t] for channel in sources]
+                slots = []
+                for m in reversed(range(count)):
+                    matrix = matrices[m]
+                    left = count - m
+                    noise = 0
+                    if matrix["noise_shift"]:
+                        slot = (left + (2 * left + 1) * (t % p["nominal"])) % p["noise_size"]
+                        noise = buffers[t // p["nominal"]][slot] << (matrix["noise_shift"] + 8)
+                    base = moving_value(matrix, row, i, block["size"], p["ramp"], True, noise)
+                    out, after = matrix["out"], row[matrix["out"]]
+                    scale = 15 - matrix["frac_bits"] + matrix["f_shift"]
+                    own = matrix["raw"][out] << scale
+                    n = matrix["bypass"]
+                    if n:
+                        assert own == (1 << 15) << n
+                        rest = after - base
+                        row[out] = rest >> n
+                        slots.append((m, rest & ((1 << n) - 1), n))
+                    else:
+                        assert own in (1 << 15, -(1 << 15)) and not matrix["delta"].get(out, 0)
+                        row[out] = after - base if own > 0 else base - after
+                for c, value in enumerate(row):
+                    start_rows[c][first + t] = value
+                bypass.append([(value, n) for _m, value, n in sorted(slots)])
+    resolve_sections(sections, restarts)
+    for index in range(samples // interval):
+        first = index * interval
+        for block in motion_blocks(p, first, interval_bounds(p)):
+            if block["section"] is not None:
+                section = sections[first + block["start"]]
+                assert same_set(section.resolved, block["matrices"]), (
+                    "the writer's state and the planner's differ"
+                )
+                sent.append((first + block["start"], block["size"], section))
+    rows_digest = fnv1a(
+        b"".join(
+            struct.pack("<i", start_rows[c][t]) for t in range(samples) for c in range(len(sources))
+        )
+    )
+    bypass_digest = fnv1a(bytes(value for per_sample in bypass for value, _n in per_sample))
+    return {
+        "sections": sections,
+        "restarts": restarts,
+        "start_rows": start_rows,
+        "bypass": bypass,
+        "sent": sent,
+        "rows_digest": rows_digest,
+        "bypass_digest": bypass_digest,
+    }
+
+
+def section_bits(section, channels):
+    """The bits of a section as a block header carries it, after the matrices-present bit, as a
+    string of 0 and 1."""
+    w = BitWriter()
+
+    class Shape:
+        mm = channels - 1
+
+    write_object_section(w, Shape, section)
+    return format(w.value, f"0{w.count}b") if w.count else ""
+
+
+MOTION_CASES = {
+    # 12 objects, the ramp to the last sample, every kind of delta, noise, 2 bypass bits: the
+    # extension of SUBSTREAM3.md section 6 (provisional)
+    "moving_ramp": {
+        "objects": 12,
+        "noise": 3,
+        "bypass_bits": 2,
+        "mix_step": 0,
+        "ramp": "end",
+        "update_units": 1,
+        "drop_idle": True,
+        "split": False,
+        "intervals": 3,
+        "stretch": 240,
+        "jump": False,
+        "moving": None,
+    },
+    # the ramp from the first sample over steps of the path: a bed row's matrix goes idle and is
+    # left out of the list, which changes from block to block
+    "moving_ramp_jump": {
+        "objects": 14,
+        "noise": 2,
+        "bypass_bits": 1,
+        "mix_step": 0,
+        "ramp": "start",
+        "update_units": 1,
+        "drop_idle": True,
+        "split": False,
+        "intervals": 3,
+        "stretch": 160,
+        "jump": True,
+        "moving": None,
+    },
+    # 16 objects whose six moving ones each have a matrix on every bed row they reach and the other
+    # two one each: sixteen matrices, with new coefficients every two units
+    "moving_sixteen": {
+        "objects": 16,
+        "noise": 1,
+        "bypass_bits": 3,
+        "mix_step": 0,
+        "ramp": "none",
+        "update_units": 2,
+        "drop_idle": False,
+        "split": True,
+        "intervals": 3,
+        "stretch": 160,
+        "jump": True,
+        "moving": 6,
+    },
+    # as moving_sixteen with every object moving and the idle matrices left out: the list shrinks
+    # and grows, and every change is new headers
+    "moving_dropping": {
+        "objects": 16,
+        "noise": 0,
+        "bypass_bits": 0,
+        "mix_step": 0,
+        "ramp": "none",
+        "update_units": 1,
+        "drop_idle": True,
+        "split": True,
+        "intervals": 3,
+        "stretch": 160,
+        "jump": True,
+        "moving": None,
+    },
+}
+
+
+def moving_params(name):
+    p = dict(MOTION_CASES[name])
+    p.update(nominal=40, interval_units=8, noise_size=64, seed=0x2A5F31)
+    samples = p["intervals"] * p["interval_units"] * p["nominal"]
+    p["samples"] = samples
+    p["paths"] = moving_gain_knots(p["objects"], samples, p["stretch"], p["jump"], p["moving"])
+    return p
+
+
+def moving_sources(p):
+    return [tone(p["samples"], 110 + c, 2**20) for c in range(p["objects"])]
+
+
+def case_moving(name):
+    """An object substream whose matrices change from block to block (MOTION_CASES): the bed rows
+    and the coded channels are what the matrices, run backwards, leave of the objects."""
+    p = moving_params(name)
+    sources = moving_sources(p)
+    plan = moving_plan(p, sources)
+    n, objects = p["samples"], p["objects"]
+    start = plan["start_rows"]
+
+    def bed_sub(lo, hi, sync=0x31EA):
+        channels = {
+            c: Channel(fir=filt([48], 6) if c % 3 == 0 else None, huff_type=c % 4)
+            for c in range(lo, hi + 1)
+        }
+        rows = [tuple(start[c][i] for c in range(hi + 1)) for i in range(n)]
+        return Substream(
+            lo, hi, hi, channels, rows, {c: start[c] for c in range(lo, hi + 1)}, sync=sync
+        )
+
+    wide = {
+        c: Channel(fir=filt([-1500], 8) if c == FIRST_CODED else None, huff_type=c % 4)
+        for c in range(FIRST_CODED, objects)
+    }
+    rows = [tuple(sources[c][i] for c in range(objects)) for i in range(n)]
+    last = Substream(
+        FIRST_CODED,
+        objects - 1,
+        objects - 1,
+        wide,
+        rows,
+        {c: start[c] for c in range(FIRST_CODED, objects)},
+        sync=0x31EC,
+        noise_seed=p["seed"],
+        sections=plan["sections"],
+        object_bypass=lambda i: plan["bypass"][i],
+    )
+    subs = [bed_sub(0, 1), bed_sub(2, 5), bed_sub(6, 7, 0x31EB), last]
+    stream = Stream(subs, n, terminator_b=True, restart_interval=p["interval_units"])
+    return stream, p, sources, plan
+
+
+def write_moving(out):
+    """The Python side of the agreement check (verify_truehd_object_bed.py): for each of
+    MOTION_CASES a stream, the request as a text file for iclforge-truehd-object-plan-tool, the
+    objects, and what Python plans for them (one line a sent block, then the digests)."""
+    out.mkdir(parents=True, exist_ok=True)
+    for name in MOTION_CASES:
+        stream, p, sources, plan = case_moving(name)
+        (out / f"{name}.thd").write_bytes(build_stream(stream))
+        lines = [
+            f"objects {p['objects']}",
+            f"noise {p['noise']}",
+            f"bypass_bits {p['bypass_bits']}",
+            f"mix_step {p['mix_step']}",
+            f"ramp {p['ramp']}",
+            f"update_units {p['update_units']}",
+            f"drop_idle {int(p['drop_idle'])}",
+            f"split {int(p['split'])}",
+            f"nominal {p['nominal']}",
+            f"interval_units {p['interval_units']}",
+            f"samples {p['samples']}",
+        ]
+        for channel, knots in sorted(p["paths"].items()):
+            lines += [f"knot {channel} {at} " + " ".join(map(str, g)) for at, g in knots]
+        (out / f"{name}.request").write_text("\n".join(lines) + "\n")
+        flat = [sources[c][t] for t in range(p["samples"]) for c in range(p["objects"])]
+        flat_bytes = struct.pack(f"<{len(flat)}i", *flat)
+        (out / f"{name}.objects").write_bytes(flat_bytes)
+        expect = [
+            f"section {at} {size} {section_bits(section, p['objects'])}"
+            for at, size, section in plan["sent"]
+        ]
+        expect += [f"rows {plan['rows_digest']:016x}", f"bypass {plan['bypass_digest']:016x}"]
+        expect.append(f"pcm {fnv1a(flat_bytes):016x}")
+        (out / f"{name}.expect").write_text("\n".join(expect) + "\n")
+        print(f"{name}: {len(plan['sent'])} sections sent in {p['samples']} samples")
+
+
 CASES = {
     "hb_filters": case_filters,
     "hb_filter_orders": case_filter_orders,
@@ -1981,9 +2539,14 @@ def main():
     gen.add_argument("--out", type=pathlib.Path, default=HANDBUILT)
     chk = sub.add_parser("check")
     chk.add_argument("directory", nargs="?", type=pathlib.Path, default=HANDBUILT)
+    moving = sub.add_parser("generate-moving")
+    moving.add_argument("--out", type=pathlib.Path, required=True)
     args = parser.parse_args()
     if args.command == "generate":
         generate(args.out)
+        return 0
+    if args.command == "generate-moving":
+        write_moving(args.out)
         return 0
     return check(args.directory)
 
