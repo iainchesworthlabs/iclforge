@@ -113,6 +113,28 @@ in one file and "element 11" in another need not be the same speaker or slot. Al
 
 Effect on this branch: nothing is changed in code. Question 3 is partly answered (anchored form supported, DEE's own form is richer); a new question 10 is open.
 
+### Second reading, with `ch_assign` and the objects' positions (analysis session, 2026-11-01; PROVISIONAL)
+
+`ch_assign` of unit 0 (`ch_assign[m]` = output channel of matrix channel m): `ctl_b` [3,1,0,4,5,6,7,8,9,10,11,2], `ctl_c` [4,8,1,0,7,6,2,3,9,10,11,5], `ctl_e` [2,0,3,4,5,6,7,8,9,10,11,1]
+(later restart headers not checked). Positions (DAMF x -1 left to 1 right, y -1 rear to 1 front, z 0 to 1): `ctl_b` and `ctl_c` object 3 at [1, 0.85, 0], size 0; `ctl_c` object 8 at [-1, 0.5, 1],
+size 0.15, decorrelation on; `ctl_e` object 3 from [-1, 1, 0] to [1, 1, 0] along the front wall in 480,000 samples, a keyframe every 1,000.
+
+1. **The slope rule holds on DEE data, exactly.** `ctl_e`, matrix out 1, sections at 4800 and 5160 (9 access units apart), `ext_field2` 3: base(4800) + 9 x delta / 8 = base(5160) for every coefficient
+   of the row, as raw places: m0 -3907 - 9 x 15120 / 8 = -20917 (5160 has -20917); m3 to m10 2765 + 9 x 4551 / 8 = 7885 (7885); m11 -1196 - 9 x 1992 / 8 = -3437 (-3437). Across a change of `f_shift` it still holds in real
+   values (out 0, m1: -5.1423 at 4800 plus 9 x 9793 / 8 / 4096 = -2.4526; 5160 has -20091 / 8192 = -2.4525). Any other `ext_field2` from 0 to 5 misses by thousands. So a section's deltas are the
+   path to the next section's base, and DEE sends the next section when it wants a new line.
+2. **Those coefficients are not the object's pan.** m0 in out 1 goes from -0.24 to -1.28 (real) in 360 samples while the object moves 0.0015 of the room (x = -1 + 2 s / 480,000). The out 1 and out 0 matrices change on a scale
+   of hundreds of samples with a path that takes ten seconds; they carry something the signal drives (the decorrelating basis of the bed and the dither cancellation), not a position. So
+   the time constant of DEE's matrix updates is not the object metadata's, and my plan (gains from positions on a section grid) matches DEE's wire form (sections, deltas) but not what DEE puts in it.
+3. **The slot order is stream-specific.** The same object 3 at the same position is on matrix channel 1 (output 1) in `ctl_b` and on matrix channel 0 (output 4) in `ctl_c`; the moving object of `ctl_e` is on matrix
+   channel 11 (output 1). So "element j is speaker j" is **not** a property of the output order, and the anchoring of section 1 is a choice of this branch, not DEE's slot convention. What the streams do show is that
+   a static object at a speaker position (`ctl_b`, [1, 0.85, 0], the right front) can ride one bed row alone at unit gain, and that a moving object rides one coded row (m11 in `ctl_e`) with the bed rows
+   holding a time-varying mix of it.
+4. **The spread of object 8 in `ctl_c`** (seven elements) can be size 0.15 plus decorrelation on rather than a pan; its position [-1, 0.5, 1] is the left wall at the ceiling, so the squares-add-to-0.89 pattern is
+   not evidence that DEE splits a point object. Question 10 stays open but its recommendation weakens: do not add a split until a point object (size 0) at a place between elements has been seen.
+
+Effect on this branch: none in code. `RenderSection`'s begin/end gains map to DEE's wire form (a section, deltas to the next base) with `ext_field2` 3 as DEE's choice for 9 units.
+
 ## 4. Tests, and what each guards
 
 See the test names; the ones that would pass for a wrong render are the closeness tests, with thresholds set from the measured values (section 6).
