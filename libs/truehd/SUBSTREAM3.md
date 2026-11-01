@@ -77,7 +77,7 @@ block per access unit, so the position of a block in its unit has not been exerc
 | block data CRC | 8 (only if `data_check_present`) | skipped, not checked | PARSE-ONLY |
 | last block | 1 | 1 ends the segment | VERIFIED |
 
-The block data of one sample time is: first one bit for each matrix that has LSB bypass, in matrix order, then for each coded channel
+The block data of one sample time is: first `field_2b` bits for each matrix that has LSB bypass (`field_2b` not 0), in matrix order, then for each coded channel
 (`min_chan` to `max_chan`) its Huffman code, if `huff_type` is not 0, and then `huff_lsbs` less the quantiser step raw bits.
 
 ### Block header
@@ -124,7 +124,7 @@ N is `max_matrix_chan` + 1. The matrices of substream 3 are numbered in the orde
 | per matrix, output channel | 4 | row the matrix writes (0 to 15, may exceed `max_matrix_chan`) | VERIFIED |
 | `frac_bits` | 4 | 0 to 15 | VERIFIED |
 | `f_shift` + 1 | 3 | `f_shift` is -1 to 6 | VERIFIED |
-| `field_2b` | 2 | bit 0 is the LSB bypass of the matrix | bit 0: VERIFIED for the bit it costs in the block data (`ctl_c` parses, 43 of 93 intervals pass); bit 1: OPEN, carried and ignored |
+| `field_2b` | 2 | not 0: the matrix has an LSB bypass of `field_2b` bits a sample (1, 2 and 3 are seen) | the bit count: VERIFIED on `ctl_c` (1), and on `soll_e12` unit 11319 (2) and `soll_sil6` unit 19277 (1 and 2), where the block data then ends with the last-block flag 1 and zero padding exactly at the end of the segment; the hand-built `hb_substream3_object_bypass_wide` holds it; what the bits add to the output is the decoder's reading (they are added to the matrix output, whose channel has a quantiser step of that many bits) |
 | `field_m4` | 4 | the matrix's noise shift (generator 1) | VERIFIED |
 | presence mask | N | bit c set: the matrix has a coefficient on matrix channel c; channel 0 is sent first | VERIFIED |
 | (after all headers) coefficients, per matrix, per set mask bit in ascending channel | `frac_bits` + 2, signed | the raw value | VERIFIED |
@@ -171,7 +171,7 @@ Rows are 32-bit integers. The decoder scales every coefficient to 2^-15, so a su
 4. **Fine terms.** If w is not 0, `sum = (sum << (w + 1)) + Σ row[c] × (delta[c] << scale)` and the final shift becomes 15 + w + 1.
 5. **Shift and mask.** `value = (sum >> shift) & keep`, an arithmetic shift (a negative sum rounds toward minus infinity). `keep` clears
    the low `quant_step[out]` bits of the output row.
-6. **LSB bypass.** If the matrix has bypass, `value += bit`, where `bit` is the one the block data sent for this matrix and this sample.
+6. **LSB bypass.** If the matrix has bypass, `value += bits`, where `bits` are the `field_2b` bits the block data sent for this matrix and this sample, read as a number, first bit most significant.
 7. The result replaces `row[out]`. Matrices run in the order of the list, each seeing the previous ones' results.
 
 Worked example. The third matrix of the `z_short.mlp` chain is described in ERRATA 69 as 2.3167 times row 0 plus row 11, written to
@@ -297,10 +297,11 @@ not exercised there. The hand-built stream `hb_substream3_object_extension` hold
 decoder's reading and no outside decoder's. The 2 reserved bits that follow each width are not understood. A present coefficient of 0
 with a delta is kept (a refinement from nothing); nothing in the owner's streams shows whether a real encoder sends one.
 
-**`field_2b` bit 1.** Carried as read; no effect is known. `field_2b` bit 0 is taken as the LSB bypass because a doubled coefficient
-(2.0 on the output's own row in `ctl_c`, where every other matrix has 1.0) loses the low bit that the bypass restores, and the block
-data length is right with one bit per bypass matrix and sample. That reading has only the decoder's own hand-built stream
-(`hb_substream3_object_bypass`) behind it besides `ctl_c`.
+**`field_2b` as the bit count of the bypass.** A matrix whose `field_2b` is n has an LSB bypass of n bits a sample: the output row's coded value
+is multiplied by 2^n by the matrix (an own coefficient of 2.0 for n = 1 in `ctl_c`, where every other matrix has 1.0), its quantiser step is n, and the
+n bits restore what the step cleared. The evidence is the length of the block data in two failing DEE blocks (`soll_e12` unit 11319 with one matrix of n = 2;
+`soll_sil6` unit 19277 with matrices of n = 1 and n = 2): with n bits read before the first channel's residual in each sample, all 40 samples parse and
+the last-block flag is 1 followed by zero padding to the end of the segment. Held by `hb_substream3_object_bypass_wide` (2 bits).
 
 **The missing first matrix in `ctl_c` at unit 256.** The first matrix of that restart (output 8, 9 coefficients) is missing from the
 matrix list the decoder reads. Why is not known. Unit 256 is also the unit that shows the extension layout.

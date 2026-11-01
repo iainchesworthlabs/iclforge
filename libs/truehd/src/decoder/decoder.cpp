@@ -66,6 +66,7 @@ struct ChannelState {
 struct MatrixPlan {
     int out = 0;
     bool lsb_bypass = false;
+    int bypass_bits = 1;  // the bits a sample the bypass reads: field_2b in an object section
     int noise_shift = 0;  // matrix_noise_shift, sent under restart sync 0x31EB (TH spec §10.2)
     int count = 0;
     // The row columns the matrix reads and the coefficients for them, scaled to 2^-14: the matrix
@@ -481,6 +482,7 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
+            plan.bypass_bits = restart.sync == kRestartSyncAtmos ? std::max<int>(spec.field_2b, 1) : 1;
             plan.noise_shift = spec.noise_shift;
             // The extension's deltas refine the coefficients by 2^-(width + 1) of their last place
             // (ERRATA.md entry 69).
@@ -626,19 +628,24 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         }
     }
     std::array<std::uint8_t, kMaxObjectMatrices> bypass_matrix{};
+    std::array<std::uint8_t, kMaxObjectMatrices> bypass_bits{};
     int bypass_count = 0;
     for (int m = 0; m < state.matrix_count; ++m) {
-        if (state.matrices[static_cast<std::size_t>(m)].lsb_bypass) {
+        const MatrixPlan& matrix_plan = state.matrices[static_cast<std::size_t>(m)];
+        if (matrix_plan.lsb_bypass) {
+            bypass_bits[static_cast<std::size_t>(bypass_count)] =
+                static_cast<std::uint8_t>(matrix_plan.bypass_bits);
             bypass_matrix[static_cast<std::size_t>(bypass_count++)] = static_cast<std::uint8_t>(m);
         }
     }
 
     // The residuals, and the bits that put back the LSBs a matrix dropped.
-    std::array<std::uint16_t, kMaxBlockSize> bypass{};
+    std::array<std::uint64_t, kMaxBlockSize> bypass{};
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_residuals");
         if (!kernels::read_residuals(reader, block, min_chan, max_chan, plans.data(), bypass_count,
-                                     bypass_matrix.data(), rows_base, kRowStride, bypass.data())) {
+                                     bypass_matrix.data(), bypass_bits.data(), rows_base,
+                                     kRowStride, bypass.data())) {
             return std::unexpected(make_error(ErrorKind::kBadBlockData,
                                               "a Huffman code no codebook has (TH spec App. C)"));
         }

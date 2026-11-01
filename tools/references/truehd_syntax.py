@@ -368,7 +368,9 @@ class Substream:
                         "out": bits.read(4),
                         "frac_bits": bits.read(4),
                         "f_shift": bits.read(3) - 1,
-                        "bypass": 1 if bits.read(2) else 0,  # ERRATA 69, provisional
+                        "bypass": bits.read(
+                            2
+                        ),  # the bits a sample of the LSB bypass (ERRATA 69, provisional)
                         "noise_shift": bits.read(4),
                         "mask": bits.read(channels),
                         "width": previous[place]["width"] if place < len(previous) else 0,
@@ -474,7 +476,7 @@ def decode_block(sub, bits, rows, first):
                 row[column] = 0
     bypass = []
     for i in range(size):
-        bits_for_sample = [bits.read(1) if matrix[2] else 0 for matrix in sub.matrices]
+        bits_for_sample = [bits.read(matrix[2]) if matrix[2] else 0 for matrix in sub.matrices]
         bypass.append(bits_for_sample)
         for ch in range(sub.min_chan, sub.max_chan + 1):
             rows[first + i][ch] = residual(bits, sub.channels[ch], sub.quant[ch])

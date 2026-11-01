@@ -52,14 +52,17 @@ struct ResidualPlan {
 // Huffman code no codebook has.
 [[nodiscard]] inline bool read_residuals(BitReader& reader, int block, int min_chan, int max_chan,
                                          const ResidualPlan* plans, int bypass_count,
-                                         const std::uint8_t* bypass_matrix, std::int32_t* rows,
-                                         std::ptrdiff_t stride, std::uint16_t* bypass) {
+                                         const std::uint8_t* bypass_matrix,
+                                         const std::uint8_t* bypass_bits, std::int32_t* rows,
+                                         std::ptrdiff_t stride, std::uint64_t* bypass) {
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
-        std::uint16_t bits = 0;
+        std::uint64_t bits = 0;
         for (int b = 0; b < bypass_count; ++b) {
-            bits = static_cast<std::uint16_t>(
-                bits | (reader.read(1) << bypass_matrix[static_cast<std::size_t>(b)]));
+            // `bypass_bits` bits a sample for the matrix (1 for the standard section, the
+            // object matrix's field_2b otherwise), kept in the matrix's nibble.
+            bits |= std::uint64_t{reader.read(bypass_bits[static_cast<std::size_t>(b)])}
+                    << (4U * bypass_matrix[static_cast<std::size_t>(b)]);
         }
         bypass[static_cast<std::size_t>(i)] = bits;
         for (int ch = min_chan; ch <= max_chan; ++ch) {
@@ -161,7 +164,7 @@ struct FineTerms {
 
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                          const std::int32_t* coeff, int out, std::uint32_t keep, bool lsb_bypass,
-                         int matrix_index, const std::uint16_t* bypass, std::int32_t* rows,
+                         int matrix_index, const std::uint64_t* bypass, std::int32_t* rows,
                          std::ptrdiff_t stride, const NoiseDraw& noise = {},
                          const FineTerms& fine = {}) {
     const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + kNoiseScaleShift);
@@ -203,8 +206,8 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
         }
         std::uint32_t value = static_cast<std::uint32_t>(sum >> shift) & keep;
         if (lsb_bypass) {
-            const std::uint32_t sent = bypass[static_cast<std::size_t>(i)];
-            value += (sent >> matrix_index) & 1U;
+            const std::uint64_t sent = bypass[static_cast<std::size_t>(i)];
+            value += static_cast<std::uint32_t>((sent >> (4 * matrix_index)) & 0xFU);
         }
         row[out] = static_cast<std::int32_t>(value);
     }

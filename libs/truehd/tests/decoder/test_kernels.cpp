@@ -133,9 +133,9 @@ TEST_CASE("the residual reader gives back what the encoder's writer put, in ever
             }
         }
         std::array<std::int32_t, kBlock * kStride> rows{};
-        std::array<std::uint16_t, kBlock> bypass{};
+        std::array<std::uint64_t, kBlock> bypass{};
         iclforge::BitReader reader(writer.bytes());
-        REQUIRE(kernels::read_residuals(reader, kBlock, 0, kChannels - 1, plans.data(), 0, nullptr,
+        REQUIRE(kernels::read_residuals(reader, kBlock, 0, kChannels - 1, plans.data(), 0, nullptr, nullptr,
                                         rows.data(), kStride, bypass.data()));
         for (int i = 0; i < kBlock; ++i) {
             for (int c = 0; c < kChannels; ++c) {
@@ -162,7 +162,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         auto rows = base;
         const std::array<std::uint8_t, 3> channel = {0, 1, 2};
         const std::array<std::int32_t, 3> coeff = {32768, -16384, 6003};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::apply_matrix(kBlock, 3, channel.data(), coeff.data(), 5, 0xFFFFFFF8U, false, 0,
                               bypass.data(), rows.data(), kStride);
         for (int i = 0; i < kBlock; ++i) {
@@ -180,7 +180,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         auto rows = base;
         const std::array<std::uint8_t, 2> channel = {0, 1};
         const std::array<std::int32_t, 2> coeff = {32768 + 1, -3};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
                               bypass.data(), rows.data(), kStride);
         bool differs_from_a_shift_of_14 = false;
@@ -200,7 +200,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         const std::array<std::uint8_t, 2> channel = {0, 1};
         const std::array<std::int32_t, 2> coeff = {32768, -4 * 1594};
         const std::array<std::int32_t, 2> delta = {0, 4 * 3986};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
                               bypass.data(), rows.data(), kStride, {},
                               kernels::FineTerms{delta.data(), 15});
@@ -231,7 +231,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         const std::array<std::uint8_t, 3> channel = {0, 1, 2};
         const std::array<std::int32_t, 3> coeff = {1, 1, 1};
         const std::array<std::int32_t, 3> delta = {INT32_MIN, INT32_MIN, INT32_MIN};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::apply_matrix(kBlock, 3, channel.data(), coeff.data(), 5, 0xFFFFFFFFU, false, 0,
                               bypass.data(), rows.data(), kStride, {},
                               kernels::FineTerms{delta.data(), 16});
@@ -280,7 +280,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         auto rows = base;
         const std::array<std::uint8_t, 2> channel = {0, 1};
         const std::array<std::int32_t, 2> coeff = {32768, -16384};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::NoiseDraw noise;
         noise.buffer = buffer.data();
         noise.shift = 3;
