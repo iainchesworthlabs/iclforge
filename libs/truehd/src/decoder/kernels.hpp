@@ -160,6 +160,7 @@ struct NoiseDraw {
 struct FineTerms {
     const std::int32_t* delta = nullptr;
     int bits = 0;
+    int ramp = 0;  // lab: 0 the same for the block; 1 grows by (i + 1) / block; 2 by i / block
 };
 
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
@@ -200,6 +201,11 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
             std::uint64_t finer = 0;
             for (int k = 0; k < count; ++k) {
                 finer += static_cast<std::uint64_t>(std::int64_t{row[channel[k]]} * fine.delta[k]);
+            }
+            if (fine.ramp != 0) {
+                const std::int64_t numerator = fine.ramp == 1 ? i + 1 : i;
+                finer = static_cast<std::uint64_t>(static_cast<std::int64_t>(finer) * numerator /
+                                                   block);
             }
             sum = static_cast<std::int64_t>((static_cast<std::uint64_t>(sum) << fine.bits) + finer);
             shift += fine.bits;

@@ -81,6 +81,10 @@ struct DecoderLab {
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
     // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
     int fold_scope = 0;
+    // The extension's deltas: 0 refine the coefficients by 2^-(width + 1) of their last place; 1 not
+    // at all; 2 by 2^-width; 3 for the block that sends them only; 4 and 5 with a ramp over the
+    // block, (i + 1) / block or i / block; 7 and 8 the same with 2^-width.
+    int object_extension = 0;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;

@@ -76,6 +76,7 @@ struct MatrixPlan {
     // The extension's finer part of each coefficient, scaled to 2^-15 and read as 2^-fine_bits.
     std::array<std::int32_t, kRowStride> fine{};
     int fine_bits = 0;
+    int fine_ramp = 0;
 };
 
 struct SubstreamState {
@@ -487,9 +488,14 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
             plan.noise_shift = spec.noise_shift;
             // The extension's deltas refine the coefficients by 2^-(width + 1) of their last place
             // (ERRATA.md entry 69).
-            const bool use_fine = restart.sync == kRestartSyncAtmos && spec.ext_width != 0;
+            const int mode = restart.sync == kRestartSyncAtmos ? config.lab.object_extension : 0;
+            const bool use_fine = restart.sync == kRestartSyncAtmos && spec.ext_width != 0 &&
+                                  mode != 1 && (mode != 3 || header.matrices->extension);
             if (use_fine) {
-                plan.fine_bits = spec.ext_width + 1;
+                // Lab modes: 1 no refinement; 2 and 7 and 8 by 2^-width; 3 for the sending block
+                // only; 4 and 7 grow over the block by (i + 1) / block, 5 and 8 by i / block.
+                plan.fine_bits = spec.ext_width + (mode == 2 || mode >= 7 ? 0 : 1);
+                plan.fine_ramp = mode == 4 || mode == 7 ? 1 : mode == 5 || mode == 8 ? 2 : 0;
             }
             if (restart.sync == kRestartSyncAtmos) {
                 plan.noise_shift = spec.field_m4;
@@ -776,7 +782,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             }
             kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
                                   plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
-                                  kRowStride, noise, kernels::FineTerms{plan.fine.data(), plan.fine_bits});
+                                  kRowStride, noise, kernels::FineTerms{plan.fine.data(), plan.fine_bits, plan.fine_ramp});
         }
     }
 

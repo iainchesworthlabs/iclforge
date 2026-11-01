@@ -458,6 +458,15 @@ int main(int argc, char** argv) {
         folded.fold_scope = scope;
         settings.push_back({kScopeNames[scope], folded});
     }
+    static const char* const kExtensionNames[] = {
+        "", "extension: no refinement", "extension: 2^-width", "extension: sending block only",
+        "extension: ramp (i+1)/block", "extension: ramp i/block", "", "extension: 2^-width, ramp (i+1)/block",
+        "extension: 2^-width, ramp i/block"};
+    for (int mode : {1, 2, 3, 4, 5, 7, 8}) {
+        DecoderLab refined = base;
+        refined.object_extension = mode;
+        settings.push_back({kExtensionNames[mode], refined});
+    }
     static const char* const kUpwardNames[] = {
         "fold: matrix channels 1 up", "fold: matrix channels 2 up", "fold: matrix channels 3 up",
         "fold: matrix channels 4 up", "fold: matrix channels 5 up", "fold: matrix channels 6 up",
