@@ -1346,3 +1346,10 @@ does not read, extract the TrueHD stream with any tool first and probe that.
 The tests of these fields are in `apps/forge/cli/tests/test_cli_truehd.cpp` (a stream with a Thrift payload in one frame and OAMD alone in the others, whose output is
 checked for not containing any of its values; the FFmpeg fixtures; the hand-built 16-channel and LSB bypass streams) and in
 `libs/truehd/tests/decoder/test_substream3.cpp` (the decoder's counters).
+
+**Extension deltas as a coefficient ramp (provisional; read from the controlled encode `ctl_c`).** In the section sent at output sample 12,280, with the next at
+12,320 (one block of 40 samples apart), raw + delta / 8 equals the next section's raw coefficient for every coefficient with a delta, in all 8 matrices, with widths 5 to 10
+and `f_shift` 0 to 2 (`SUBSTREAM3.md` section 6 gives numbers). Between sections 13 and 38 blocks apart the coefficient moves by more than delta / 8, by a factor of 2 to 38 that depends on the matrix, so what a delta means across several blocks is not known. On the 1 kHz object's channel (matrix channel 0) the only
+samples that differ from the sine in interval 2 are 9 in this section (4 to 8 off the sine's rounding); a flat 2^-4 or a ramp of 2^-3 over the block leaves none, the rule in force (2^-(w + 1))
+leaves 9. No setting changes a count of passing intervals, so the decoder keeps its rule. Question 65: does a delta of a matrix not followed by another section within one block ramp the
+coefficient over the block to raw + delta / 8, and what do the 10,240 and 10,760 sections (13 and 38 blocks before the next section) do over their blocks? Recommendation: ramp over the block, i / block, until a controlled encode with a longer ramp says otherwise.

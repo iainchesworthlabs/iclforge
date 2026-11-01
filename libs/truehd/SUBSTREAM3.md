@@ -278,6 +278,8 @@ tests each is in `DecoderLab` (`libs/truehd/include/iclforge/truehd/decoder/deco
 | The standard matrix section (4-bit count, a presence bit for every channel) for substream 3 | Rejected by ERRATA 69; entries 65 to 68 were this layout read wrongly |
 | Four early grammars for the extension (a value for every present channel or every channel, one width or one per matrix) | All failed at the first update (unit 4,072 in `soll_e12`, 4,175 in `EX_00002a`) |
 | The extension as one bit per matrix channel | Changes nothing |
+| The extension's delta read at 2^-(w + 1 + k), k = -6 to 2, with either sign; a fixed 2^-n for n = -1 to 8; the delta counted from 2^-frac or from one absolute place; flat, ramped over the block, or adding up over blocks | No lift in `ctl_c`, `e5` (one line 93 against 92), `e7` (at most 25 against 23) or `EX_00002a`; on matrix channel 0 of `ctl_c` interval 2 several give 0 to 1 misses against 9 (see section 6) |
+| Refilling the noise buffer for every block (`object_noise_index` bit 2) | Worse: the hand-built extension stream fails, every file at or below its base |
 | A sweep of 96 grammars of the extension | Inconclusive: it held the layout now used, but ran before the bypass bit was known, so its blocks did not parse (no longer in the lab) |
 
 ## 6. Open items
@@ -295,7 +297,19 @@ found; section 5 lists what it is not. The controlled encodes of DEE are what se
 known. The lab prints the failing block header's bit position, the flags and the extension widths it was read against (the line
 starting "block header at bit").
 
-**The extension.** What the deltas do, and their scale: the decoder applies `delta / 2^(w + 1)` of the base's last place, which lifts
+**The extension, newest reading (not in force; sections 5 and 6 below it are older).** In the synthetic control `ctl_c`, the section sent at
+output sample 12,280 (the only block of 40 samples between it and the next section, at 12,320) has the extension. For all of its 8 matrices, every
+coefficient that has a delta satisfies raw + delta / 8 = the raw coefficient of the next section, to rounding (for example 15,723 + 773 / 8 = 15,819.6
+against 15,820; 13,744 + 297 / 8 = 13,781.1 against 13,781; -20,159 - 444 / 8 = -20,214.5 against -20,214), whatever the width (5 to 10) or `f_shift`. So the delta is
+the change of the coefficient over the block, in raw last places divided by 8, not a width-dependent refinement. The same section's sine on matrix channel 0 (the
+object's tone, 1 kHz) is exact to the sine's rounding with a flat delta / 16 (2^-4) or with a ramp across the block of delta / 8 (2^-3, either (i + 1) / block or i / block),
+and misses 9 samples by 4 to 8 with the rule in force. Counts of misses at threshold 4 in interval 2: rule in force 9; delta / 2^(w + 1) weighted 4 times 1; flat 2^-4 0; ramp 2^-3 0.
+These settings (`object_extension_fixed`, `_unit`, `_cumulative`, `_bias`) do not change any count of passing intervals in `ctl_c`, `e5`, `e7` or `EX_00002a`, so the lock does not
+yet confirm any of them, and the rule in force is unchanged. The sections at 10,240 and 10,760 of the same file carry the extension too, with 13 and 38 blocks until the next section; the
+coefficients in the next section differ from raw + delta / 8 there (by about 2 to 38 times delta / 8, depending on the matrix), so the delta is not simply a
+step that repeats in each block; what it is over several blocks is not known. Tools: `sections`, `sine`, `sinesweep`, `sinefit` of the lab.
+
+**The extension, the older reading.** What the deltas do, and their scale: the decoder applies `delta / 2^(w + 1)` of the base's last place, which lifts
 `soll_e12` from 9 to 11 passing checks and `soll_sil6` from 15 to 18. The deltas of `ctl_c` and `EX_00002a` are near 0 and the scale is
 not exercised there. The hand-built stream `hb_substream3_object_extension` holds the decoder's rule (section 2), but it holds the
 decoder's reading and no outside decoder's. The 2 reserved bits that follow each width are not understood. A present coefficient of 0
