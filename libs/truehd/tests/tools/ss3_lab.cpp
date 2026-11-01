@@ -9,6 +9,7 @@
 // Prints counts and error texts only: no sample leaves the decoder.
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -280,9 +281,71 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
 
 }  // namespace
 
+// For a synthetic control that holds one sine in one matrix channel: how far the decoded output of
+// that channel is from the ideal sine (amplitude, frequency in Hz, phase 0, 48 kHz), over the first
+// intervals kept. The offset of the best match is searched, the deviations are listed by size, and
+// the samples that are far from the sine are named.
+void sine_check(const std::vector<std::byte>& stream, int channel, double amplitude, double hz) {
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    config.strictness = Strictness::kLenient;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    while (const auto unit = reader.next()) {
+        (void)decoder.decode(*unit);
+    }
+    const DecoderCounters& c = decoder.counters();
+    const std::size_t samples = c.object_first_out.size() / 12;
+    const double pi = 3.14159265358979323846;
+    const auto ideal = [&](long n) {
+        return std::llround(amplitude * std::sin(2.0 * pi * hz * static_cast<double>(n) / 48000.0));
+    };
+    long best_offset = 0;
+    double best_cost = 1e300;
+    for (long offset = -400; offset <= 400; ++offset) {
+        double cost = 0;
+        for (std::size_t i = 1000; i < 3000 && i < samples; ++i) {
+            const long n = static_cast<long>(i) + offset;
+            cost += std::fabs(static_cast<double>(c.object_first_out[i * 12 + static_cast<std::size_t>(channel)]) -
+                              static_cast<double>(ideal(n)));
+        }
+        if (cost < best_cost) {
+            best_cost = cost;
+            best_offset = offset;
+        }
+    }
+    std::printf("sine check of matrix channel %d over %zu samples: best offset %ld (output sample i is "
+                "input sample i + %ld), mean |deviation| %.2f\n",
+                channel, samples, best_offset, best_offset, best_cost / 2000.0);
+    std::vector<long> histogram(41, 0);  // deviation / 16 from -20 to 20, the ends hold the rest
+    std::vector<std::pair<std::size_t, long>> outliers;
+    for (std::size_t i = 0; i < samples; ++i) {
+        const long dev = static_cast<long>(c.object_first_out[i * 12 + static_cast<std::size_t>(channel)]) -
+                         ideal(static_cast<long>(i) + best_offset);
+        const long bucket = std::clamp(static_cast<long>(std::lround(static_cast<double>(dev) / 16.0)), -20L, 20L);
+        ++histogram[static_cast<std::size_t>(bucket + 20)];
+        if (std::labs(dev) >= 64 && outliers.size() < 40) {
+            outliers.emplace_back(i, dev);
+        }
+    }
+    std::printf("deviation in units of 16 (value: count):");
+    for (long b = -20; b <= 20; ++b) {
+        if (histogram[static_cast<std::size_t>(b + 20)] != 0) {
+            std::printf(" %ld:%ld", b, histogram[static_cast<std::size_t>(b + 20)]);
+        }
+    }
+    std::printf("\nsamples whose deviation is 64 or more (index:deviation, first 40):");
+    for (const auto& [index, dev] : outliers) {
+        std::printf(" %zu:%ld", index, dev);
+    }
+    std::printf("\n");
+}
+
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::fprintf(stderr, "usage: iclforge-truehd-ss3-lab STREAM\n");
+    if (argc != 2 && argc != 6) {
+        std::fprintf(stderr,
+                     "usage: iclforge-truehd-ss3-lab STREAM\n"
+                     "       iclforge-truehd-ss3-lab STREAM sine CHANNEL AMPLITUDE HZ\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -295,6 +358,10 @@ int main(int argc, char** argv) {
     std::vector<std::byte> stream(raw.size());
     for (std::size_t i = 0; i < raw.size(); ++i) {
         stream[i] = static_cast<std::byte>(raw[i]);
+    }
+    if (argc == 6) {
+        sine_check(stream, std::atoi(argv[3]), std::atof(argv[4]), std::atof(argv[5]));
+        return 0;
     }
     std::vector<Setting> settings;
     DecoderLab base;
