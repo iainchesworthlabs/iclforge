@@ -37,6 +37,7 @@
 #include "truehd_evolution.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_objects.hpp"
+#include "truehd_rate.hpp"
 #include "truehd_structure.hpp"
 
 namespace forge_cli::commands {
@@ -665,9 +666,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                             const std::function<void()>& container_text,
                             std::size_t ac3_core_frames) {
     // detail=frames and detail=blocks ask for per-unit lines this report does not have, and are
-    // refused; detail=evolution, structure and format are its own.
-    if (const int refused = check_options_applied(
-            meta, {"json=", "detail=evolution", "detail=structure", "detail=format"});
+    // refused; detail=evolution, structure, format and rate are its own.
+    if (const int refused = check_options_applied(meta, {"json=", "detail=evolution",
+                                                         "detail=structure", "detail=format",
+                                                         "detail=rate", "truehd-bitrate="});
         refused != kExitOk) {
         return refused;
     }
@@ -696,6 +698,14 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         meta.detail.has_value() && (*meta.detail == "evolution" || *meta.detail == "format");
     const bool want_structure =
         meta.detail.has_value() && (*meta.detail == "structure" || *meta.detail == "format");
+    // detail=rate: the arrival model over the stream, at the declared peak rate or at
+    // truehd-bitrate= (libs/truehd/ratectl.hpp).
+    const bool want_rate = meta.detail.has_value() && *meta.detail == "rate";
+    if (!want_rate && meta.thdenc.bitrate_kbps) {
+        fmt::println(stderr, "error: truehd-bitrate= is read by probe with detail=rate only");
+        return kExitUsage;
+    }
+    RateSurvey rate(want_rate, meta.thdenc.bitrate_kbps ? *meta.thdenc.bitrate_kbps * 1000ULL : 0ULL);
     EvolutionSurvey evolution(want_evolution);
     StructureSurvey structure;
     while (const auto unit = reader.next()) {
@@ -740,6 +750,7 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
     if (want_structure) {
         structure.decode(stream);
     }
+    rate.run(stream);
     const std::uint64_t unreadable = info->access_units > units ? info->access_units - units : 0;
     const std::size_t lost_bytes = reader.skipped_bytes() - reader.leading_bytes();
     const bool damaged = segment_failures != 0 || unreadable != 0 || lost_bytes != 0;
@@ -805,6 +816,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             json.key("structure");
             structure.write_json(json);
         }
+        if (want_rate) {
+            json.key("rate");
+            rate.write_json(json);
+        }
         json.end_object();
         json.end_object();
         json.finish();
@@ -858,6 +873,7 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         if (want_structure) {
             structure.print_text();
         }
+        rate.print_text();
     }
     return damaged ? 1 : 0;
 }

@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 159> kOptionTokens{{
+constexpr std::array<OptionToken, 163> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -120,6 +120,10 @@ constexpr std::array<OptionToken, 159> kOptionTokens{{
     {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
     {"truehd-peak-rate=", "truehd-encode: the rate the stream is declared not to exceed, kbit/s (default 18000)"},
     {"truehd-rate-check=", "truehd-encode: strict (the default) refuses a stream that cannot be sent within the peak rate; lenient writes it and counts"},
+    {"truehd-rate-mode=", "truehd-atmos: strict (the default) refuses a stream that does not fit; shape lets the object channels of substream 3 give up low bits, one at a time, in the restart intervals that do not fit (the 7.1 bed is never touched; provisional, lossy for the objects)"},
+    {"truehd-shape-bits=", "truehd-atmos with truehd-rate-mode=shape: the most low bits an interval's objects give up, 0 to 16 (default 8)"},
+    {"truehd-bitrate=", "truehd-encode, truehd-atmos: hold the stream to this bitrate over any 75 ms, kbit/s, 1000 to 100000 (default the declared peak rate); probe detail=rate: run the arrival model at it"},
+    {"truehd-major-sync=", "truehd-encode, truehd-atmos: access units between major syncs, 0 (one at every restart header, the default) or a multiple of truehd-restart="},
     {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
     {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
     {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
@@ -212,7 +216,7 @@ constexpr std::array<OptionToken, 159> kOptionTokens{{
                "transcoding to AC-3 or falling back to decoded PCM"},
     {"preset=", "qc: gate the measurement against a named delivery spec"},
     {"json=", "probe: emit the JSON document instead of the human table"},
-    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure or format"},
+    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure, format or rate"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
     {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
                "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
@@ -552,7 +556,8 @@ void print_truehd_topic() {
     fmt::println("       truehd-downmix=none|standard,");
     fmt::println("       truehd-downmix-gains=<C,Ls/Rs,LFE,Lrs/Rrs in dB>,");
     fmt::println("       truehd-restart=<access units>, truehd-peak-rate=<kbit/s>,");
-    fmt::println("       truehd-rate-check=strict|lenient, truehd-fir-order=0..8,");
+    fmt::println("       truehd-rate-check=strict|lenient, truehd-bitrate=<kbit/s>,");
+    fmt::println("       truehd-major-sync=<access units>, truehd-fir-order=0..8,");
     fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
     fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
     fmt::println("       the input.");
@@ -1142,6 +1147,9 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
         fmt::println("                    headers, a decode check, what follows each last block");
         fmt::println("  detail=format     both; metadata only, no content");
+        fmt::println("  detail=rate       TrueHD: per restart interval the bitrate, the largest unit's rate and");
+        fmt::println("                    the least headroom of the 75 ms arrival model (truehd-bitrate=");
+        fmt::println("                    sets the rate it runs at)");
     }
     if ((mask & topic::kContentSignature) != 0) {
         fmt::println("");

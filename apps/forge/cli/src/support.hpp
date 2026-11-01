@@ -169,6 +169,12 @@ struct Options {
         std::optional<int> restart_units;             // truehd-restart=
         std::optional<std::uint32_t> peak_rate_kbps;  // truehd-peak-rate=
         bool rate_lenient = false;                    // truehd-rate-check=lenient
+        // truehd-bitrate=: the bitrate the stream is held to over 75 ms (the encoders), or the rate
+        // the arrival model runs at (probe detail=rate; the declared peak rate when unset).
+        std::optional<std::uint32_t> bitrate_kbps;
+        bool shape = false;                   // truehd-rate-mode=shape (truehd-atmos only)
+        std::optional<int> shape_bits;        // truehd-shape-bits=
+        std::optional<int> major_sync_units;  // truehd-major-sync=
         std::optional<int> fir_order;                 // truehd-fir-order=
         bool matrix = true;                           // truehd-matrix=
         unsigned stereo_mode = 0;  // truehd-stereo-mode=: stereo, ltrt, headphone
