@@ -105,6 +105,32 @@ void print_subsets(const DecoderCounters& c) {
 // For a stream whose objects are constant (a synthetic control): the values each matrix channel's
 // output takes in the first intervals, and where it leaves its most common value. A channel that
 // is not constant in such a stream shows its errors here without the lossless check.
+void print_interval_values(const DecoderCounters& c) {
+    std::printf("    output values by interval (distinct values, smallest..largest, by matrix channel; "
+                "o passed, F failed):\n");
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i < c.object_interval_facts.size() && i < 10; ++i) {
+        // the check at the end of interval k is for the samples before the restart that holds it
+        const std::size_t end = c.object_interval_facts[i].samples_so_far;
+        if (end <= begin) {
+            continue;
+        }
+        std::printf("      interval %zu %c (%zu samples):", i,
+                    (c.object_interval_log[i] & 1U) != 0 ? 'o' : 'F', end - begin);
+        for (std::size_t ch = 0; ch < 12; ++ch) {
+            std::vector<std::int32_t> values;
+            for (std::size_t s = begin; s < end; ++s) {
+                values.push_back(c.object_first_out[s * 12 + ch]);
+            }
+            std::sort(values.begin(), values.end());
+            const auto distinct = std::unique(values.begin(), values.end()) - values.begin();
+            std::printf(" %zu:%td[%d..%d]", ch, distinct, values.front(), values.back());
+        }
+        std::printf("\n");
+        begin = end;
+    }
+}
+
 void print_constant_deviations(const DecoderCounters& c) {
     const std::size_t samples = c.object_first_out.size() / 12;
     if (samples == 0) {
@@ -229,6 +255,7 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
             std::printf("%c", updates > 9 ? '+' : static_cast<char>('0' + updates));
         }
         std::printf("\n");
+        print_interval_values(c);
         print_constant_deviations(c);
         std::printf("    quantiser steps by matrix channel at the first check:");
         for (int ch = 0; ch < 12; ++ch) {

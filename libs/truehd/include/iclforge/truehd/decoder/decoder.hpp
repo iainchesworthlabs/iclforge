@@ -171,6 +171,7 @@ struct DecoderCounters {
         std::uint8_t coded_bits = 0;
         std::uint8_t bed_bits = 0;
         std::uint8_t out_bits = 0;
+        std::uint32_t samples_so_far = 0;  // output samples kept when the interval ended
     };
     std::vector<ObjectIntervalFacts> object_interval_facts;
     std::string object_error_context;  // the first object block header that failed (lab)

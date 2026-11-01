@@ -360,6 +360,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
                 counters.object_quant_step = state.quant_step;
                 counters.object_output_shift = state.output_shift;
             }
+            facts.samples_so_far = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
             counters.object_interval_facts.push_back(facts);
         }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
@@ -792,7 +793,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             }
         }
     }
-    if (index == kObjectSubstream && counters.object_checks_kept < 3) {
+    if (index == kObjectSubstream && counters.object_checks_kept < 10) {
         auto& stats = counters.object_stats;
         for (int i = 0; i < block; ++i) {
             const std::int32_t* const coded = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
