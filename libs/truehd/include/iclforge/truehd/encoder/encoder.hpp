@@ -11,6 +11,7 @@
 
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/object_paths.hpp"
+#include "iclforge/truehd/encoder/ratectl.hpp"
 #include "iclforge/truehd/export.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
@@ -120,6 +121,32 @@ enum class ObjectLayout : std::uint8_t {
     kBedMatrices,
 };
 
+// What the encoder does when a unit would arrive later than the model of libs/truehd/ratectl.hpp
+// allows (ERRATA.md entry 71).
+enum class RateMode : std::uint8_t {
+    // Nothing: the stream is lossless, so a unit that does not fit is kRateExceeded (or counted, with
+    // EncoderConfig::allow_rate_violations).
+    kStrict,
+    // The object channels of substream 3 give up low bits, one at a time, in the restart interval
+    // that does not fit, until it does (RateControl::max_shape_bits at most). The 7.1 bed of
+    // substreams 0 to 2 is never touched. The objects of such an interval are no longer the input's:
+    // each sample is the input's rounded to a multiple of 2^k, and EncoderStats::shaped_intervals
+    // says how many intervals it happened in. Needs object_channels. PROVISIONAL: whether the owner
+    // accepts a lossy object substream at all is ERRATA.md question 71.
+    kShape,
+};
+
+struct RateControl {
+    RateMode mode = RateMode::kStrict;
+    // The bitrate the stream is held to, over any 75 ms (the arrival model run at this rate). 0: the
+    // declared peak data rate, which is as much as a decoder is told to expect. Above the declared
+    // peak rate it changes nothing.
+    std::uint32_t target_bitrate_bps = 0;
+    // kShape: the most low bits an interval's object channels give up beyond the ones the input
+    // leaves clear. 0 to 16.
+    int max_shape_bits = 8;
+};
+
 struct EncoderConfig {
     StreamKind kind = StreamKind::kTrueHd;  // only kTrueHd is written
     std::uint32_t sample_rate = 48000;
@@ -135,8 +162,17 @@ struct EncoderConfig {
     // units than this has one restart header. A longer interval makes a smaller stream, a shorter
     // one a smaller delay before the first unit leaves the encoder and a quicker random access.
     int restart_interval_units = 128;
+    // The access units between major syncs: 0 (a major sync at every restart header, the default
+    // and what the encoder always wrote) or a multiple of restart_interval_units. The restarts
+    // between two major syncs have a restart header in every substream and no major sync
+    // (layout.hpp, LayoutCadence).
+    int major_sync_interval_units = 0;
     // TH spec §4.4, §18: the rate the stream is declared not to exceed. 18 Mbps is Blu-ray's.
     std::uint32_t peak_data_rate_bps = 18'000'000;
+    // What happens to a unit that would arrive late at that rate, or at the bitrate chosen in
+    // `rate_control` (ratectl.hpp). The extra_data source may be called more than once for a unit:
+    // a restart interval that is coded again asks again.
+    RateControl rate_control{};
     // false: a stream that cannot be sent within peak_data_rate_bps and the 75 ms of TH spec §18
     // is an error (kRateExceeded). true: it is written anyway and counted in
     // EncoderStats::rate_violations.
@@ -240,6 +276,14 @@ struct EncoderStats {
     // ObjectLayout::kBedMatrices: restart intervals whose mix of the objects into the bed had its
     // gain lowered, or dropped, to keep the bed within 24 bits.
     std::uint64_t object_mix_reduced_intervals = 0;
+    // The smallest headroom of any unit under the declared peak rate (ratectl.hpp), in microseconds;
+    // below 0 only with allow_rate_violations.
+    std::int64_t min_headroom_us = 0;
+    // RateMode::kShape: restart intervals whose object channels gave up bits, the most any of them
+    // gave up beyond what the input leaves clear, and the intervals coded again on the way.
+    std::uint64_t shaped_intervals = 0;
+    int max_shape_bits = 0;
+    std::uint64_t shape_retries = 0;
 };
 
 class ICLFORGE_TRUEHD_EXPORT Encoder {
@@ -269,6 +313,9 @@ class ICLFORGE_TRUEHD_EXPORT Encoder {
     [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> flush();
 
     [[nodiscard]] const EncoderStats& stats() const noexcept;
+    // The figures of every restart interval written so far, in order (ratectl.hpp): what
+    // analyse_rate() finds in the stream the units make.
+    [[nodiscard]] std::span<const IntervalRate> interval_rates() const noexcept;
     // The samples per channel in a full access unit: 40 at 44.1 and 48 kHz, 80 at 88.2 and 96,
     // 160 at 176.4 and 192.
     [[nodiscard]] int samples_per_access_unit() const noexcept;
