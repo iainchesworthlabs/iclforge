@@ -615,6 +615,17 @@ one; `follow=off`, or no output that can take PCM, refuses. It is carried in `Ou
      (`aplay -D "hdmi:CARD=<card>,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e" mat.wav`; untried here); then Windows; Core Audio last.
      WP6's session was said to be producing MAT bursts for the Shield and the Onkyo: its branch (`feature/truehd-validation`) held none when this was
      written, so the bursts for the first run are `forge spdif` of the 25 fixtures.
+     **2026-11-01, first run (step A, `aplay` of `forge spdif`'s WAV): the carrier works.** Raspberry Pi 4B, vc4hdmi0, ALSA, into the Onkyo
+     TX-RZ740, with the owner present and the volume at 0. `forge spdif` of `truehd_m51_s16.thd` made an 8-channel 16-bit 192,000 Hz WAV; played with
+     `aplay -D "hdmi:CARD=vc4hdmi0,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e"`, the receiver's eISCP status (IFAQSTN) said "Dolby Audio - TrueHD, 48 kHz,
+     5.1 ch" from about 4.4 s to 26.7 s, twice; `truehd_cat_st48_s24.thd` said "Dolby TrueHD SUR, 48 kHz, 2.0 ch". The owner's photos show the Dolby logo and
+     the right speakers lit (the panel shows the logo, not the word; the owner's confirmation of the word is pending). No `dmesg` audio errors, no throttling.
+     **What it shows:** eight channels of 16 bits at 192 kHz with the non-audio channel status is a carrier an Onkyo names TrueHD (question 7 of
+     `libs/containers/ERRATA.md`, for the 48 kHz family; 176.4 kHz is still unseen). **What it does not show:** the library's own path. Steps B
+     (`PassthroughSink` with `BitstreamFormat::kMat`) and C (PipeWire, and `pw-dump` of the stream for entry 123) have not been run, so ALSA stays "not run" in
+     `mat_status.hpp`. **Two findings for the player:** the fixtures are 8 and 13 bursts (0.2 s), too short for the receiver to lock; and lock took 1.5 to 4.5 s
+     from the start of the carrier, with the HDMI label flashing meanwhile, so the link must start before the first burst and the player must not
+     expect sound in its first seconds.
 121. **A platform marked "not run" is never chosen automatically.** The user can pin Bitstream to try it. *Recommend:* keep, and flip a platform to
      "run" only in the commit that records a run that passed (the table has a test that pins it).
 122. **WASAPI's MLP format fields.** `dwEncodedSamplesPerSec` is the content rate and `dwEncodedChannelCount` 8, as the other two families have

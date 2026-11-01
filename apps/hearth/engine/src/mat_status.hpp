@@ -45,7 +45,8 @@ struct MatPlatformStatus {
         case PassthroughBackend::kAlsa:
             return {backend, MatRun::kNotRun,
                     "it opens 8 channels of 16 bits at 192 kHz (176.4 kHz) with the non-audio "
-                    "status bit, and has been checked against software devices only"};
+                    "status bit; an Onkyo named that carrier TrueHD when it was played with aplay "
+                    "on 2026-11-01, but this library's own sink has not been run"};
         case PassthroughBackend::kPipeWire:
             return {backend, MatRun::kNotRun,
                     "it negotiates SPA's TrueHD codec on the same link, and no sink has been "

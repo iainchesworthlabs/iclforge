@@ -46,7 +46,9 @@ repeats the comparisons against whatever FFmpeg is installed, and the `[truehd]`
    arithmetic on the burst size and an eight-channel assumption, not a statement of TH spec §21.3, and nothing has played the
    WAV into a receiver. Is eight channels at four times the family rate (HDMI's MAT carrier) the carrier? **Provisional,
    owner to confirm.** (The owner's decision of 2026-10-29 names this carrier. The audio library's passthrough sink now opens it on ALSA, PipeWire
-   and WASAPI; no platform has played it to a receiver, so it stays open: `planning/truehd-parity-hearth-player.md`, entry 120. The owner confirmed the reading again to the Crucible session on 2026-10-31, and Microsoft's "Representing Formats for IEC 61937 Transmissions" gives the same link.)
+   and WASAPI; no platform's sink has played it to a receiver, so it stays open: `planning/truehd-parity-hearth-player.md`, entry 120. On 2026-11-01
+   `aplay` of `forge spdif`'s WAV, from a Raspberry Pi over ALSA, was named TrueHD by an Onkyo TX-RZ740 at 48 kHz, 5.1 and 2.0 channels: the carrier
+   is seen to work for one receiver and the 48 kHz family, and 176.4 kHz is unseen. The owner confirmed the reading again to the Crucible session on 2026-10-31, and Microsoft's "Representing Formats for IEC 61937 Transmissions" gives the same link.)
 8. **TrueHD in a transport stream is Blu-ray's alone (`forge ts`).** The command writes TrueHD with `stream_type` 0x83 and the
    `HDMV` registration, and refuses the `dvb` and `atsc` profiles with a usage error, because neither defines TrueHD carriage in
    anything found for this work (C8 is about the same stream_type). Does DVB or ATSC define one?
