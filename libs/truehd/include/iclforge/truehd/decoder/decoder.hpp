@@ -96,7 +96,8 @@ struct DecoderLab {
     int mask_rows = 0;
     bool object_restart_clears = false;  // an object restart clears the filter histories
     // The object matrices' noise index: bit 0 counts the samples from the start of the block, not
-    // of the access unit; bit 1 numbers the matrices from the first, not from the last.
+    // of the access unit; bit 1 numbers the matrices from the first, not from the last; bit 2
+    // fills the noise buffer again for every block, not once for the access unit.
     int object_noise_index = 0;
     int object_noise_cap = 0;          // the matrix number in the noise index is at most this
     int object_noise_stride_mask = 0;  // the noise stride is masked with this (0 no mask)

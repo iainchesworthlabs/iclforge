@@ -706,7 +706,8 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         if (!state.context.noise_type) {
             kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base,
                                     kRowStride, kMaxChannels);
-        } else if (!state.noise_filled) {
+        } else if (!state.noise_filled ||
+                   (state.context.object_matrices && (config.lab.object_noise_index & 4) != 0)) {
             state.noise_seed =
                 detail::fill_noise_buffer(state.noise_seed, noise_size, state.noise_buffer.data());
             state.noise_filled = true;
