@@ -2478,8 +2478,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         // TrueHD encoding, which 'truehd-encode' and 'truehd-atmos' read
         // (iclforge::truehd::EncoderConfig).
-        if ((command == "truehd-encode" || command == "truehd-atmos") &&
-            key.starts_with("truehd-")) {
+        // ('probe' reads truehd-bitrate= alone: the rate detail=rate runs the arrival model at.)
+        if (((command == "truehd-encode" || command == "truehd-atmos") &&
+             key.starts_with("truehd-")) ||
+            (command == "probe" && key == "truehd-bitrate")) {
             Options::TruehdEncode& enc = out.thdenc;
             const std::string_view name = key.substr(7);
             if (name == "downmix") {
@@ -2523,6 +2525,54 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     return false;
                 }
                 enc.rate_lenient = value == "lenient";
+                continue;
+            }
+            if (name == "bitrate") {
+                const auto kbps = parse_u32_or(value, 0);
+                if (kbps < 1000 || kbps > 100000) {
+                    fmt::println(
+                        stderr, "error: truehd-bitrate is a rate in kbit/s, 1000 to 100000 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.bitrate_kbps = kbps;
+                continue;
+            }
+            if (name == "rate-mode") {
+                if (value != "strict" && value != "shape") {
+                    fmt::println(stderr, "error: truehd-rate-mode is strict or shape (got '{}')",
+                                 token);
+                    return false;
+                }
+                if (value == "shape" && command != "truehd-atmos") {
+                    fmt::println(stderr,
+                                 "error: truehd-rate-mode=shape gives up low bits of the object "
+                                 "channels, which only truehd-atmos has");
+                    return false;
+                }
+                enc.shape = value == "shape";
+                continue;
+            }
+            if (name == "shape-bits") {
+                const auto bits = parse_u32_or(value, 99);
+                if (bits > 16) {
+                    fmt::println(stderr, "error: truehd-shape-bits is 0 to 16 (got '{}')", token);
+                    return false;
+                }
+                enc.shape_bits = static_cast<int>(bits);
+                continue;
+            }
+            if (name == "major-sync") {
+                const auto units = parse_u32_or(value, 70000);
+                if (units > 65536) {
+                    fmt::println(stderr,
+                                 "error: truehd-major-sync is the access units between major "
+                                 "syncs, 0 (one at every restart header) or a multiple of "
+                                 "truehd-restart= up to 65536 (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.major_sync_units = static_cast<int>(units);
                 continue;
             }
             if (name == "fir-order") {
@@ -3472,9 +3522,9 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (key == "detail") {
             if (value != "frames" && value != "blocks" && value != "evolution" &&
-                value != "structure" && value != "format") {
+                value != "structure" && value != "format" && value != "rate") {
                 fmt::println(stderr,
-                             "error: detail must be frames, blocks, evolution, structure or format "
+                             "error: detail must be frames, blocks, evolution, structure, format or rate "
                              "(got '{}')",
                              token);
                 return false;
