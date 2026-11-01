@@ -53,11 +53,15 @@ encodes and in hand-built streams, in substreams 0 to 2; the `ch_assign` of subs
 
 **What the lossless check folds.** Each restart header carries one byte, the check of the interval that ends at that header. For every
 sample time and every output channel p the decoder takes the output row m = the matrix channel p takes, applies the output shift of m
-(left shift for a positive value, arithmetic right shift for a negative one), keeps the low 24 bits, shifts them left by m and XORs the
-result into a 32-bit fold. The check byte is the XOR of the four bytes of the fold. Each substream folds its own rows (`max_matrix_chan` + 1 of them);
-substream 3 folds all N, the bed rows included. VERIFIED for substreams 0 to 2 (732, 54, 927 and 1,077 intervals over the owner's
-files, all passing). For substream 3 the same fold passes every interval in some files (`z_short.mlp` 18 of 18, `ctl_a` and `ctl_b`
-93 of 93) and only some intervals in others (section 6).
+(left shift for a positive value, arithmetic right shift for a negative one), keeps the low 24 bits, shifts them left by **m modulo 8**
+and XORs the result into a 32-bit fold. The check byte is the XOR of the four bytes of the fold. Each substream folds its own rows
+(`max_matrix_chan` + 1 of them); substream 3 folds all N, the bed rows included. VERIFIED for substreams 0 to 2 (732, 54, 927 and 1,077
+intervals over the owner's files, all passing). VERIFIED for substream 3 on the owner's synthetic encodes: `z_short`, `ctl_a`, `ctl_b`,
+`e1` and the other single-object streams, and with the modulo 8 also the dense-chain controls (`e2`, `e8`, `e12`, `d3`, `ctl_d`) at 93
+of 93. The modulo is what a shift by the plain channel number gets wrong from channel 8 up: 24 + m is then above 32 bits and the top
+bits of a sample (the sign bits of a negative one) fall out of the word, so that the byte differs by a fixed pattern whose parity is that of
+the number of negative samples in the interval (07 or 00 in `e8`). A shift by m modulo 8 gives the byte a rotation of the word by m gives
+(ERRATA 69). A file of real music still passes only part of its intervals (section 6).
 
 **Restart interval, block, access unit.** On the disc the restarts of substream 3 are 128 units apart (ERRATA 67). Every owner file has one
 block per access unit, so the position of a block in its unit has not been exercised against real streams.

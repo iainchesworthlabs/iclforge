@@ -557,8 +557,8 @@ def decode_block(sub, bits, rows, first):
         if sub.interval is None:
             sub.interval = 0
         for ch, value in enumerate(out_row):
-            # The shift is the matrix channel the output channel takes (ERRATA 12, provisional).
-            sub.interval ^= (value & 0xFFFFFF) << sub.output_source[ch]
+            # The shift is the matrix channel the output channel takes, modulo 8 (ERRATA 12, 69).
+            sub.interval ^= (value & 0xFFFFFF) << (sub.output_source[ch] & 7)
             sub.interval &= 0xFFFFFFFF
     return output_rows
 

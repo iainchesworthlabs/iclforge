@@ -521,7 +521,7 @@ def lossless_fold(rows, ch_assign):
     sources = output_sources(ch_assign)
     for row in rows:
         for ch, value in enumerate(row):
-            fold ^= (value & 0xFFFFFF) << sources[ch]
+            fold ^= (value & 0xFFFFFF) << (sources[ch] & 7)
             fold &= 0xFFFFFFFF
     return ref.fold_check(fold)
 

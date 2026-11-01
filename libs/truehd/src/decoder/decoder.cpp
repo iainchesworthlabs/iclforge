@@ -852,32 +852,6 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         if (index == kObjectSubstream && config.lab.fold_scope != 0) {
             // Lab: fold other samples than the output of every matrix channel (ERRATA.md entry 69).
             const int scope = config.lab.fold_scope;
-            if (scope == 20 || scope == 21) {
-                // Lab: the bits a shift by the matrix channel pushes past 32 wrap round (20), or
-                // the shift is the channel number modulo 8 (21).
-                std::uint32_t wrapped = fold_before;
-                for (int i = 0; i < block; ++i) {
-                    const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
-                    for (int ch = 0; ch < out_channels; ++ch) {
-                        const unsigned c = state.output_source[static_cast<std::size_t>(ch)];
-                        const auto shift = state.output_shift[c];
-                        const std::int32_t source = matrix_base[at + c];
-                        const std::int32_t output =
-                            shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source)
-                                                                   << shift)
-                                       : source >> -shift;
-                        const std::uint64_t v = static_cast<std::uint32_t>(output) & 0xFFFFFFU;
-                        if (scope == 20) {
-                            const std::uint64_t x = v << c;
-                            wrapped ^= static_cast<std::uint32_t>(x) ^ static_cast<std::uint32_t>(x >> 32U);
-                        } else {
-                            wrapped ^= static_cast<std::uint32_t>(v << (c & 7U));
-                        }
-                    }
-                }
-                state.interval_fold = wrapped;
-            }
-            if (scope < 20) {
             const bool upward = scope >= 10;
             const int first = upward                   ? scope - 10
                               : scope >= 3 && scope <= 4 ? 0
@@ -903,7 +877,6 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 }
             }
             state.interval_fold = fold;
-            }
         }
     }
     state.interval_open = true;

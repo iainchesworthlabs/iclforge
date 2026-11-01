@@ -458,12 +458,6 @@ int main(int argc, char** argv) {
         folded.fold_scope = scope;
         settings.push_back({kScopeNames[scope], folded});
     }
-    DecoderLab wrapped = base;
-    wrapped.fold_scope = 20;
-    settings.push_back({"fold: shifted bits wrap round", wrapped});
-    DecoderLab modulo = base;
-    modulo.fold_scope = 21;
-    settings.push_back({"fold: shift modulo 8", modulo});
     static const char* const kUpwardNames[] = {
         "fold: matrix channels 1 up", "fold: matrix channels 2 up", "fold: matrix channels 3 up",
         "fold: matrix channels 4 up", "fold: matrix channels 5 up", "fold: matrix channels 6 up",
