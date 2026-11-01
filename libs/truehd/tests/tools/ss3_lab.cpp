@@ -285,7 +285,8 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
 // that channel is from the ideal sine (amplitude, frequency in Hz, phase 0, 48 kHz), over the first
 // intervals kept. The offset of the best match is searched, the deviations are listed by size, and
 // the samples that are far from the sine are named.
-void sine_check(const std::vector<std::byte>& stream, int channel, double amplitude, double hz) {
+void sine_check(const std::vector<std::byte>& stream, int channel, double amplitude, double hz,
+                std::int64_t threshold, std::size_t from_sample) {
     DecoderConfig config;
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
@@ -320,14 +321,21 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
                 static_cast<long long>(best_offset), best_cost / 2000.0);
     std::vector<std::int64_t> histogram(41, 0);  // deviation / 16 from -20 to 20, the ends hold the rest
     std::vector<std::pair<std::size_t, std::int64_t>> outliers;
+    std::vector<std::int64_t> per_interval;  // outliers in each 5120-sample interval
     for (std::size_t i = 0; i < samples; ++i) {
         const std::int64_t dev =
             static_cast<std::int64_t>(c.object_first_out[i * 12 + static_cast<std::size_t>(channel)]) -
             ideal(static_cast<std::int64_t>(i) + best_offset);
         const std::int64_t bucket = std::clamp<std::int64_t>(std::llround(static_cast<double>(dev) / 16.0), -20, 20);
         ++histogram[static_cast<std::size_t>(bucket + 20)];
-        if (std::llabs(dev) >= 64 && outliers.size() < 40) {
-            outliers.emplace_back(i, dev);
+        if (std::llabs(dev) >= threshold) {
+            if (per_interval.size() <= i / 5120) {
+                per_interval.resize(i / 5120 + 1, 0);
+            }
+            ++per_interval[i / 5120];
+            if (i >= from_sample && outliers.size() < 40) {
+                outliers.emplace_back(i, dev);
+            }
         }
     }
     std::printf("deviation in units of 16 (value: count):");
@@ -337,7 +345,14 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
                         static_cast<long long>(histogram[static_cast<std::size_t>(b + 20)]));
         }
     }
-    std::printf("\nsamples whose deviation is 64 or more (index:deviation, first 40):");
+    std::printf("\nsamples whose deviation is %lld or more, by 5120-sample interval (interval:count):",
+                static_cast<long long>(threshold));
+    for (std::size_t k = 0; k < per_interval.size(); ++k) {
+        if (per_interval[k] != 0) {
+            std::printf(" %zu:%lld", k, static_cast<long long>(per_interval[k]));
+        }
+    }
+    std::printf("\nfirst 40 such samples from sample %zu (index:deviation):", from_sample);
     for (const auto& [index, dev] : outliers) {
         std::printf(" %zu:%lld", index, static_cast<long long>(dev));
     }
@@ -345,10 +360,10 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2 && argc != 6) {
+    if (argc != 2 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sine CHANNEL AMPLITUDE HZ\n");
+                     "       iclforge-truehd-ss3-lab STREAM sine CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -362,8 +377,10 @@ int main(int argc, char** argv) {
     for (std::size_t i = 0; i < raw.size(); ++i) {
         stream[i] = static_cast<std::byte>(raw[i]);
     }
-    if (argc == 6) {
-        sine_check(stream, std::atoi(argv[3]), std::atof(argv[4]), std::atof(argv[5]));
+    if (argc >= 6) {
+        sine_check(stream, std::atoi(argv[3]), std::atof(argv[4]), std::atof(argv[5]),
+                   argc > 6 ? std::atoll(argv[6]) : 64,
+                   argc > 7 ? static_cast<std::size_t>(std::atoll(argv[7])) : 0);
         return 0;
     }
     std::vector<Setting> settings;
