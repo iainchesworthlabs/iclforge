@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -26,6 +27,12 @@
 namespace {
 
 using namespace iclforge::truehd;
+
+// SS3_LAB_FROM=N keeps the 51,200 samples from output sample N for the sine modes and the value tables.
+std::uint64_t lab_record_from() {
+    const char* text = std::getenv("SS3_LAB_FROM");
+    return text == nullptr ? 0 : static_cast<std::uint64_t>(std::atoll(text));
+}
 
 struct Setting {
     const char* name;
@@ -180,9 +187,11 @@ void print_constant_deviations(const DecoderCounters& c) {
 void run(const std::vector<std::byte>& stream, const char* name, const DecoderLab& lab,
          bool stats = false, bool brief = false) {
     DecoderConfig config;
+    config.lab.record_from = lab_record_from();
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
     config.lab = lab;
+    config.lab.record_from = lab_record_from();
     Decoder decoder(config);
     ElementaryReader reader(stream);
     std::uint64_t units = 0;
@@ -289,6 +298,7 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
 // Every matrix section sent between two output samples, with the extension's width and deltas.
 void print_sections(const std::vector<std::byte>& stream, std::size_t from, std::size_t to) {
     DecoderConfig config;
+    config.lab.record_from = lab_record_from();
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
     Decoder decoder(config);
@@ -297,7 +307,7 @@ void print_sections(const std::vector<std::byte>& stream, std::size_t from, std:
         (void)decoder.decode(*unit);
     }
     const DecoderCounters& c = decoder.counters();
-    std::printf("matrix sections of the first ten intervals sent at output samples %zu to %zu "
+    std::printf("matrix sections sent at output samples %zu to %zu "
                 "(sample, extension flag, matrices):\n", from, to);
     std::printf("blocks (sample:size; h a header, + matrices in it, x the extension):");
     for (const auto& b : c.object_blocks) {
@@ -331,9 +341,11 @@ void print_sections(const std::vector<std::byte>& stream, std::size_t from, std:
 void sine_fit(const std::vector<std::byte>& stream, const DecoderLab& lab, double hz, double hz2,
               std::int64_t threshold, std::size_t interval) {
     DecoderConfig config;
+    config.lab.record_from = lab_record_from();
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
     config.lab = lab;
+    config.lab.record_from = lab_record_from();
     Decoder decoder(config);
     ElementaryReader reader(stream);
     while (const auto unit = reader.next()) {
@@ -406,7 +418,9 @@ void sine_fit(const std::vector<std::byte>& stream, const DecoderLab& lab, doubl
 void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, bool brief, int channel,
                 double amplitude, double hz, std::int64_t threshold, std::size_t from_sample) {
     DecoderConfig config;
+    config.lab.record_from = lab_record_from();
     config.lab = lab;
+    config.lab.record_from = lab_record_from();
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
     Decoder decoder(config);

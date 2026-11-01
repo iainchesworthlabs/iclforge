@@ -96,6 +96,9 @@ struct DecoderLab {
     int object_extension_unit = 0;
     // The deltas add up block after block from the block that sends them.
     bool object_extension_cumulative = false;
+    // The output sample from which the lab keeps the first 51,200 samples of the object substream
+    // (object_first_out); 0 keeps the first ones.
+    std::uint64_t record_from = 0;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
     int object_tie_mode = 0;
@@ -230,6 +233,8 @@ struct DecoderCounters {
         bool extension = false;
     };
     std::vector<ObjectBlock> object_blocks;
+    // Output samples of the object substream decoded so far (for the lab's positions).
+    std::uint64_t object_samples_total = 0;
     std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};
     // The first three intervals of the object substream, by matrix channel: the smallest and the
     // largest value and the number of samples that differ from the one before, in the rows as

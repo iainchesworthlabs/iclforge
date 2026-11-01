@@ -29,6 +29,7 @@ constexpr int kMaxMlpMatrixChannel = 5;
 constexpr int kMaxHuffLsbs = 24;  // TH spec §8.3
 constexpr int kMaxHuffLsbsAtmos = 31;
 constexpr std::size_t kMaxBlockDataBits = 16000;  // TH spec §8.1
+constexpr std::uint64_t kLabLogSamples = 600000;  // the lab's section and block logs stop here
 constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-15 (ERRATA.md entry 60)
 constexpr int kObjectSubstream = 3;
 // TH spec §3.5, §16.5: terminatorA, 0xD234E or 0x348D3, is followed by the 12-bit zero_samples
@@ -839,10 +840,20 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 stats.coded_last[c] = coded[ch];
                 stats.out_last[c] = out[ch];
             }
+            ++stats.samples;
+        }
+    }
+    if (index == kObjectSubstream) {
+        // Lab: the output samples from `record_from` on, up to 51,200 of them, by matrix channel.
+        for (int i = 0; i < block; ++i) {
+            if (counters.object_samples_total + static_cast<std::uint64_t>(i) < config.lab.record_from ||
+                counters.object_first_out.size() / 12 >= 51200) {
+                continue;
+            }
+            const std::int32_t* const out = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
             for (int ch = 0; ch < 12; ++ch) {
                 counters.object_first_out.push_back(ch < out_channels ? out[ch] : 0);
             }
-            ++stats.samples;
         }
     }
 
@@ -997,9 +1008,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 if (header->matrices->count > 0) {
                     ++state.object_updates;
                 }
-                if (header->matrices->count > 0 && counters.object_first_out.size() / 12 < 51200) {
+                if (header->matrices->count > 0 && counters.object_samples_total < kLabLogSamples) {
                     DecoderCounters::ObjectSection section;
-                    section.sample = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
+                    section.sample = static_cast<std::uint32_t>(counters.object_samples_total);
                     section.extension = header->matrices->extension;
                     for (unsigned m = 0; m < header->matrices->count; ++m) {
                         const MatrixSpec& spec = header->matrices->items[m];
@@ -1084,9 +1095,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                            "more than 255 samples in an access unit (TH spec §3.3)"));
         }
         if (index == kObjectSubstream && state.context.object_matrices &&
-            counters.object_first_out.size() / 12 < 51200) {
+            counters.object_samples_total < kLabLogSamples) {
             DecoderCounters::ObjectBlock block;
-            block.sample = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
+            block.sample = static_cast<std::uint32_t>(counters.object_samples_total);
             block.size = static_cast<std::uint16_t>(state.block_size);
             block.header = block_header;
             block.carries = block_carries;
@@ -1128,6 +1139,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             return std::unexpected(decoded.error());
         }
         result.samples += state.block_size;
+        if (index == kObjectSubstream) {
+            counters.object_samples_total += static_cast<std::uint64_t>(state.block_size);
+        }
         const std::size_t data_end = reader.bit_position();
         const bool last = reader.read(1) != 0;
         segment_trace += " size " + std::to_string(state.block_size) + " data ends " +
