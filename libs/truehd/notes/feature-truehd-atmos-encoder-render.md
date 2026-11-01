@@ -71,8 +71,20 @@ CMakeLists says so), so the panner is its own code and the test is what keeps it
 
 The plan: each element's place at the section boundaries gives gains at the boundaries; between two boundaries the gains move in a straight
 line, and a section's end is the next one's begin, so there is no step. `gains_at(plan, sample)` is the trajectory. The matrix side quantises it:
-`quantise_mix_gain` (frac_bits 12, 14 bit signed range) and `bed_mix_matrices` (the 8 bed-row matrices). Per 40-sample block, take
-`gains_at` at the block's two ends for the extension delta.
+`quantise_mix_gain` (frac_bits 12, 14 bit signed range) and `bed_mix_matrices` (the 8 bed-row matrices). For the extension's deltas (decoder session, `39f303f`, PROVISIONAL until a
+stream confirms it): a coefficient moves by delta / 2^ext_field2 raw places in every 40-sample access unit, and a raw place is
+2^-(frac_bits - f_shift) (not 2^-frac_bits). So per matrix and coefficient the slope in raw places per unit is
+(end - begin) * 2^(frac_bits - f_shift) * 40 / section_samples, and delta = round(slope * 2^ext_field2) with ext_field2 0 to 3 and the width
+chosen so the largest delta fits in width + 1 signed bits. The matrix side derives this from the plan; nothing here changes.
+
+### What ctl_c shows about the anchoring (relayed by the decoder session, not seen by me; PROVISIONAL)
+
+The first matrix list of `ctl_c` has one matrix that writes row 8 with its own coefficient -1.0 (f_shift -1), then matrices that write outputs
+0, 1, 2, 4, 5 and 6 and 11 with coefficients on the coded rows 8 to 11, the same value on rows 8, 9 and 10 in each (e.g. -2774 at frac 14 in the
+output-2 matrix). The tone is carried by coded row 11 (rows 8 to 10 are silent). Reading: DEE's bed rows 0, 1, 2, 4, 5, 6 are indeed
+"element j plus a mix of the coded rows" as in section 1 (the speaker-anchored form), and the rows are not an object's own: one coded row carries
+the object and the matrices mix every coded row, silent ones included, into each bed row. This supports the anchored-elements-0-to-7 guess for
+the LFE-less rows, and says nothing yet on how DEE picks the coded row for an object. Row 3 (LFE) has no matrix in that list.
 
 ## 4. Tests, and what each guards
 
