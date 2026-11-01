@@ -86,6 +86,33 @@ output-2 matrix). The tone is carried by coded row 11 (rows 8 to 10 are silent).
 the object and the matrices mix every coded row, silent ones included, into each bed row. This supports the anchored-elements-0-to-7 guess for
 the LFE-less rows, and says nothing yet on how DEE picks the coded row for an object. Row 3 (LFE) has no matrix in that list.
 
+### What the analysis session's lab dumps show (2026-11-01; read from `D:/ac3bld/thd-ss3-lab-out29`, parameters and counts only; I opened no master)
+
+Channels below are **matrix channels** as the lab prints them, not output positions: `ch_assign` of each stream was not in the dumps, so "element 11"
+in one file and "element 11" in another need not be the same speaker or slot. All numbers are STREAM (the lab's), the readings are mine and PROVISIONAL.
+
+1. **A lone moving object sits on one coded row at full amplitude** (`ctl_e`, a 1 kHz tone moving over 10 s): matrix channel 11 carries it at
+   +-838,880 (unit gain, its own amplitude) in coded and output; matrix channels 0, 1, 2 hold large coded values (+-255k, +-983k, +-800k) and output 0. So the matrices
+   subtract the object's share from three bed rows using row 11: bed[j] = element[j] (here silent) + g_j(t) * element[11], the `[I | G]` form of section 1,
+   for a *single free element*. That g_1 peaks at 1.17 of the object means the shares are not a unit-power pan.
+2. **The shares move by the extension, with sections far apart.** `ctl_e` sends sections at 0, 4640, 4800, 5160, 6160, 9880 (over 10 s); between them blocks carry no matrices. At 0, 4800
+   and 5160 the extension is on and the coefficients that carry the object start at base 0 or a small base with a delta (e.g. out 2: rows 3 to 10 base 0, delta 827, widths 11 to 14);
+   at 4640, 6160 and 9880 it is off and the bases are fresh values. This is the ramp/slope the decoder session solved. For my plan it says sections are hundreds to
+   thousands of samples apart (not 480), so `section_samples` should be a parameter in the thousands for slow moves, with the slope fitting the longer line.
+3. **The bed matrices are dense, not just `[I | G]`.** Every first section has an `out 0` matrix of the form row 0 less about 0.316 (`ctl_b`, -5181/16384 = -1/sqrt(10)) or 0.3015
+   (`ctl_e`, -4940/16384 = -1/sqrt(11)) of every other row from 3 (or 2) up, and `out 11` matrices with `f_shift` 1 or 2 that add a multiple of row 0 (2.16 in `ctl_b`). With nothing in the
+   other rows these cancel the encoder's dither (as ERRATA 69 found in `z_short`); with two objects (`ctl_c`) ten matrices mix the bed rows with each other and with the coded rows (out 2 has
+   coefficients on rows 0, 1, 2, 4, 5, 6, 7, 8, 9, 10 and 11, the same -2774 on rows 8 to 10). So DEE's "bed" is a decorrelated basis, and `[I | G]` is the simplest member of it, not DEE's own form.
+4. **A static object can sit on a bed row with no coded row at all** (`ctl_b`: matrix channel 1 carries the 1 kHz object at +-838,880, no matrix reads or writes channel 1, the coded rows 2 to 10 are
+   silent): the anchored case of section 2 step 2 (an object at a speaker position is that element, unchanged).
+5. **An object can be spread over several elements** (`ctl_c`, objects 3 at 1 kHz and 8 at 3 kHz, both static): channel 0 carries object 3 alone (+-52,430 x 16 = 838,880, output shift 4), and the
+   rest of the output energy, which can only be object 8 (+-26,277 after the shift), is on channels 7 (20,097), 4 (10,384), 6 (6,430), 2 (6,393), 11 (3,849), 5 (1,823) and 1 (817): shares of 0.77, 0.40, 0.24, 0.24, 0.15, 0.07 and 0.03 of its amplitude, whose squares add to
+   about 0.89. That is an amplitude pan of one object over seven elements, which my rule (one element per object, section 2 step 3) never does. It is the one finding that argues against the hard assignment; whether
+   it is because the position is between elements, because both objects share the stream, or because 7 of the 12 are fixed virtual speakers is not settled by these files.
+6. The same object 3 is on matrix channel 1 in `ctl_b` and on channel 0 in `ctl_c`: either `ch_assign` differs, or DEE's slot choice depends on the other objects.
+
+Effect on this branch: nothing is changed in code. Question 3 is partly answered (anchored form supported, DEE's own form is richer); a new question 10 is open.
+
 ## 4. Tests, and what each guards
 
 See the test names; the ones that would pass for a wrong render are the closeness tests, with thresholds set from the measured values (section 6).
@@ -130,3 +157,4 @@ wall position is the centre speaker's and the centre speaker is tried first.
 7. **LFE.** `lfe_send` of a dynamic object and the LFE object's filtering are not handled; the LFE is whatever is pinned to row 3.
 8. **Height.** 7.1.2's top-middle pair are ordinary free elements here; the bed they make has no height. Nothing says DEE does otherwise.
 9. **Section length.** 480 samples. DEE's metadata cadence is 1,536 (38.4 units, WP1 status); a longer section means a longer straight line between boundaries and a larger panning error, a shorter one more matrix sections on the wire.
+10. **Split an object over elements?** Item 5 above suggests DEE pans an object over several elements. Recommendation: add an optional second-nearest-element split to `cluster_elements` (gain-weighted, power-preserving) only after the analysis session gives `ch_assign` and the objects' positions for `ctl_c`, so the split can be compared with the shares in item 5.
