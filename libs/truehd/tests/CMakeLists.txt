@@ -44,10 +44,9 @@ target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::b
 target_include_directories(iclforge-truehd-tests PRIVATE ../fuzz)
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
 # build), so the tests that exercise them compile coding.cpp themselves and see src/. The same goes
-# for the object substream's matrix planner (object_bed.cpp) and the render side (render_bed.cpp,
-# cluster_elements.cpp).
-target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp ../src/encoder/object_bed.cpp
-    ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp)
+# for the object substream's matrix planner (object_bed.cpp) and the render and clustering code.
+target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp
+    ../src/encoder/object_bed.cpp ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp)
 target_include_directories(iclforge-truehd-tests PRIVATE ../src)
 
 # The AVX2 kernel of src/internal/avx2, compiled a second time into this binary for the reason

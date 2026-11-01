@@ -189,10 +189,10 @@ struct EncoderConfig {
     // kBedMatrices with paths: an update every this many access units (the first access unit
     // updates at each of its two blocks). A coefficient holds from one update to the next.
     int object_update_units = 1;
-    // kBedMatrices with paths: send the extension, ramping each coefficient across the block
-    // (object_paths.hpp). PROVISIONAL: the ramp is a reading of one controlled encode, and the
-    // stream only decodes under the decoder's lab settings for it. Needs an update at every block.
-    ObjectRamp object_ramp = ObjectRamp::kNone;
+    // kBedMatrices with paths: send the extension's slopes (object_paths.hpp): a moving object is a
+    // section with its coefficients and their slopes, and a new section only when the path turns
+    // or the coefficient has drifted. Needs object_update_units 1.
+    ObjectExtension object_extension = ObjectExtension::kNone;
     // kBedMatrices with paths: a mixing matrix whose coefficients are all 0 in a block is left out
     // of that block's list (the section sends new headers when the list changes).
     bool object_drop_idle_matrices = false;

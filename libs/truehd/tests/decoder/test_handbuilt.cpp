@@ -480,23 +480,31 @@ TEST_CASE("the 16-channel stream has an object substream and four directory entr
     CHECK(info->channels[3] == 16);
 }
 
-TEST_CASE("the object matrices' extension refines the coefficients, sample for sample",
+TEST_CASE("the object matrices' extension runs the coefficients as slopes, sample for sample",
           "[truehd][handbuilt][no-external-oracle]") {
     // ERRATA entry 69, "The extension". hb_substream3_object_extension is four object matrices over
-    // sixteen access units in two restart intervals, with seven matrix sections:
-    //   sample   0  new headers, C2 with widths 3, 5, 2, 0 and deltas; the matrix of width 0 sends
-    //               none, and a present coefficient of base 0 has a delta (refined from nothing)
-    //   sample  80  new headers, C2 clear: the widths of the matrices at the same place stand
-    //   sample 160  A clear: the matrices and their deltas stand
-    //   sample 240  A set and B clear: new coefficients on the headers that stand, the widths stand
-    //   sample 320  a restart: A2 set, B2 clear, no deltas, and the widths are gone
-    //   sample 400  A clear, C2 with new widths and deltas on the set that stands
-    //   sample 480  A clear: the deltas of sample 400 stand
-    // The expected signal is the one the Python writer built the stream from, and the Python decode
-    // (tools/references/truehd_syntax.py) agrees with this one. Each part of the rule changes the
-    // samples when it is left out: the finer part, its scale 2^-(width + 1), the inherited widths,
-    // the deltas standing under A = 0, and the zero base. No decoder outside this repository reads
-    // the section.
+    // sixteen access units of 40 samples in two restart intervals (restarts at samples 0 and 320),
+    // with twelve matrix sections:
+    //   sample   0  new headers, deltas with widths 3, 5, 2, 0 and scales 1, 0, 3, 2 (the matrix of width 0
+    //               sends none)
+    //   sample   8  A clear, new deltas, widths and scales stand (the restart unit's second block)
+    //   sample  80  new headers, no new deltas: the deltas, widths and scales stand across the headers
+    //   sample 160  A clear: the running coefficients and the deltas stand
+    //   sample 200  extension off: the deltas are cleared and the coefficients rebuilt from raw
+    //   sample 240  extension on with new deltas on the inherited widths and scales
+    //   sample 320  a restart: no deltas, widths or scales are left
+    //   sample 360  extension on, widths 0, so no deltas
+    //   sample 400  A clear, new widths 5, 4, 6, 2 and scales 3, 2, 1, 0 with deltas
+    //   sample 480  the deltas of sample 400 stand
+    //   sample 520  extension off: the coefficients keep what they accumulated
+    //   sample 560  extension on again, deltas 0
+    // The expected signal is the one the Python writer built the stream from (the coded channels
+    // follow from it by the rule), and the Python decode (tools/references/truehd_syntax.py)
+    // agrees with this one. Breaking any part of the rule changes the samples: the ramp's step,
+    // its reset at the start of the unit, the move of the coefficients at the end of the unit, the
+    // clearing of the deltas when the extension is off, the scale, and the truncation of the fine
+    // sum. The rule was measured on the owner's controlled encodes; no decoder outside this
+    // repository was run on this stream.
     std::ifstream manifest_file(dir() + "/manifest.json");
     REQUIRE(manifest_file.good());
     const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
@@ -528,9 +536,9 @@ TEST_CASE("the object matrices' extension refines the coefficients, sample for s
     }
     CHECK(pcm.size() == 640U * 12U * 4U);
     CHECK(hex(iclforge::base::crypto::sha256(pcm)) == expected);
-    // Seven blocks send a matrix section, and the lossless checks of the first interval, which
+    // Twelve blocks send a matrix section, and the lossless checks of the first interval, which
     // fold the output after the matrices, hold in all four substreams.
-    CHECK(decoder.counters().matrix_headers == 7);
+    CHECK(decoder.counters().matrix_headers == 12);
     CHECK(decoder.counters().lossless_checks_ok == 4);
     CHECK(decoder.counters().lossless_check_failures == 0);
     CHECK(decoder.counters().check_failures == 0);

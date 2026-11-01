@@ -26,6 +26,7 @@ Not written: restart_header's heavy DRC (TH spec 12.2, 7.1), whose place among t
 the streams do not show (ERRATA 7)."""
 
 import argparse
+import functools
 import hashlib
 import json
 import math
@@ -99,6 +100,7 @@ class Substream:
         ch_assign=None,
         matrices=(),
         bypass=None,
+        object_bypass=None,
         out_shift=None,
         sync=0x31EA,
         data_check=False,
@@ -107,7 +109,6 @@ class Substream:
         matrix_noise_shift=0,
         ch_assign_cycle=None,
         sections=None,
-        object_bypass=None,
     ):
         self.min_chan, self.max_chan, self.mm = min_chan, max_chan, mm
         self.channels = channels  # {ch: Channel}
@@ -123,6 +124,10 @@ class Substream:
         # the matrix's own under noise_type 1 and defaults to `matrix_noise_shift`
         self.matrices = list(matrices)
         self.bypass = bypass or {}  # {matrix index: [bit per sample]}
+        # A function of the sample's place in the stream giving the bypass bits the object matrices
+        # in force there send: [(value, bits), ...] in the order of the matrices that have them. It
+        # stands in for `bypass` when the matrix list changes from block to block.
+        self.object_bypass = object_bypass
         self.out_shift = out_shift or [0] * (mm + 1)
         self.sync = sync
         self.data_check = data_check
@@ -133,19 +138,16 @@ class Substream:
         # {first sample of a block: ObjectSection}: the object matrix section that block sends
         # (sync 0x31EC), in place of `matrices`; every restart block needs one.
         self.sections = sections or {}
-        # A function of the sample's place in the stream giving the bypass bits the object matrices
-        # in force there send: [(value, bits), ...] in the order of the matrices that have them. It
-        # stands in for `bypass` when the matrix list changes from block to block.
-        self.object_bypass = object_bypass
 
 
 class ObjectSection:
-    """One object matrix section as a block sends it (TH spec 10.2.1a, ERRATA 69): A (the matrices
-    change), B (new headers), the headers (out, frac_bits, f_shift, noise shift), the coefficients
-    of each matrix as {channel: raw} (the keys are the presence mask, so a raw 0 is a present
-    coefficient), then A2, B2, C2, the widths C2 sends, their 2 reserved bits, and the deltas
-    of each matrix with a width, {channel: delta}. `resolve_sections` fills `resolved`, the
-    matrices in force after the section."""
+    """One object matrix section as a block sends it (TH spec 10.2.1a, ERRATA 69): A (coefficients
+    are sent), B (new headers), the headers (out, frac_bits, f_shift, noise shift), the
+    coefficients of each matrix as {channel: raw} (the keys are the presence mask, so a raw 0 is a
+    present coefficient), then A2 (extension present), B2 (deltas sent), C2 (widths sent), the
+    widths C2 sends with their ext_field2 (2 bits), and the deltas of each matrix with a width,
+    {channel: delta}. `resolve_sections` fills `resolved`, the matrices in force after the
+    section."""
 
     def __init__(
         self,
@@ -157,25 +159,26 @@ class ObjectSection:
         b2=False,
         c2=False,
         widths=(),
-        reserved=(),
+        field2=(),
         deltas=(),
     ):
         self.coeffs = [dict(c) for c in coeffs]
         self.headers = list(headers)
         self.a, self.b, self.a2, self.b2, self.c2 = a, b, a2, b2, c2
         self.widths = list(widths)
-        self.reserved = list(reserved) or [0] * len(self.widths)
+        self.field2 = list(field2) or [0] * len(self.widths)
         self.deltas = [dict(d) for d in deltas]
         self.resolved = None
 
 
 def resolve_sections(sections, restarts):
     """The matrices in force after each section ({first sample: ObjectSection}, in order), by the
-    rules of ERRATA 69: new headers (B) keep the width of the matrix at the same place; new
-    coefficients clear the deltas; with A clear the last set stands, deltas and all; C2 replaces
-    the widths, else they stand; a width not 0 takes a delta for each coefficient; a restart
-    (`restarts`: the first samples of the restart blocks) clears the set. Each matrix is a dict
-    with out, frac_bits, f_shift, noise_shift, raw, width and delta."""
+    rules of ERRATA 69: new headers (B) keep the width, ext_field2 and deltas of the matrix at the
+    same place; with A clear the last set stands; without A2 every delta is cleared; with A2 and
+    B2 every delta is replaced (a width not 0 takes one for each coefficient) and C2 replaces the
+    widths and ext_field2, else they stand; a restart (`restarts`: the first samples of the restart
+    blocks) clears the set. Each matrix is a dict with out, frac_bits, f_shift, noise_shift, raw,
+    width, field2 and delta."""
     state = []
     for start in sorted(sections):
         section = sections[start]
@@ -184,19 +187,17 @@ def resolve_sections(sections, restarts):
         if section.a:
             fresh = []
             for place, coeffs in enumerate(section.coeffs):
+                last = state[place] if place < len(state) else None
                 if section.b:
                     out, frac_bits, f_shift, noise_shift, *more = section.headers[place]
                     bypass = more[0] if more else 0  # the bits a sample of the LSB bypass
-                    width = state[place]["width"] if place < len(state) else 0
                 else:
-                    last = state[place]
-                    out, frac_bits, f_shift, noise_shift, bypass, width = (
+                    out, frac_bits, f_shift, noise_shift, bypass = (
                         last["out"],
                         last["frac_bits"],
                         last["f_shift"],
                         last["noise_shift"],
                         last["bypass"],
-                        last["width"],
                     )
                     if set(coeffs) != set(last["raw"]):
                         raise ValueError("coefficients do not match the headers that stand")
@@ -208,23 +209,76 @@ def resolve_sections(sections, restarts):
                         "noise_shift": noise_shift,
                         "bypass": bypass,
                         "raw": dict(coeffs),
-                        "width": width,
-                        "delta": {},
+                        "width": last["width"] if last else 0,
+                        "field2": last["field2"] if last else 0,
+                        "delta": dict(last["delta"]) if last else {},
                     }
                 )
             state = fresh
         else:
             state = [{**m, "delta": dict(m["delta"])} for m in state]
-        if section.a2 and section.b2:
+        if not section.a2:
+            for matrix in state:
+                matrix["delta"] = {}
+        elif section.b2:
             if section.c2:
-                for matrix, width in zip(state, section.widths, strict=True):
-                    matrix["width"] = width
+                for matrix, width, field2 in zip(
+                    state, section.widths, section.field2, strict=True
+                ):
+                    matrix["width"], matrix["field2"] = width, field2
             for matrix, delta in zip(state, section.deltas, strict=True):
                 if matrix["width"] and set(delta) != set(matrix["raw"]):
                     raise ValueError("a delta for every coefficient of a matrix with a width")
                 matrix["delta"] = dict(delta) if matrix["width"] else {}
+        for matrix in state:
+            if not set(matrix["delta"]) <= set(matrix["raw"]):
+                raise ValueError("a delta that stands for a coefficient the mask no longer has")
         section.resolved = [{**m, "delta": dict(m["delta"])} for m in state]
     return state
+
+
+def object_trace(sections, restarts, samples, per_unit, rate_code=0):
+    """What each object matrix has in force at every sample, by the rules of ERRATA 69 (the
+    sections resolved first): trace[i][k] is (c, d, shift, ramp) of matrix k at sample i, with c
+    the running coefficients {channel: value at 2^-18}, d the deltas {channel: delta} (empty
+    without the extension), shift = ext_field2 - f_shift + frac_bits and ramp the matrix's ramp
+    (0 without the extension). The ramp is 0 at the first sample of an access unit and grows by
+    (0x666 >> r) * 4 a sample while the extension is present; at the end of an access unit with
+    the extension every coefficient grows by its delta shifted left by 18 - shift."""
+    step = (0x666 >> (rate_code & 3)) * 4
+    current, running, ramp, extension = [], [], [], False
+    trace = []
+    for i in range(samples):
+        if i % per_unit == 0:
+            ramp = [0] * len(current)
+        if i in restarts:
+            current, running, ramp, extension = [], [], [], False
+        section = sections.get(i)
+        if section is not None:
+            current = section.resolved
+            if section.a:
+                running = [
+                    {
+                        ch: raw << (18 - m["frac_bits"] + m["f_shift"])
+                        for ch, raw in m["raw"].items()
+                    }
+                    for m in current
+                ]
+            extension = section.a2
+            ramp = [ramp[k] if k < len(ramp) else 0 for k in range(len(current))]
+        row = []
+        for k, m in enumerate(current):
+            shift = m["field2"] - m["f_shift"] + m["frac_bits"]
+            row.append((dict(running[k]), dict(m["delta"]), shift, ramp[k]))
+            if extension:
+                ramp[k] += step
+        trace.append(row)
+        if extension and (i + 1) % per_unit == 0:
+            for k, m in enumerate(current):
+                up = 18 - (m["field2"] - m["f_shift"] + m["frac_bits"])
+                for ch, delta in m["delta"].items():
+                    running[k][ch] += delta << up if up >= 0 else delta >> -up
+    return trace
 
 
 def write_object_section(w, sub, section):
@@ -254,9 +308,9 @@ def write_object_section(w, sub, section):
         return
     w.put(1 if section.c2 else 0, 1)
     if section.c2:
-        for width, reserved in zip(section.widths, section.reserved, strict=True):
+        for width, field2 in zip(section.widths, section.field2, strict=True):
             w.put(width, 4)
-            w.put(reserved, 2)
+            w.put(field2, 2)
     for matrix in section.resolved:
         if matrix["width"]:
             for c in sorted(matrix["delta"]):
@@ -1166,23 +1220,35 @@ def case_substream3_object_bypass():
 
 def case_substream3_object_extension():
     """A twelve channel substream 3 whose object matrices carry the extension of the section
-    (ERRATA 69): a finer part for each coefficient, coefficient = base + delta / 2^(width + 1) in
-    units of the base's last place. Four matrices (output 8 to 11, `frac_bits` 12, 13 with
-    `f_shift` 1, 0 and 15; noise shifts 2, 0, 5 and 3), a block of the stream for each case:
+    (ERRATA 69): sixteen access units of 40 samples and four matrices (output 8 to 11, `frac_bits`
+    12, 13 with `f_shift` 1, 0 and 15; noise shifts 2, 0, 5 and 3). A block of the stream for each
+    case; widths and ext_field2 (f2) are given per matrix, A2 is the extension, B2 the deltas, C2
+    the widths:
 
-      sample   0  restart: new headers, C2 with widths 3, 5, 2 and 0 (a matrix with no deltas),
-                  deltas, and a present coefficient of base 0 with a delta
-      sample  80  new headers with different masks, C2 clear: the widths of the matrices at the
-                  same place stand and the deltas follow the new masks
-      sample 160  A clear: the matrices and the deltas stand
-      sample 240  A set, B clear: the headers stand, new coefficients, the widths stand, new deltas
-      sample 320  restart: no deltas (A2 set, B2 clear), which also clears the widths
-      sample 400  A clear with C2: widths 0, 4, 6 and 2 on the matrices that stand, and deltas
-      sample 480  A clear, no extension: the deltas of sample 400 stand
+      sample   0  restart (A, B): new headers; A2, B2, C2 with widths 3, 5, 2, 0 (a matrix with
+                  no deltas) and f2 1, 0, 3, 2; deltas, one of them 0 on a present coefficient
+      sample   8  second block of the restart unit, A clear: A2, B2, no C2: the widths and f2
+                  stand, the deltas are replaced with the ramp already at 8 samples
+      sample  80  A, B: new headers with other masks (channels added; a matrix with no deltas
+                  changes completely), A2 without B2: widths, f2 and deltas stand
+      sample 160  A clear, A2 without B2: the matrices stand, the coefficients with the four
+                  units of slope they took
+      sample 200  A without B: new coefficients, no A2: the extension is off and the deltas clear
+      sample 240  A without B, A2, B2, no C2: new coefficients, the widths and f2 of the matrices
+                  stand, new deltas
+      sample 320  restart: A, B; A2 without B2: the deltas, widths and f2 are cleared
+      sample 360  A without B, A2, B2, no C2: the widths are 0, so no deltas follow
+      sample 400  A clear, A2, B2, C2: widths 5, 4, 6, 2 and f2 3, 2, 1, 0 on the matrices that
+                  stand, and deltas
+      sample 480  A clear, A2 without B2: the deltas of sample 400 stand
+      sample 520  A clear, no A2: the extension is off, the coefficients keep what they took
+      sample 560  A clear, A2 without B2: the extension is on and the deltas are 0
 
-    The coded channels are what the matrices, run backwards in integers, leave of the signal: the
-    sum of a matrix is (base sum + noise) << bits plus the sum of rows times deltas, shifted down
-    by 15 + bits, with bits = width + 1 (0 without a width)."""
+    The deltas stand in the units between sections (no matrices in the block header). The coded
+    channels are what the matrices, run backwards in integers, leave of the signal: the sum of a
+    matrix at 2^-18 is the rows times the running coefficients, plus the rows times the deltas
+    shifted down by ext_field2 - f_shift + frac_bits times the ramp, plus the noise shifted left
+    by its shift + 11, shifted down by 18 (`object_trace`)."""
     n = 40 * 16
     seed = 0x2A5F31
     src = [tone(n, 110 + c, 2**21) for c in range(12)]
@@ -1195,21 +1261,21 @@ def case_substream3_object_extension():
         (10, 0, 0, shifts[2]),
         (11, 15, 0, shifts[3]),
     ]
-    unity = [1 << (frac - fs) for _out, frac, fs, _noise in heads]
+    u = [1 << (frac - fs) for _out, frac, fs, _noise in heads]
     sections = {
         0: ObjectSection(
             coeffs=[
-                {8: unity[0], 1: 777, 4: 0, 3: -1500},
-                {9: unity[1], 8: 2500, 0: -3333},
-                {10: unity[2], 9: 1, 2: -1},
-                {11: unity[3], 10: -20001, 7: 12345},
+                {8: u[0], 1: 777, 4: 0, 3: -1500},
+                {9: u[1], 8: 2500, 0: -3333},
+                {10: u[2], 9: 1, 2: -1},
+                {11: u[3], 10: -20001, 7: 12345},
             ],
             headers=heads,
             a2=True,
             b2=True,
             c2=True,
             widths=[3, 5, 2, 0],
-            reserved=[1, 2, 3, 0],
+            field2=[1, 0, 3, 2],
             deltas=[
                 {8: 0, 1: -5, 4: 6, 3: 7},
                 {9: 0, 8: -23, 0: 17},
@@ -1217,85 +1283,109 @@ def case_substream3_object_extension():
                 {},
             ],
         ),
-        80: ObjectSection(
-            coeffs=[
-                {8: unity[0], 1: -300, 5: 421, 6: 0},
-                {9: unity[1], 8: 2500, 10: -900, 0: 1},
-                {10: unity[2], 9: -1},
-                {11: unity[3], 10: 5000, 7: -12345},
-            ],
-            headers=heads,
+        8: ObjectSection(
+            a=False,
             a2=True,
             b2=True,
             deltas=[
-                {8: 0, 1: 4, 5: -8, 6: 3},
-                {9: 0, 8: 5, 10: 31, 0: -32},
-                {10: 0, 9: 2},
+                {8: 0, 1: 6, 4: -7, 3: 2},
+                {9: 0, 8: 20, 0: -9},
+                {10: 0, 9: -2, 2: 1},
                 {},
             ],
         ),
-        160: ObjectSection(a=False),
+        80: ObjectSection(
+            coeffs=[
+                {8: u[0], 1: -300, 4: 421, 3: 0, 5: -77},
+                {9: u[1], 8: 2500, 0: 1},
+                {10: u[2], 9: -1, 2: 1},
+                {11: u[3], 10: 5000, 7: -12345, 6: 300},
+            ],
+            headers=heads,
+            a2=True,
+        ),
+        160: ObjectSection(a=False, a2=True),
+        200: ObjectSection(
+            coeffs=[
+                {8: u[0], 1: 120, 4: -999, 3: 33, 5: 4000},
+                {9: u[1], 8: -1800, 0: 77},
+                {10: u[2], 9: 1, 2: 0},
+                {11: u[3], 10: 100, 7: 200, 6: -300},
+            ],
+            b=False,
+        ),
         240: ObjectSection(
             coeffs=[
-                {8: unity[0], 1: 512, 5: -77, 6: 0},
-                {9: unity[1], 8: -2100, 10: 333, 0: 200},
-                {10: unity[2], 9: 1},
-                {11: unity[3], 10: -1, 7: 999},
+                {8: u[0], 1: 512, 4: -77, 3: 0, 5: 99},
+                {9: u[1], 8: -2100, 0: 333},
+                {10: u[2], 9: 1, 2: -1},
+                {11: u[3], 10: -1, 7: 999, 6: 5},
             ],
             b=False,
             a2=True,
             b2=True,
             deltas=[
-                {8: 0, 1: 7, 5: -8, 6: -1},
-                {9: 0, 8: 5, 10: -17, 0: 31},
-                {10: 0, 9: -4},
+                {8: 0, 1: 7, 4: -8, 3: -1, 5: 3},
+                {9: 0, 8: 5, 0: -17},
+                {10: 0, 9: -4, 2: 1},
                 {},
             ],
         ),
         320: ObjectSection(
             coeffs=[
-                {8: unity[0], 2: -1234, 3: 1000},
-                {9: unity[1], 8: -1500, 1: 3},
-                {10: unity[2], 8: -1},
-                {11: unity[3], 9: -16000, 0: 1},
+                {8: u[0], 2: -1234, 3: 1000},
+                {9: u[1], 8: -1500, 1: 3},
+                {10: u[2], 8: -1},
+                {11: u[3], 9: -16000, 0: 1},
             ],
             headers=heads,
             a2=True,
+        ),
+        360: ObjectSection(
+            coeffs=[
+                {8: u[0], 2: 500, 3: -77},
+                {9: u[1], 8: 900, 1: -3},
+                {10: u[2], 8: 1},
+                {11: u[3], 9: 2000, 0: -1},
+            ],
+            b=False,
+            a2=True,
+            b2=True,
+            deltas=[{}, {}, {}, {}],
         ),
         400: ObjectSection(
             a=False,
             a2=True,
             b2=True,
             c2=True,
-            widths=[0, 4, 6, 2],
-            reserved=[0, 3, 2, 1],
+            widths=[5, 4, 6, 2],
+            field2=[3, 2, 1, 0],
             deltas=[
-                {},
-                {9: 0, 8: 15, 1: -16},
-                {10: 0, 8: -33},
-                {11: 0, 9: -4, 0: 3},
+                {8: 0, 2: -16, 3: 15},
+                {9: 0, 8: 7, 1: -8},
+                {10: 0, 8: 1},
+                {11: 0, 9: -3, 0: 2},
             ],
         ),
-        480: ObjectSection(a=False),
+        480: ObjectSection(a=False, a2=True),
+        520: ObjectSection(a=False),
+        560: ObjectSection(a=False, a2=True),
     }
     restarts = {0, 320}
     resolve_sections(sections, restarts)
+    trace = object_trace(sections, restarts, n, 40)
     terms = noise1_terms(n, 40, 0, 8, seed, shifts)
-    starts = sorted(sections)
     coded = [list(column) for column in src]
-    for start, end in zip(starts, [*starts[1:], n], strict=True):
-        matrices = sections[start].resolved
-        for i in range(start, end):
-            for k in reversed(range(len(matrices))):
-                m = matrices[k]
-                out, scale = m["out"], 15 - m["frac_bits"] + m["f_shift"]
-                assert m["raw"][out] == 1 << (m["frac_bits"] - m["f_shift"])
-                assert m["delta"].get(out, 0) == 0
-                base = sum(coded[c][i] * (r << scale) for c, r in m["raw"].items() if c != out)
-                fine = sum(coded[c][i] * (d << scale) for c, d in m["delta"].items() if c != out)
-                bits = m["width"] + 1 if m["width"] else 0
-                total = ((base + 2 * terms[k][i]) << bits) + fine
-                coded[out][i] -= total >> (15 + bits)
+    for i in range(n):
+        for k in reversed(range(len(trace[i]))):
+            running, deltas, shift, ramp = trace[i][k]
+            out = heads[k][0]
+            assert running[out] == 1 << 18 and deltas.get(out, 0) == 0
+            total = sum(coded[c][i] * v for c, v in running.items() if c != out)
+            fine = sum(coded[c][i] * d for c, d in deltas.items())
+            total += (fine >> shift if shift >= 0 else fine << -shift) * ramp
+            total += terms[k][i] << 4  # the draw at 2^-18: its shift + 11, the terms hold + 7
+            coded[out][i] -= total >> 18
 
     def sub_for(lo, hi, sync=0x31EA):
         channels = {
@@ -1327,7 +1417,7 @@ def case_substream3_object_extension():
     stream = Stream(subs, n, terminator_b=True, restart_interval=8)
     return (
         stream,
-        "a twelve channel substream 3 whose object matrices carry the extension's finer parts",
+        "a twelve channel substream 3 whose object matrices carry the extension's deltas",
         ["substream_3", "twelve_channels", "object_extension", "object_noise", "matrices_4"],
     )
 
@@ -1709,20 +1799,26 @@ def case_noise1_bypass():
 # The arithmetic of libs/truehd/src/encoder/object_bed.cpp, written again from the notes
 # (libs/truehd/notes/feature-truehd-atmos-encoder-matrices.md): an object's gain into each bed row
 # is a path of integer knots; the coefficient of its mixing matrix is minus the gain at 2^-12; the
-# sections are planned in the cheapest form that gets the decoder to the matrices wanted; the rows
-# the decoder starts from are found by running the matrices backwards sample by sample. Agreement
-# with this library's decoder is not agreement with Dolby's: nothing outside the repository reads
-# restart sync 0x31EC, and the ramp (SUBSTREAM3.md section 6) is a reading of one controlled encode.
+# decoder's running coefficients and slopes (SUBSTREAM3.md section 3) are followed access unit by
+# access unit, a section is sent only where a coefficient has drifted from the path or the path
+# turns, in the cheapest form; the rows the decoder starts from are found by running the matrices
+# backwards sample by sample. The decoder's own model in `object_trace` is held to the state kept
+# here. Agreement with this library's decoder is not agreement with Dolby's: nothing outside the
+# repository reads restart sync 0x31EC.
 
 GAIN_BITS = 16
 MIX_FRAC_BITS = 12
 DEFAULT_GAIN = 46341  # -3 dB, in units of 2^-16
-RAMP_BITS = 3
 FIRST_CODED = 8
-MAX_DELTA = (1 << 15) - 1
-MIN_DELTA = -(1 << 15)
 MIX_STEPS = 4
 BED_ROW_OF_OBJECT = (0, 1, 2, 4, 5, 6, 7, 3)  # L R C LFE Ls Rs Lrs Rrs
+OBJECT_SHIFT = 18
+SLOPE_SCALE_FIELD = 3  # ext_field2 of the slopes: a delta is 2^-3 raw places a unit
+MAX_DELTA_WIDTH = 15
+JUMP_TOLERANCE = 32  # in units of 2^-18: half a raw place at 12 fractional bits
+SLOPE_TOLERANCE = 16
+STEP_LIMIT = 1 << 16  # a move of more than a quarter of a gain in a unit is a step, not a slope
+MATRIX_CHANNELS = 16
 
 
 def round_div(numerator, denominator):
@@ -1748,116 +1844,123 @@ def path_gain(knots, row, sample):
     return first[row] * span + (second[row] - first[row]) * (sample - first_at), span
 
 
-def trajectory_coefficient(start, end, mix_step, ramp):
-    """(raw, delta) of a mixing matrix's coefficient on an object for a gain that is `start` at the
-    block's first anchor and `end` at its second: raw is minus the gain at 2^-12 rounded, and with a
-    ramp delta is eight times how far the end is from raw, rounded, so that raw + delta / 8 is the
-    end. The gains are halved `mix_step` times; the last step mixes nothing."""
-    if mix_step >= MIX_STEPS - 1:
-        return 0, 0
-    places = 1 << MIX_FRAC_BITS
-    halves = 1 << mix_step
-    raw = round_div(-start[0] * places, start[1] * (1 << GAIN_BITS) * halves)
-    delta = 0
-    if ramp:
-        denominator = end[1] * (1 << GAIN_BITS) * halves
-        eighths = 1 << RAMP_BITS
-        delta = round_div(-eighths * end[0] * places - eighths * raw * denominator, denominator)
-        delta = max(MIN_DELTA, min(MAX_DELTA, delta))
-    return raw, delta
+def width_for(bound):
+    """The smallest width whose deltas (width + 1 bits, signed) hold magnitudes up to `bound`."""
+    return 0 if bound <= 0 else min(MAX_DELTA_WIDTH, max(1, bound.bit_length()))
 
 
-def width_of(deltas):
-    """The smallest width whose deltas (width + 1 bits, signed) hold all of these; 0 for none."""
-    width = 0
-    for d in deltas:
-        if d:
-            width = max(width, 1, (d if d >= 0 else -d - 1).bit_length())
-    return width
+def ramp_step(per_unit):
+    return (0x666 >> ((per_unit // 40).bit_length() - 1)) * 4
 
 
-def moving_matrix(out, frac_bits, f_shift, noise_shift, bypass, raw, width=0, delta=None):
+def moving_head(out, frac_bits, f_shift, noise_shift, bypass, present, width=0, field2=0):
     return {
         "out": out,
         "frac_bits": frac_bits,
         "f_shift": f_shift,
         "noise_shift": noise_shift,
         "bypass": bypass,
-        "raw": dict(raw),
+        "present": frozenset(present),
         "width": width,
-        "delta": dict(delta or {}),
+        "field2": field2,
     }
 
 
-def held_matrix(matrix):
-    """The matrix as the decoder holds it: the deltas of a matrix with no width are not used."""
-    return {**matrix, "delta": matrix["delta"] if matrix["width"] else {}}
+def place_bits(head):
+    return OBJECT_SHIFT - head["frac_bits"] + head["f_shift"]
 
 
-def same_set(before, after):
-    return len(before) == len(after) and all(
-        held_matrix(a) == held_matrix(b) for a, b in zip(before, after, strict=True)
-    )
+def slope_scale(head):
+    return head["field2"] - head["f_shift"] + head["frac_bits"]
 
 
 def same_headers(a, b):
-    keys = ("out", "frac_bits", "f_shift", "noise_shift", "bypass")
-    return all(a[k] == b[k] for k in keys) and set(a["raw"]) == set(b["raw"])
+    keys = ("out", "frac_bits", "f_shift", "noise_shift", "bypass", "present")
+    return all(a[k] == b[k] for k in keys)
 
 
-def plan_object_section(before, after):
-    """The ObjectSection that takes the decoder from the matrices `before` (none after a restart)
-    to `after`, or None when they are the same: new deltas on the set that stands (A clear), new
-    coefficients on the headers that stand (B clear), or new headers."""
-    if same_set(before, after):
-        return None
-    headers_same = (
-        bool(before)
-        and len(before) == len(after)
-        and all(same_headers(b, a) for b, a in zip(before, after, strict=True))
-    )
-
-    def widths_differ(reference):
-        return any(
-            (reference[place]["width"] if place < len(reference) else 0) != m["width"]
-            for place, m in enumerate(after)
-        )
-
-    has_delta = any(m["width"] and any(m["delta"].values()) for m in after)
-    keep = headers_same and all(b["raw"] == a["raw"] for b, a in zip(before, after, strict=True))
-    headers = not headers_same
-    widths = widths_differ(before)
-    deltas = True if keep else (widths or has_delta)
-    return ObjectSection(
-        coeffs=[] if keep else [m["raw"] for m in after],
-        headers=(
-            [(m["out"], m["frac_bits"], m["f_shift"], m["noise_shift"], m["bypass"]) for m in after]
-            if headers
-            else []
-        ),
-        a=not keep,
-        b=headers,
-        a2=deltas,
-        b2=deltas,
-        c2=widths,
-        widths=[m["width"] for m in after] if widths else [],
-        deltas=[m["delta"] if m["width"] else {} for m in after] if deltas else [],
-    )
+def new_run():
+    return {"coeff": {}, "slope": {}, "extension": False, "scale": 0, "ramp": 0}
 
 
-def interval_bounds(p):
-    """The blocks of a restart interval: the first access unit is cut after 8 samples."""
-    nominal = p["nominal"]
-    bounds = [(0, 8), (8, nominal - 8)]
-    return bounds + [(u * nominal, nominal) for u in range(1, p["interval_units"])]
+def copy_run(run):
+    return {**run, "coeff": dict(run["coeff"]), "slope": dict(run["slope"])}
+
+
+def apply_moving_section(state, form, items):
+    """What the decoder holds after a section ({'matrices': heads, 'runs': running states}): the
+    rules of SUBSTREAM3.md section 2 and the decoder's apply_block_header. `items` holds, for each
+    matrix of the list after the section, the raw coefficients (A), the widths and scales (C2) and
+    the deltas (B2) that the section carries."""
+    matrices = [dict(m) for m in state["matrices"]]
+    if form["change"] and form["headers"]:
+        # new headers keep the width and scale of the matrix at the same place
+        matrices = []
+        for place, item in enumerate(items):
+            head = dict(item["head"])
+            head["width"] = (
+                state["matrices"][place]["width"] if place < len(state["matrices"]) else 0
+            )
+            head["field2"] = (
+                state["matrices"][place]["field2"] if place < len(state["matrices"]) else 0
+            )
+            matrices.append(head)
+    runs = [
+        copy_run(state["runs"][m]) if m < len(state["runs"]) else new_run()
+        for m in range(len(items))
+    ]
+    for place, item in enumerate(items):
+        head, run = matrices[place], runs[place]
+        if form["deltas"] and form["widths"]:
+            head["width"], head["field2"] = item["head"]["width"], item["head"]["field2"]
+        if form["change"]:
+            run["coeff"] = {
+                ch: item["raw"][ch] << place_bits(head) for ch in sorted(head["present"])
+            }
+        if not form["extension"]:
+            run["slope"] = {}
+        elif form["deltas"]:
+            run["slope"] = (
+                {ch: item["delta"][ch] for ch in sorted(head["present"])} if head["width"] else {}
+            )
+        run["extension"] = form["extension"]
+        run["scale"] = slope_scale(head)
+    return {"matrices": matrices, "runs": runs}
+
+
+def advance_run(head, run, size, ends_unit, step):
+    """The state at the start of the next block after one of `size` samples: the ramp grows with the
+    extension on, and at the end of an access unit each coefficient moves by its slope."""
+    if run["extension"]:
+        run["ramp"] += step * size
+    if ends_unit and run["extension"]:
+        up = OBJECT_SHIFT - run["scale"]
+        for ch in head["present"]:
+            slope = run["slope"].get(ch, 0)
+            run["coeff"][ch] = run["coeff"].get(ch, 0) + (slope << up if up >= 0 else slope >> -up)
+
+
+def moving_raw_for(mixes, mix_of, items, head_list, list_changed, raws, state, m, ch, jumped):
+    """The raw value of coefficient `ch` of list place `m` in a section that sends coefficients:
+    the fixed matrices' own, a mixing matrix's own 1.0, and its objects' values (the path's where
+    the coefficient jumps or the list is new, else the one nearest to where it has got to)."""
+    r = mix_of[m]
+    if r < 0:
+        return items[m]["raw"][ch]
+    if ch == head_list[m]["out"]:
+        return 1 << MIX_FRAC_BITS
+    if jumped or list_changed:
+        return raws[r][mixes[r]["objects"].index(ch - FIRST_CODED)]
+    return round_div(state["runs"][m]["coeff"][ch], 1 << place_bits(head_list[m]))
 
 
 def motion_blocks(p, first_sample, bounds):
-    """The blocks of one restart interval, as the encoder plans them: {start, size, matrices,
-    section} with the matrices in force and the ObjectSection the block's header sends (or None).
-    `p` is a request (moving_params)."""
+    """The blocks of one restart interval, as the encoder plans them: {start, size, matrices, runs,
+    section} with the matrices in force, the decoder's state at the block's first sample after the
+    section, and the ObjectSection the block's header sends (or None). `p` is a request."""
     objects, above = p["objects"], p["objects"] - FIRST_CODED
-    ramp = p["ramp"] != "none"
+    slopes = p["extension"] == "slopes"
+    nominal = p["nominal"]
     paths = {}
     for k in range(above):
         default = [0] * 8
@@ -1869,85 +1972,285 @@ def motion_blocks(p, first_sample, bounds):
             for row in range(8):
                 if not any(gains[row] for _at, gains in paths[k]):
                     continue
+                if p["split"]:
+                    mixes.append({"row": row, "objects": [k], "width": 0})
+                    continue
                 for mix in mixes:
-                    if mix["row"] == row and not p["split"]:
+                    if mix["row"] == row:
                         mix["objects"].append(k)
                         break
                 else:
                     mixes.append({"row": row, "objects": [k], "width": 0})
-    coefficients = []
-    for place, (start, size) in enumerate(bounds):
-        absolute = first_sample + start
-        update = (
-            ramp
-            or place == 0
-            or (
-                absolute % p["nominal"] == 0 and (absolute // p["nominal"]) % p["update_units"] == 0
-            )
-        )
-        if not update:
-            coefficients.append(coefficients[-1])
-            continue
-        end_anchored = p["ramp"] == "end"
-        anchor_start = absolute - 1 if end_anchored else absolute
-        anchor_end = absolute + size - 1 if end_anchored else absolute + size
-        coefficients.append(
-            [
-                [
-                    trajectory_coefficient(
-                        path_gain(paths[k], mix["row"], anchor_start),
-                        path_gain(paths[k], mix["row"], anchor_end),
-                        p["mix_step"],
-                        ramp,
+    halves = 1 << p["mix_step"]
+
+    def gain_at(mix, o, sample):
+        return path_gain(paths[mix["objects"][o]], mix["row"], sample)
+
+    def raw_of(g):
+        return round_div(-g[0] * (1 << MIX_FRAC_BITS), g[1] * (1 << GAIN_BITS) * halves)
+
+    def at_18(g):
+        return round_div(-g[0] * (1 << (OBJECT_SHIFT - GAIN_BITS)), g[1] * halves)
+
+    step = ramp_step(nominal)
+    end = bounds[-1][0] + bounds[-1][1]
+    unit_count = -(-end // nominal)
+    up = OBJECT_SHIFT - (SLOPE_SCALE_FIELD + MIX_FRAC_BITS)
+    if slopes:
+        for mix in mixes:
+            bound = 0
+            for u in range(unit_count):
+                origin = first_sample + u * nominal
+                for o in range(len(mix["objects"])):
+                    move = abs(
+                        at_18(gain_at(mix, o, origin + nominal)) - at_18(gain_at(mix, o, origin))
                     )
-                    for k in mix["objects"]
-                ]
-                for mix in mixes
-            ]
-        )
-    if ramp:
-        for index, mix in enumerate(mixes):
-            mix["width"] = width_of([c[1] for block in coefficients for c in block[index]])
-    blocks = []
-    for place, (start, size) in enumerate(bounds):
-        matrices = [moving_matrix(FIRST_CODED, 0, -1, 0, 0, {FIRST_CODED: -2})]
+                    if 0 < move <= STEP_LIMIT:
+                        bound = max(bound, (move + JUMP_TOLERANCE + (1 << up) - 1) >> up)
+            mix["width"] = width_for(bound)
+
+    flip = {
+        "head": moving_head(FIRST_CODED, 0, -1, 0, 0, {FIRST_CODED}),
+        "raw": {FIRST_CODED: -2},
+    }
+    doubled = None
+    if p["bypass_bits"]:
         n = p["bypass_bits"]
-        if n:
-            matrices.append(
-                moving_matrix(objects - 1, MIX_FRAC_BITS, n, p["noise"], n, {objects - 1: 1 << 12})
-            )
-        for index, mix in enumerate(mixes):
-            raw = {mix["row"]: 1 << MIX_FRAC_BITS}
-            delta = {mix["row"]: 0}
-            idle = True
-            for k, (value, step) in zip(mix["objects"], coefficients[place][index], strict=True):
-                raw[FIRST_CODED + k] = value
-                delta[FIRST_CODED + k] = step if mix["width"] else 0
-                idle = idle and value == 0 and step == 0
-            if not (idle and p["drop_idle"]):
-                matrices.append(
-                    moving_matrix(
-                        mix["row"],
-                        MIX_FRAC_BITS,
-                        0,
-                        p["noise"],
-                        0,
-                        raw,
-                        mix["width"],
-                        delta if mix["width"] else {},
-                    )
+        out = objects - 1
+        doubled = {
+            "head": moving_head(out, MIX_FRAC_BITS, n, p["noise"], n, {out}),
+            "raw": {out: 1 << MIX_FRAC_BITS},
+        }
+
+    blocks = []
+    state = {"matrices": [], "runs": []}
+    held_raw = None
+    for j, (start, size) in enumerate(bounds):
+        unit_start = start % nominal == 0
+        from_sample = first_sample + start
+        to_sample = from_sample + nominal
+        section = None
+        if unit_start:
+            update = (
+                j == 0
+                or slopes
+                or (
+                    from_sample % nominal == 0 and (from_sample // nominal) % p["update_units"] == 0
                 )
-        if len(matrices) > 16:
-            raise ValueError("more than 16 object matrices")
-        before = [] if place == 0 else blocks[-1]["matrices"]
+            )
+            raw0 = [[] for _ in mixes]
+            raw1 = [[] for _ in mixes]
+            at0 = [[] for _ in mixes]
+            at1 = [[] for _ in mixes]
+            for r, mix in enumerate(mixes):
+                for o in range(len(mix["objects"])):
+                    g0, g1 = gain_at(mix, o, from_sample), gain_at(mix, o, to_sample)
+                    raw0[r].append(raw_of(g0))
+                    raw1[r].append(raw_of(g1))
+                    at0[r].append(at_18(g0))
+                    at1[r].append(at_18(g1))
+            if not slopes and update:
+                held_raw = [list(v) for v in raw0]
+            wanted = raw0 if slopes else held_raw
+
+            items, mix_of = [flip], [-1]
+            if doubled:
+                items.append(doubled)
+                mix_of.append(-1)
+            for r, mix in enumerate(mixes):
+                idle = all(
+                    wanted[r][o] == 0 and (not slopes or raw1[r][o] == 0)
+                    for o in range(len(mix["objects"]))
+                )
+                if idle and p["drop_idle"]:
+                    continue
+                present = {mix["row"]} | {FIRST_CODED + k for k in mix["objects"]}
+                width = mix["width"] if slopes else 0
+                head = moving_head(
+                    mix["row"],
+                    MIX_FRAC_BITS,
+                    0,
+                    p["noise"],
+                    0,
+                    present,
+                    width,
+                    SLOPE_SCALE_FIELD if width else 0,
+                )
+                items.append({"head": head, "raw": {}})
+                mix_of.append(r)
+            if len(items) > 16:
+                raise ValueError("more than 16 object matrices")
+            head_list = [it["head"] for it in items]
+            extension = slopes and any(h["width"] for h in head_list)
+            list_changed = not state["matrices"] or not (
+                len(state["matrices"]) == len(head_list)
+                and all(
+                    same_headers(a, b) for a, b in zip(state["matrices"], head_list, strict=True)
+                )
+            )
+
+            raw_for = functools.partial(
+                moving_raw_for,
+                mixes,
+                mix_of,
+                items,
+                head_list,
+                list_changed,
+                raw0 if slopes else wanted,
+                state,
+            )
+
+            form = {
+                "change": False,
+                "headers": False,
+                "extension": False,
+                "deltas": False,
+                "widths": False,
+            }
+            carried = [
+                {"head": h, "raw": dict(it["raw"]) if mix_of[m] < 0 else {}, "delta": {}}
+                for m, (h, it) in enumerate(zip(head_list, items, strict=True))
+            ]
+            send = False
+            intended = None
+            if not slopes:
+                differs = list_changed
+                for m, h in enumerate(head_list):
+                    for ch in sorted(h["present"]):
+                        if (
+                            not differs
+                            and raw_for(m, ch, True) << place_bits(h)
+                            != state["runs"][m]["coeff"][ch]
+                        ):
+                            differs = True
+                if differs:
+                    send = True
+                    form["change"], form["headers"] = True, list_changed
+                    for m, h in enumerate(head_list):
+                        for ch in sorted(h["present"]):
+                            carried[m]["raw"][ch] = raw_for(m, ch, True)
+            else:
+                jump = list_changed
+                nxt = [new_run() for _ in head_list]
+                if not list_changed:
+                    for m in range(len(head_list)):
+                        nxt[m] = copy_run(state["runs"][m])
+                        r = mix_of[m]
+                        for o, k in enumerate(mixes[r]["objects"] if r >= 0 else []):
+                            ch = FIRST_CODED + k
+                            if abs(state["runs"][m]["coeff"][ch] - at0[r][o]) > JUMP_TOLERANCE:
+                                jump = True
+                if jump:
+                    for m, h in enumerate(head_list):
+                        r = mix_of[m]
+                        for ch in sorted(h["present"]):
+                            far = list_changed
+                            if r >= 0 and ch != h["out"] and not list_changed:
+                                far = (
+                                    abs(
+                                        state["runs"][m]["coeff"][ch]
+                                        - at0[r][mixes[r]["objects"].index(ch - FIRST_CODED)]
+                                    )
+                                    > JUMP_TOLERANCE
+                                )
+                            raw = raw_for(m, ch, far)
+                            carried[m]["raw"][ch] = raw
+                            nxt[m]["coeff"][ch] = raw << place_bits(h)
+                slope_changed = list_changed
+                for m, h in enumerate(head_list):
+                    r = mix_of[m]
+                    nxt[m]["extension"] = extension
+                    nxt[m]["scale"] = slope_scale(h)
+                    if list_changed:
+                        nxt[m]["slope"] = {}
+                    if r < 0 or h["width"] == 0:
+                        continue
+                    mup = OBJECT_SHIFT - nxt[m]["scale"]
+                    reach = 1 << h["width"]
+                    for o, k in enumerate(mixes[r]["objects"]):
+                        ch = FIRST_CODED + k
+                        c = nxt[m]["coeff"][ch]
+                        target = at1[r][o]
+                        standing = 0 if list_changed else nxt[m]["slope"].get(ch, 0)
+                        if (
+                            not list_changed
+                            and abs(c + (standing << mup) - target) <= SLOPE_TOLERANCE
+                        ):
+                            continue
+                        move = target - c
+                        delta = 0
+                        if abs(move) <= STEP_LIMIT:
+                            delta = max(-reach, min(reach - 1, round_div(move, 1 << mup)))
+                        if delta != standing:
+                            slope_changed = True
+                        nxt[m]["slope"][ch] = delta
+                intended = nxt
+                if jump or slope_changed or list_changed:
+                    send = True
+                    form["change"], form["headers"] = jump, list_changed
+                    form["extension"] = extension
+                    form["deltas"] = extension and slope_changed
+                    for m, h in enumerate(head_list):
+                        before = state["matrices"][m] if m < len(state["matrices"]) else None
+                        if (h["width"], h["field2"]) != (
+                            (before["width"], before["field2"]) if before else (0, 0)
+                        ):
+                            form["widths"] = extension
+                        if h["width"]:
+                            carried[m]["delta"] = {
+                                ch: nxt[m]["slope"].get(ch, 0) for ch in sorted(h["present"])
+                            }
+                    if form["widths"]:
+                        form["deltas"] = True
+            if send:
+                state = apply_moving_section(state, form, carried)
+                if slopes:
+                    for m in range(len(head_list)):
+                        got = state["runs"][m]
+                        want = intended[m]
+                        channels = set(got["slope"]) | set(want["slope"])
+                        if (
+                            got["coeff"] != want["coeff"]
+                            or got["extension"] != want["extension"]
+                            or any(
+                                got["slope"].get(c, 0) != want["slope"].get(c, 0) for c in channels
+                            )
+                        ):
+                            raise ValueError("a section does not give the state planned")
+                section = ObjectSection(
+                    coeffs=[c["raw"] for c in carried] if form["change"] else [],
+                    headers=(
+                        [
+                            (h["out"], h["frac_bits"], h["f_shift"], h["noise_shift"], h["bypass"])
+                            for h in head_list
+                        ]
+                        if form["change"] and form["headers"]
+                        else []
+                    ),
+                    a=form["change"],
+                    b=form["headers"],
+                    a2=form["extension"],
+                    b2=form["deltas"],
+                    c2=form["widths"],
+                    widths=[h["width"] for h in head_list] if form["widths"] else [],
+                    field2=[h["field2"] for h in head_list] if form["widths"] else [],
+                    deltas=[c["delta"] for c in carried] if form["deltas"] else [],
+                )
+        if unit_start:
+            for run in state["runs"]:
+                run["ramp"] = 0
         blocks.append(
             {
                 "start": start,
                 "size": size,
-                "matrices": matrices,
-                "section": plan_object_section(before, matrices),
+                "matrices": [dict(h) for h in state["matrices"]],
+                "runs": [copy_run(r) for r in state["runs"]],
+                "section": section,
             }
         )
+        ends_unit = (start + size) % nominal == 0
+        for head, run in zip(state["matrices"], state["runs"], strict=True):
+            advance_run(head, run, size, ends_unit, step)
     return blocks
 
 
@@ -1974,23 +2277,21 @@ def fnv1a(data, state=0xCBF29CE484222325):
     return state
 
 
-def moving_value(m, row, phase, size, ramp, skip_own, noise):
+def moving_value(head, run, row, i, step, skip_own, noise):
     """The matrix's value for a row of samples before the mask and the bypass bits (the decoder's
-    kernel): the products at 2^-15, with the ramp's part at 3 places finer when it has a width."""
-    scale = 15 - m["frac_bits"] + m["f_shift"]
-    fine = ramp != "none" and m["width"] != 0
-    total, finer = noise, 0
-    for channel, raw in m["raw"].items():
-        if skip_own and channel == m["out"]:
+    kernels::apply_object_matrix): the running coefficients, the slopes' share times the ramp, the
+    noise, all at 2^-18, shifted down by 18."""
+    total, fine = noise, 0
+    for ch in sorted(head["present"]):
+        if skip_own and ch == head["out"]:
             continue
-        total += row[channel] * (raw << scale)
-        if fine:
-            finer += row[channel] * (m["delta"].get(channel, 0) << scale)
-    if not fine:
-        return total >> 15
-    product = finer * (phase + 1 if ramp == "end" else phase)
-    finer = product // size if product >= 0 else -(-product // size)
-    return ((total << RAMP_BITS) + finer) >> (15 + RAMP_BITS)
+        total += row[ch] * run["coeff"][ch]
+        fine += row[ch] * run["slope"].get(ch, 0)
+    if run["extension"]:
+        shared = fine >> run["scale"] if run["scale"] >= 0 else fine << -run["scale"]
+        shared = ((shared + (1 << 31)) & 0xFFFFFFFF) - (1 << 31)  # an int32
+        total += shared * (run["ramp"] + step * i)
+    return total >> OBJECT_SHIFT
 
 
 def moving_noise_buffers(units, size, seed):
@@ -2012,8 +2313,9 @@ def moving_plan(p, sources):
     interval = p["interval_units"] * p["nominal"]
     samples = len(sources[0])
     assert samples % interval == 0
-    sections, restarts, bypass, sent = {}, set(), [], []
+    sections, restarts, bypass, sent, traced = {}, set(), [], [], []
     start_rows = [[0] * samples for _ in sources]
+    step = ramp_step(p["nominal"])
     for index in range(samples // interval):
         first = index * interval
         blocks = motion_blocks(p, first, interval_bounds(p))
@@ -2022,45 +2324,53 @@ def moving_plan(p, sources):
         for block in blocks:
             if block["section"] is not None:
                 sections[first + block["start"]] = block["section"]
-            matrices = block["matrices"]
-            count = len(matrices)
+            heads, runs = block["matrices"], block["runs"]
+            count = len(heads)
             for i in range(block["size"]):
                 t = block["start"] + i
                 row = [channel[first + t] for channel in sources]
                 slots = []
+                traced.append((i, [copy_run(r) for r in runs]))
                 for m in reversed(range(count)):
-                    matrix = matrices[m]
+                    head, run = heads[m], runs[m]
                     left = count - m
                     noise = 0
-                    if matrix["noise_shift"]:
+                    if head["noise_shift"]:
                         slot = (left + (2 * left + 1) * (t % p["nominal"])) % p["noise_size"]
-                        noise = buffers[t // p["nominal"]][slot] << (matrix["noise_shift"] + 8)
-                    base = moving_value(matrix, row, i, block["size"], p["ramp"], True, noise)
-                    out, after = matrix["out"], row[matrix["out"]]
-                    scale = 15 - matrix["frac_bits"] + matrix["f_shift"]
-                    own = matrix["raw"][out] << scale
-                    n = matrix["bypass"]
+                        noise = buffers[t // p["nominal"]][slot] << (head["noise_shift"] + 11)
+                    base = moving_value(head, run, row, i, step, True, noise)
+                    out, after = head["out"], row[head["out"]]
+                    own = run["coeff"][out]
+                    n = head["bypass"]
                     if n:
-                        assert own == (1 << 15) << n
+                        assert own == (1 << OBJECT_SHIFT) << n
                         rest = after - base
                         row[out] = rest >> n
                         slots.append((m, rest & ((1 << n) - 1), n))
                     else:
-                        assert own in (1 << 15, -(1 << 15)) and not matrix["delta"].get(out, 0)
+                        assert own in (1 << OBJECT_SHIFT, -(1 << OBJECT_SHIFT))
+                        assert run["slope"].get(out, 0) == 0
                         row[out] = after - base if own > 0 else base - after
                 for c, value in enumerate(row):
                     start_rows[c][first + t] = value
                 bypass.append([(value, n) for _m, value, n in sorted(slots)])
-    resolve_sections(sections, restarts)
-    for index in range(samples // interval):
-        first = index * interval
-        for block in motion_blocks(p, first, interval_bounds(p)):
             if block["section"] is not None:
-                section = sections[first + block["start"]]
-                assert same_set(section.resolved, block["matrices"]), (
-                    "the writer's state and the planner's differ"
+                sent.append((first + block["start"], block["size"], block["section"]))
+    resolve_sections(sections, restarts)
+    # the decoder session's model of the running state, held to the one kept here
+    trace = object_trace(sections, restarts, samples, p["nominal"])
+    for t in range(samples):
+        place, mine_row = traced[t]
+        assert len(trace[t]) == len(mine_row), f"the lists differ at sample {t}"
+        for (c, d, shift, ramp), mine in zip(trace[t], mine_row, strict=True):
+            assert c == mine["coeff"], f"the running coefficients differ at sample {t}"
+            assert shift == mine["scale"], f"the scales differ at sample {t}"
+            if mine["extension"]:
+                channels = set(d) | set(mine["slope"])
+                assert all(d.get(ch, 0) == mine["slope"].get(ch, 0) for ch in channels), (
+                    f"the deltas differ at sample {t}"
                 )
-                sent.append((first + block["start"], block["size"], section))
+                assert ramp == mine["ramp"] + step * place, f"the ramps differ at sample {t}"
     rows_digest = fnv1a(
         b"".join(
             struct.pack("<i", start_rows[c][t]) for t in range(samples) for c in range(len(sources))
@@ -2078,6 +2388,13 @@ def moving_plan(p, sources):
     }
 
 
+def interval_bounds(p):
+    """The blocks of a restart interval: the first access unit is cut after 8 samples."""
+    nominal = p["nominal"]
+    bounds = [(0, 8), (8, nominal - 8)]
+    return bounds + [(u * nominal, nominal) for u in range(1, p["interval_units"])]
+
+
 def section_bits(section, channels):
     """The bits of a section as a block header carries it, after the matrices-present bit, as a
     string of 0 and 1."""
@@ -2091,30 +2408,30 @@ def section_bits(section, channels):
 
 
 MOTION_CASES = {
-    # 12 objects, the ramp to the last sample, every kind of delta, noise, 2 bypass bits: the
-    # extension of SUBSTREAM3.md section 6 (provisional)
-    "moving_ramp": {
+    # 12 objects whose coefficients slide: one section with the slopes, then plain blocks, and a new
+    # section only where the path turns or a coefficient has drifted
+    "moving_slopes": {
         "objects": 12,
         "noise": 3,
         "bypass_bits": 2,
         "mix_step": 0,
-        "ramp": "end",
+        "extension": "slopes",
         "update_units": 1,
-        "drop_idle": True,
+        "drop_idle": False,
         "split": False,
         "intervals": 3,
-        "stretch": 240,
+        "stretch": 1200,
         "jump": False,
         "moving": None,
     },
-    # the ramp from the first sample over steps of the path: a bed row's matrix goes idle and is
-    # left out of the list, which changes from block to block
-    "moving_ramp_jump": {
+    # steps of the path with the slopes on: a step is a jump of the coefficient, not a slope, and a
+    # bed row's matrix goes idle and is left out of the list
+    "moving_slopes_jump": {
         "objects": 14,
         "noise": 2,
         "bypass_bits": 1,
         "mix_step": 0,
-        "ramp": "start",
+        "extension": "slopes",
         "update_units": 1,
         "drop_idle": True,
         "split": False,
@@ -2130,7 +2447,7 @@ MOTION_CASES = {
         "noise": 1,
         "bypass_bits": 3,
         "mix_step": 0,
-        "ramp": "none",
+        "extension": "none",
         "update_units": 2,
         "drop_idle": False,
         "split": True,
@@ -2146,7 +2463,7 @@ MOTION_CASES = {
         "noise": 0,
         "bypass_bits": 0,
         "mix_step": 0,
-        "ramp": "none",
+        "extension": "none",
         "update_units": 1,
         "drop_idle": True,
         "split": True,
@@ -2225,7 +2542,7 @@ def write_moving(out):
             f"noise {p['noise']}",
             f"bypass_bits {p['bypass_bits']}",
             f"mix_step {p['mix_step']}",
-            f"ramp {p['ramp']}",
+            f"extension {p['extension']}",
             f"update_units {p['update_units']}",
             f"drop_idle {int(p['drop_idle'])}",
             f"split {int(p['split'])}",

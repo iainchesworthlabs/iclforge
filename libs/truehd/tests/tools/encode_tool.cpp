@@ -6,7 +6,7 @@
 //   iclforge-truehd-encode-tool in.wav out.thd [bits=N] [restart=N] [order=N] [matrix=0|1]
 //       [verify=0|1] [chunk=N] [peak=BPS] [assignment=0xNNNN] [stereo-mode=N] [rate-violations=0|1]
 //       [object-bed=0|1] [object-noise=N] [object-bypass=0|1] [object-bypass-bits=1..3]
-//       [object-motion=static|slow|jump] [object-ramp=none|end|start] [object-update=N]
+//       [object-motion=static|slow|jump] [object-slopes=0|1] [object-update=N]
 //       [object-drop=0|1] [object-split=0|1] [object-stretch=N]
 //
 // object-bed=1 reads the file's 9 to 16 channels as the objects of an Atmos stream whose 7.1 bed is
@@ -14,8 +14,8 @@
 // object-motion moves the objects in the bed (tools/checks/verify_truehd_object_bed.py defines the
 // same paths): every `object-stretch` samples (24,000) object k goes from its own bed row to the
 // next object's (slow: a straight line across the stretch; jump: a step at its end), alternating.
-// object-ramp sends the provisional extension; it needs object-update=1 and decodes only under the
-// decoder's lab settings for it.
+// object-slopes=1 sends the extension's slopes (a section only where the path turns or the
+// coefficient has drifted); it needs object-update=1.
 //
 // Reads 16, 24 or 32 bit integer PCM (WAVE_FORMAT_PCM or EXTENSIBLE). `bits` is the width of the
 // samples to code (default: the file's, at most 24); a 24 bit file given bits=16 must carry 16 bit
@@ -210,10 +210,9 @@ int main(int argc, char** argv) {
             config.object_bypass_bits = std::atoi(value.c_str());
         } else if (option(arg, "object-motion", value)) {
             object_motion = value;
-        } else if (option(arg, "object-ramp", value)) {
-            config.object_ramp = value == "end"     ? ObjectRamp::kEnd
-                                 : value == "start" ? ObjectRamp::kStart
-                                                    : ObjectRamp::kNone;
+        } else if (option(arg, "object-slopes", value)) {
+            config.object_extension =
+                value != "0" ? ObjectExtension::kSlopes : ObjectExtension::kNone;
         } else if (option(arg, "object-update", value)) {
             config.object_update_units = std::atoi(value.c_str());
         } else if (option(arg, "object-split", value)) {

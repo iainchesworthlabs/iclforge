@@ -48,32 +48,36 @@ class Render(unittest.TestCase):
 writer = check.truehd_writer
 
 
+def falling_object(extension, blocks=None):
+    """One object (channel 8) whose gain into the left row falls from 1 to 0 over 4,000 samples,
+    eight access units: the request the C++ test of the trajectory makes."""
+    request = {
+        "objects": 9,
+        "noise": 0,
+        "bypass_bits": 0,
+        "mix_step": 0,
+        "extension": extension,
+        "update_units": 1,
+        "drop_idle": False,
+        "split": False,
+        "nominal": 40,
+        "interval_units": 8,
+        "paths": {8: [(0, [65536] + [0] * 7), (4000, [0] * 8)]},
+    }
+    return writer.motion_blocks(request, 0, blocks or writer.interval_bounds(request)), request
+
+
 class MovingObjects(unittest.TestCase):
     """The reference writer's plan of moving objects, held to values worked out by hand. The C++
-    tests
-    (libs/truehd/tests/encoder/test_encoder_object_motion.cpp) hold the same numbers."""
-
-    def falling(self, ramp, mix_step=0):
-        knots = [(0, [65536, 0, 0, 0, 0, 0, 0, 0]), (4000, [0] * 8)]
-        return [
-            writer.trajectory_coefficient(
-                writer.path_gain(knots, 0, a), writer.path_gain(knots, 0, b), mix_step, True
-            )
-            for a, b in ramp
-        ]
+    tests (libs/truehd/tests/encoder/test_encoder_object_motion.cpp) hold the same numbers."""
 
     def test_halves_round_away_from_zero(self):
-        self.assertEqual(
-            [writer.round_div(n, d) for n, d in ((5, 2), (-5, 2), (7, 3), (-7, 3))], [3, -3, 2, -2]
-        )
+        got = [writer.round_div(n, d) for n, d in ((5, 2), (-5, 2), (7, 3), (-7, 3))]
+        self.assertEqual(got, [3, -3, 2, -2])
 
     def test_a_path_is_linear_between_knots_holds_outside_and_steps_at_a_repeated_sample(self):
-        knots = [
-            (10, [1000] + [0] * 7),
-            (110, [3000] + [0] * 7),
-            (110, [6000] + [0] * 7),
-            (310, [2000] + [0] * 7),
-        ]
+        row = [0] * 7
+        knots = [(10, [1000, *row]), (110, [3000, *row]), (110, [6000, *row]), (310, [2000, *row])]
 
         def gain(sample):
             n, d = writer.path_gain(knots, 0, sample)
@@ -84,55 +88,99 @@ class MovingObjects(unittest.TestCase):
             [1000, 1000, 2000, 2980, 6000, 4000, 2000],
         )
 
-    def test_the_ramp_to_the_last_sample_anchors_a_sample_early(self):
-        # blocks (0, 8), (8, 32), (40, 40): the anchors are -1 to 7, 7 to 39, 39 to 79
-        got = self.falling([(-1, 7), (7, 39), (39, 79)])
-        self.assertEqual(got, [(-4096, 57), (-4089, 263), (-4056, 327)])
+    def test_a_coefficient_slides_on_its_slope_and_a_section_is_sent_where_it_stops_reaching(self):
+        blocks, _request = falling_object("slopes")
+        sent = [place for place, block in enumerate(blocks) if block["section"] is not None]
+        self.assertEqual(sent, [0, 7])
+        first, later = blocks[0]["section"], blocks[7]["section"]
+        writer.resolve_sections(
+            {blocks[place]["start"]: blocks[place]["section"] for place in sent}, {0}
+        )
+        # the restart: A, B, A2, B2 and C2, the raw value -4096 and a delta of 328 (2,624 units a
+        # unit of 2^-18 at S = 15), the width 9 and scale 3
+        self.assertEqual((first.a, first.b, first.a2, first.b2, first.c2), (True,) * 5)
+        self.assertEqual(first.resolved[1]["raw"][8], -4096)
+        self.assertEqual(first.resolved[1]["delta"][8], 328)
+        self.assertEqual((first.resolved[1]["width"], first.resolved[1]["field2"]), (9, 3))
+        # the running coefficient at the start of units 1 and 2
+        self.assertEqual(blocks[2]["runs"][1]["coeff"][8], -262144 + 2624)
+        self.assertEqual(blocks[3]["runs"][1]["coeff"][8], -262144 + 2 * 2624)
+        # the second section: the slope alone (A clear, A2, B2, no C2), a delta of 326
+        self.assertEqual((later.a, later.a2, later.b2, later.c2), (False, True, True, False))
+        self.assertEqual(later.deltas[1][8], 326)
 
-    def test_the_ramp_from_the_first_sample_anchors_at_the_block(self):
-        self.assertEqual(self.falling([(0, 8), (8, 40)]), [(-4096, 66), (-4088, 264)])
-
-    def test_the_last_mix_step_mixes_nothing(self):
-        self.assertEqual(self.falling([(0, 8)], mix_step=3), [(0, 0)])
-        self.assertEqual(self.falling([(0, 8)], mix_step=1)[0][0], -2048)
-
-    def test_a_width_holds_its_deltas_and_no_more(self):
+    def test_without_slopes_a_coefficient_holds_and_a_held_block_sends_nothing(self):
+        blocks, request = falling_object("none", [(0, 8), (8, 32), (40, 40), (80, 40), (120, 40)])
+        request["update_units"] = 2
+        blocks = writer.motion_blocks(request, 0, [(0, 8), (8, 32), (40, 40), (80, 40), (120, 40)])
         self.assertEqual(
-            [writer.width_of(d) for d in ([0], [1], [-2], [2], [-3], [327], [-512], [512])],
-            [0, 1, 1, 2, 2, 9, 9, 10],
+            [b["section"] is not None for b in blocks], [True, False, False, True, False]
+        )
+        raw = [b["runs"][1]["coeff"][8] // 64 for b in blocks]
+        self.assertEqual(raw, [-4096, -4096, -4096, -4014, -4014])
+
+    def test_a_slope_adds_its_share_across_the_unit_and_moves_the_coefficient_at_its_end(self):
+        head = writer.moving_head(0, 12, 0, 0, 0, {0, 8}, 6, 3)
+        run = {
+            "coeff": {0: 4096 << 6, 8: 100 << 6},
+            "slope": {8: 40},
+            "extension": True,
+            "scale": 15,
+            "ramp": 0,
+        }
+        step = writer.ramp_step(40)
+        self.assertEqual(step, 6552)
+        row = [0] * 9
+        row[8] = 1 << 20
+        values = [writer.moving_value(head, run, row, i, step, False, 0) for i in (0, 1, 2, 10, 39)]
+        self.assertEqual(values, [25600, 25631, 25663, 25919, 26847])
+        writer.advance_run(head, run, 40, True, step)
+        self.assertEqual(run["coeff"][8], 105 << 6)
+
+    def sections_bits(self, first, second):
+        sections = {0: first, 40: second}
+        writer.resolve_sections(sections, {0})
+        return writer.section_bits(second, 12)
+
+    def restart(self):
+        return writer.ObjectSection(
+            coeffs=[{0: 5, 8: 1}],
+            headers=[(9, 12, 0, 0)],
+            a2=True,
+            b2=True,
+            c2=True,
+            widths=[3],
+            field2=[0],
+            deltas=[{0: 0, 8: 0}],
         )
 
-    def test_a_section_with_new_deltas_on_the_set_that_stands(self):
-        before = [writer.moving_matrix(9, 12, 0, 0, 0, {0: 5, 8: 1}, 3, {0: 0, 8: 0})]
-        after = [writer.moving_matrix(9, 12, 0, 0, 0, {0: 5, 8: 1}, 3, {0: -2, 8: 5})]
-        sections = {
-            0: writer.plan_object_section([], before),
-            40: writer.plan_object_section(before, after),
-        }
-        writer.resolve_sections(sections, {0})
-        # A clear, then A2 B2 and no C2 (the widths stand): 0 1 1 0, and the deltas of 4 bits
-        self.assertEqual(writer.section_bits(sections[40], 12), "0110" + "1110" + "0101")
+    def test_new_slopes_on_the_set_that_stands(self):
+        second = writer.ObjectSection(a=False, a2=True, b2=True, deltas=[{0: -2, 8: 5}])
+        self.assertEqual(self.sections_bits(self.restart(), second), "011011100101")
 
-    def test_a_section_with_new_coefficients_on_the_headers_that_stand(self):
-        before = [writer.moving_matrix(9, 12, 0, 0, 0, {0: 1, 8: 1})]
-        after = [writer.moving_matrix(9, 12, 0, 0, 0, {0: 5, 8: -3})]
-        sections = {
-            0: writer.plan_object_section([], before),
-            40: writer.plan_object_section(before, after),
-        }
-        writer.resolve_sections(sections, {0})
-        # A set, B clear, the two coefficients in 14 bits, no extension
+    def test_new_coefficients_on_the_headers_that_stand_with_the_extension_off(self):
+        second = writer.ObjectSection(coeffs=[{0: 5, 8: -3}], b=False)
         self.assertEqual(
-            writer.section_bits(sections[40], 12), "10" + "00000000000101" + "11111111111101" + "0"
+            self.sections_bits(self.restart(), second), "1000000000000101111111111111010"
         )
 
-    def test_nothing_is_sent_when_nothing_changes(self):
-        matrix = [writer.moving_matrix(9, 12, 0, 0, 0, {0: 5, 8: 1})]
-        self.assertIsNone(writer.plan_object_section(matrix, [dict(m) for m in matrix]))
+    def test_new_coefficients_with_the_standing_slopes(self):
+        second = writer.ObjectSection(coeffs=[{0: 5, 8: -3}], b=False, a2=True)
+        self.assertEqual(
+            self.sections_bits(self.restart(), second),
+            "10000000000001011111111111110110",
+        )
+
+    def test_new_widths_and_scales_with_their_slopes(self):
+        second = writer.ObjectSection(
+            a=False, a2=True, b2=True, c2=True, widths=[3], field2=[2], deltas=[{0: -2, 8: 5}]
+        )
+        self.assertEqual(self.sections_bits(self.restart(), second), "011100111011100101")
 
     def test_the_writer_and_the_plan_agree_on_every_case(self):
         for name in writer.MOTION_CASES:
-            # case_moving asserts that the writer's state is the plan's
+            # case_moving asserts that the decoder session's model of the running state is the
+            # one kept here, sample for sample
             plan = writer.case_moving(name)[3]
             self.assertGreater(len(plan["sent"]), 0, name)
 

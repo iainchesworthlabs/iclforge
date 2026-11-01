@@ -13,8 +13,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -28,10 +28,12 @@ namespace {
 
 using namespace iclforge::truehd;
 
-// SS3_LAB_FROM=N keeps the 51,200 samples from output sample N for the sine modes and the value tables.
+// A last argument from=N keeps the 51,200 samples from output sample N for the sine modes and the
+// value tables.
+std::uint64_t g_record_from = 0;
+
 std::uint64_t lab_record_from() {
-    const char* text = std::getenv("SS3_LAB_FROM");
-    return text == nullptr ? 0 : static_cast<std::uint64_t>(std::atoll(text));
+    return g_record_from;
 }
 
 struct Setting {
@@ -228,6 +230,11 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
     if (!c.object_error_context.empty()) {
         std::printf("    %s\n", c.object_error_context.c_str());
     }
+    std::printf("    checks: ");
+    for (const std::uint8_t entry : c.object_interval_log) {
+        std::printf("%c", (entry & 1U) != 0 ? 'o' : 'F');
+    }
+    std::printf("\n");
     if (brief) {
         return;
     }
@@ -511,10 +518,14 @@ void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, boo
 }
 
 int main(int argc, char** argv) {
+    if (argc > 2 && std::strncmp(argv[argc - 1], "from=", 5) == 0) {
+        g_record_from = static_cast<std::uint64_t>(std::atoll(argv[argc - 1] + 5));
+        --argc;
+    }
     if (argc != 2 && argc != 5 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ HZ2 THRESHOLD INTERVAL\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
+                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ HZ2 THRESHOLD INTERVAL\n       (add from=N as the last argument to record 51,200 samples from output sample N)\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -531,173 +542,6 @@ int main(int argc, char** argv) {
     std::vector<Setting> settings;
     DecoderLab base;
     settings.push_back({"standard", base});
-    DecoderLab after = base;
-    after.lower_rows_after_matrices = true;
-    settings.push_back({"lower rows after their matrices", after});
-    DecoderLab keep = base;
-    keep.no_quantiser_mask = true;
-    settings.push_back({"no quantiser mask", keep});
-    DecoderLab reverse = base;
-    reverse.reverse_matrices = true;
-    settings.push_back({"matrices last to first", reverse});
-    DecoderLab shift = base;
-    shift.inverse_f_shift = true;
-    settings.push_back({"inverse f_shift", shift});
-    // Every combination of the four arithmetic switches (now that the matrices draw their noise).
-    static std::vector<std::string> combination_names;
-    combination_names.reserve(16);
-    for (int bits = 1; bits < 16; ++bits) {
-        DecoderLab combined = base;
-        combined.lower_rows_after_matrices = (bits & 1) != 0;
-        combined.no_quantiser_mask = (bits & 2) != 0;
-        combined.reverse_matrices = (bits & 4) != 0;
-        combined.inverse_f_shift = (bits & 8) != 0;
-        combination_names.push_back(std::string("combo:") + ((bits & 1) != 0 ? " lower-after" : "") +
-                                    ((bits & 2) != 0 ? " no-mask" : "") +
-                                    ((bits & 4) != 0 ? " reversed" : "") +
-                                    ((bits & 8) != 0 ? " inverse-fshift" : ""));
-        settings.push_back({combination_names.back().c_str(), combined});
-    }
-    DecoderLab mask_coded = base;
-    mask_coded.mask_rows = 1;
-    settings.push_back({"quantiser mask: coded rows only", mask_coded});
-    DecoderLab mask_bed = base;
-    mask_bed.mask_rows = 2;
-    settings.push_back({"quantiser mask: bed rows only", mask_bed});
-    static const char* const kTieNames[] = {"", "matrix sums: a tie rounds up", "matrix sums: a tie rounds to even",
-                                            "matrix sums: round to nearest (control)"};
-    for (int mode = 1; mode <= 3; ++mode) {
-        DecoderLab tied = base;
-        tied.object_tie_mode = mode;
-        settings.push_back({kTieNames[mode], tied});
-    }
-    static const char* const kScaleNames[] = {"", "noise scaled: minus the output shift", "noise scaled: minus the quantiser step",
-                                              "noise scaled: minus both", "noise scaled: plus the output shift"};
-    for (int mode = 1; mode <= 4; ++mode) {
-        DecoderLab scaled = base;
-        scaled.object_noise_scale = mode;
-        settings.push_back({kScaleNames[mode], scaled});
-    }
-    for (int cap = 3; cap <= 8; ++cap) {
-        static std::vector<std::string> cap_names;
-        cap_names.reserve(8);
-        DecoderLab capped = base;
-        capped.object_noise_cap = cap;
-        cap_names.push_back("noise number capped at " + std::to_string(cap));
-        settings.push_back({cap_names.back().c_str(), capped});
-    }
-    for (int mask : {15, 31}) {
-        static std::vector<std::string> mask_names;
-        mask_names.reserve(4);
-        DecoderLab masked = base;
-        masked.object_noise_stride_mask = mask;
-        mask_names.push_back("noise stride masked with " + std::to_string(mask));
-        settings.push_back({mask_names.back().c_str(), masked});
-    }
-    DecoderLab noisy_only = base;
-    noisy_only.object_noise_left = 1;
-    settings.push_back({"noise start index: noisy matrices only", noisy_only});
-    DecoderLab cleared = base;
-    cleared.object_restart_clears = true;
-    settings.push_back({"object restart clears histories", cleared});
-    static const char* const kIndexNames[] = {
-        "", "noise index: from the block", "noise index: matrices from the first",
-        "noise index: from the block, matrices from the first",
-        "noise: buffer refilled for every block", "noise: buffer refilled, index from the block"};
-    for (int mode : {1, 2, 3, 4, 5}) {
-        DecoderLab indexed = base;
-        indexed.object_noise_index = mode;
-        settings.push_back({kIndexNames[mode], indexed});
-    }
-    static const char* const kScopeNames[] = {
-        "",
-        "fold: coded channels, shift by matrix channel",
-        "fold: coded channels, shift by place",
-        "fold: channels below, shift by matrix channel",
-        "fold: channels below, shift by place",
-        "fold: coded samples before matrices, shift by matrix channel",
-        "fold: coded samples before matrices, shift by place"};
-    for (int scope = 1; scope <= 6; ++scope) {
-        DecoderLab folded = base;
-        folded.fold_scope = scope;
-        settings.push_back({kScopeNames[scope], folded});
-    }
-    static const char* const kExtensionNames[] = {
-        "", "extension: no refinement", "extension: 2^-width", "extension: sending block only",
-        "extension: ramp (i+1)/block", "extension: ramp i/block", "", "extension: 2^-width, ramp (i+1)/block",
-        "extension: 2^-width, ramp i/block"};
-    for (int mode : {1, 2, 3, 4, 5, 7, 8}) {
-        DecoderLab refined = base;
-        refined.object_extension = mode;
-        settings.push_back({kExtensionNames[mode], refined});
-    }
-    static std::vector<std::string> bias_names;
-    bias_names.reserve(16);
-    for (int bias : {-6, -5, -4, -3, -2, 1, 2}) {
-        for (bool negate : {false, true}) {
-            DecoderLab weighted = base;
-            weighted.object_extension_bias = bias;
-            weighted.object_extension_negate = negate;
-            bias_names.push_back("extension: deltas read at 2^-(width+1" + std::string(bias < 0 ? "" : "+") +
-                                 std::to_string(bias) + ")" + (negate ? ", negated" : ""));
-            settings.push_back({bias_names.back().c_str(), weighted});
-        }
-    }
-    static std::vector<std::string> combo_names;
-    combo_names.reserve(96);
-    for (int bias : {-2, -3}) {
-        for (int mode : {3, 4, 5}) {
-            DecoderLab combined = base;
-            combined.object_extension_bias = bias;
-            combined.object_extension = mode;
-            combo_names.push_back("extension: weighted 2^-(width+1" + std::to_string(bias) + ") with mode " +
-                                  std::to_string(mode));
-            settings.push_back({combo_names.back().c_str(), combined});
-        }
-    }
-    for (int bits : {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8}) {
-        DecoderLab fixed = base;
-        fixed.object_extension_fixed = bits + 16;
-        combo_names.push_back("extension: deltas at a fixed 2^-" + std::to_string(bits));
-        settings.push_back({combo_names.back().c_str(), fixed});
-    }
-    for (int unit = 1; unit <= 5; ++unit) {
-        for (int bits : {3, 4, 5}) {
-            DecoderLab placed = base;
-            placed.object_extension_unit = unit;
-            placed.object_extension_fixed = bits + 16;
-            combo_names.push_back("extension: place " + std::to_string(unit) + ", deltas at a fixed 2^-" +
-                                  std::to_string(bits));
-            settings.push_back({combo_names.back().c_str(), placed});
-        }
-    }
-    for (int bits : {3, 4}) {
-        for (int mode : {0, 4, 5}) {
-            for (bool cumulative : {false, true}) {
-                DecoderLab ramped = base;
-                ramped.object_extension_fixed = bits + 16;
-                ramped.object_extension = mode;
-                ramped.object_extension_cumulative = cumulative;
-                combo_names.push_back(std::string("extension: 2^-") + std::to_string(bits) + (mode == 4 ? ", ramp (i+1)/block" : mode == 5 ? ", ramp i/block" : ", flat") +
-                                      (cumulative ? ", adding up per block" : ", one block"));
-                settings.push_back({combo_names.back().c_str(), ramped});
-            }
-        }
-    }
-    {
-        DecoderLab negated = base;
-        negated.object_extension_negate = true;
-        settings.push_back({"extension: deltas negated", negated});
-    }
-    static const char* const kUpwardNames[] = {
-        "fold: matrix channels 1 up", "fold: matrix channels 2 up", "fold: matrix channels 3 up",
-        "fold: matrix channels 4 up", "fold: matrix channels 5 up", "fold: matrix channels 6 up",
-        "fold: matrix channels 7 up", "fold: matrix channels 8 up"};
-    for (int from = 1; from <= 8; ++from) {
-        DecoderLab folded = base;
-        folded.fold_scope = 10 + from;
-        settings.push_back({kUpwardNames[from - 1], folded});
-    }
     if (argc == 5 && std::strcmp(argv[2], "sections") == 0) {
         print_sections(stream, static_cast<std::size_t>(std::atoll(argv[3])),
                        static_cast<std::size_t>(std::atoll(argv[4])));

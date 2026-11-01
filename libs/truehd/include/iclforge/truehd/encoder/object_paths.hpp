@@ -33,19 +33,14 @@ struct ObjectPath {
     std::vector<ObjectGainKnot> knots;
 };
 
-// What the extension of the matrix sections does (SUBSTREAM3.md section 6, provisional): `kNone`
-// sends no deltas, so a coefficient holds from one update to the next. With a ramp, each block's
-// section sends a delta for every coefficient of a matrix that moves, and the coefficient goes
-// from its raw value to raw + delta / 8 (in the last places of the raw value) across the block,
-// reaching the end at the block's last sample (`kEnd`, the value at sample i of the block is
-// raw + delta / 8 * (i + 1) / size) or one sample short of the block's end (`kStart`, i / size).
-// Only the decoder's lab settings read a ramp (DecoderLab::object_extension 4 and 5 with
-// object_extension_fixed 19); the decoder's rule is something else, and no outside decoder is
-// known to read either.
-enum class ObjectRamp : std::uint8_t {
+// What the extension of the matrix sections does (SUBSTREAM3.md sections 2 and 3). `kNone` sends no
+// deltas: a coefficient holds from one update to the next. With `kSlopes` the sections send slopes:
+// a coefficient moves by delta / 2^ext_field2 raw places in every access unit until the slope is
+// replaced, so a moving object is one section and then plain blocks, and the encoder sends a new
+// section only when the coefficient has drifted from the path or the path turns.
+enum class ObjectExtension : std::uint8_t {
     kNone,
-    kEnd,
-    kStart,
+    kSlopes,
 };
 
 }  // namespace iclforge::truehd

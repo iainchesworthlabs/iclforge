@@ -3,7 +3,7 @@
 // tools/references/truehd_writer.py generate-moving).
 //
 //   iclforge-truehd-object-plan-tool plan  NAME.request NAME.objects
-//   iclforge-truehd-object-plan-tool decode NAME.thd [ramp=none|end|start]
+//   iclforge-truehd-object-plan-tool decode NAME.thd
 //
 // `plan` reads a request (the objects, the matrices' parameters, the paths' knots, one line each:
 // "key value", "knot CHANNEL SAMPLE GAIN x 8") and the objects as 32-bit little-endian samples, a
@@ -12,8 +12,7 @@
 // section (the section's bits as 0 and 1, after the matrices-present bit), then "rows HEX" and
 // "bypass HEX" (FNV-1a of the rows the decoder starts from and of the LSB bypass bits) and "pcm
 // HEX" (FNV-1a of the objects). `decode` prints "pcm HEX" for what this library's decoder gives for
-// substream 3 of a stream, with the lab settings for the ramp when asked. The Python side prints
-// the same lines; the check compares them.
+// substream 3 of a stream. The Python side prints the same lines; the check compares them.
 
 #include <algorithm>
 #include <cstdint>
@@ -83,12 +82,11 @@ bool read_request(const char* file, Request& out) {
             }
             by_channel[channel].object = channel;
             by_channel[channel].knots.push_back(knot);
-        } else if (key == "ramp") {
+        } else if (key == "extension") {
             std::string mode;
             words >> mode;
-            out.timeline.ramp = mode == "end"     ? ObjectRamp::kEnd
-                                : mode == "start" ? ObjectRamp::kStart
-                                                  : ObjectRamp::kNone;
+            out.timeline.extension =
+                mode == "slopes" ? ObjectExtension::kSlopes : ObjectExtension::kNone;
         } else {
             words >> value;
             if (key == "objects") out.timeline.objects = static_cast<int>(value);
@@ -227,16 +225,12 @@ int plan(const char* request_path, const char* objects_path) {
     return 0;
 }
 
-int decode(const char* stream_path, const std::string& ramp) {
+int decode(const char* stream_path) {
     std::ifstream in(stream_path, std::ios::binary);
     const std::vector<char> raw((std::istreambuf_iterator<char>(in)),
                                 std::istreambuf_iterator<char>());
     DecoderConfig config;
     config.presentation = Presentation::kAll;
-    if (ramp != "none") {
-        config.lab.object_extension = ramp == "end" ? 4 : 5;
-        config.lab.object_extension_fixed = 19;
-    }
     Decoder decoder(config);
     // the stream is a run of access units, each led by its length in the low 12 bits of two bytes
     // (in words)
@@ -272,11 +266,7 @@ int main(int argc, char** argv) {
         return plan(argv[2], argv[3]);
     }
     if (argc >= 3 && std::string(argv[1]) == "decode") {
-        std::string ramp = argc >= 4 ? argv[3] : "none";
-        if (ramp.rfind("ramp=", 0) == 0) {
-            ramp = ramp.substr(5);
-        }
-        return decode(argv[2], ramp);
+        return decode(argv[2]);
     }
     std::fprintf(stderr,
                  "usage: %s plan NAME.request NAME.objects\n       %s decode NAME.thd "

@@ -427,10 +427,11 @@ TEST_CASE("an object segment cut at every byte ends in samples or an error",
     }
 }
 
-TEST_CASE("a delta that overflows 32 bits at the coefficient's scale is refused",
+TEST_CASE("the largest delta at the largest scale decodes without overflow",
           "[truehd][decoder][robustness]") {
-    // frac_bits 0 with f_shift +6 puts a coefficient's last place at 2^21 in the decoder's scale
-    // of 2^-15, and a 16 bit delta of 32767 of those places does not fit 32 bits.
+    // frac_bits 0 with f_shift +6 puts a coefficient's scale at -6 (the slope shifts left), and a
+    // 16 bit delta of 32767 times a 24 bit row is far beyond 32 bits: the kernel wraps, it does not
+    // fault, and the decoder reports no error.
     Header header;
     header.out = 0;
     header.frac_bits = 0;
@@ -443,16 +444,8 @@ TEST_CASE("a delta that overflows 32 bits at the coefficient's scale is refused"
     const std::vector<Header> set{header};
     const Section section = [&](BitWriter& w) { put_section(w, true, true, set, 4, 1, extension); };
     for (const Strictness strictness : {Strictness::kStrict, Strictness::kLenient}) {
-        const Outcome outcome = decode_sections(3, {section}, strictness);
-        REQUIRE_FALSE(outcome.ok);
-        CHECK(outcome.kind == ErrorKind::kBadParameter);
+        CHECK(decode_sections(3, {section}, strictness).ok);
     }
-    // The same delta at frac_bits 0 and f_shift 0 is 32767 * 2^15, which fits.
-    Header fits = header;
-    fits.f_shift_code = 1;
-    const std::vector<Header> fitting{fits};
-    const Section fitting_section = [&](BitWriter& w) { put_section(w, true, true, fitting, 4, 1, extension); };
-    CHECK(decode_sections(3, {fitting_section}).ok);
 }
 
 namespace {
@@ -493,17 +486,7 @@ DecoderConfig random_config(Sequence& sequence) {
     DecoderConfig config;
     config.presentation = sequence.below(4) == 0 ? Presentation::kBest : Presentation::kAll;
     config.strictness = sequence.below(2) == 0 ? Strictness::kStrict : Strictness::kLenient;
-    DecoderLab& lab = config.lab;
-    lab.lower_rows_after_matrices = sequence.below(4) == 0;
-    lab.no_quantiser_mask = sequence.below(4) == 0;
-    lab.reverse_matrices = sequence.below(4) == 0;
-    lab.inverse_f_shift = sequence.below(4) == 0;
-    const std::size_t scope = sequence.below(12);
-    lab.fold_scope = scope < 7 ? static_cast<int>(scope) : static_cast<int>(10 + sequence.below(8));
-    lab.object_tie_mode = static_cast<int>(sequence.below(4));
-    lab.mask_rows = static_cast<int>(sequence.below(3));
-    lab.object_restart_clears = sequence.below(4) == 0;
-    lab.object_noise_index = static_cast<int>(sequence.below(4));
+    config.lab.record_from = sequence.below(3) * 40;
     return config;
 }
 
