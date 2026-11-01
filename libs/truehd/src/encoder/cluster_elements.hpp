@@ -87,6 +87,7 @@ struct ClusterResult {
 
 // The bed-mix plan for a clustering: the free elements' placements at the boundaries, as
 // build_render_plan takes them.
-[[nodiscard]] RenderPlan make_render_plan(const ClusterResult& clustering);
+[[nodiscard]] RenderPlan make_render_plan(const ClusterResult& clustering,
+                                          PanLaw law = PanLaw::kRing);
 
 }  // namespace iclforge::truehd::detail

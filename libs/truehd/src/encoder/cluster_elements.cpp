@@ -434,14 +434,14 @@ std::expected<ClusterResult, ClusterError> cluster_objects(std::span<const Clust
     return result;
 }
 
-RenderPlan make_render_plan(const ClusterResult& clustering) {
+RenderPlan make_render_plan(const ClusterResult& clustering, PanLaw law) {
     std::vector<std::vector<ElementPlacement>> free_places;
     free_places.reserve(clustering.placements.size());
     for (const std::vector<ElementPlacement>& boundary : clustering.placements) {
         free_places.emplace_back(boundary.begin() + kRenderBedRows, boundary.end());
     }
     return build_render_plan(clustering.elements, clustering.section_samples,
-                             clustering.total_samples, free_places);
+                             clustering.total_samples, free_places, law);
 }
 
 }  // namespace iclforge::truehd::detail

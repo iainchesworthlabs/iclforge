@@ -7,6 +7,7 @@
 
 #include "encoder/render_plan.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
 
 // The render rule of the object encoder: where an element sits, how much of it each row of the 7.1
 // bed gets, and the matrices that carry those shares (libs/truehd/notes/
@@ -32,6 +33,18 @@ struct ElementPlacement {
 // The bed rows in stream order, and the LFE's, which no panning reaches.
 inline constexpr int kBedLfeRow = 3;
 
+// How a place becomes shares of the bed's rows. kRing pans by azimuth on the 7.1 ring, which is
+// what libs/render does on the decode side. kWall is fitted to the 7.1 presentation of the owner's
+// DEE controls ctl_e and ctl_k (notes, "Fourth reading"): the place is projected from the middle
+// of the room onto its walls, and between two neighbouring speakers on a wall the shares are the
+// cosine and sine of the position along it (constant power, linear in the wall's coordinate). On a
+// wall it agrees with those streams to about 0.03; inside the room it is only the projection, which
+// the streams (ctl_j, ctl_l spread an interior place over three or four speakers) do not support.
+enum class PanLaw : std::uint8_t {
+    kRing,
+    kWall,
+};
+
 // Where the speaker of a bed row sits on the room's wall: the place whose azimuth is the speaker's
 // own (30 degrees for L, 0 for C, 90 for Ls, 150 for Lrs, mirrored on the right), so that
 // pan_to_bed of it puts the whole signal on that row. Row 3 (the LFE) is at the centre of the
@@ -42,13 +55,14 @@ inline constexpr int kBedLfeRow = 3;
 // 7.1 ring (L 30, C 0, R -30, Ls 90, Rs -90, Lrs 150, Rrs -150 degrees, counter-clockwise from the
 // front), height ignored. The squares of the shares add up to 1; the LFE row is 0. A place at the
 // exact centre of the room has no direction and is rendered at the front.
-[[nodiscard]] std::array<double, kRenderBedRows> pan_to_bed(double x, double y,
-                                                            double z = 0.0) noexcept;
+[[nodiscard]] std::array<double, kRenderBedRows> pan_to_bed(double x, double y, double z = 0.0,
+                                                            PanLaw law = PanLaw::kRing) noexcept;
 
 // The gains of the free elements (8 and up) into the bed rows, for elements placed as given:
 // gain[row][k] = pan_to_bed(placement k)[row] times the placement's gain. Elements beyond
 // `free_elements.size()` get 0.
-[[nodiscard]] BedMixGains mix_gains(std::span<const ElementPlacement> free_elements) noexcept;
+[[nodiscard]] BedMixGains mix_gains(std::span<const ElementPlacement> free_elements,
+                                    PanLaw law = PanLaw::kRing) noexcept;
 
 // The plan for elements placed at the boundaries of sections: boundary s is the first sample of
 // section s, so there is one more boundary than there are sections, and `placements[s][k]` is the
@@ -57,7 +71,7 @@ inline constexpr int kBedLfeRow = 3;
 // the last, which ends at `total_samples`.
 [[nodiscard]] RenderPlan build_render_plan(
     int elements, std::int64_t section_samples, std::int64_t total_samples,
-    std::span<const std::vector<ElementPlacement>> placements);
+    std::span<const std::vector<ElementPlacement>> placements, PanLaw law = PanLaw::kRing);
 
 // The gains at one sample of the stream: the plan's trajectory in a straight line from the
 // boundary before the sample to the one after it. Held at the first and last boundary outside.
@@ -67,6 +81,13 @@ inline constexpr int kBedLfeRow = 3;
 // range of a signed coefficient of frac_bits + 2 bits. Gains are 0 to 1, so only a gain a little
 // above 1 can clip.
 [[nodiscard]] std::int32_t quantise_mix_gain(double gain, int frac_bits) noexcept;
+
+// The plan as the encoder takes it (EncoderConfig::object_paths): one path for each free element k,
+// for the object 8 + k, with a knot at every section boundary holding round(gain * 2^16) into each
+// bed row. Straight lines between the knots, so the trajectory is the plan's. A gain beyond the
+// encoder's +-1.98 is held at it. Free elements the plan has no gain for (past its elements) get
+// no path.
+[[nodiscard]] std::vector<ObjectPath> object_paths_of(const RenderPlan& plan);
 
 // The matrices of the 8 bed rows for one set of gains, in row order: bed row j becomes the row it
 // holds less the share of each coded element (own coefficient +1.0, -gain on row 8 + k, frac_bits

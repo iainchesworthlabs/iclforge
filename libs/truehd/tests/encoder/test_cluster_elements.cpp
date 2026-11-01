@@ -17,6 +17,7 @@
 #include "encoder/render_bed.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
 
 // The clustering step and the render of the object encoder (libs/truehd/notes/
 // feature-truehd-atmos-encoder-render.md): objects with positions become 12, 14 or 16 elements, the
@@ -220,14 +221,16 @@ TEST_CASE("the crossing's bed matrices, a block at a time, rebuild the elements 
                               signal.begin() + static_cast<std::ptrdiff_t>(start + kBlock));
         }
         const std::vector<ObjectPlane> elements = rows;
-        std::vector<std::vector<std::uint8_t>> bypass;
-        REQUIRE(invert_object_chain(chain, shape, rows, bypass));
+        ObjectTimeline timeline;
+        timeline.blocks.push_back(ObjectBlock{0, static_cast<int>(kBlock), chain, false, {}});
+        ObjectBypass bypass;
+        REQUIRE(invert_object_timeline(timeline, shape, rows, bypass));
         for (std::size_t row = 0; row < kBedRows; ++row) {
             for (std::size_t t = 0; t < kBlock; ++t) {
                 decoded[row][start + t] = rows[row][t];
             }
         }
-        apply_object_chain(chain, shape, bypass, rows);
+        apply_object_timeline(timeline, shape, bypass, rows);
         REQUIRE(rows == elements);
     }
     const double db = error_db(intended_bed(objects, samples), decoded);
@@ -486,6 +489,57 @@ TEST_CASE("clustering refuses what it cannot cluster",
     CHECK(none->signals.size() == 12);
 }
 
+TEST_CASE("the crossing is written with the plan's paths and its bed is close to the intended one, "
+          "12, 14 and 16",
+          "[truehd][encoder][atmos][render][cluster]") {
+    const int elements = GENERATE(12, 14, 16);
+    CAPTURE(elements);
+    const std::size_t samples = 24000;
+    const std::vector<std::int32_t> a_pcm = tone(samples, 440.0, 2.0e6);
+    const std::vector<std::int32_t> b_pcm = tone(samples, 1130.0, 1.5e6);
+    std::vector<ClusterObject> objects(2);
+    objects[0].pcm = a_pcm;
+    objects[0].keys = {key(0, 0.2, 0.25), key(23999, 0.8, 0.45)};
+    objects[1].pcm = b_pcm;
+    objects[1].keys = {key(0, 0.2, 0.45), key(23999, 0.8, 0.25)};
+    ClusterConfig config = config_of(elements);
+    config.section_samples = 480;
+    const ClusterResult result = cluster(objects, config);
+    const RenderPlan plan = make_render_plan(result);
+
+    EncoderConfig writer;
+    writer.channels = 8;
+    writer.object_channels = elements;
+    writer.object_layout = ObjectLayout::kBedMatrices;
+    writer.object_meaning.dyn_object_only = true;
+    writer.object_meaning.lfe_present = true;
+    writer.object_paths = object_paths_of(plan);
+    writer.verify = true;
+    std::vector<std::int32_t> interleaved(samples * static_cast<std::size_t>(elements));
+    for (std::size_t t = 0; t < samples; ++t) {
+        for (std::size_t e = 0; e < static_cast<std::size_t>(elements); ++e) {
+            interleaved[t * static_cast<std::size_t>(elements) + e] = result.signals[e][t];
+        }
+    }
+    const Encoded encoded = encode_all(writer, interleaved);
+    REQUIRE_FALSE(encoded.units.empty());
+    CHECK(encoded.stats.verified_units == encoded.units.size());
+    CHECK(encoded.stats.object_mix_reduced_intervals == 0);
+    // substream 3 gives the elements back, and the 7.1 bed of substreams 0 to 2 is the plan's
+    CHECK(decode_all(encoded.units, 24, elements, Presentation::kAll) == interleaved);
+    const std::vector<std::int32_t> bed = decode_all(encoded.units, 24, 8);
+    REQUIRE(bed.size() >= samples * kBedRows);
+    std::vector<std::vector<double>> decoded(kBedRows, std::vector<double>(samples, 0.0));
+    for (std::size_t t = 0; t < samples; ++t) {
+        for (std::size_t row = 0; row < kBedRows; ++row) {
+            decoded[row][t] = bed[t * kBedRows + row];
+        }
+    }
+    const double db = error_db(intended_bed(objects, samples), decoded);
+    CAPTURE(db);
+    CHECK(db < -35.0);
+}
+
 TEST_CASE("clustered elements are written as substream 3 and decode losslessly, 12, 14 and 16",
           "[truehd][encoder][atmos][render][cluster]") {
     const int elements = GENERATE(12, 14, 16);
@@ -542,6 +596,10 @@ TEST_CASE("clustered elements are written as substream 3 and decode losslessly, 
     writer.object_meaning.dyn_object_only = true;
     writer.object_meaning.lfe_present = true;
     writer.verify = true;
+    // the bed the plan asks for, not the fixed render: the plan's gains as the encoder's paths
+    // (the signals are written a quarter their size, the gains are not)
+    writer.object_paths = object_paths_of(make_render_plan(result));
+    CHECK(writer.object_paths.size() == static_cast<std::size_t>(elements - kRenderBedRows));
     const Encoded encoded = encode_all(writer, interleaved);
     REQUIRE_FALSE(encoded.units.empty());
     CHECK(encoded.stats.verified_units == encoded.units.size());

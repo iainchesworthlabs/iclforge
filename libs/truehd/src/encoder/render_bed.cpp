@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace iclforge::truehd::detail {
 
@@ -65,8 +66,57 @@ ElementPlacement bed_speaker_placement(int row) noexcept {
     return placement;
 }
 
-std::array<double, kRenderBedRows> pan_to_bed(double x, double y, double z) noexcept {
+namespace {
+
+// The speakers round the room's wall in order, with their places in the metadata's cube (x -1 left
+// to 1 right, y -1 rear to 1 front): L C R Rs Rrs Lrs Ls, back to L.
+struct WallSpeaker {
+    int row;
+    double x;
+    double y;
+};
+constexpr std::array<WallSpeaker, 7> kWall{{
+    {0, -1.0, 1.0},   // L
+    {2, 0.0, 1.0},    // C
+    {1, 1.0, 1.0},    // R
+    {5, 1.0, 0.0},    // Rs
+    {7, 1.0, -1.0},   // Rrs
+    {6, -1.0, -1.0},  // Lrs
+    {4, -1.0, 0.0},   // Ls
+}};
+
+[[nodiscard]] std::array<double, kRenderBedRows> pan_wall(double x, double y) noexcept {
+    std::array<double, kRenderBedRows> gains{};
+    // room coordinates to the metadata's cube, then out along the ray from the middle to the wall
+    const double cx = 2.0 * x - 1.0;
+    const double cy = 1.0 - 2.0 * y;
+    const double reach = std::max(std::abs(cx), std::abs(cy));
+    const double px = reach < kCentreEpsilon ? 0.0 : cx / reach;
+    const double py = reach < kCentreEpsilon ? 1.0 : cy / reach;
+    for (std::size_t i = 0; i < kWall.size(); ++i) {
+        const WallSpeaker& a = kWall[i];
+        const WallSpeaker& b = kWall[(i + 1) % kWall.size()];
+        const double dx = b.x - a.x;
+        const double dy = b.y - a.y;
+        const double t = ((px - a.x) * dx + (py - a.y) * dy) / (dx * dx + dy * dy);
+        const double off = std::abs((px - a.x) * dy - (py - a.y) * dx);
+        if (t >= -kCentreEpsilon && t <= 1.0 + kCentreEpsilon && off < 1e-9) {
+            const double u = std::clamp(t, 0.0, 1.0) * (std::numbers::pi / 2.0);
+            gains[static_cast<std::size_t>(a.row)] = std::cos(u);
+            gains[static_cast<std::size_t>(b.row)] = std::sin(u);
+            break;
+        }
+    }
+    return gains;
+}
+
+}  // namespace
+
+std::array<double, kRenderBedRows> pan_to_bed(double x, double y, double z, PanLaw law) noexcept {
     static_cast<void>(z);  // the legacy bed has no height: see the header
+    if (law == PanLaw::kWall) {
+        return pan_wall(x, y);
+    }
     std::array<double, kRenderBedRows> gains{};
     const double left = 0.5 - x;
     const double forward = 0.5 - y;
@@ -102,12 +152,12 @@ std::array<double, kRenderBedRows> pan_to_bed(double x, double y, double z) noex
     return gains;
 }
 
-BedMixGains mix_gains(std::span<const ElementPlacement> free_elements) noexcept {
+BedMixGains mix_gains(std::span<const ElementPlacement> free_elements, PanLaw law) noexcept {
     BedMixGains gains{};
     const std::size_t count = std::min(free_elements.size(), gains[0].size());
     for (std::size_t k = 0; k < count; ++k) {
         const ElementPlacement& place = free_elements[k];
-        const auto pan = pan_to_bed(place.x, place.y, place.z);
+        const auto pan = pan_to_bed(place.x, place.y, place.z, law);
         for (std::size_t row = 0; row < gains.size(); ++row) {
             gains[row][k] = pan[row] * place.gain;
         }
@@ -117,7 +167,8 @@ BedMixGains mix_gains(std::span<const ElementPlacement> free_elements) noexcept 
 
 RenderPlan build_render_plan(int elements, std::int64_t section_samples,
                              std::int64_t total_samples,
-                             std::span<const std::vector<ElementPlacement>> placements) {
+                             std::span<const std::vector<ElementPlacement>> placements,
+                             PanLaw law) {
     RenderPlan plan;
     plan.elements = elements;
     if (section_samples <= 0 || total_samples <= 0) {
@@ -131,7 +182,7 @@ RenderPlan build_render_plan(int elements, std::int64_t section_samples,
         const std::vector<ElementPlacement>& at =
             placements[std::min(boundary, placements.size() - 1)];
         return mix_gains(
-            std::span<const ElementPlacement>(at).first(std::min(at.size(), free_count)));
+            std::span<const ElementPlacement>(at).first(std::min(at.size(), free_count)), law);
     };
     const std::int64_t sections = (total_samples + section_samples - 1) / section_samples;
     plan.sections.reserve(static_cast<std::size_t>(sections));
@@ -170,6 +221,34 @@ std::int32_t quantise_mix_gain(double gain, int frac_bits) noexcept {
     const double raw = std::nearbyint(gain * static_cast<double>(std::int64_t{1} << frac_bits));
     const double limit = static_cast<double>(std::int64_t{1} << (frac_bits + 1));
     return static_cast<std::int32_t>(std::clamp(raw, -limit, limit - 1.0));
+}
+
+std::vector<ObjectPath> object_paths_of(const RenderPlan& plan) {
+    constexpr std::int32_t kMaxGain = 130000;  // the encoder's limit, +-1.98
+    std::vector<ObjectPath> paths;
+    const int free_count = std::clamp(plan.elements - kRenderBedRows, 0, kRenderMaxFree);
+    const auto scale = static_cast<double>(std::int64_t{1} << kObjectGainBits);
+    const auto knot_of = [&](std::int64_t sample, const BedMixGains& gains, std::size_t k) {
+        ObjectGainKnot knot;
+        knot.sample = sample;
+        for (std::size_t row = 0; row < gains.size(); ++row) {
+            const auto value = static_cast<std::int32_t>(std::nearbyint(gains[row][k] * scale));
+            knot.gain[row] = std::clamp(value, -kMaxGain, kMaxGain);
+        }
+        return knot;
+    };
+    for (int k = 0; k < free_count && !plan.sections.empty(); ++k) {
+        ObjectPath path;
+        path.object = kRenderBedRows + k;
+        const auto element = static_cast<std::size_t>(k);
+        for (const RenderSection& section : plan.sections) {
+            path.knots.push_back(knot_of(section.start, section.begin, element));
+        }
+        const RenderSection& last = plan.sections.back();
+        path.knots.push_back(knot_of(last.start + last.samples, last.end, element));
+        paths.push_back(std::move(path));
+    }
+    return paths;
 }
 
 std::vector<MatrixSpec> bed_mix_matrices(const BedMixGains& gains, int elements, int noise_shift) {
