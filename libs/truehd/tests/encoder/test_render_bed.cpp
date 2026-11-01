@@ -77,6 +77,93 @@ TEST_CASE("the bed panner keeps power, leaves the LFE alone and ignores height",
     CHECK(pan_to_bed(0.5, 0.5)[2] == Approx(1.0));
 }
 
+TEST_CASE("the wall pan law follows the shares of the owner's 7.1 presentations on a wall",
+          "[truehd][encoder][atmos][render]") {
+    // Normalised shares (each row's share of the vector's length) read from the 8 channel decode
+    // of two DEE controls, a 1 kHz object moving along the front wall (ctl_e) and along the left
+    // wall (ctl_k), at the window centres 1, 3, 7 and 9 s (ctl_e) and 1, 3, 5, 7 and 9 s (ctl_k).
+    // Statistics of the owner's streams, no audio. Positions in the metadata's cube (x -1 left to
+    // 1 right, y -1 rear to 1 front) become room positions by x = (dx + 1) / 2, y = (1 - dy) / 2.
+    struct Share {
+        double dx;
+        double dy;
+        std::array<double, kBedRows> row;  // L R C LFE Ls Rs Lrs Rrs
+    };
+    constexpr std::array<Share, 9> kShares{{
+        {-0.8, 1.0, {0.950, 0, 0.314, 0, 0, 0, 0, 0}},
+        {-0.4, 1.0, {0.579, 0, 0.815, 0, 0, 0, 0, 0}},
+        {0.4, 1.0, {0, 0.588, 0.809, 0, 0, 0, 0, 0}},
+        {0.8, 1.0, {0, 0.954, 0.300, 0, 0, 0, 0, 0}},
+        {-1.0, 0.8, {0.950, 0, 0, 0, 0.313, 0, 0, 0}},
+        {-1.0, 0.4, {0.580, 0, 0, 0, 0.814, 0, 0, 0}},
+        {-1.0, 0.0, {0, 0, 0, 0, 1.000, 0, 0, 0}},
+        {-1.0, -0.4, {0, 0, 0, 0, 0.819, 0, 0.574, 0}},
+        {-1.0, -0.8, {0, 0, 0, 0, 0.302, 0, 0.953, 0}},
+    }};
+    double worst_wall = 0.0;
+    double worst_ring = 0.0;
+    for (const Share& share : kShares) {
+        const double x = (share.dx + 1.0) / 2.0;
+        const double y = (1.0 - share.dy) / 2.0;
+        const auto wall = pan_to_bed(x, y, 0.0, PanLaw::kWall);
+        const auto ring = pan_to_bed(x, y, 0.0, PanLaw::kRing);
+        for (std::size_t r = 0; r < kBedRows; ++r) {
+            worst_wall = std::max(worst_wall, std::abs(wall[r] - share.row[r]));
+            worst_ring = std::max(worst_ring, std::abs(ring[r] - share.row[r]));
+        }
+    }
+    CAPTURE(worst_wall, worst_ring);
+    CHECK(worst_wall < 0.04);
+    CHECK(worst_ring > 0.15);  // the azimuth ring is the decode side's law, not these streams'
+}
+
+TEST_CASE("the wall pan law keeps power, passes the speakers and is continuous round the room",
+          "[truehd][encoder][atmos][render]") {
+    // the speakers' own places, in room coordinates, pan to their own rows
+    struct Place {
+        double x;
+        double y;
+        std::size_t row;
+    };
+    constexpr std::array<Place, 7> kPlaces{{{0.0, 0.0, 0},
+                                            {1.0, 0.0, 1},
+                                            {0.5, 0.0, 2},
+                                            {0.0, 0.5, 4},
+                                            {1.0, 0.5, 5},
+                                            {0.0, 1.0, 6},
+                                            {1.0, 1.0, 7}}};
+    for (const Place& place : kPlaces) {
+        const auto gains = pan_to_bed(place.x, place.y, 0.0, PanLaw::kWall);
+        for (std::size_t r = 0; r < kBedRows; ++r) {
+            CAPTURE(place.row, r);
+            CHECK(gains[r] == Approx(r == place.row ? 1.0 : 0.0).margin(1e-9));
+        }
+    }
+    // power 1 anywhere, the LFE never, and no jump between neighbouring places
+    std::array<double, kBedRows> previous = pan_to_bed(0.0, 0.0, 0.0, PanLaw::kWall);
+    double largest = 0.0;
+    for (int step = 1; step <= 400; ++step) {
+        // once round the walls: the perimeter of the unit square, 4 sides of 100 steps
+        const int side = (step - 1) / 100;
+        const double f = static_cast<double>((step - 1) % 100 + 1) / 100.0;
+        const double x = side == 0 ? f : (side == 1 ? 1.0 : (side == 2 ? 1.0 - f : 0.0));
+        const double y = side == 0 ? 0.0 : (side == 1 ? f : (side == 2 ? 1.0 : 1.0 - f));
+        const auto gains = pan_to_bed(x, y, 0.0, PanLaw::kWall);
+        double power = 0.0;
+        for (std::size_t r = 0; r < kBedRows; ++r) {
+            power += gains[r] * gains[r];
+            largest = std::max(largest, std::abs(gains[r] - previous[r]));
+        }
+        CHECK(power == Approx(1.0).margin(1e-9));
+        CHECK(gains[static_cast<std::size_t>(kBedLfeRow)] == 0.0);
+        previous = gains;
+    }
+    CHECK(largest < 0.05);
+    // the middle of the room is at the front; a place off a wall is its projection onto the wall
+    CHECK(pan_to_bed(0.5, 0.5, 0.0, PanLaw::kWall)[2] == Approx(1.0));
+    CHECK(pan_to_bed(0.25, 0.25, 0.0, PanLaw::kWall) == pan_to_bed(0.0, 0.0, 0.0, PanLaw::kWall));
+}
+
 TEST_CASE("a speaker's wall position pans to its own row and to no other",
           "[truehd][encoder][atmos][render]") {
     for (const int row : {0, 1, 2, 4, 5, 6, 7}) {
@@ -229,7 +316,7 @@ TEST_CASE("the bed-row matrices run backwards exactly and give the definition's 
     shape.units = 4;
     shape.nominal = 40;
     std::vector<ObjectPlane> rows = elements;
-    std::vector<std::vector<std::uint8_t>> bypass;
+    ObjectBypass bypass;
     REQUIRE(invert_object_chain(chain, shape, rows, bypass));
 
     // bed row j = element j less the matrix's floor of (sum of -raw * element * 8) / 2^15, which is
