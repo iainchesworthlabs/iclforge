@@ -130,10 +130,10 @@ stream; that is tested on synthetic carriers, and no capture device or receiver 
 
 ### TrueHD (MAT)
 
-!!! warning "One receiver reported TrueHD; the owner did not see it on the display; the library's own sink is not run"
+!!! warning "One receiver reported and displayed TrueHD; the library's own sink is not run"
     On 2026-11-01 a WAV made by `forge spdif` and played with `aplay` on a Raspberry Pi 4B (vc4hdmi0, ALSA) into an Onkyo TX-RZ740 was reported as
-    TrueHD by the receiver's eISCP status ("Dolby Audio - TrueHD, 48 kHz, 5.1 ch"), but the owner did not see "TrueHD" on its LCD, so the carrier below
-    is not yet confirmed.
+    TrueHD by the receiver's eISCP status ("Dolby Audio - TrueHD, 48 kHz, 5.1 ch"), and its LCD showed "DD DTHD 2.0" (the receiver's abbreviation, to be confirmed
+    by the owner), at 48 kHz and 96 kHz content. The carrier below worked for that receiver.
     The library's `PassthroughSink` path and PipeWire have **not been run against a receiver**, and the receiver took 1.5 to 4.5 seconds to lock
     from the start of the carrier. The code does what the carrier decision of 2026-10-29
     says, which is itself provisional ([libs/containers/ERRATA.md](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md),
