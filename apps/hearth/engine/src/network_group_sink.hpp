@@ -84,8 +84,13 @@ public:
         std::uint16_t objects = 0;
         // ItemFacts::objects_alone.
         bool objects_alone = false;
-        // ItemFacts::frame_rate; 0 when not known.
+        // ItemFacts::frame_rate, in chunks a second (a TrueHD chunk is up to 24 access units, so
+        // 1,200 units a second is 50); 0 when not known.
         double frame_rate = 0.0;
+        // ItemFacts::peak_kbps; 0 when not known.
+        std::uint32_t peak_kbps = 0;
+        // ItemFacts::presentations; empty when not known or not TrueHD.
+        std::vector<std::uint16_t> presentations{};
         // The karaoke reproduction the item is to be heard in, when it is a karaoke stream and
         // one is wanted (StreamNeeds::karaoke).
         std::optional<KaraokeChoice> karaoke{};
@@ -97,6 +102,9 @@ public:
     // submit_pcm_variants() in this order. Empty for a group that plays one
     // layout, or before open().
     [[nodiscard]] virtual std::vector<render::OutputLayout> variants() const { return {}; }
+    // The first substreams of a TrueHD stream the group's coded members are sent, when the plan cut
+    // it to a lower presentation; 0 for the whole stream.
+    [[nodiscard]] virtual int coded_substreams() const { return 0; }
 
     // Opens `group_name` - resolved against whatever this sink was built
     // with (make_group_sink()'s `resolve`), not a fixed group chosen once at
@@ -220,10 +228,28 @@ struct GroupPlanRequest {
     std::uint16_t objects = 0;
     bool objects_alone = false;
     double frame_rate = 0.0;
+    std::uint32_t peak_kbps = 0;
+    std::vector<std::uint16_t> presentations{};
     // As NetworkGroupSink::Format::karaoke.
     std::optional<KaraokeChoice> karaoke{};
     // The layout the player renders to, which a member that wants it is sent.
     render::OutputLayout layout{};
+};
+
+// What a MemberPlanner answers: the layouts, beyond the request's, that the members chosen for PCM
+// take; and the rate they take it at when that is not the stream's, which the group's sink then
+// converts to (dsp::StreamResampler). A list of layouts alone is a plan with no conversion.
+struct GroupPlan {
+    std::vector<render::OutputLayout> variants{};
+    std::uint32_t pcm_rate = 0;
+    // GroupFormPlan::coded_substreams: the first substreams of a TrueHD stream the members sent it
+    // coded get, when not all of them.
+    int coded_substreams = 0;
+
+    GroupPlan() = default;
+    // NOLINTNEXTLINE(google-explicit-constructor): a planner that has no rate to change answers a list.
+    GroupPlan(std::vector<render::OutputLayout> layouts, std::uint32_t rate = 0)
+        : variants(std::move(layouts)), pcm_rate(rate) {}
 };
 
 // Decides, for each member of a group, the form it is sent the programme in
@@ -231,8 +257,7 @@ struct GroupPlanRequest {
 // the layouts, beyond the request's, that the members chosen for PCM are to
 // get. Called when a group opens, on the engine's thread. With none, the
 // group plays PCM at the player's layout to whichever members take it.
-using MemberPlanner =
-    std::function<std::vector<render::OutputLayout>(const GroupPlanRequest& request)>;
+using MemberPlanner = std::function<GroupPlan(const GroupPlanRequest& request)>;
 
 // Tells the members of group `group_id` that decode for themselves how to reproduce a karaoke
 // stream, for a choice made while it plays (NetworkGroupSink::set_karaoke()).

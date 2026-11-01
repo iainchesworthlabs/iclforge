@@ -31,7 +31,8 @@ target_link_libraries(iclforge_sink PRIVATE iclforge::warnings iclforge::coverag
 add_library(iclforge_sink_decode STATIC src/decoding_output.cpp)
 add_library(iclforge::sink_decode ALIAS iclforge_sink_decode)
 target_link_libraries(iclforge_sink_decode PUBLIC iclforge::sink iclforge::ac3 iclforge::ac4
-                                                  iclforge::containers iclforge::objects iclforge::render)
+                                                  iclforge::containers iclforge::objects iclforge::render
+                                                  iclforge::truehd)
 target_link_libraries(iclforge_sink_decode PRIVATE iclforge::warnings iclforge::coverage)
 
 # The pass-through output (include/iclforge/sink/passthrough.hpp): a burst output that rebuilds each

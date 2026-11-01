@@ -123,7 +123,7 @@ struct MadeStream {
 
 inline MadeStream make_stream(int channels, std::uint64_t frames, std::uint32_t sample_rate = 48000,
                               int restart_interval_units = 128, std::uint32_t seed = 7,
-                              int silent_channel = -1) {
+                              int silent_channel = -1, bool downmix = false) {
     MadeStream out;
     out.channels = channels;
     out.frames = frames;
@@ -156,6 +156,11 @@ inline MadeStream make_stream(int channels, std::uint64_t frames, std::uint32_t 
     config.channels = channels;
     config.bits = 24;
     config.restart_interval_units = restart_interval_units;
+    // Substream 0 a stereo downmix, substream 1 the 5.1 (TH spec section 2.2), the later substreams'
+    // matrices taking them apart again.
+    if (downmix) {
+        config.downmix = iclforge::truehd::DownmixMode::kStandard;
+    }
     auto encoder = iclforge::truehd::Encoder::create(config);
     REQUIRE(encoder.has_value());
     out.samples_per_unit = encoder->samples_per_access_unit();

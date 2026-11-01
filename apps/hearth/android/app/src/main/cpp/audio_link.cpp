@@ -24,6 +24,7 @@ namespace ac = sendspin::player;
         case ac::DataType::kEac3:
             return audio::BitstreamFormat::kEac3;
         case ac::DataType::kAc4:
+        case ac::DataType::kTruehd:  // access units, not IEC 61937 bursts: this link does not take them
             break;
     }
     return std::nullopt;

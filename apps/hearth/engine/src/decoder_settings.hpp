@@ -114,7 +114,24 @@ enum class DualMonoChoice : std::uint8_t {
     kSecond,
 };
 
+// Which of a file's audio tracks plays when it holds more than one, which a Blu-ray remux does: TrueHD
+// first, and AC-3 or E-AC-3 after it. Hearth decodes TrueHD here but cannot yet send it on as it is
+// (planning/truehd-parity-hearth-player.md, H6), so an output that takes a bitstream is better
+// served by the compressed track until it can.
+enum class TrackPreference : std::uint8_t {
+    // The compressed (AC-3, E-AC-3 or AC-4) track where the output decision for it is a bitstream
+    // to the output Hearth has open; otherwise the best track, which is the first Hearth can play.
+    kAutomatic,
+    // The first track Hearth can play, whatever the output.
+    kBest,
+    // The first AC-3, E-AC-3 or AC-4 track, whatever the output.
+    kCompressed,
+};
+
 struct DecoderSettings {
+    // See TrackPreference. Applied when an item opens, as `programme` is, so it is not part of the
+    // decoder configuration.
+    TrackPreference track = TrackPreference::kAutomatic;
     // §7.7's operating mode. kLine and kRf each fix the dynamic range
     // handling and normalise dialogue; kCustom uses the four switches below.
     ac3::OperatingMode mode = ac3::OperatingMode::kLine;

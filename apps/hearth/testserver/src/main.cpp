@@ -36,12 +36,14 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/number_parse.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/handshake.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/json.hpp"
 #include "iclforge/sendspin/messages.hpp"
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 #include "server_store.hpp"
 #include "sink.hpp"
 
@@ -89,7 +91,8 @@ _iclforge_player@v1, and writes a report of what each said about it.
     --opus             with --pcm, in Opus (20 ms packets) where the player
                        lists it, a twelfth of PCM's bytes and lossy
 
-  --play FILE          the programme, an .ac3, .ec3 or .ac4 file (AC-4 is sent as one
+  --play FILE          the programme, an .ac3, .ec3, .ac4 or .thd file (a TrueHD stream is sent
+                       as access units, 24 to a chunk; AC-4 is sent as one
                        sync frame a burst, at 48 kHz, and a player that lists no `ac4`
                        refuses it)
   --tone               instead of a file, two tones at 48 kHz stereo for
@@ -362,6 +365,9 @@ class BurstSource {
 // data-burst periods IEC 61937-14 writes them with. Packed once, so that every pass has the same
 // bursts and the next starts where the last ended.
 struct Ac4Programme {
+    // The data type the frames are sent as: AC-4's sync frames, or a TrueHD programme's chunks of
+    // access units (read_truehd_programme()), which are packed the same way for this tool's purposes.
+    ac::DataType data_type = ac::DataType::kAc4;
     struct Frame {
         // The sync frame whole, the CRC word included: a view into the file's bytes.
         std::span<const std::byte> sync_frame;
@@ -375,6 +381,69 @@ struct Ac4Programme {
     std::uint64_t pass_samples = 0;
     std::uint32_t sample_rate = 0;
 };
+
+// Whether `bytes` opens with a TrueHD or MLP access unit: a check nibble and a length, a timing word,
+// and a major sync (TH spec section 4.2).
+[[nodiscard]] bool starts_truehd(std::span<const std::byte> bytes) {
+    return bytes.size() >= 8 && bytes[4] == std::byte{0xF8} && bytes[5] == std::byte{0x72} &&
+           bytes[6] == std::byte{0x6F} && (bytes[7] == std::byte{0xBA} || bytes[7] == std::byte{0xBB});
+}
+
+// A TrueHD programme (planning/truehd-parity-hearth-player.md, H5): the stream's access units, 24 to a
+// chunk (sendspin::kTruehdUnitsPerChunk), each chunk a burst of Pc 22 and a Pd in bytes, on the
+// timeline of the units' samples. The chunk's payload is a view of the file: its units are
+// contiguous there. Shaped as an Ac4Programme so that the same source sends it.
+[[nodiscard]] std::optional<Ac4Programme> read_truehd_programme(std::span<const std::byte> bytes,
+                                                                std::string& error) {
+    const auto major = iclforge::truehd::parse_major_sync(bytes.subspan(4));
+    if (!major) {
+        error = "its first access unit's major sync does not read";
+        return std::nullopt;
+    }
+    if (major->kind != iclforge::truehd::StreamKind::kTrueHd) {
+        error = "it is MLP, which has no data type on the network";
+        return std::nullopt;
+    }
+    Ac4Programme out;
+    out.data_type = ac::DataType::kTruehd;
+    out.sample_rate = major->sample_rate();
+    const std::uint64_t unit_samples = 40U * (out.sample_rate / (out.sample_rate % 44100U == 0 ? 44100U : 48000U));
+    std::size_t at = 0;
+    std::size_t chunk_start = 0;
+    std::size_t units = 0;
+    const auto close_chunk = [&](std::size_t end) {
+        if (units == 0) {
+            return;
+        }
+        const std::span<const std::byte> payload = bytes.subspan(chunk_start, end - chunk_start);
+        out.frames.push_back({.sync_frame = payload,
+                              .pc = static_cast<std::uint16_t>(ss::BurstDataType::kTruehd),
+                              .pd = static_cast<std::uint16_t>(payload.size()),
+                              .payload_bytes = payload.size(),
+                              .period = units * unit_samples});
+        out.pass_samples += units * unit_samples;
+        units = 0;
+        chunk_start = end;
+    };
+    while (at + 4 <= bytes.size()) {
+        const std::size_t words = ((std::to_integer<std::size_t>(bytes[at]) & 0x0FU) << 8U) |
+                                  std::to_integer<std::size_t>(bytes[at + 1]);
+        const std::size_t size = words * 2;
+        if (size < 4 || at + size > bytes.size()) {
+            break;
+        }
+        at += size;
+        if (++units == ss::kTruehdUnitsPerChunk) {
+            close_chunk(at);
+        }
+    }
+    close_chunk(at);
+    if (out.frames.empty()) {
+        error = "it holds no whole access unit";
+        return std::nullopt;
+    }
+    return out;
+}
 
 // Whether `bytes` opens with an AC-4 sync word, 0xAC40 or 0xAC41.
 [[nodiscard]] bool starts_ac4(std::span<const std::byte> bytes) {
@@ -1190,9 +1259,10 @@ int main(int argc, char** argv) {
             std::cerr << "cannot read " << programme.string() << "\n";
             return kExitUsage;
         }
-        if (starts_ac4(*bytes)) {
+        if (starts_ac4(*bytes) || starts_truehd(*bytes)) {
             std::string why;
-            ac4_programme = read_ac4_programme(*bytes, why);
+            const bool truehd = starts_truehd(*bytes);
+            ac4_programme = truehd ? read_truehd_programme(*bytes, why) : read_ac4_programme(*bytes, why);
             if (!ac4_programme) {
                 std::cerr << programme.string() << ": " << why << "\n";
                 return kExitUsage;
@@ -1203,7 +1273,7 @@ int main(int argc, char** argv) {
                 return kExitUsage;
             }
             pass_samples = ac4_programme->pass_samples;
-            info = {.file = programme.generic_string(), .codec = "AC-4", .channels = 0};
+            info = {.file = programme.generic_string(), .codec = truehd ? "TrueHD" : "AC-4", .channels = 0};
         } else {
             std::expected<iclforge::ac3::io::ScannedStream, iclforge::ac3::io::ScanError> scanned =
                 iclforge::ac3::io::scan(*bytes);
@@ -1354,7 +1424,7 @@ int main(int argc, char** argv) {
     const std::int32_t kToneBitDepth = tone_bits;
     const bool from_file = stream.has_value() || ac4_programme.has_value();
     const ac::DataType data_type =
-        ac4_programme.has_value()                                          ? ac::DataType::kAc4
+        ac4_programme.has_value()                                          ? ac4_programme->data_type
         : from_file && stream->kind == iclforge::ac3::io::StreamKind::kAc3 ? ac::DataType::kAc3
                                                                            : ac::DataType::kEac3;
     ss::Group::Programme group_programme{
