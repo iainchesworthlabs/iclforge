@@ -42,6 +42,7 @@ Dialog {
         // extension, so this list is a convenience for the picker only.
         nameFilters: [qsTr("AC-3 / E-AC-3 (*.ac3 *.ec3)"),
                      qsTr("AC-4 (*.ac4)"),
+                     qsTr("TrueHD / MLP (*.thd *.mlp)"),
                      qsTr("Containers (*.mkv *.webm *.mp4 *.m4a *.mov *.ts *.m2ts)"),
                      qsTr("All files (*)")]
         onAccepted: QcController.measureFile(selectedFile)
@@ -216,6 +217,20 @@ Dialog {
                     font.family: Theme.monoFamily
                     font.weight: Font.DemiBold
                     color: Theme.text
+                }
+
+                // TrueHD and MLP: the integrity gate `forge qc` runs, as a verdict and what it
+                // counted. Other streams have none.
+                Text {
+                    objectName: "qcIntegrityText"
+                    visible: QcController.hasIntegrity
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: (QcController.integrityOk ? qsTr("Integrity: PASS") : qsTr("Integrity: FAIL"))
+                          + " · " + QcController.integrityText
+                    font.pixelSize: Theme.fontSmall
+                    font.family: Theme.monoFamily
+                    color: QcController.integrityOk ? Theme.good : Theme.bad
                 }
 
                 Repeater {
