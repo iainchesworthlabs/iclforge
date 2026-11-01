@@ -1,0 +1,6213 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A clean-room AC-3 / E-AC-3 / AC-4 / Dolby Atmos codec library and a TrueHD / MLP codec in C++23, the Forge CLI and GUI over them, Crucible, a desktop per-application Atmos mixer, and Hearth, the player and its network sinks">
+      
+      
+      
+        <link rel="canonical" href="https://iainchesworthlabs.github.io/iclforge/karaoke/">
+      
+      
+        <link rel="prev" href="../library/rust-api/">
+      
+      
+        <link rel="next" href="forced-alignment/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Guide - ICL Forge</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"IBM Plex Sans";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../stylesheets/new.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#karaoke" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="ICL Forge" class="md-header__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ICL Forge
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+  
+
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../quickstart/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../library/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Library
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Karaoke
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../verification/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Validation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../performance-quality/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Performance & quality
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../forge/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Forge
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../crucible/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Crucible
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../hearth/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hearth
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../platforms/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Platforms
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ICL Forge" class="md-nav__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ICL Forge
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/ac3-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-3 & E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/atmos-joc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atmos & JOC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/object-signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/truehd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD & MLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building from source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../library/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Library
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The projects of the tree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/development-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/application-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the library
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example programs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/encoding-ac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/encoding-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/decoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/spatial-and-atmos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial & Atmos objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/station-broadcast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example — station broadcast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/channel-plans-and-routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel plans & routing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/muxing-and-sinks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Muxing & sinks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/file-io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/iab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAB (SMPTE ST 2098-2) reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/adm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM / BW64 reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/adm-bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM → Atmos bridging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/iamf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAMF reading and writing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4 decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/truehd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD and MLP decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measuring quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/header-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Header map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/api-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bindings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/c-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/rust-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="./" class="md-nav__link md-nav__link--active">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link md-nav__link--active" for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Karaoke
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="forced-alignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timing with a forced aligner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How output is checked
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conformance-vectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformance vectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance & quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance & quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../truehd-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD against FFmpeg and DEE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tool-comparison-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tool comparison trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../object-quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../landscape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Landscape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../forge/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forge
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forge
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../forge/cli/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/cli/commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/cli/metadata-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options & grammars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../forge/gui/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    GUI guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/loading-a-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loading a source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/format-and-channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format & channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/objects-and-motion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects & motion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/live-session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live capture & session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/source-assignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-source & assignment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/karaoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/coding-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QC a stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/inspect-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspect objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/open-stream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Localisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & text size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../crucible/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crucible
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Crucible
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & first run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/room/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The room
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/signal-path/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The signal path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & screen readers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Languages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design record
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/design/promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Promotion plan and record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/windows-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Windows demo it grew from
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../hearth/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hearth
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/desktop-player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the desktop player
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth Player for Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth for Android
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-S3 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-C6 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-P4 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-speakers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Speaker levels and the test tone
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sink firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-installer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install from the browser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-layouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing the speaker layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/design/player-appliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../platforms/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platforms
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platforms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/raspberry-pi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raspberry Pi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android (Shield demo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_10_7" id="__nav_10_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebAssembly
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    WebAssembly
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/wasm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wasm-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wasm-encode-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../platforms/bare-metal/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bare metal
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10_8" id="__nav_10_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bare metal
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/cortex-m3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cortex-M3 (QEMU reference)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-P4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-c3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esphome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESPHome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/memory-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 memory layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 build profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/board-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing and benchmarking the boards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/windows-driver-acx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows null-sink driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../renamed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renamed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-self-hosted-runners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-hosted CI runners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-lanes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI lane partitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-agentic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI for many agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#try-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Try it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-karaoke-stream-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a karaoke stream is
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What a karaoke stream is">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#e-ac-3-and-ac-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E-AC-3 and AC-4
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#play-it-in-hearth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Play it in Hearth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lyrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lyrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lyrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-duet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A duet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subrip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SubRip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-substation-alpha" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced SubStation Alpha
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#midi-karaoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MIDI karaoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-shown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is shown
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-cdg-disc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A CD+G disc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-the-words-in-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping the words in sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timing-a-file-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing a file by hand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-singer-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The singer view
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-another-player-in-crucible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In another player, in Crucible
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sing-into-a-microphone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sing into a microphone
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sing into a microphone">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-scores-against" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it scores against
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-score-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the score is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-you-see-while-you-sing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you see while you sing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The delay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-take" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A take
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#make-a-karaoke-stream-with-your-voice-in-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Make a karaoke stream with your voice in it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does not do
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#make-one-in-the-forge-gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Make one in the Forge GUI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-the-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the command line
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-a-program" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a program
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-does-not-do_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does not do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it is checked
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="karaoke">Karaoke<a class="headerlink" href="#karaoke" title="Permanent link">&para;</a></h1>
+<p>A karaoke stream is an ordinary AC-3 programme whose channels are <strong>parts</strong>, not speakers: the
+backing music, a guide melody, and one or two vocals. ETSI TS 102 366 Annex C defines it for AC-3;
+E-AC-3 carries the same service type and is reproduced the same way (<a href="#e-ac-3-and-ac-4">E-AC-3 and
+AC-4</a>). iclforge handles it end to end, in three places:</p>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Play</strong> one, choose which vocals you hear, and sing along to its words</td>
+<td><a href="#play-it-in-hearth">Hearth</a></td>
+</tr>
+<tr>
+<td><strong>Make</strong> one from a backing track, a guide melody and one or two vocals</td>
+<td><a href="#make-one-in-the-forge-gui">The Forge GUI</a></td>
+</tr>
+<tr>
+<td>Encode, probe and decode one in a script</td>
+<td><a href="#from-the-command-line"><code>forge</code></a></td>
+</tr>
+</tbody>
+</table>
+<p>There is no separate karaoke program: Hearth has a Karaoke page, and the Forge GUI has a Karaoke
+entry in its Controls switch.</p>
+<h2 id="try-it">Try it<a class="headerlink" href="#try-it" title="Permanent link">&para;</a></h2>
+<p><a href="https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/auld-lang-syne"><code>examples/karaoke/auld-lang-syne/</code></a>
+is a karaoke stream with everything it is made of, so that nothing has to be built first. It is
+"Auld Lang Syne", one verse, 16.5 s, generated by a script and not recorded:</p>
+<ul>
+<li><strong>The parts</strong>: a stereo backing, a melody guide and two vocals as WAV files, and a Forge GUI
+  project that opens them in the Karaoke flow. Open the project, press through <strong>Hear</strong> to listen
+  to the stream as coded, aware and capable, change a part or a level, and <strong>Save</strong> to encode it
+  again.</li>
+<li><strong>The stream and its words</strong>: <code>auld-lang-syne.ac3</code> and <code>auld-lang-syne.lrc</code>. Open the stream in
+  Hearth and the words follow the singing, syllable by syllable.</li>
+</ul>
+<p>The example's own README gives each step, and the <code>forge encode</code> line that writes the same stream.</p>
+<p>A second example is built for <strong>duets</strong>:
+<a href="https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/leave-her-johnny"><code>examples/karaoke/leave-her-johnny/</code></a>
+is a traditional capstan shanty, one verse, 19.2 s, in which the shantyman and the crew sing
+<em>different</em> lines and each is silent while the other sings, so that "V1 only", "V2 only" and
+"both" each sound different and leave a different part for you to sing. Its project names the four
+parts and nothing of how they are laid out; the Karaoke flow and <code>forge project</code> work that out.</p>
+<h2 id="what-a-karaoke-stream-is">What a karaoke stream is<a class="headerlink" href="#what-a-karaoke-stream-is" title="Permanent link">&para;</a></h2>
+<p>It is a main service with <code>bsmod</code> 7 and a coding mode above 1/0. L and R carry the backing; the
+slot a programme would use for its centre carries a <strong>guide melody</strong> (M), and the slots it would
+use for its surrounds carry <strong>one or two vocals</strong> (V1 and V2):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Parts, in coded order</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3/0</td>
+<td>L M R</td>
+</tr>
+<tr>
+<td>2/1</td>
+<td>L R V1</td>
+</tr>
+<tr>
+<td>3/1</td>
+<td>L M R V1</td>
+</tr>
+<tr>
+<td>2/2</td>
+<td>L R V1 V2</td>
+</tr>
+<tr>
+<td>3/2</td>
+<td>L M R V1 V2</td>
+</tr>
+</tbody>
+</table>
+<p>A player that knows nothing about karaoke plays the channels where they are coded, so the vocals
+come out of the rear speakers. Annex C defines two kinds of decoder that do better:</p>
+<ul>
+<li>A <strong>karaoke-aware</strong> decoder (Table C.2.2) plays L, C and R: the backing, the melody guide in the
+  centre, and the vocals mixed in at the surround level the stream carries.</li>
+<li>A <strong>karaoke-capable</strong> decoder (Table C.2.3) does the same and lets the listener choose which
+  vocals play: none, V1, V2 or both. With none, what is left is the backing and the guide melody,
+  for singing along to. Annex C also leaves it room to move the level of each part, which
+  iclforge's capable decoder offers.</li>
+</ul>
+<h3 id="e-ac-3-and-ac-4">E-AC-3 and AC-4<a class="headerlink" href="#e-ac-3-and-ac-4" title="Permanent link">&para;</a></h3>
+<p><strong>E-AC-3</strong> carries the same service type: its <code>bsmod</code> is in the <code>infomdat</code> group (Annex E, Table
+E1.2), and Annex G (Table G.2) gives the E-AC-3 descriptor a karaoke service type. Annex E defines
+no reproduction for it. iclforge reproduces an E-AC-3 stream flagged this way as it does an AC-3
+one, by analogy and as Dolby's own decoder does (<a href="#how-it-is-checked">How it is checked</a>), where
+the programme is one independent substream with no object layer. A programme with a dependent
+substream or an object layer is played as coded: Annex C has no vocals for it. The levels the
+reproduction uses are the stream's Lo/Ro mixing group (<code>lorocmixlev</code> and <code>lorosurmixlev</code>), or
+-3 dB each where the stream has none, and <code>forge eac3-encode</code> writes the group whenever <code>bsmod</code> is
+7 and the layout has a centre or a surround. A player that does not apply the reproduction plays
+the vocals from the surround speakers, as it does an AC-3 stream.</p>
+<p><strong>AC-4</strong> has no karaoke mode: its specification has no <code>bsmod</code> value for it, so there is nothing
+to reproduce, and <code>forge</code> warns and ignores the choice on an AC-4 stream. <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-ac4-options.md">The options for carrying
+karaoke in AC-4</a>
+say what its presentations and objects could do; none is built.</p>
+<h2 id="play-it-in-hearth">Play it in Hearth<a class="headerlink" href="#play-it-in-hearth" title="Permanent link">&para;</a></h2>
+<p>Open a karaoke stream in Hearth (a raw <code>.ac3</code> or <code>.ec3</code>, or an MP4, Matroska or MPEG-TS file with
+an AC-3 or E-AC-3 track) and choose the <strong>Karaoke</strong> page (<code>Ctrl+7</code>).</p>
+<p><img alt="Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays" src="screenshots/hearth-karaoke-page.png" /></p>
+<p><em>The "Auld Lang Syne" example, 1.8 s in and held there: the word being sung is part way through its fill. <code>hearth --smoke-shot karaoke.png --page karaoke --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 1800</code> (<a href="../hearth/#command-line">Hearth's command line</a>). The picture is of 2026-10-12, before the page had its <a href="#sing-into-a-microphone">Microphone card</a>, which is now the first card of the right-hand column.</em></p>
+<p><strong>Reproduction</strong> is the decoder's choice, kept across starts:</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>What you hear</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>As coded</strong></td>
+<td>The channels as the stream codes them: the vocals come from the surround speakers.</td>
+</tr>
+<tr>
+<td><strong>Aware</strong> (the default)</td>
+<td>L, C and R, with the vocals at the stream's own level. On two speakers this is the ordinary Lo/Ro fold, which Annex C says is the same thing.</td>
+</tr>
+<tr>
+<td><strong>Capable</strong></td>
+<td>As aware, with <strong>Vocals</strong> set to None, V1, V2 or Both. A single vocal plays in the centre with the melody; Both is V1 on the left and V2 on the right, so a stream with only V1 plays it on the left. A <strong>level</strong> for the melody and for each vocal moves it against the table, from 24 dB down (which is off) to 12 dB up.</td>
+</tr>
+</tbody>
+</table>
+<p>The levels are the capable decoder's alone, 0 dB each is the table as it stands, and they are
+kept across starts with the choice. Raising a part far enough lowers the others a little, so that
+no speaker is driven past full scale. <strong>Reset levels</strong> puts all three back. A part at the bottom of
+its control is off, and the page lists it as muted. A level has nothing to act on for a vocal the
+stream lacks or the <strong>Vocals</strong> choice leaves out, and its control is closed.</p>
+<p>The page says which part each speaker plays under the choice made, and says in words when the
+choice does not apply:</p>
+<ul>
+<li>The stream is <strong>not karaoke</strong>: an ordinary programme, an AC-4 stream, or an E-AC-3 stream flagged
+  karaoke whose programme has a dependent substream or an object layer, which Annex C has no
+  vocals for. The page says which, and that the stream plays as coded.</li>
+<li>The stream is going to a receiver as a <strong>bitstream</strong>. That happens only with <strong>As coded</strong> chosen
+  and a receiver chosen for passthrough in the output picker: the receiver decodes the stream, and
+  unless it is karaoke-capable, V1 and V2 play from its surround speakers. With <strong>Aware</strong> or
+  <strong>Capable</strong> chosen Hearth decodes the stream itself and sends the receiver PCM, so the choice
+  is heard. The page's notice, shown while a bitstream goes out, says both, and has a button to
+  choose another output.</li>
+<li>The output is a <strong>network group</strong>: a sink that lists the karaoke settings (and, for an E-AC-3
+  stream, <code>eac3</code> among the codecs it reproduces karaoke for) and decodes as many channels as the
+  stream has is sent the stream as it is and told your choice, and decodes it itself; one that
+  does not (an ESP32-C6 decodes two channels) is sent PCM that Hearth has decoded with the
+  choice applied. Every member plays one reproduction, at the same levels (see
+  <a href="../hearth/#karaoke">the Hearth page</a>).</li>
+<li>The stereo fold is <strong>Lt/Rt</strong>, for which Annex C defines no reproduction. The page has a button to
+  use Lo/Ro, which does.</li>
+</ul>
+<h2 id="lyrics">Lyrics<a class="headerlink" href="#lyrics" title="Permanent link">&para;</a></h2>
+<p>Hearth shows the words of the stream playing from a <strong><code>.lrc</code> file with the same name</strong> in the same
+folder: <code>Auld Lang Syne.ac3</code> is read with <code>Auld Lang Syne.lrc</code> (the extension in any case). Where
+there is no <code>.lrc</code>, a <strong>SubRip <code>.srt</code></strong> of that name is read the same way (see <a href="#subrip">below</a>),
+and failing that an <strong>Advanced SubStation Alpha <code>.ass</code></strong> (see <a href="#advanced-substation-alpha">below</a>),
+and then a <strong>MIDI karaoke <code>.kar</code></strong> (see <a href="#midi-karaoke">below</a>).</p>
+<h3 id="the-file">The file<a class="headerlink" href="#the-file" title="Permanent link">&para;</a></h3>
+<p>LRC is an informal format; what Hearth reads is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[ti:Auld Lang Syne]
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>[ar:Traditional]
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>[offset:0]
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>[00:12.00]&lt;00:12.00&gt;Should &lt;00:12.60&gt;auld &lt;00:13.10&gt;acquaintance &lt;00:14.20&gt;be &lt;00:14.60&gt;forgot,
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>[00:16.00]And never brought to mind?
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[mm:ss.xx]</code></td>
+<td>A line, shown from that time. <code>.xx</code> is hundredths, <code>.x</code> tenths and <code>.xxx</code> milliseconds. Several tags give one text at several times (a repeated chorus).</td>
+</tr>
+<tr>
+<td><code>&lt;mm:ss.xx&gt;</code> before a word</td>
+<td>The <strong>word-timed</strong> form: the word starts at that time and runs to the next word's tag, and a line's last word runs to the next line.</td>
+</tr>
+<tr>
+<td><code>[offset:+/-ms]</code></td>
+<td>Shifts every time. A positive value makes the lyrics appear sooner.</td>
+</tr>
+<tr>
+<td><code>[ti:]</code> <code>[ar:]</code> <code>[al:]</code> <code>[by:]</code> <code>[length:mm:ss]</code></td>
+<td>Kept for display.</td>
+</tr>
+<tr>
+<td><code>V1:</code> <code>V2:</code> <code>V1+V2:</code> at the start of a line</td>
+<td>A <strong>duet</strong>: which vocal sings the line (see below). Not shown as text.</td>
+</tr>
+<tr>
+<td><code>[v1:name]</code> <code>[v2:name]</code></td>
+<td>What the file calls the two singers.</td>
+</tr>
+</tbody>
+</table>
+<p>The text is <strong>UTF-8</strong>, with or without a byte-order mark. A file in another encoding is not shown,
+and the page says so; playback is not affected.</p>
+<h3 id="a-duet">A duet<a class="headerlink" href="#a-duet" title="Permanent link">&para;</a></h3>
+<p>A karaoke stream has two vocals, and a duet's lines can say which sings each:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[v1:Shantyman]
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>[v2:Crew]
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>[00:12.00]V1: Oh, the times are hard and the wages low
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>[00:16.00]V2: Leave her, Johnny, leave her
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>[00:20.00]V1+V2: It&#39;s time for us to leave her
+</code></pre></div>
+<p>The marker is the first thing after the time (before any <code>&lt;mm:ss.xx&gt;</code> word tag), in either case,
+with spaces allowed round the <code>+</code> and after the colon. A line with no marker is for nobody in
+particular. A plain file with no times may carry the markers too, so that a duet's text can be
+marked before it is timed. Hearth's timing window sets each line's singer and the two names as the
+file is timed, and saves them in the file (see <a href="../hearth/#timing-the-lyrics">Timing the lyrics</a>).</p>
+<p>Where a file marks its lines, the Karaoke page has two name fields. A name typed there is for this
+run of Hearth only, never kept for a song, and comes before the file's <code>[v1:]</code> and <code>[v2:]</code>, which
+come before "V1" and "V2". Every line then says who sings it, three ways: the <strong>name</strong> above it, the
+<strong>side</strong> (the second singer's lines are indented, the first's are not) and the <strong>colour</strong>. On a
+karaoke stream the name also says whose line it is for you: <strong>guide</strong> when the vocal that is playing
+sings it, <strong>you</strong> when it does not, and <strong>shared</strong> when it is a line for both and only one of the
+two plays. A sentence under the names says the same for the whole file ("The vocal of Shantyman
+plays: you sing the lines of Crew."), which is what choosing <strong>V1</strong>, <strong>V2</strong>, <strong>None</strong> or <strong>Both</strong>
+under Capable changes.</p>
+<p><img alt="Hearth's Karaoke page for the duet example: each line is tagged with who sings it and whether the playing vocal guides it" src="screenshots/hearth-karaoke-duet.png" /></p>
+<p><em>"Leave Her, Johnny", 6.3 s in: the crew's line, indented and tagged </em><em>guide</em><em> because both vocals play. <code>hearth --smoke-shot duet.png --page karaoke --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 6300</code>, of 2026-10-12 as the picture above is.</em></p>
+<h3 id="subrip">SubRip<a class="headerlink" href="#subrip" title="Permanent link">&para;</a></h3>
+<p>A <code>.srt</code> file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>1
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>00:00:12,000 --&gt; 00:00:15,500
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Should auld acquaintance
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>be forgot
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>2
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>00:00:20,250 --&gt; 00:00:22,000
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>And never brought to mind?
+</code></pre></div>
+<p>Each cue is a line, and it ends where its cue ends, so the gap between two cues is a stretch where
+nothing is being sung (which an LRC file, whose lines end where the next begins, cannot say). The
+text lines of a cue are joined with a space; styling (<code>&lt;i&gt;</code>, <code>&lt;b&gt;</code>, <code>&lt;font ...&gt;</code>) and <code>{...}</code>
+override blocks are dropped, and a position after the end time is ignored. The number above a cue
+is not needed, a <code>.</code> is read for a <code>,</code> in a time, and cues out of order are put in order. There are
+no words in a SubRip file, so there is no word fill: the whole line is emphasised as it is sung.
+The encodings are the LRC reader's: UTF-8 with or without a byte-order mark, or UTF-16 with one.</p>
+<h3 id="advanced-substation-alpha">Advanced SubStation Alpha<a class="headerlink" href="#advanced-substation-alpha" title="Permanent link">&para;</a></h3>
+<p>A <code>.ass</code> script is read as lyrics too, which is what subtitle-karaoke tools write, and its
+karaoke tags are <strong>word times</strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[Events]
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\k50}Should {\k30}auld {\k80}acquaint{\k20}ance
+</code></pre></div>
+<p>Each <code>Dialogue:</code> event is a line from its start to its end. Each <code>{\k50}</code> (and <code>\kf</code>, <code>\K</code>, <code>\ko</code>:
+the same duration, drawn differently) begins a <strong>syllable</strong> that lasts that many hundredths of a
+second after the one before; a syllable is a word of the line, so the fill moves by syllable, as
+the script's own sweep does. Everything else is dropped: the other override tags (<code>{\an8}</code>,
+<code>{\pos(...)}</code>), the styles' fonts, colours and positions, and any event that draws (<code>{\p1}</code>) or is
+a <code>Comment:</code>. <code>\N</code> is a space. The columns are the script's own <code>Format:</code> line, with the v4+ order
+where it has none, and an event with no karaoke tags is a line with no words.</p>
+<p>Two columns are read for what they say and not for how they look:</p>
+<ul>
+<li><strong>Who sings.</strong> Where exactly two different <strong>actors</strong> (the <code>Name</code> column) are named on the sung
+  lines, the ones with karaoke tags, they are the two singers, the one who appears first being the
+  first vocal, and their names are the file's. Failing that, where exactly two different
+  <strong>styles</strong> are used on the sung lines, those are the two singers; a style's name is its
+  author's own label, so it is not shown as a name. One, three or none marks nobody, because it is
+  not clear who is who. Hearth's <a href="#a-duet">duet view</a> then tells each line's singer, as it does for
+  a <code>V1:</code> or <code>V2:</code> marker in an <code>.lrc</code>.</li>
+<li><strong>Which line at one time.</strong> A line written on two layers, an outline under a fill, is one line.
+  Where lines in different styles share a start and an end, a line that is not sung and is in a
+  style of its own (a translation, a romanisation) is dropped beside the sung one, and where none
+  is sung the style that is commonest in the file is the one read. Lines of one style at one time
+  are all read, and a line that ends at another time than the sung one is a line of its own.</li>
+<li><strong>A script made with Aegisub's karaoke templater.</strong> The templater keeps the timed karaoke it was
+  given as a <code>Comment:</code> event with the Effect <code>karaoke</code>, and writes the effects it makes from it as
+  <code>Dialogue:</code> events with the Effect <code>fx</code>, one for each syllable or decoration. Read as they stand,
+  the effects would be the lyrics and the real lines would be skipped as comments. So where a
+  script has a line whose Effect has <code>karaoke</code> in it, that line is read as sung, comment or not,
+  and the <code>fx</code> lines are not read. The templater's own definitions (a comment whose Effect begins
+  <code>template</code>, <code>code</code> or <code>mixin</code>) are never read. A script with no such line reads as it did.</li>
+</ul>
+<h3 id="midi-karaoke">MIDI karaoke<a class="headerlink" href="#midi-karaoke" title="Permanent link">&para;</a></h3>
+<p>A <code>.kar</code> file (a Standard MIDI File whose syllables are meta events) is read for its words, and only
+its words: the music in it is not played or read. What is taken:</p>
+<ul>
+<li>the <strong>words</strong> from the track called <code>Words</code>, where there is one, else from the file's Lyric
+  events, else from its Text events;</li>
+<li>the <strong>title</strong> and the <strong>artist</strong> from the first and second <code>@T</code> lines; the other <code>@</code> lines
+  (<code>@K</code>, <code>@L</code>, <code>@I</code>, <code>@V</code>) are not words;</li>
+<li>a <code>/</code> begins a new line, and a backslash a new verse (a line too, here), and so does a line end in the
+  text;</li>
+<li>every <strong>syllable</strong> is a word of the line with its own start, from its tick through the file's
+  <strong>tempo map</strong> (a tempo change on any track moves every later tick), so the fill moves by syllable. A
+  syllable that begins with a space is the start of the next word: the space is joined to the one
+  before it. A line ends where the next begins;</li>
+<li>a file whose time is counted in <strong>SMPTE frames</strong> (a frame rate and the ticks in a frame, where the
+  other files count ticks in a quarter note) has a tick of a fixed length, and its tempo events mean
+  nothing: 24, 25, 29.97 and 30 frames a second are the four rates the format defines, and all
+  four are read.</li>
+</ul>
+<p>A file with no words, that is cut short, or that counts SMPTE frames at some other rate says so. A
+MIDI file carries <strong>no word of its encoding</strong>, and what is read is UTF-8 unless the program is told
+the page: Latin-1 and the other code pages are not guessed at, so a Western karaoke file with
+accented letters saved in Latin-1 (and Hebrew in Windows-1255) is refused with the reason, as an LRC
+file in a code page is, until <code>forge encode ... lyrics=&lt;file&gt; lyrics-encoding=&lt;page&gt;</code> says which
+page it is in (<a href="../forge/cli/commands/#lyrics-beside-the-stream-lyrics"><code>lyrics-encoding=</code></a>). Plain
+ASCII is UTF-8, and most are. Only the title, the artist and the words are checked (and, when a page
+is named, read in it): the other <code>@</code> lines are not shown, so a copyright or key line in a code page
+does not refuse a file whose words are fine.</p>
+<h3 id="what-is-shown">What is shown<a class="headerlink" href="#what-is-shown" title="Permanent link">&para;</a></h3>
+<ul>
+<li>In a <strong>word-timed</strong> file, a word that has been <strong>sung</strong> is in the accent colour, a word <strong>not yet
+  sung</strong> is muted, and the word <strong>being sung</strong> is underlined and fills in the accent from left to
+  right as it is sung.</li>
+<li>In a file that times <strong>lines but not words</strong>, the whole line is emphasised as it is sung. No word
+  times are invented for it.</li>
+<li>A file with <strong>no times at all</strong> is shown whole and is not followed.</li>
+<li>With <strong>no file</strong>, the page says which name it looks for.</li>
+</ul>
+<p>The words follow the position of what is <em>heard</em>: the output device's own clock less its path's
+delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.</p>
+<p>They are on the Karaoke page, full screen (<a href="#the-singer-view">the singer view</a>), and on the Play
+page: an item with lyrics, or a CD+G picture, gets a <strong>Lyrics</strong> card there beside the queue (in
+a window 1,580 pixels wide or more) or at the top of the monitor column (in a narrower one). An
+item with none gets no card, so the Play page is as it was for every other stream.</p>
+<p><img alt="Hearth's Play page for a karaoke stream: the queue, and a Lyrics card above what is playing" src="screenshots/hearth-play-lyrics.png" /></p>
+<p><em>The Play page at its default size, 1.8 s into the example. <code>hearth --smoke-shot play.png --page play --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 1800</code>.</em></p>
+<h3 id="a-cdg-disc">A CD+G disc<a class="headerlink" href="#a-cdg-disc" title="Permanent link">&para;</a></h3>
+<p>A <strong><code>.cdg</code> file with the same name</strong> is the picture of a karaoke disc that was ripped on its own,
+the other half of an "MP3+G" pair: <code>Song.mp3</code> and <code>Song.cdg</code>. When there is <strong>no lyrics file</strong>,
+Hearth shows that picture where the words would be, with the proportions of the disc's 300 by 216
+and as large as fits (in whole steps, so the small type stays crisp), drawn against the position of
+what is <em>heard</em> and moved by the lyric delay as the words are.</p>
+<p>The words of a disc are <strong>part of the picture</strong>. Nothing is read from it as text, so there is no
+fill, no line to follow and nothing to translate or copy, and the page says so.</p>
+<p><strong>When a lyrics file is beside the stream too</strong>, the words are shown, since they are what a
+word-by-word fill and the delay can follow, and a <strong>Show</strong> choice (Words or Picture) appears in the
+Lyrics card, and on the bar of the full-screen singer view, to show the disc instead. The choice is
+for <strong>this run of Hearth</strong>: it is not kept for the song, it holds from one song to the next while
+Hearth is open, and a song with only a lyrics file or only a disc is not changed by it. Choosing
+the picture takes nothing from the lyrics: the file is still loaded, so the timing window, the
+duet cues and the lyrics a board is sent are as they were. A <code>.cdg</code> that cannot be read beside a
+lyrics file is not shown and not reported: the words are.</p>
+<p>What is drawn is what the disc's own player draws: the screen preset and the border preset, the
+tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
+brings back what left), the smooth scrolling offsets within a tile (the picture is shown up to 5
+pixels left and 11 up of where its memory has it, which is how a disc scrolls a line a pixel at a
+time), the 12-bit colour table of 16 colours, and the transparent colour (drawn as the backdrop, which
+is black: there is no video here for it to show). A packet that is not CD+G is skipped
+and keeps its place in time, and a file that is not a whole number of 24-byte packets, or has no
+CD+G packet in it, is refused with the reason (playback is not affected). The packets are not checked
+for parity: a rip has already been through the drive's error correction.</p>
+<h3 id="keeping-the-words-in-sync">Keeping the words in sync<a class="headerlink" href="#keeping-the-words-in-sync" title="Permanent link">&para;</a></h3>
+<p><strong>Settings, Playback, Lyric delay</strong> moves the words later (positive) or sooner (negative) by up to a
+second in steps of 10 ms, on top of the file's own <code>[offset:]</code>. It is kept across starts. A file's
+times are rarely right to the frame against a particular output.</p>
+<h3 id="timing-a-file-by-hand">Timing a file by hand<a class="headerlink" href="#timing-a-file-by-hand" title="Permanent link">&para;</a></h3>
+<p><strong>Time the lyrics…</strong> on the Karaoke page's Lyrics card opens a window that gives a file its times
+as the song plays: <code>Space</code> as each line starts, then as each word starts, with your reaction time
+taken off each press. A file that already has times opens with them, so the window is also where
+one wrong line or word is put right: choose it, then stamp it again or move it 10 ms at a time.
+<strong>Save</strong> writes the <code>.lrc</code> beside the song and keeps the file that was there once, as <code>.lrc.bak</code>.
+<a href="../hearth/#timing-the-lyrics">Timing the lyrics</a> has every step.</p>
+<p><img alt="The timing window over the Karaoke page: the Lines and Words passes, Play and the position, the example's four lines each with its time and its words, and under them Stamp again, the 10 ms nudges, the singer of a line and the reaction time" src="screenshots/hearth-timing-window.png" /></p>
+<p><em>The example's own file in the timing window, 5.2 s in: every line has a time already, and its words are drawn solid because the file gives their times. <code>hearth --smoke-shot timing.png --page timing --setting "microphone/takesFolder=C:/Users/you/Documents/Hearth takes" --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 5200</code>.</em></p>
+<h3 id="the-singer-view">The singer view<a class="headerlink" href="#the-singer-view" title="Permanent link">&para;</a></h3>
+<p><code>F11</code>, or <strong>Full screen</strong> on the Karaoke page's lyrics or the Play page's, opens the words alone,
+large, on a dark screen. <code>Esc</code> leaves it, and <code>Space</code> pauses.</p>
+<p><img alt="The singer view: the line being sung large between the line before it and the two after, the song that comes next named at the top right, and the position bar, Previous, Play, Next, Queue and the Vocals chooser at the bottom" src="screenshots/hearth-singer-view.png" /></p>
+<p><em>The example 5.2 s in, with the duet queued behind it. <code>hearth --smoke-shot singer.png --page singer --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 5200</code>: a capture draws the view in the window, where <code>F11</code> gives it the whole screen.</em></p>
+<p>A position bar, Previous, Play/Pause, Next, <strong>Queue</strong> and the <strong>Vocals</strong> chooser stay at the
+bottom, so a singer can move about in the song, pause, skip, pick the next song or change which
+vocals play without leaving. Choosing a vocal there chooses the capable reproduction with it.</p>
+<p><strong>Moving about.</strong> Press the position bar, or drag along it: the words and the clock show the place
+the bar is held at, and the song moves there when you let go, whether it was playing or paused.
+<code>Left</code> and <code>Right</code> move it five seconds either way, and stop at the ends.</p>
+<p><strong>The queue.</strong> The strip at the top names the song that comes next. <strong>Queue</strong>, or <code>Q</code>, opens the
+queue beside the words: the song that is playing is marked, and pressing another plays it from
+its start. <code>Q</code> or the button closes it again.</p>
+<h3 id="in-another-player-in-crucible">In another player, in Crucible<a class="headerlink" href="#in-another-player-in-crucible" title="Permanent link">&para;</a></h3>
+<p><a href="../crucible/">Crucible</a> reads the same <code>.lrc</code> file and shows the line being sung on its
+Room page, against whichever application it is given the file for: a player with no words of its
+own, or a browser. A player that publishes where it is in the song to the system's media controls
+is followed from that, and one that does not is followed from a press of <strong>Start</strong>, which is how
+Hearth is followed there. <a href="../crucible/room/#06-lyrics">The room</a> has a picture of it and the
+details.</p>
+<h2 id="sing-into-a-microphone">Sing into a microphone<a class="headerlink" href="#sing-into-a-microphone" title="Permanent link">&para;</a></h2>
+<p>The Karaoke page has a <strong>Microphone</strong> card. It shows you how close your pitch is to the tune while
+you sing, and it can keep a take of your voice. It records nothing unless you press <strong>Record a
+take</strong>, and nothing leaves your computer.</p>
+<ul>
+<li><strong>It is off until you turn it on.</strong> Choosing an input does not open it, and neither does having
+  used it last time. It closes when you turn it off, when you leave the page, and when the item
+  ends or is changed. While it is on the card shows <strong>Microphone on</strong>, and the operating system
+  shows its own sign as well.</li>
+<li><strong>Choose the input</strong> from the list, or take the computer's default. <strong>Refresh</strong> looks again after
+  you plug one in.</li>
+<li><strong>Say whether you are wearing headphones.</strong> Through open speakers the microphone hears the
+  backing as well as you, and a pitch score reads as nearly perfect for no singing at all, so the
+  score is shown only when you have said you are wearing headphones.</li>
+<li><strong>The level</strong> shows what the microphone hears. <strong>Too loud</strong> means a sample reached full scale.
+  If nothing arrives the card says the microphone may be muted or the wrong input is chosen.</li>
+</ul>
+<h3 id="what-it-scores-against">What it scores against<a class="headerlink" href="#what-it-scores-against" title="Permanent link">&para;</a></h3>
+<p>The card names the part it is scoring you against. A karaoke stream carries its tune in its own
+channels, so the <strong>melody guide (M)</strong> is used when the stream has one. If you have taken a vocal away
+(Capable, with the vocals you chose), the vocal you took away is the one you are replacing, and that
+is the one used. A stream with no clear tune in the part, a stream that is not karaoke, and the
+other formats, have <strong>no melody to score against</strong>, and the card says so; it still shows the pitch
+you are singing and how sharp or flat it is.</p>
+<h3 id="what-the-score-is">What the score is<a class="headerlink" href="#what-the-score-is" title="Permanent link">&para;</a></h3>
+<p><strong>The share of the tune's time during which your pitch was within a semitone of it, in any octave.</strong>
+It hears pitch and nothing else: not the words, not the timing, not the feeling. A singer on pitch
+and out of time with the words scores well on it. The card also says when you are consistently
+behind or ahead of the tune, which is usually a delay in the microphone and not in you.</p>
+<p>Two things on the card change what "within" means, and the card says when either is in use:</p>
+<ul>
+<li><strong>How close counts</strong> is a semitone unless you choose otherwise: <strong>close</strong> is half a semitone
+  (50 cents), and <strong>loose</strong> is a whole tone (200 cents). It is kept, and it applies to the marks and
+  the summary as well as the score so far.</li>
+<li><strong>Score against my key</strong> is for singing a whole song a little sharp or flat of the tune: your own
+  key is taken from your first sung notes (it needs about twenty of them) and allowed for, so that you
+  are judged on the shape of your melody. The card says how far you are from the tune's key while it
+  is in use, and the summary says it was. It is <strong>off every time Hearth starts</strong>, because a score
+  that has allowed for your key is not the same score.</li>
+</ul>
+<h3 id="what-you-see-while-you-sing">What you see while you sing<a class="headerlink" href="#what-you-see-while-you-sing" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The pitch ribbon</strong>, under the pitch line on the card and under the words in the singer view
+  (<code>F11</code>): the tune as a ribbon of notes moving past a mark for <em>now</em>, and your voice as a line over
+  it. Where your voice is within the tolerance of the tune the line is thick and solid; where it is
+  not it is thin and dashed, so the difference does not depend on colour. A voice an octave away is
+  drawn on the tune's octave, as it is scored, so the line is where the notes are. When you are not
+  voiced the ribbon says <strong>Listening…</strong> and draws no line.</li>
+<li><strong>A mark under each line you have sung</strong>: three dots and a percentage, in the lyrics on the page
+  and in the singer view. Three dots is 75 % or more, two is 45 % or more, one is less. Where the
+  levels fall is presentation and not measurement: the percentage is the figure. A line the tune has
+  no notes in has <strong>no mark</strong>, which is not a score of zero. A line you were not voiced for (under a
+  fifth of its notes' time) says <strong>not sung</strong> in words and carries no number, since that is not the
+  same as singing it badly. Without your headphones answer there are no marks at all.</li>
+<li><strong>A summary</strong> on the card when it ends: <strong>Last performance</strong> gives the pitch score, how much of
+  the tune's time you were voiced for, how sharp or flat you were on average and whether you were
+  behind or ahead, and what it was compared with: the part, the tolerance, octaves ignored, and that
+  lines with no notes were not scored. It stays until you turn the microphone on again or choose
+  another song. It is shown there and kept nowhere: nothing is ranked, named or sent.</li>
+</ul>
+<p><img alt="The singer view part way through the last word of the example's last line, sung along to: the two lines before it each marked with three dots and a percentage, the line being sung large with its word part way through its fill, and under the words the pitch ribbon, the tune as bars and the singer's line over them on the same notes, with a mark for now" src="screenshots/hearth-singer-view-singing.png" /></p>
+<p><em>The singer view 14.9 s into the example, with the performance going on: the marks under the lines
+already sung, and the ribbon with the voice on the tune. <code>hearth --smoke-shot singing.png --page
+singer --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --sing
+examples/karaoke/auld-lang-syne/parts/vocal-1-lead.wav --seek 14900</code> (<a href="../hearth/#command-line">Hearth's command
+line</a>). There is no singer: the example's own lead vocal is the
+microphone, sung along to the song as the song is heard, and the song goes to an output that plays
+to nothing, so the picture is taken with no microphone opened and no sound made.</em></p>
+<p>A song you sang only part of scores low as a whole, because the score is over all of the tune's
+time. The marks say which lines were the ones.</p>
+<h3 id="the-delay">The delay<a class="headerlink" href="#the-delay" title="Permanent link">&para;</a></h3>
+<p>A microphone's sound reaches the program a little after it was sung, and some take a tenth of a
+second or more (a webcam's microphone measured about 130 ms through the whole path, in the Windows
+shared mode that Hearth uses). The <strong>Microphone delay</strong> slider is how long, and <strong>Move your timing</strong>
+is for the rest: raise the delay if you are told you are behind the tune and are not.</p>
+<h3 id="a-take">A take<a class="headerlink" href="#a-take" title="Permanent link">&para;</a></h3>
+<p>With the microphone on, <strong>Record a take</strong> keeps your voice. The card shows <strong>Recording</strong> and how long
+it has run, which is a second sign beside <strong>Microphone on</strong>, since having the microphone on is not
+recording. <strong>Stop recording</strong> keeps it, and turning the microphone off, leaving the page or
+the item ending does the same.</p>
+<ul>
+<li><strong>It is your voice alone</strong>, not the backing: the microphone's own sound mixed to one channel, at the
+  microphone's rate, as a lossless FLAC file at 24 bits. It can be placed against any copy of the
+  backing and re-mixed. Through open speakers the backing is in it too, which is the other reason
+  to wear headphones.</li>
+<li><strong>A small file beside it</strong>, <code>Song - 2026-10-12 211500.take.json</code>, says which item it was, where
+  in the item its first sample was sung (taken from where the song was when the sound reached the
+  microphone, less the microphone's delay, plus the timing you moved), and the alignment in force,
+  so that any editor can place it and you can move it if you disagree.</li>
+<li><strong>Where it goes</strong> is shown on the card and changed with <strong>Choose…</strong>: your documents, in a folder
+  called "Hearth takes", unless you chose another. The folder is not made until the first take.
+  Takes are never put beside the song file.</li>
+<li><strong>The last take</strong> is offered with <strong>Show in folder</strong> and <strong>Delete this take</strong>, which removes the
+  file and its description.</li>
+<li><strong>Your takes</strong> lists what is in the folder, newest first: the five newest, and how many more
+  there are. Each has <strong>Delete</strong>, which asks again (<strong>Delete for good</strong>, or <strong>Keep</strong>) before it
+  removes the file and its description, because a take cannot be got back. Only takes Hearth made
+  are listed: a file with no description beside it is not one, and is never offered for removal.</li>
+</ul>
+<h3 id="make-a-karaoke-stream-with-your-voice-in-it">Make a karaoke stream with your voice in it<a class="headerlink" href="#make-a-karaoke-stream-with-your-voice-in-it" title="Permanent link">&para;</a></h3>
+<p>A take is a vocal part, and the Forge's <a href="../forge/gui/karaoke/">Karaoke flow</a> takes any mono file
+as <strong>Vocal 1</strong> or <strong>Vocal 2</strong>. A take is a recording of one person at one time, so four things need
+handling first:</p>
+<ul>
+<li><strong>It is FLAC, and the Forge reads WAV.</strong> Convert it with any tool that reads FLAC; the lines below
+  use ffmpeg.</li>
+<li><strong>It is at the microphone's rate</strong>, often 44.1 kHz. The Forge GUI resamples a part to the
+  backing's rate and says so; <code>forge encode</code> refuses a source at another rate, so convert it.</li>
+<li><strong>It starts partway into the song.</strong> <code>item_start_ms</code> in the <code>.take.json</code> is where, in
+  milliseconds (12340 is 12.34 s), with the microphone's delay and any timing you moved already
+  taken off. <code>null</code> means the take could not be placed, and you place it by ear.</li>
+<li><strong>It is shorter than the song.</strong> The Forge holds a part's last sample past the part's end, which
+  is not silence: end the take on silence and as long as the backing. The command below does.</li>
+</ul>
+<p>In the Forge GUI, give the backing and the melody guide as their parts, the take converted to WAV
+as <strong>Vocal 1</strong>, set its <strong>Start offset</strong> to <code>item_start_ms</code> divided by 1000, and save.</p>
+<p>From the command line, from a stream you sang to (a 3/2 stream with a melody guide and two vocals:
+<code>forge probe</code> says the layout) and a take:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>forge decode song.ac3 parts.wav
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ffmpeg -i &quot;Song - 2026-10-12 211500.flac&quot; -af &quot;adelay=12340,apad=whole_dur=213.5&quot; -ar 48000 -c:a pcm_s24le take.wav
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>forge encode parts.wav mine.ac3 320 L,C,R,Cs src=take.wav map=0.0:L,0.1:R,0.2:C,0.3:none,0.4:none,1.0:Cs bsmod=voiceover
+</code></pre></div>
+<p><code>adelay</code> is in milliseconds (the take's <code>item_start_ms</code>) and <code>apad=whole_dur</code> is the song's length
+in seconds (<code>forge probe</code> shows it as the duration); together they make the take as long as the
+backing, silent before and after it. <code>-ar</code> is the backing's rate. In <code>forge encode</code>, <code>parts.wav</code>
+is source 0: its channels 0, 1 and 2 are L, R and the melody guide, and channels 3 and 4, the
+stream's own vocals, go to <code>none</code>. The take is source 1 and takes the surround, which one vocal
+makes a 3/1 stream with (<code>L,C,R,Cs</code>, 320 kbit/s). A stream with one vocal has no channel 4, so leave
+<code>0.4:none</code> out.</p>
+<p>This decodes the stream and encodes it again, which is a second generation of AC-3 for the backing.
+If you still have the files it was made from, give those to the Karaoke flow instead.
+A one-click "save my performance as a karaoke stream" in Hearth is not built: the plan holds it
+until this has been tried (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md">D12</a>).
+A take made through open speakers has the backing in it as well as your voice, and is a recording of
+somebody else's work: keep it for yourself.</p>
+<h3 id="what-it-does-not-do">What it does not do<a class="headerlink" href="#what-it-does-not-do" title="Permanent link">&para;</a></h3>
+<ul>
+<li>It does not play your voice back to you. A microphone through the operating system's own audio
+  path adds a tenth of a second on common equipment, which is too late to sing along with; use your
+  headset's own monitoring if it has one.</li>
+<li>It does not send your voice to other speakers or other devices.</li>
+<li>It cannot tell a singer from a loud speaker, which is why the headphones answer matters.</li>
+</ul>
+<h2 id="make-one-in-the-forge-gui">Make one in the Forge GUI<a class="headerlink" href="#make-one-in-the-forge-gui" title="Permanent link">&para;</a></h2>
+<p>Choose <strong>Karaoke</strong> in the Controls switch. Four steps build the stream from the recordings it is
+made of. The pictures are of the <a href="#try-it">example's project</a>, opened with <strong>Project…</strong> in the
+title strip.</p>
+<p><strong>1 · Parts.</strong> Give each part its own file: a <strong>stereo backing</strong>, and optionally a <strong>mono melody
+guide</strong>, <strong>Vocal 1</strong>, <strong>Vocal 2</strong> and an <strong>LFE</strong>. Or give <strong>one multichannel file</strong> whose WAV
+speakers are already named. The page shows the coding mode the parts make, why, and what is wrong
+with anything that cannot be used.</p>
+<p><img alt="The Forge GUI's Karaoke flow at the Parts step: a backing, a melody guide and two vocals, each its own file, an LFE row with nothing chosen, and under them the coding mode 3/2 with its checks" src="screenshots/forge-karaoke-parts.png" /></p>
+<p><em><code>forge-gui --smoke-shot parts.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=parts height=1100</code></em></p>
+<p><strong>2 · Levels.</strong> The centre level (the melody guide in a stereo fold) and the surround level (the
+vocals), which an aware decoder applies.</p>
+<p><img alt="The Levels step: the centre level and the surround level, each with what an aware decoder does with it" src="screenshots/forge-karaoke-levels.png" /></p>
+<p><em><code>forge-gui --smoke-shot levels.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=levels</code></em></p>
+<p><strong>3 · Hear.</strong> The stream is encoded and played back the way a karaoke player decodes it: as coded,
+aware, or capable with the vocals you choose and a level for each part. It plays the encoded
+stream, not your source files.</p>
+<p><img alt="The Hear step: the stream built and ready to play as an aware decoder plays it, the vocals and the part levels closed until Capable is chosen, and which parts reach which speaker" src="screenshots/forge-karaoke-hear.png" /></p>
+<p><em><code>forge-gui --smoke-shot hear.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=hear</code>: the capture waits for the stream to be built, and plays nothing.</em></p>
+<p><strong>4 · Save.</strong> The format (AC-3, the default, or E-AC-3), the file type (the raw stream, or
+Matroska, MP4 or MPEG-TS), the bit rate, the lyrics file that goes beside the stream, the
+equivalent <code>forge encode</code> (or <code>forge eac3-encode</code>) command, and the encode.</p>
+<p><img alt="The Save step: the format, the file type, the bit rate, the Lyrics row with no file chosen, and the same encode as a forge command line" src="screenshots/forge-karaoke-save.png" /></p>
+<p><em><code>forge-gui --smoke-shot save.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=save</code></em></p>
+<p>Each coded channel is written into the same draft the other tiers edit, so switching to Expert
+afterwards shows the same bed, <code>bsmod</code> and assignments. The Forge GUI guide has the details of each
+step and of what a part may be: <a href="../forge/gui/karaoke/">Forge GUI, Karaoke</a>.</p>
+<h2 id="from-the-command-line">From the command line<a class="headerlink" href="#from-the-command-line" title="Permanent link">&para;</a></h2>
+<p>Encode: a stereo backing and a melody guide and two vocals as five coded channels, with <code>bsmod</code>
+set to 7 (the token is <code>voiceover</code>, which at a layout above 1/0 is the karaoke main service). The
+sources are mapped to bed positions with <code>src=</code> and <code>map=</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>forge encode backing.wav out.ac3 384 L,C,R,Ls,Rs src=melody.wav src=lead.wav src=harmony.wav \
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>      map=0.0:L,0.1:R,1.0:C,2.0:Ls,3.0:Rs bsmod=voiceover
+</code></pre></div>
+<p>A single multichannel WAV whose speakers are named needs no <code>map=</code>.</p>
+<p>E-AC-3 takes the same sources, mapping and <code>bsmod</code>. <code>forge eac3-encode</code> has its coding tools
+positional (<code>none</code> here) before the layout, and writes the stream's Lo/Ro mixing group, which is
+where a decoder reads the levels of the reproduction:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>forge eac3-encode backing.wav out.ec3 384 none L,C,R,Ls,Rs src=melody.wav src=lead.wav src=harmony.wav \
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>      map=0.0:L,0.1:R,1.0:C,2.0:Ls,3.0:Rs bsmod=voiceover
+</code></pre></div>
+<p>Probe:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>$ forge probe out.ac3
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>...
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>bsmod           7 (karaoke)
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>layout          3/2 (acmod 7, lfeon 0)
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>renders         5 channel(s): L C R Ls Rs
+</code></pre></div>
+<p>Decode, as an aware decoder (<code>karaoke</code>) or a capable one with a choice of vocals
+(<code>karaoke=none</code>, <code>karaoke=v1</code>, <code>karaoke=v2</code> or <code>karaoke=v1+v2</code>), to L, C and R:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>forge decode out.ac3 aware.wav karaoke
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>forge decode out.ac3 melody-and-v1.wav karaoke=v1
+</code></pre></div>
+<p><code>channels=2</code> or <code>channels=1</code> gives the 2/0 or 1/0 reproduction. <code>downmix=ltrt</code> is refused with
+<code>karaoke</code>, as Annex C defines no Lt/Rt reproduction. A stream that is not karaoke is decoded as
+coded, and the report says so. An E-AC-3 karaoke stream decodes the same way
+(<code>forge decode out.ec3 aware.wav karaoke</code>), and the report says the reproduction is applied to
+E-AC-3 as Dolby's decoder does. The library form is <code>OutputConfig::karaoke</code> and
+<code>OutputConfig::karaoke_vocals</code>; see <a href="../library/decoding/">Decoding</a>.</p>
+<p><code>forge monitor</code> takes the same choice and plays the reproduction on the output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>forge monitor out.ac3 karaoke=none      # L, C, R: the backing and the melody, for singing along
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>forge monitor out.ac3 karaoke=v1+v2     # V1 left, V2 right
+</code></pre></div>
+<p>The capable decoder's levels are <code>karaoke-melody=&lt;dB&gt;</code>, <code>karaoke-v1=&lt;dB&gt;</code> and <code>karaoke-v2=&lt;dB&gt;</code> on
+both commands: each part against Table C.2.3, 0 dB the table, up to 12 dB louder and <code>-24</code> or <code>off</code>
+at the bottom, the span and the defaults of Hearth's sliders.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>forge decode out.ac3 sing.wav karaoke=none karaoke-melody=-6
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>forge monitor out.ac3 karaoke=v1 karaoke-v1=-12 karaoke-melody=3
+</code></pre></div>
+<p>They move nothing under the aware reproduction, so a level without a choice of vocals
+(<code>karaoke=none</code>, <code>v1</code>, <code>v2</code> or <code>v1+v2</code>) is refused.</p>
+<p>On an output narrower than the stream, which <code>monitor</code> folds to unasked, the 2/0 reproduction
+plays. <code>forge play</code> applies the choice where it decodes (its PCM fallback), and <code>forge spdif</code>
+and <code>forge play</code>'s bitstream legs hand the coded stream on: they accept <code>karaoke</code> and say it is
+not applied, since a receiver reproduces the stream. AC-4 is ignored with a warning by all of
+them, and <code>forge spatial</code> ignores the choice with its own: it places an E-AC-3 stream's objects
+and has no karaoke bed.</p>
+<h2 id="from-a-program">From a program<a class="headerlink" href="#from-a-program" title="Permanent link">&para;</a></h2>
+<p>The reproduction and the lyric reader are in the libraries, so a program of your own can use them:</p>
+<table>
+<thead>
+<tr>
+<th>You are in</th>
+<th>The reproduction</th>
+<th>The lyrics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C or C++ through the C API</td>
+<td><code>iclforge_decoder_create_with_karaoke()</code>, <a href="../library/c-api/#karaoke-streams-annex-c">C API</a></td>
+<td><code>iclforge_lyrics_parse()</code> and its cursor, <a href="../library/c-api/#lyrics">C API</a></td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>DecoderConfig(karaoke=...)</code>, <a href="../library/python-api/#karaoke-streams-and-lyrics">Python</a></td>
+<td><code>iclforge.lyrics</code></td>
+</tr>
+<tr>
+<td>Rust</td>
+<td><code>Decoder::with_karaoke</code>, <a href="../library/rust-api/#karaoke-and-lyrics">Rust</a></td>
+<td><code>iclforge::lyrics::Lyrics</code></td>
+</tr>
+<tr>
+<td>A browser or Node (WebAssembly)</td>
+<td><code>FoldOptions.karaoke</code>, <a href="../platforms/wasm/">the npm package</a></td>
+<td><code>parseLyrics</code> in the demo's module, which the <a href="../wasm-demo/">decode demo</a>'s Words panel uses</td>
+</tr>
+<tr>
+<td>C++</td>
+<td><code>OutputConfig::karaoke</code> and its levels, <a href="../library/decoding/">Decoding</a></td>
+<td><code>iclforge::lyrics</code>, <code>libs/lyrics</code></td>
+</tr>
+</tbody>
+</table>
+<p>All of them take the same choices (as coded, aware or capable; the vocals; the three part levels in
+dB over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
+samples and the same lines as <code>forge decode</code> and Hearth do.</p>
+<h2 id="what-it-does-not-do_1">What it does not do<a class="headerlink" href="#what-it-does-not-do_1" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Aligning words to the sound.</strong> Hearth's timing window (<a href="../hearth/#timing-the-lyrics">Timing the
+  lyrics</a>) takes word times from your presses, and an estimate
+  by the letters of a word is only where a press starts from. A forced aligner is outside software,
+  and <a href="forced-alignment/">Timing a song with a forced aligner</a> runs one and reads its result in.</li>
+<li><strong>Reading a lyrics file in a code page, in Hearth and Crucible.</strong> UTF-8 and UTF-16 are read there;
+  Latin-1, Windows-1255 and the other encodings are named and not guessed at. Forge reads one when it
+  is told the page (<code>lyrics-encoding=</code>, or the Code page list on the Karaoke flow's Lyrics row, which
+  shows how the page chosen reads the first lines) and writes the words beside the stream as UTF-8,
+  which every player reads, so a file in a code page is brought in once, at the encode. A MIDI
+  karaoke file has no way to say its encoding; naming the page is how to read it.</li>
+<li><strong>Text from a CD+G disc.</strong> Its words are pixels, so Hearth shows the picture and cannot follow the
+  words.</li>
+<li><strong>A screen on a sink that has not been run.</strong> A board that decodes for itself is sent the lyrics
+  and where the sound is in them, follows them on its own clock and reports the line. The P4
+  firmware also draws them, with the colour moving as the song does, on a 7-inch panel
+  (<a href="../hearth/sink-esp32-p4/#the-screen">An ESP32-P4 sink</a>): drawn and measured on a board with no
+  panel, not yet run on one, and without a microphone, scoring or recording.</li>
+<li><strong>Karaoke in AC-4.</strong> Its specification has no karaoke mode, so nothing is reproduced for it.</li>
+<li><strong>Knowing what a receiver does with E-AC-3.</strong> Annex E defines no reproduction and no TV or
+  receiver was tried here: Dolby's reference decoder reproduces an E-AC-3 karaoke stream, and a
+  player that does not reproduce it plays the vocals from the surrounds.</li>
+<li><strong>A microphone on a board or on Android.</strong> The microphone, the pitch score and the takes are in
+  Hearth's desktop player and the browser demo (<a href="#sing-into-a-microphone">Sing into a microphone</a>).
+  The board's part of the <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md">plan</a>
+  is not built.</li>
+</ul>
+<h2 id="how-it-is-checked">How it is checked<a class="headerlink" href="#how-it-is-checked" title="Permanent link">&para;</a></h2>
+<p>Two things stand behind it. The reproduction is held to the annex's own tables, transcribed
+independently of the code: every mode is encoded with a tone in each part and decoded under each
+reproduction and each choice of vocals, and the tones on each output are what the table says. And
+Dolby's reference decoder reproduces karaoke for AC-3 and for E-AC-3, which is the one outside
+decoder to compare with: <code>tools/checks/verify_karaoke_oracle.py</code> encodes a tone-per-channel stream
+both ways, decodes it with <code>forge decode</code> and with the Reference Player's <code>dlbac3dec</code>, and compares
+what each output channel carries as ratios. The player is licensed, so the script runs locally and
+not in CI, and its measured ratios are constants in the library's tests
+(<code>libs/ac3/tests/decoder/test_eac3_karaoke.cpp</code>). There is still no karaoke stream from anyone
+else: Dolby's encoder (DEE) cannot write <code>bsmod</code> 7. See <a href="../verification/">Verification</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/enhancements.js"></script>
+      
+        <script src="../javascripts/hero-stats.js"></script>
+      
+    
+  </body>
+</html>

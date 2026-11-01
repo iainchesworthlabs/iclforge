@@ -1,0 +1,6345 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A clean-room AC-3 / E-AC-3 / AC-4 / Dolby Atmos codec library and a TrueHD / MLP codec in C++23, the Forge CLI and GUI over them, Crucible, a desktop per-application Atmos mixer, and Hearth, the player and its network sinks">
+      
+      
+      
+        <link rel="canonical" href="https://iainchesworthlabs.github.io/iclforge/truehd-comparison/">
+      
+      
+        <link rel="prev" href="../performance-trend/">
+      
+      
+        <link rel="next" href="../quality-trend/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>TrueHD against FFmpeg and DEE - ICL Forge</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"IBM Plex Sans";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../stylesheets/new.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#truehd-encoder-and-decoder-against-ffmpeg-and-dee" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="ICL Forge" class="md-header__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ICL Forge
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              TrueHD against FFmpeg and DEE
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+  
+
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../quickstart/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../library/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Library
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../karaoke/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Karaoke
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../verification/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Validation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../performance-quality/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Performance & quality
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../forge/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Forge
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../crucible/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Crucible
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../hearth/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hearth
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../platforms/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Platforms
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ICL Forge" class="md-nav__button md-logo" aria-label="ICL Forge" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ICL Forge
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iainchesworthlabs/iclforge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iainchesworthlabs/iclforge
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/ac3-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-3 & E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/atmos-joc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atmos & JOC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/object-signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/truehd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD & MLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building from source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../library/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Library
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The projects of the tree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/development-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/application-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the library
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the library
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example programs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/encoding-ac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/encoding-eac3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoding E-AC-3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/decoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/spatial-and-atmos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial & Atmos objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/station-broadcast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example — station broadcast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/channel-plans-and-routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channel plans & routing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/muxing-and-sinks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Muxing & sinks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/file-io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/iab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAB (SMPTE ST 2098-2) reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/adm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM / BW64 reading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/adm-bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADM → Atmos bridging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/iamf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IAMF reading and writing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/ac4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AC-4 decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/truehd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD and MLP decoding and encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measuring quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/header-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Header map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/api-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bindings
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/c-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/python-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/rust-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../karaoke/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Karaoke
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../karaoke/forced-alignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timing with a forced aligner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How output is checked
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conformance-vectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conformance vectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance & quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance & quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD against FFmpeg and DEE
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TrueHD against FFmpeg and DEE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#encoder-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoder size
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decoder-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decoder speed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#damaged-streams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Damaged streams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-not-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not measured
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-it-again" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run it again
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tool-comparison-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tool comparison trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../object-quality-trend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object quality trend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../landscape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Landscape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../forge/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forge
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forge
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../forge/cli/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/cli/commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/cli/metadata-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options & grammars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../forge/gui/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    GUI guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/loading-a-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loading a source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/format-and-channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format & channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/objects-and-motion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Objects & motion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/live-session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live capture & session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/source-assignment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-source & assignment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/karaoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Karaoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/coding-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QC a stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/inspect-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspect objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/open-stream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open stream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Localisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forge/gui/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & text size
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../crucible/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crucible
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Crucible
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & first run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/room/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The room
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/signal-path/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The signal path
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/accessibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard & screen readers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/localisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Languages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design record
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crucible/design/promotion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Promotion plan and record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/windows-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Windows demo it grew from
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../hearth/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hearth
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/desktop-player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the desktop player
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth Player for Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hearth for Android
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-S3 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-C6 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    An ESP32-P4 sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-speakers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Speaker levels and the test tone
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sink firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-installer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install from the browser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/sink-layouts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing the speaker layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hearth/design/player-appliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../platforms/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platforms
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platforms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/raspberry-pi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raspberry Pi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/macos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android (Shield demo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_10_7" id="__nav_10_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebAssembly
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    WebAssembly
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/wasm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Browser support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wasm-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wasm-encode-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encode demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../platforms/bare-metal/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bare metal
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10_8" id="__nav_10_8_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bare metal
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/cortex-m3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cortex-M3 (QEMU reference)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-p4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-P4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-c3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esp32-c6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32-C6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/esphome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESPHome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/memory-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 memory layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ESP32 build profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/bare-metal/board-bench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing and benchmarking the boards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platforms/windows-driver-acx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows null-sink driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/CHANGELOG.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../renamed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renamed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-self-hosted-runners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-hosted CI runners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-lanes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI lane partitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-agentic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI for many agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#encoder-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoder size
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decoder-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decoder speed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#damaged-streams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Damaged streams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-not-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not measured
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-it-again" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run it again
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="truehd-encoder-and-decoder-against-ffmpeg-and-dee">TrueHD encoder and decoder against FFmpeg and DEE<a class="headerlink" href="#truehd-encoder-and-decoder-against-ffmpeg-and-dee" title="Permanent link">&para;</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Measured on 2026-10-31, on one Windows machine, with the tools named at the end</p>
+<p>Every number on this page comes from a script in the tree that anyone can run again, and every claim
+names the table that carries it. Where forge is not better, the page says so. The scripts are
+<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/compare_truehd_encoders.py"><code>compare_truehd_encoders.py</code></a> (stream size) and
+<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/tools/checks/compare_truehd_decoders.py"><code>compare_truehd_decoders.py</code></a> (decoder speed and what
+each decoder does with a damaged stream); the library's own workloads are <code>iclforge-bench</code>,
+<code>iclforge-perf</code> and <code>iclforge-membench</code> (<a href="../performance-trend/">Performance trend</a>).</p>
+</div>
+<p>TrueHD is lossless, so an encoder has no quality to race: the stream either decodes to the source or it
+does not, and what is left to compare is size. A stream counts here only if it decodes to the source.
+That is checked for forge's by forge's own decoder and by FFmpeg's strict decode, and for FFmpeg's and
+DEE's by FFmpeg's strict decode; a stream that does not is shown with its bytes, marked <code>*</code>, and left
+out of the ratios and totals.</p>
+<h2 id="encoder-size">Encoder size<a class="headerlink" href="#encoder-size" title="Permanent link">&para;</a></h2>
+<p><strong>Method.</strong> <code>forge truehd-encode</code> (restart interval 128 units, FIR order up to 8, pair matrices, its own
+verification on) and FFmpeg's encoder (<code>-c:a truehd -strict -2</code>) write a stream of each source. DEE's stream
+of the same source is read from a gold set when there is one: the 13 legs committed in
+<code>testdata/truehd-dee</code> (made on 2026-10-29 with DEE 6.5.4, whose licence ends on 2026-11-06) are the
+default, and the full set stays on the owner's machine (<code>--set</code>). DEE's streams are test inputs: their bytes
+are counted and <code>forge probe</code> prints their summary fields, nothing else about them is read. The second
+group of rows is cut from <code>testdata/audio</code> (<code>--programme</code>). The tables are bytes; the ratio is forge's
+bytes over the other stream's, so below 1 is smaller.</p>
+<p><strong>Corpus, and what it is not.</strong> The 13 sources are 0.08 to 0.25 s. The programme rows are 1.5 to 10 s of
+the repository's own material: a Mendelssohn recording and a spoken-word recording (both 16 bit, 48 kHz), and the 5.1
+reference programme (16 bit, 2.5 s long, of which the rows use 1.5 s). <strong>There is no 24-bit programme material in the repository</strong>: the
+rows marked 24 bits put 16-bit samples in a 24-bit container, which the encoder sends as an output shift,
+so they come out the same size as the 16-bit rows. The 7.1 rows are the 5.1 programme with its first two
+channels repeated as the rear surrounds, not 7.1 content, and the 96 and 192 kHz rows are the 48 kHz
+recordings resampled by FFmpeg. Real 24-bit, 7.1 and film material is below, from the owner's discs and local only; speech
+and music at 24 bit are still <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA question 92</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th style="text-align: right;">Rate</th>
+<th style="text-align: right;">Ch</th>
+<th style="text-align: right;">Bits</th>
+<th style="text-align: right;">s</th>
+<th style="text-align: right;">DEE</th>
+<th style="text-align: right;">FFmpeg</th>
+<th style="text-align: right;">forge</th>
+<th style="text-align: right;">forge/FFmpeg</th>
+<th style="text-align: right;">forge/DEE</th>
+<th>bit-exact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>thd-fx-8ch-tones-48k24-dmx6-dmx2 (3 presentations)</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">108,146</td>
+<td style="text-align: right;">73,664 *</td>
+<td style="text-align: right;">59,802</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">0.553</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-6ch-music-48k24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">58,688</td>
+<td style="text-align: right;">63,254</td>
+<td style="text-align: right;">56,672</td>
+<td style="text-align: right;">0.896</td>
+<td style="text-align: right;">0.966</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-2ch-music-48k24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">16,384</td>
+<td style="text-align: right;">19,650</td>
+<td style="text-align: right;">16,218</td>
+<td style="text-align: right;">0.825</td>
+<td style="text-align: right;">0.99</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-2ch-music-96k24</td>
+<td style="text-align: right;">96000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">47,602 *</td>
+<td style="text-align: right;">58,620</td>
+<td style="text-align: right;">54,624</td>
+<td style="text-align: right;">0.932</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-8ch-tones-96k24</td>
+<td style="text-align: right;">96000</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.125</td>
+<td style="text-align: right;">87,880 *</td>
+<td style="text-align: right;">64,248 *</td>
+<td style="text-align: right;">46,532</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-2ch-tones-48k16</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">9,140</td>
+<td style="text-align: right;">13,896</td>
+<td style="text-align: right;">9,116</td>
+<td style="text-align: right;">0.656</td>
+<td style="text-align: right;">0.997</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-2ch-tones-48k20</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">16,298</td>
+<td style="text-align: right;">19,598</td>
+<td style="text-align: right;">9,954</td>
+<td style="text-align: right;">0.508</td>
+<td style="text-align: right;">0.611</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-2ch-music-48k24-drc-film_standard</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">16,384</td>
+<td style="text-align: right;">19,650</td>
+<td style="text-align: right;">16,218</td>
+<td style="text-align: right;">0.825</td>
+<td style="text-align: right;">0.99</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-fx-2ch-music-48k24-timecode (embed-timecode, timecode-frame-rate)</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">16,400</td>
+<td style="text-align: right;">19,650</td>
+<td style="text-align: right;">16,218</td>
+<td style="text-align: right;">0.825</td>
+<td style="text-align: right;">0.989</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-len-2ch-48k-12000</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">25,574</td>
+<td style="text-align: right;">30,560</td>
+<td style="text-align: right;">15,498</td>
+<td style="text-align: right;">0.507</td>
+<td style="text-align: right;">0.606</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-len-2ch-48k-12001</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">25,100</td>
+<td style="text-align: right;">30,928</td>
+<td style="text-align: right;">17,868</td>
+<td style="text-align: right;">0.578</td>
+<td style="text-align: right;">0.712</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-len-2ch-48k-12039</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.251</td>
+<td style="text-align: right;">24,980</td>
+<td style="text-align: right;">30,792</td>
+<td style="text-align: right;">15,656</td>
+<td style="text-align: right;">0.508</td>
+<td style="text-align: right;">0.627</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>thd-len-2ch-48k-4001</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.083</td>
+<td style="text-align: right;">10,152</td>
+<td style="text-align: right;">10,766</td>
+<td style="text-align: right;">7,124</td>
+<td style="text-align: right;">0.662</td>
+<td style="text-align: right;">0.702</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>music-20-48-24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">896,644</td>
+<td style="text-align: right;">759,458</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>music-20-48-16</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">896,644</td>
+<td style="text-align: right;">759,458</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>music-20-44-24</td>
+<td style="text-align: right;">44100</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">1,733,984</td>
+<td style="text-align: right;">1,601,200</td>
+<td style="text-align: right;">0.923</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>music-20-96-24</td>
+<td style="text-align: right;">96000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">2,648,500</td>
+<td style="text-align: right;">2,452,358</td>
+<td style="text-align: right;">0.926</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>music-20-192-24</td>
+<td style="text-align: right;">192000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">1,754,208</td>
+<td style="text-align: right;">1,865,906</td>
+<td style="text-align: right;">1.064</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>speech-10-48-24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">550,498</td>
+<td style="text-align: right;">500,996</td>
+<td style="text-align: right;">0.91</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>speech-20-48-24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">565,948</td>
+<td style="text-align: right;">501,772</td>
+<td style="text-align: right;">0.887</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ref-51-48-24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">352,378</td>
+<td style="text-align: right;">298,558</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ref-51-48-16</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">352,378</td>
+<td style="text-align: right;">298,562</td>
+<td style="text-align: right;">0.847</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ref-51-96-24</td>
+<td style="text-align: right;">96000</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">1,210,068</td>
+<td style="text-align: right;">1,159,498</td>
+<td style="text-align: right;">0.958</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ref-51-192-24</td>
+<td style="text-align: right;">192000</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">1,699,984</td>
+<td style="text-align: right;">1,953,462</td>
+<td style="text-align: right;">1.149</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ref-71-48-24</td>
+<td style="text-align: right;">48000</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">731,874 *</td>
+<td style="text-align: right;">469,266</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ref-71-96-24</td>
+<td style="text-align: right;">96000</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">1,111,560 *</td>
+<td style="text-align: right;">1,449,674</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">-</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>Over the 22 rows with FFmpeg's stream: forge 12,386,406 bytes, FFmpeg 12,978,598, ratio 0.954.
+Over the 11 rows with DEE's stream: forge 240,344 bytes, DEE 327,246, ratio 0.734.</p>
+<p>* the other encoder's stream does not decode to the source (FFmpeg's strict decode: a different layout, a leg that alters the level, or a refusal); its bytes are shown and left out of the ratio and the totals.</p>
+<p><strong>Film, concert and speech excerpts, run locally.</strong> The owner's three Blu-ray discs gave fourteen excerpts of film audio, and a concert
+release (a Blu-ray rip on the owner's server, 2025) ten of music (two 40 s excerpts each of its TrueHD 7.1 track, also as 5.1 and as stereo
+by picking channels, and of its 96 and 192 kHz FLAC stereo tracks), all 24 bit. A film of a 1980s concert-driven drama (a UHD Blu-ray
+remux on the owner's server) gave four of music at 48 kHz, its lossless DTS-HD MA 5.1 track and its 24-bit FLAC stereo track, from two
+loud passages, and two of speech from its director's commentary, which is a lossy AC-3 track decoded to 24 bit and so a test signal, not a
+24-bit speech recording. The film excerpts: six of 45 s at 48 kHz
+(5.1 from the lossless DTS-HD MA track of one disc, and 7.1 from the TrueHD tracks of two, the 7.1 presentation of a TrueHD plus Atmos
+track) and eight of 40 s at 96 kHz (7.1 from the 96 kHz TrueHD track of the third disc, from its main feature and from a short clip, with
+the same audio as stereo and as 5.1 by picking channels, not mixing). All were decoded by FFmpeg. The 96 kHz audio is band-limited: its
+energy above 24 kHz is 74 to 82 dB below the total. The audio is copyrighted and is not in the repository: the table is what
+<code>compare_truehd_encoders.py --set none --corpus DIR</code> printed for the folder. Every forge stream decodes to its source in forge's decoder
+and in FFmpeg's strict decode, sample for sample.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th style="text-align: right;">Ch</th>
+<th style="text-align: right;">s</th>
+<th style="text-align: right;">FFmpeg</th>
+<th style="text-align: right;">forge</th>
+<th style="text-align: right;">forge/FFmpeg</th>
+<th style="text-align: right;">forge, of the 24-bit PCM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>film 5.1 (DTS-HD MA) a</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">18,641,394</td>
+<td style="text-align: right;">17,670,578</td>
+<td style="text-align: right;">0.948</td>
+<td style="text-align: right;">45.4%</td>
+</tr>
+<tr>
+<td>film 5.1 (DTS-HD MA) b</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">18,179,952</td>
+<td style="text-align: right;">17,334,296</td>
+<td style="text-align: right;">0.953</td>
+<td style="text-align: right;">44.6%</td>
+</tr>
+<tr>
+<td>film 7.1 (TrueHD) F a</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">17,681,218 *</td>
+<td style="text-align: right;">11,647,988</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">22.5%</td>
+</tr>
+<tr>
+<td>film 7.1 (TrueHD) F b</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">17,525,586 *</td>
+<td style="text-align: right;">11,332,580</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">21.9%</td>
+</tr>
+<tr>
+<td>film 7.1 (TrueHD) G a</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">16,358,580 *</td>
+<td style="text-align: right;">13,383,746</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">25.8%</td>
+</tr>
+<tr>
+<td>film 7.1 (TrueHD) G b</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">17,919,668 *</td>
+<td style="text-align: right;">14,573,614</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">28.1%</td>
+</tr>
+<tr>
+<td>film 96 kHz stereo H a</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">7,302,522</td>
+<td style="text-align: right;">6,516,698</td>
+<td style="text-align: right;">0.892</td>
+<td style="text-align: right;">28.3%</td>
+</tr>
+<tr>
+<td>film 96 kHz stereo H c</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">4,882,172</td>
+<td style="text-align: right;">4,120,022</td>
+<td style="text-align: right;">0.844</td>
+<td style="text-align: right;">17.9%</td>
+</tr>
+<tr>
+<td>film 96 kHz 5.1 H a</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">16,900,140</td>
+<td style="text-align: right;">15,899,768</td>
+<td style="text-align: right;">0.941</td>
+<td style="text-align: right;">23.0%</td>
+</tr>
+<tr>
+<td>film 96 kHz 5.1 H c</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">12,129,056</td>
+<td style="text-align: right;">10,969,150</td>
+<td style="text-align: right;">0.904</td>
+<td style="text-align: right;">15.9%</td>
+</tr>
+<tr>
+<td>film 96 kHz 7.1 H a</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">32,347,542 *</td>
+<td style="text-align: right;">20,764,856</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">22.5%</td>
+</tr>
+<tr>
+<td>film 96 kHz 7.1 H b</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">33,913,138 *</td>
+<td style="text-align: right;">23,047,752</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">25.0%</td>
+</tr>
+<tr>
+<td>film 96 kHz 7.1 H c</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">25,857,542 *</td>
+<td style="text-align: right;">13,769,546</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">14.9%</td>
+</tr>
+<tr>
+<td>film 96 kHz 7.1 H d</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">28,795,906 *</td>
+<td style="text-align: right;">16,848,970</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">18.3%</td>
+</tr>
+<tr>
+<td>concert stereo 192 kHz a</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">27,209,944</td>
+<td style="text-align: right;">27,711,254</td>
+<td style="text-align: right;">1.018</td>
+<td style="text-align: right;">60.1%</td>
+</tr>
+<tr>
+<td>concert stereo 192 kHz b</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">26,556,322</td>
+<td style="text-align: right;">27,527,458</td>
+<td style="text-align: right;">1.037</td>
+<td style="text-align: right;">59.7%</td>
+</tr>
+<tr>
+<td>concert stereo 48 kHz a</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">7,248,272</td>
+<td style="text-align: right;">6,834,960</td>
+<td style="text-align: right;">0.943</td>
+<td style="text-align: right;">59.3%</td>
+</tr>
+<tr>
+<td>concert stereo 48 kHz b</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">7,351,392</td>
+<td style="text-align: right;">6,806,874</td>
+<td style="text-align: right;">0.926</td>
+<td style="text-align: right;">59.1%</td>
+</tr>
+<tr>
+<td>concert 5.1 48 kHz a</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">16,016,666</td>
+<td style="text-align: right;">15,242,040</td>
+<td style="text-align: right;">0.952</td>
+<td style="text-align: right;">44.1%</td>
+</tr>
+<tr>
+<td>concert 5.1 48 kHz b</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">16,198,998</td>
+<td style="text-align: right;">15,280,502</td>
+<td style="text-align: right;">0.943</td>
+<td style="text-align: right;">44.2%</td>
+</tr>
+<tr>
+<td>concert 7.1 48 kHz a</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">20,693,566 *</td>
+<td style="text-align: right;">20,369,902</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">44.2%</td>
+</tr>
+<tr>
+<td>concert 7.1 48 kHz b</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">20,944,280 *</td>
+<td style="text-align: right;">19,535,482</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">42.4%</td>
+</tr>
+<tr>
+<td>concert stereo 96 kHz a</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">16,336,062</td>
+<td style="text-align: right;">15,901,132</td>
+<td style="text-align: right;">0.973</td>
+<td style="text-align: right;">69.0%</td>
+</tr>
+<tr>
+<td>concert stereo 96 kHz b</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">16,381,882</td>
+<td style="text-align: right;">15,936,542</td>
+<td style="text-align: right;">0.973</td>
+<td style="text-align: right;">69.2%</td>
+</tr>
+<tr>
+<td>animated film 5.1 192 kHz a</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">31,039,412</td>
+<td style="text-align: right;">30,960,312</td>
+<td style="text-align: right;">0.997</td>
+<td style="text-align: right;">29.9%</td>
+</tr>
+<tr>
+<td>animated film 5.1 192 kHz b</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">33,532,106</td>
+<td style="text-align: right;">33,852,302</td>
+<td style="text-align: right;">1.010</td>
+<td style="text-align: right;">32.7%</td>
+</tr>
+<tr>
+<td>animated film 5.1 48 kHz a</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">5,985,704</td>
+<td style="text-align: right;">5,439,014</td>
+<td style="text-align: right;">0.909</td>
+<td style="text-align: right;">21.0%</td>
+</tr>
+<tr>
+<td>animated film 5.1 48 kHz b</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">6,657,122</td>
+<td style="text-align: right;">6,009,284</td>
+<td style="text-align: right;">0.903</td>
+<td style="text-align: right;">23.2%</td>
+</tr>
+<tr>
+<td>concert film music stereo a</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">9,481,444</td>
+<td style="text-align: right;">8,911,356</td>
+<td style="text-align: right;">0.940</td>
+<td style="text-align: right;">77.4%</td>
+</tr>
+<tr>
+<td>concert film music stereo b</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">8,756,348</td>
+<td style="text-align: right;">8,195,840</td>
+<td style="text-align: right;">0.936</td>
+<td style="text-align: right;">71.1%</td>
+</tr>
+<tr>
+<td>concert film music 5.1 a</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">23,602,014</td>
+<td style="text-align: right;">22,430,872</td>
+<td style="text-align: right;">0.950</td>
+<td style="text-align: right;">64.9%</td>
+</tr>
+<tr>
+<td>concert film music 5.1 b</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">21,438,178</td>
+<td style="text-align: right;">20,327,922</td>
+<td style="text-align: right;">0.948</td>
+<td style="text-align: right;">58.8%</td>
+</tr>
+<tr>
+<td>interview speech stereo (lossy source) a</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">7,163,690</td>
+<td style="text-align: right;">6,153,936</td>
+<td style="text-align: right;">0.859</td>
+<td style="text-align: right;">53.4%</td>
+</tr>
+<tr>
+<td>interview speech stereo (lossy source) b</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">6,879,108</td>
+<td style="text-align: right;">5,751,694</td>
+<td style="text-align: right;">0.836</td>
+<td style="text-align: right;">49.9%</td>
+</tr>
+</tbody>
+</table>
+<p>On the 5.1 film forge is 0.95 of FFmpeg's size, as on the programme rows, and on the 96 kHz stereo and 5.1 0.84 to 0.94. <strong>On the concert, real full-band music, forge is 0.93 to 0.95 of FFmpeg's size at 48 kHz
+(stereo, 5.1), 0.97 at 96 kHz and 1.02 and 1.04 at 192 kHz</strong>: the concert is louder, full-band music where the programme rows are the repository's own recordings, and the 192 kHz loss is the specification's order-4 limit (below, ERRATA question 96). FFmpeg's 7.1 streams do not decode to the source, so they
+have no ratio. A 7.1 file with the standard channel mask lists BL BR before SL SR, TrueHD has Ls Rs before Lrs Rrs, and
+<code>forge decode</code> writes no mask: its output has the last four channels swapped in pairs, which the harness expects and FFmpeg's decode,
+which writes the mask's order, does not show.</p>
+<p><strong>What it shows.</strong></p>
+<ul>
+<li><strong>5.1 music, the row that was worst: 101,314 bytes before, 56,672 now</strong>, against DEE's 58,688 and FFmpeg's 63,254
+  (0.966 and 0.896). The cause was one output shift and quantiser step for all six channels: the source's L, R, Ls
+  and Rs are 16-bit material (7 or 8 clear low bits) and its C and LFE use all 24 bits, so the single step sent the
+  low 8 bits of four channels for nothing. The encoder now sends each channel's own shift and step
+  (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA entry 90</a>); a test fails if it does not
+  (<code>each channel sends its own clear low bits...</code>, mutation-checked), and the pull-request flow fails a change that makes any
+  of the 13 sources larger than FFmpeg's or DEE's stream of it.</li>
+<li><strong>On the 13 committed sources forge is smaller than FFmpeg's encoder on every row where FFmpeg's stream is the source</strong>
+  (0.507 to 0.932) and smaller than DEE's on every row where DEE's is (0.553 to 0.997; 0.734 over the 11 rows). Those
+  totals are led by the length-test and tone rows, where forge is 30 to 50 per cent smaller; on the two real 48 kHz music
+  sources forge is 1 and 3.4 per cent smaller than DEE and 17.5 and 10.4 per cent smaller than FFmpeg.
+  The DEE rows at 0.997 and 0.990 are ties, not wins.</li>
+<li><strong>On the programme material forge is 0.85 to 0.96 of FFmpeg's size at 44.1 to 96 kHz</strong> (0.954 over all 22 rows
+  FFmpeg's stream is the source of, the 13 sources included).</li>
+<li><strong>At 192 kHz forge is larger than FFmpeg: 1.064 stereo and 1.149 for 5.1.</strong> The specification limits the filter
+  order there to 4 and FFmpeg's encoder writes order 7 (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA entry 35</a>). FFmpeg 8.0.1's
+  strict decode refused forge's 192 kHz streams of 3 or more channels while they had one substream, as the text of
+  the specification has it; its own encoder writes two, and so does forge now, with FFmpeg's decode of the 5.1 row exact
+  (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA entry 90</a>, provisional until the owner confirms).</li>
+<li><strong>DEE's 96 kHz streams are not the source</strong>: FFmpeg's strict decode of them differs from it (about -47 dB, <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA entry 50</a>),
+  so their sizes are not a size for the same audio and are not compared. Forge is 0.932 of FFmpeg's size on the
+  96 kHz music, and the gap to DEE's smaller figure is not a gap in coding.</li>
+<li><strong>FFmpeg's 8-channel streams are not the source either</strong> (<code>*</code> on the 7.1 and 8-channel rows), so FFmpeg has no 7.1 size to compare with.</li>
+<li><strong>What was tried and is not in the encoder.</strong> A least-squares (covariance) FIR candidate beside the windowed autocorrelation one
+  changed the 96 kHz music by 0.04 per cent and was dropped. On that source a long filter (order 32) needs about 11 per cent fewer
+  bits than order 8 by an estimate with exact coefficients, which is the case of music resampled up by FFmpeg. Measured on real
+  recordings, with the coefficients quantised as the format asks and the recursion run in integers
+  (<code>tools/checks/estimate_truehd_iir_gain.py</code>, 13 files), the format's IIR filter next to a FIR of order 8 is 99.9 to 100.4 per cent of
+  order 8's residual bits, and 99.7 to 100.0 per cent if the better of the two is taken for each segment; it saves 3.7 per cent at 96 kHz
+  and 11 per cent at 192 kHz only on the resampled test signal. It is not written (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA question 91</a>).</li>
+<li><strong>Against a retail encoder's stream of the same audio.</strong> The 192 kHz and 48 kHz 5.1 TrueHD tracks of an animated film's UHD Blu-ray
+  were decoded and re-encoded by forge: a unit of forge's stream is 0.990 of the retail unit's size at 192 kHz and 0.995 at 48 kHz (bytes
+  per access unit, the two excerpts covering slightly different spans), exact in forge's decoder and in FFmpeg's strict decode; on 30 s
+  excerpts forge is 0.997 and 1.010 of FFmpeg's encoder's size at 192 kHz and 0.90 at 48 kHz. Both retail tracks have the layout forge
+  writes at these rates, two substreams of 2 and 6 channels; their substream 1 carries restart sync 0x31EB, which forge now writes too
+  (<a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA entry 97</a>).</li>
+</ul>
+<h2 id="decoder-speed">Decoder speed<a class="headerlink" href="#decoder-speed" title="Permanent link">&para;</a></h2>
+<p>Wall time of <code>forge decode IN OUT.wav</code> against <code>ffmpeg -f truehd -i IN -f null -</code> on the streams forge wrote, the fastest
+of 9 runs, so <strong>both include starting the process, and forge also writes the WAV file</strong>, which only works against it. The short
+streams (1.5 s) are mostly process start.</p>
+<table>
+<thead>
+<tr>
+<th>Stream</th>
+<th style="text-align: right;">Audio s</th>
+<th style="text-align: right;">forge ms</th>
+<th style="text-align: right;">FFmpeg ms</th>
+<th style="text-align: right;">forge x real time</th>
+<th style="text-align: right;">FFmpeg x real time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>music-20-48-24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">50.1</td>
+<td style="text-align: right;">128.8</td>
+<td style="text-align: right;">199.7</td>
+<td style="text-align: right;">77.6</td>
+</tr>
+<tr>
+<td>music-20-96-24</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">77.6</td>
+<td style="text-align: right;">134.1</td>
+<td style="text-align: right;">128.8</td>
+<td style="text-align: right;">74.6</td>
+</tr>
+<tr>
+<td>ref-51-48-24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">33.7</td>
+<td style="text-align: right;">67</td>
+<td style="text-align: right;">44.6</td>
+<td style="text-align: right;">22.4</td>
+</tr>
+<tr>
+<td>ref-51-96-24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">46</td>
+<td style="text-align: right;">75.2</td>
+<td style="text-align: right;">32.6</td>
+<td style="text-align: right;">19.9</td>
+</tr>
+<tr>
+<td>music-20-192-24</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">68.3</td>
+<td style="text-align: right;">106.6</td>
+<td style="text-align: right;">73.2</td>
+<td style="text-align: right;">46.9</td>
+</tr>
+<tr>
+<td>ref-71-48-24</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">36.4</td>
+<td style="text-align: right;">69.7</td>
+<td style="text-align: right;">41.2</td>
+<td style="text-align: right;">21.5</td>
+</tr>
+</tbody>
+</table>
+<p>In process, with no file and no process start, <code>iclforge-bench</code> (the fastest of five runs, 20 passes over the stream, a machine in
+use: a figure moves by a third from run to run):</p>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th style="text-align: right;">Microseconds an access unit</th>
+<th style="text-align: right;">Times real time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>truehd_stereo_decode</code></td>
+<td style="text-align: right;">1.44</td>
+<td style="text-align: right;">578</td>
+</tr>
+<tr>
+<td><code>truehd_51_decode</code></td>
+<td style="text-align: right;">4.04</td>
+<td style="text-align: right;">206</td>
+</tr>
+<tr>
+<td><code>truehd_71_decode</code> (the rear surrounds repeat two channels)</td>
+<td style="text-align: right;">5.55</td>
+<td style="text-align: right;">150</td>
+</tr>
+<tr>
+<td><code>truehd_51_96k_decode</code></td>
+<td style="text-align: right;">7.60</td>
+<td style="text-align: right;">110</td>
+</tr>
+<tr>
+<td><code>truehd_stereo_192k_decode</code></td>
+<td style="text-align: right;">4.87</td>
+<td style="text-align: right;">171</td>
+</tr>
+<tr>
+<td><code>truehd_stereo_encode</code></td>
+<td style="text-align: right;">21.4</td>
+<td style="text-align: right;">39</td>
+</tr>
+<tr>
+<td><code>truehd_51_encode</code></td>
+<td style="text-align: right;">57.3</td>
+<td style="text-align: right;">14.5</td>
+</tr>
+<tr>
+<td><code>truehd_71_encode</code></td>
+<td style="text-align: right;">77.2</td>
+<td style="text-align: right;">10.8</td>
+</tr>
+<tr>
+<td><code>truehd_51_96k_encode</code></td>
+<td style="text-align: right;">97.2</td>
+<td style="text-align: right;">8.6</td>
+</tr>
+<tr>
+<td><code>truehd_stereo_192k_encode</code></td>
+<td style="text-align: right;">53.7</td>
+<td style="text-align: right;">15.5</td>
+</tr>
+</tbody>
+</table>
+<p>FFmpeg's decoder with <code>-stream_loop 40</code> over the same 5.1 stream measured about 140 times real time (<code>-benchmark</code>, user time
+0.55 to 0.84 s and real time 0.44 s for 61.5 s of audio), so forge's in-process figure is in the same range; the two are not the same measurement and
+the wall-clock table above is the comparison. Windows, macOS and ARM figures come from the CI legs, not from this page.</p>
+<h2 id="damaged-streams">Damaged streams<a class="headerlink" href="#damaged-streams" title="Permanent link">&para;</a></h2>
+<p>One change to a 5.1 stream of 72,000 frames, then each decoder. Each cell is the exit status, the frames written, the
+frames equal to the source and the longest run of source frames missing or wrong. "forge" is <code>forge decode</code> as it runs (it
+stops at the first failed check); "forge lenient" is <code>truehd-check=lenient</code> (it counts the failure and goes on); "FFmpeg
+strict" is the flags the encoder tests use, <code>-xerror -err_detect crccheck+bitstream+buffer+explode</code>.</p>
+<p>Damaged <code>ref-51-48-24</code> (72,000 frames). Each cell: exit status, frames written, frames equal to the source, longest run missing or wrong.</p>
+<table>
+<thead>
+<tr>
+<th>Damage</th>
+<th>forge</th>
+<th>forge lenient</th>
+<th>FFmpeg</th>
+<th>FFmpeg strict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>drop-unit</td>
+<td>exit 2, 2,560, 2,560, 69,440</td>
+<td>exit 0, 69,520, 69,440, 2,560</td>
+<td>exit 0, 69,840, 69,440, 2,560</td>
+<td>exit 3199971767, 2,560, 2,560, 69,440</td>
+</tr>
+<tr>
+<td>drop-unit-late</td>
+<td>exit 2, 10,200, 5,240, 66,760</td>
+<td>exit 0, 71,960, 67,000, 5,000</td>
+<td>exit 0, 71,960, 67,000, 5,000</td>
+<td>exit 0, 71,960, 67,000, 5,000</td>
+</tr>
+<tr>
+<td>zero-unit</td>
+<td>exit 2, 2,560, 2,560, 69,440</td>
+<td>exit 0, 69,440, 69,440, 2,560</td>
+<td>exit 0, 71,960, 69,440, 2,560</td>
+<td>exit 3199971767, 2,560, 2,560, 69,440</td>
+</tr>
+<tr>
+<td>flip-payload</td>
+<td>exit 2, 2,560, 2,560, 69,440</td>
+<td>exit 0, 72,000, 69,455, 1,523</td>
+<td>exit 0, 72,000, 69,455, 1,523</td>
+<td>exit 0, 72,000, 69,455, 1,523</td>
+</tr>
+<tr>
+<td>flip-sync</td>
+<td>exit 2, 5,120, 5,120, 66,880</td>
+<td>exit 0, 66,880, 66,880, 5,120</td>
+<td>exit 0, 66,880, 66,880, 5,120</td>
+<td>exit 0, 66,880, 66,880, 5,120</td>
+</tr>
+<tr>
+<td>insert-junk</td>
+<td>exit 2, 2,560, 2,560, 69,440</td>
+<td>exit 0, 69,440, 69,440, 2,560</td>
+<td>exit 0, 69,440, 69,440, 2,560</td>
+<td>exit 0, 69,440, 69,440, 2,560</td>
+</tr>
+<tr>
+<td>junk-prefix</td>
+<td>exit 0, 72,000, 72,000, 0</td>
+<td>exit 0, 72,000, 72,000, 0</td>
+<td>exit 0, 72,000, 72,000, 0</td>
+<td>exit 0, 72,000, 72,000, 0</td>
+</tr>
+<tr>
+<td>truncate</td>
+<td>exit 2, 5,240, 5,240, 66,760</td>
+<td>exit 0, 5,240, 5,240, 66,760</td>
+<td>exit 0, 5,240, 5,240, 66,760</td>
+<td>exit 0, 5,240, 5,240, 66,760</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What it shows, and what it does not.</strong></p>
+<ul>
+<li><strong>Recovery is the same.</strong> With the failure counted and the decode going on, forge and FFmpeg recover the same frames at the next
+  restart in every case (the same <code>exact</code> column), including after a lost unit, junk between units and a cut stream. Forge is not
+  better at resynchronising and the page does not say it is.</li>
+<li><strong>A flipped bit in a payload is where they differ.</strong> FFmpeg warns that the substream's parity, checksum and lossless check
+  failed and writes 2,545 wrong frames with exit status 0, as it runs and with the strict flags. Forge as it runs stops at that unit and
+  exits 2. A library test flips 48 bits across two units of a real stream and a strict decode refuses all 48
+  (<code>one bit flipped in the payload of any unit...</code>, mutation-checked: switching the parity and CRC checks off fails all 48). Forge
+  lenient does what FFmpeg does, and counts the failure.</li>
+<li><strong>Exit status.</strong> Forge as it runs refuses every damage except the junk before the first unit, which all four skip. FFmpeg as it runs exits 0 on
+  all of them, and with the strict flags it fails on a dropped or zeroed unit only. Whether stopping is better than writing what can be read
+  is the caller's choice, and forge offers both.</li>
+</ul>
+<h2 id="what-is-not-measured">What is not measured<a class="headerlink" href="#what-is-not-measured" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No 24-bit programme material and no real 7.1 or film material (above).</li>
+<li>DEE's speed: it is a licensed binary on another machine; the question is <a href="https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md">ERRATA question 94</a>.</li>
+<li>Memory beyond <code>iclforge-membench</code>'s per-frame counts; the TrueHD rows are in <a href="../performance-trend/">Performance trend</a>.</li>
+<li>Windows, macOS, ARM and the small parts: CI legs and the ESP32 phase of the plan, not this machine.</li>
+<li>The tiers of the arithmetic audit: the decoder is exact integer arithmetic and has one tier; the encoder's analysis is <code>double</code>, and the
+  one AVX2 kernel (the bit count) has its own bit-exactness test. No float, fixed-point or further SIMD tier was written here.</li>
+</ul>
+<h2 id="run-it-again">Run it again<a class="headerlink" href="#run-it-again" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python tools/checks/compare_truehd_encoders.py --forge build/bin/forge --programme
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python tools/checks/compare_truehd_encoders.py --forge build/bin/forge --set D:/ac3bld/dee-gold   # the full set, on the owner&#39;s machine
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>python tools/checks/compare_truehd_decoders.py --forge build/bin/forge
+</code></pre></div>
+<p>Tools: forge 0.10.0-beta.1+5866; FFmpeg 8.0.1 (gyan.dev full build, the version <code>.github/workflows/_ci-core.yml</code> pins); DEE 6.5.4 for the
+committed legs; Windows 11, MSVC 14.51 Release, AMD Ryzen 9 5950X (16 cores).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/enhancements.js"></script>
+      
+        <script src="../javascripts/hero-stats.js"></script>
+      
+    
+  </body>
+</html>
