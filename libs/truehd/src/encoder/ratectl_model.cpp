@@ -63,8 +63,8 @@ void RateModel::reset() noexcept {
 
 std::uint64_t declared_peak_rate_bps(std::uint64_t requested_bps,
                                      std::uint32_t sample_rate) noexcept {
-    // The field is raw = rate * 16 / sample rate, at most 15 bits; a reader gets raw * sample rate /
-    // 16 back, rounded to nearest (MajorSync::peak_data_rate_bps).
+    // The field is raw = rate * 16 / sample rate, at most 15 bits; a reader gets raw * sample rate
+    // / 16 back, rounded to nearest (MajorSync::peak_data_rate_bps).
     const std::uint64_t raw = std::min<std::uint64_t>(0x7FFF, (requested_bps * 16U) / sample_rate);
     return (raw * sample_rate + 8U) >> 4U;
 }
@@ -152,9 +152,8 @@ std::expected<RateReport, Error> analyse_rate(std::span<const std::byte> stream,
             meter->begin(unit_number);
             open = true;
         }
-        const RateStep step =
-            model->admit(static_cast<std::int64_t>(unit_number) * report.samples_per_unit,
-                         unit->size());
+        const RateStep step = model->admit(
+            static_cast<std::int64_t>(unit_number) * report.samples_per_unit, unit->size());
         meter->add(unit->size(), report.samples_per_unit, step);
         ++report.units;
         report.bytes += unit->size();
@@ -168,7 +167,8 @@ std::expected<RateReport, Error> analyse_rate(std::span<const std::byte> stream,
     if (!model) {
         return std::unexpected(Error{ErrorKind::kBadSync, "no access unit with a major sync"});
     }
-    const std::uint64_t samples = report.units * static_cast<std::uint64_t>(report.samples_per_unit);
+    const std::uint64_t samples =
+        report.units * static_cast<std::uint64_t>(report.samples_per_unit);
     if (samples != 0) {
         report.bitrate_bps = clamp_u32(report.bytes * 8U * report.sample_rate / samples);
     }

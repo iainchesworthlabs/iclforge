@@ -21,9 +21,9 @@
 #include "platform/process.hpp"
 
 // `forge truehd-atmos` with the rate and layout options, and `forge probe detail=rate`
-// (libs/truehd/ERRATA.md entry 71): the real binary, a stream of 12 object channels of a signal that
-// is quiet for a second and noisy for a second, and the figures the probe reads back checked against
-// the library's own reading of the same bytes.
+// (libs/truehd/ERRATA.md entry 71): the real binary, a stream of 12 object channels of a signal
+// that is quiet for a second and noisy for a second, and the figures the probe reads back checked
+// against the library's own reading of the same bytes.
 //
 // ICLFORGE_CLI_EXE comes from apps/forge/cli/tests/CMakeLists.txt.
 
@@ -54,7 +54,8 @@ std::string read_text(const fs::path& path) {
 
 std::vector<std::byte> read_stream(const fs::path& path) {
     std::ifstream in{path, std::ios::binary};
-    const std::vector<char> raw{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    const std::vector<char> raw{std::istreambuf_iterator<char>{in},
+                                std::istreambuf_iterator<char>{}};
     std::vector<std::byte> out(raw.size());
     std::transform(raw.begin(), raw.end(), out.begin(),
                    [](char c) { return static_cast<std::byte>(c); });
@@ -75,8 +76,9 @@ std::vector<std::vector<float>> object_channels(int seconds) {
         for (std::size_t c = 0; c < 12; ++c) {
             state = state * 1664525U + 1013904223U;
             const double noise = static_cast<double>(state >> 8U) / 16777216.0 * 2.0 - 1.0;
-            const double tone = std::sin(2.0 * std::numbers::pi * (200.0 + 90.0 * static_cast<double>(c)) *
-                                         static_cast<double>(t) / 48000.0);
+            const double tone =
+                std::sin(2.0 * std::numbers::pi * (200.0 + 90.0 * static_cast<double>(c)) *
+                         static_cast<double>(t) / 48000.0);
             channels[c][t] = static_cast<float>(t < 48000 ? 0.002 * tone : noise * 0.001);
         }
     }
@@ -102,7 +104,8 @@ Written write_atmos(const std::string& name, const std::string& options, int sec
 
 }  // namespace
 
-TEST_CASE("probe detail=rate prints a figure for every restart interval", "[forge-cli][truehd][rate]") {
+TEST_CASE("probe detail=rate prints a figure for every restart interval",
+          "[forge-cli][truehd][rate]") {
     const Written w = write_atmos("rate_probe", "truehd-restart=16");
     const fs::path log = w.stream.parent_path() / "rate_probe_probe.log";
     REQUIRE(run_cli("probe " + quoted(w.stream) + " detail=rate", log) == 0);
@@ -173,7 +176,8 @@ TEST_CASE("probe detail=rate json holds what the library reads from the same byt
     REQUIRE(intervals.size() == expected->intervals.size());
     std::uint64_t units = 0;
     for (std::size_t i = 0; i < intervals.size(); ++i) {
-        CHECK(intervals[i].at("first_unit").get<std::uint64_t>() == expected->intervals[i].first_unit);
+        CHECK(intervals[i].at("first_unit").get<std::uint64_t>() ==
+              expected->intervals[i].first_unit);
         CHECK(intervals[i].at("units").get<std::uint64_t>() == 16);
         CHECK(intervals[i].at("bitrate_bps").get<std::uint64_t>() ==
               expected->intervals[i].bitrate_bps);
@@ -196,7 +200,8 @@ TEST_CASE("probe detail=rate runs the model at truehd-bitrate=", "[forge-cli][tr
     const Written w = write_atmos("rate_model", "truehd-restart=16");
     const fs::path log = w.stream.parent_path() / "rate_model_probe.log";
     // A rate well under what the noisy second needs: some units are late, which the figures say.
-    REQUIRE(run_cli("probe " + quoted(w.stream) + " json=1 detail=rate truehd-bitrate=6000", log) == 0);
+    REQUIRE(run_cli("probe " + quoted(w.stream) + " json=1 detail=rate truehd-bitrate=6000", log) ==
+            0);
     const auto doc = nlohmann::json::parse(read_text(log));
     const auto& rate = doc.at("truehd").at("rate");
     CHECK(rate.at("model_rate_bps").get<std::uint64_t>() == 6'000'000);
@@ -227,8 +232,8 @@ TEST_CASE("truehd-major-sync= puts a major sync every so many access units",
                       " truehd-presentation=all",
                   log) == 0);
     // A multiple of the restart interval, or the encoder says so.
-    const Written bad = write_atmos("rate_major_bad", "truehd-restart=16 truehd-major-sync=40", 1,
-                                    kExitUsage);
+    const Written bad =
+        write_atmos("rate_major_bad", "truehd-restart=16 truehd-major-sync=40", 1, kExitUsage);
     CHECK(read_text(bad.log).find("multiple") != std::string::npos);
 }
 
@@ -265,8 +270,8 @@ TEST_CASE("truehd-rate-mode=shape fits a bitrate that the lossless stream does n
     CHECK(at_target->late_units == 0);
     CHECK(at_target->min_headroom_us >= 0);
     const fs::path log = shaped.stream.parent_path() / "rate_shape_probe.log";
-    REQUIRE(run_cli("probe " + quoted(shaped.stream) + " json=1 detail=rate truehd-bitrate=" +
-                        std::to_string(kbps),
+    REQUIRE(run_cli("probe " + quoted(shaped.stream) +
+                        " json=1 detail=rate truehd-bitrate=" + std::to_string(kbps),
                     log) == 0);
     CHECK(nlohmann::json::parse(read_text(log))
               .at("truehd")
@@ -287,12 +292,12 @@ TEST_CASE("the rate options are refused where they mean nothing", "[forge-cli][t
                       " truehd-rate-mode=shape",
                   log) == kExitUsage);
     CHECK(read_text(log).find("only truehd-atmos has") != std::string::npos);
-    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "x.thd") +
-                      " truehd-shape-bits=17",
-                  log) == kExitUsage);
-    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "x.thd") +
-                      " truehd-bitrate=999",
-                  log) == kExitUsage);
+    CHECK(run_cli(
+              "truehd-atmos " + quoted(wav) + " " + quoted(dir / "x.thd") + " truehd-shape-bits=17",
+              log) == kExitUsage);
+    CHECK(
+        run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "x.thd") + " truehd-bitrate=999",
+                log) == kExitUsage);
     CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "x.thd") +
                       " truehd-rate-mode=sometimes",
                   log) == kExitUsage);

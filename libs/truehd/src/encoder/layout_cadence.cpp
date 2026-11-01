@@ -41,8 +41,7 @@ bool layout_has_major_sync(const LayoutCadence& cadence, std::uint64_t interval)
     if (cadence.major_sync_units == 0 || cadence.major_sync_units == cadence.restart_units) {
         return true;
     }
-    const auto every =
-        static_cast<std::uint64_t>(cadence.major_sync_units / cadence.restart_units);
+    const auto every = static_cast<std::uint64_t>(cadence.major_sync_units / cadence.restart_units);
     return interval % every == 0;
 }
 
@@ -95,8 +94,9 @@ LayoutAudit audit_layout(std::span<const std::byte> stream) {
             ++audit.major_syncs;
         }
         if (parsed->num_substreams != substreams) {
-            return fail(unit_text(number, "the directory's substream count is not the major "
-                                          "sync's"));
+            return fail(unit_text(number,
+                                  "the directory's substream count is not the major "
+                                  "sync's"));
         }
         const bool restart = !parsed->entries[0].restart_nonexistent;
         for (int i = 0; i < parsed->num_substreams; ++i) {
@@ -119,8 +119,9 @@ LayoutAudit audit_layout(std::span<const std::byte> stream) {
                 continue;
             }
             if (segment.size() < 3 || segment.size() % 2 != 0) {
-                return fail(unit_text(number, "a segment with parity and CRC is shorter than 3 "
-                                              "bytes or an odd size"));
+                return fail(unit_text(number,
+                                      "a segment with parity and CRC is shorter than 3 "
+                                      "bytes or an odd size"));
             }
             const auto payload = segment.first(segment.size() - 2);
             if (substream_parity(payload) !=
@@ -136,8 +137,9 @@ LayoutAudit audit_layout(std::span<const std::byte> stream) {
         if (parsed->extra_data && !parsed->extra_data->padding_only) {
             const ExtraData& extra = *parsed->extra_data;
             if (!extra.check_ok || !extra.framing_ok || !extra.parity_ok) {
-                return fail(unit_text(number, "the extra data's framing, check nibble or parity "
-                                              "does not hold"));
+                return fail(unit_text(number,
+                                      "the extra data's framing, check nibble or parity "
+                                      "does not hold"));
             }
             ++audit.extra_data_units;
         }
