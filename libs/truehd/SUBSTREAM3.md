@@ -274,6 +274,10 @@ Counts of the earlier runs were made with a fold that shifted by the channel ins
 
 ## 6. Open items
 
+**Slope rule seen directly in `ctl_e`.** In the section dumps of `ctl_e` (one object moving over 10 s), `ext_field2` 3, nine access units apart (samples 4,800 to 5,160), the base of
+every coefficient plus 9 × delta / 2^3 equals the next section's base, also in real values across a change of `f_shift`. The coefficients that move are not the object's pan: in the same file
+one matrix moves by 1.04 in 360 samples while the object moves 0.0015 of the room, and `ch_assign` differs from stream to stream, so a slot's order is not the speaker order.
+
 **Sample rates other than 48 kHz.** The ramp's step and the length of the access unit (40 << r samples) are measured at 48 kHz only; every stream in the
 corpus is 48 kHz. The step for 96 and 192 kHz is the rule's reading, untested.
 
