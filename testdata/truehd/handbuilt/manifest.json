@@ -822,7 +822,7 @@
       "channels": 12,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "7ee7c42097bd4a7b0353632bd49351ed55588decb0ba15bff16309d17b8e1ddd",
+      "stream_sha256": "e8984ec000a63d13b727717a5d8e9c3bcf9914aa9c6b66c4bf5a8ee20ee8dc49",
       "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34"
     },
     {
@@ -858,7 +858,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "7ee7c42097bd4a7b0353632bd49351ed55588decb0ba15bff16309d17b8e1ddd",
+      "stream_sha256": "e8984ec000a63d13b727717a5d8e9c3bcf9914aa9c6b66c4bf5a8ee20ee8dc49",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
     },
     {
@@ -894,8 +894,8 @@
       "channels": 12,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "66536d7d4b0f993523e15ad5fee96c14da04b740b4f091d8b62261c9315897f0",
-      "pcm_sha256": "424b8898790edc84d58e1b05ab56cf4a71503559f02f54540c59db01f2fd0e34"
+      "stream_sha256": "29db7aafeff5ab7355455c7e49f296335cda4a7531fd03fb758538d5dc41732b",
+      "pcm_sha256": "e6de370024ef14f9d5cca5cd8b2d708609cbe7f71757b64d175e4a2803f1f070"
     },
     {
       "name": "hb_substream3_object_bypass_wide_best",
@@ -930,7 +930,7 @@
       "channels": 8,
       "access_units": 32,
       "pcm_samples": 1280,
-      "stream_sha256": "66536d7d4b0f993523e15ad5fee96c14da04b740b4f091d8b62261c9315897f0",
+      "stream_sha256": "29db7aafeff5ab7355455c7e49f296335cda4a7531fd03fb758538d5dc41732b",
       "pcm_sha256": "7099e52e6a3ddc81d91b5cd93663897f63c87353a992a89ddc1eb8380dff94f0"
     },
     {

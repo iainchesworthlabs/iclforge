@@ -1037,6 +1037,8 @@ def case_substream3_fine_matrices(
     bypass_index=None,
     assign=None,
     bypass_width=1,
+    masked_out=None,
+    masked_width=0,
 ):
     """A twelve channel substream 3 (restart sync 0x31EC) whose matrices carry `frac_bits` 15, 14,
     13 and 0, as the object substream of the owner's discs does (ERRATA 60): four channels of
@@ -1044,9 +1046,15 @@ def case_substream3_fine_matrices(
     bit of the 17 bit field (an odd value at `frac_bits` 15) and one that reads two channels.
     With `assign` the substream's ch_assign is that permutation of 0 to 11: the matrices and the
     coded channels are the same, and output position p carries the matrix channel m with
-    assign[m] == p (TH spec 7.4, ERRATA 42), which is how the owner's discs order their objects."""
+    assign[m] == p (TH spec 7.4, ERRATA 42), which is how the owner's discs order their objects.
+    The output of a matrix with an LSB bypass is its sum plus the bypass bits; the output of a
+    matrix without one takes the quantiser step of its output channel over the whole sum, so a
+    channel with `masked_width` as its step (`masked_out`, none of whose matrices has a bypass)
+    carries samples that are multiples of 2^masked_width (ERRATA 69)."""
     n = 40 * 32
     src = [tone(n, 90 + c, 2**21) for c in range(12)]
+    if masked_out is not None:
+        src[masked_out] = [x & -(1 << masked_width) for x in src[masked_out]]
     # (out, frac_bits, {channel: coefficient}); the unity coefficient of `out` is 2^frac_bits
     plan = [
         (8, 15, {1: 12345, 4: -20001}),
@@ -1079,17 +1087,26 @@ def case_substream3_fine_matrices(
     for k in reversed(range(len(steps))):
         out, frac, others, fs = steps[k]
         scale = 15 - frac + fs
-        if k == bypass_index:
-            # the matrix's output channel is quantised to a step of 2^width and the bits it loses
-            # are sent in the block data, `width` bits a sample (ERRATA 69)
-            wanted = coded[out]
+        if k == bypass_index or out == masked_out:
             stepped = [
                 ((sum(coded[c][i] * w for c, w in others.items()) << scale) + 2 * terms[k][i]) >> 15
                 for i in range(n)
             ]
+            wanted = coded[out]
+        if k == bypass_index:
+            # the matrix's output channel is quantised to a step of 2^width and the output is the
+            # sum, whose low bits are whatever the other channels leave, plus `width` bits a
+            # sample sent in the block data (ERRATA 69): the coded channel (a multiple of the
+            # step) takes the part of what is wanted above the step, the bits the rest
             low = (1 << bypass_width) - 1
-            coded[out] = [(x & ~low) - (st & ~low) for x, st in zip(wanted, stepped, strict=True)]
-            bypass_bits[k] = [x & low for x in wanted]
+            coded[out] = [(x - st) & ~low for x, st in zip(wanted, stepped, strict=True)]
+            bypass_bits[k] = [(x - st) & low for x, st in zip(wanted, stepped, strict=True)]
+            continue
+        if out == masked_out:
+            # no bypass: the whole sum, the others' share included, is cut to the step
+            keep = -(1 << masked_width)
+            assert all(x == x & keep for x in wanted)
+            coded[out] = [x - (st & keep) for x, st in zip(wanted, stepped, strict=True)]
             continue
         coded[out] = [
             o
@@ -1111,7 +1128,11 @@ def case_substream3_fine_matrices(
         c: Channel(
             fir=filt([-1500], 8) if c == 8 else None,
             huff_type=c % 4,
-            quant=bypass_width if bypass_index is not None and c == steps[bypass_index][0] else 0,
+            quant=bypass_width
+            if bypass_index is not None and c == steps[bypass_index][0]
+            else masked_width
+            if c == masked_out
+            else 0,
         )
         for c in range(8, 12)
     }
@@ -1179,9 +1200,15 @@ def case_substream3_object_noise():
 def case_substream3_object_bypass_wide():
     """As `case_substream3_object_bypass`, with a bypass of 2 bits a sample (field_2b 2), as
     soll_e12 and soll_sil6 have it: the output channel is quantised to a step of 4 and the two
-    bits it loses come before the first channel's residual in every sample (ERRATA 69)."""
+    bits come before the first channel's residual in every sample, added to the unmasked sum
+    (ERRATA 69). Channel 11, whose matrices have no bypass, has a step of 8: its output is the
+    whole sum cut to the step."""
     stream, _description, _features = case_substream3_fine_matrices(
-        noise_shifts=(2, 0, 7, 11, 0, 4, 1), bypass_index=2, bypass_width=2
+        noise_shifts=(2, 0, 7, 11, 0, 4, 1),
+        bypass_index=2,
+        bypass_width=2,
+        masked_out=11,
+        masked_width=3,
     )
     return (
         stream,
@@ -1193,7 +1220,8 @@ def case_substream3_object_bypass_wide():
 def case_substream3_object_bypass():
     """The stream of `case_substream3_fine_matrices` with noise shifts, and an LSB bypass on its
     third matrix (output channel 10, quantised to a step of 2): the two bits next to `f_shift` in
-    an object matrix header have bit 0 as the bypass (ERRATA 69, provisional)."""
+    an object matrix header have bit 0 as the bypass; its output is the sum, whose low bit the
+    other channels set, plus that bit (ERRATA 69, provisional)."""
     stream, _description, _features = case_substream3_fine_matrices(
         noise_shifts=(2, 0, 7, 11, 0, 4, 1), bypass_index=2
     )

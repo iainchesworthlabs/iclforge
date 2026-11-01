@@ -531,7 +531,7 @@ def decode_block(sub, bits, rows, first):
     shift = OBJECT_SHIFT if sub.object_matrices else MATRIX_SHIFT
     if sub.object_matrices and first == 0:
         sub.object_ramp = [0] * len(sub.object_set)  # the ramps restart with the access unit
-    for index, (out, coeffs, _lsb_bypass, noise_shift) in enumerate(sub.matrices):
+    for index, (out, coeffs, lsb_bypass, noise_shift) in enumerate(sub.matrices):
         keep = s32((-1 << sub.quant[out]) & 0xFFFFFFFF) if out <= sub.max_chan else -1
         # Generator 1's noise (TH spec 17.3): the matrix starts the unit at the index of the
         # matrices left (this one included) and steps by twice that, plus one, a sample.
@@ -557,7 +557,16 @@ def decode_block(sub, bits, rows, first):
             if noise_shift:
                 slot = (left + (first + i) * (2 * left + 1)) % sub.noise_size
                 total += sub.noise_buffer[slot] * (1 << (noise_shift + 7 + shift - 14))
-            row[out] = s32(((total >> shift) & keep) + bypass[i][index])
+            if sub.object_matrices:
+                # An object matrix gives the sum as it is, plus the bypass bits where it has the
+                # LSB bypass; without the bypass the whole sum takes the output channel's
+                # quantiser step.
+                if lsb_bypass:
+                    row[out] = s32(s32(total >> shift) + bypass[i][index])
+                else:
+                    row[out] = s32(total >> shift) & keep
+            else:
+                row[out] = s32(((total >> shift) & keep) + bypass[i][index])
     if sub.object_matrices and sub.object_extension and first + size == sub.unit_size:
         for state in sub.object_set:
             up = OBJECT_SHIFT - (state["field2"] - state["f_shift"] + state["frac_bits"])
