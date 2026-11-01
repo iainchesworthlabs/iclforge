@@ -1,5 +1,14 @@
 # TrueHD and DD+ parity: the ESP32 sinks
 
+!!! note "Status as of 2026-11-01: the decoder is measured on the C6 and the P4; the S3 is owed; no sink plays TrueHD"
+    A probe of the library's decoder (`firmware/truehd-probe`) ran on an ESP32-C6 and an ESP32-P4: all eight
+    fixtures decode bit-exact to FFmpeg's PCM and the figures are in
+    [Measured on the C6 and the P4](#measured-on-the-c6-and-the-p4-2026-11-01). The S3 was not measured
+    (its USB port stopped answering after a debug session; see the section). The host-ratio estimates
+    below it stand for the S3 only. No ESP-IDF component, `hearth_sink` or `libs/device` source names
+    TrueHD yet; the sender side (Sendspin carriage, the sink library, Hearth) is built and tested on the
+    host ([truehd-parity-hearth-player.md](truehd-parity-hearth-player.md)).
+
 !!! note "Status as of 2026-10-29: audit and plan only; nothing built, nothing run on a board"
     TrueHD does not run on any ESP32 sink, and no source file of the ESP-IDF component, `hearth_sink`,
     `libs/sendspin`, `libs/sink` or `libs/device` names it. This page sets the DD+ budget of each tier
@@ -178,6 +187,65 @@ allocated by every call, not only at a restart. For comparison DD+ peaks at 47,6
 and uses 13 to 21 KB of stack. These are x86-64 figures; on a 32-bit core pointers are smaller and the
 arrays are the same `int32` arrays, so the heap and stack should be within a few hundred bytes of these
 (estimate).
+
+## Measured on the C6 and the P4 (2026-11-01)
+
+`firmware/truehd-probe` compiles the library's decoder (`core`, `decoder`, `io/access_unit`,
+`io/major_sync`; nothing else of the repository) into a small ESP-IDF v6.1 image, embeds eight fixtures from
+`testdata/truehd`, and for each one decodes it once while taking the SHA-256 of the 32-bit samples and
+comparing it with the manifest's `pcm_sha256` (FFmpeg's strict decode), then times four passes in CPU cycles and
+keeps the least. The decoder's sources are `-O2`, the rest `-Os`. No network, no I2S, no PSRAM: the decoder
+and its state are in internal RAM. Each board's `ota_0` and `otadata` were backed up first and written back
+afterwards; the read-back of both is byte-identical to the backup and the board answered `/status` after.
+Full output: `firmware/truehd-probe/results/esp32c6.txt` and `esp32p4.txt`.
+
+| Fixture | C6 160 MHz: mean us/unit | real-time factor | slowest unit | P4 360 MHz: mean us/unit | real-time factor | slowest unit |
+|---|---:|---:|---:|---:|---:|---:|
+| 1.0, 48 kHz, 24-bit | 164 | 0.197 | 705 us | 67 | 0.080 | 315 us |
+| 2.0, 48 kHz, 16-bit | 251 | 0.301 | 840 us | 101 | 0.122 | 372 us |
+| 2.0, 48 kHz, 24-bit | 285 | 0.342 | 958 us | 111 | 0.133 | 376 us |
+| 2.0, 44.1 kHz, 24-bit | 296 | 0.327 | 992 us | 115 | 0.127 | 379 us |
+| 2.0, 96 kHz, 24-bit | 495 | 0.595 | 1,222 us | 192 | 0.230 | 464 us |
+| 2.0, 192 kHz, 24-bit | 890 | **1.068** | 1,670 us | 348 | 0.417 | 631 us |
+| 5.1, 48 kHz, 16-bit | 546 | 0.656 | 1,759 us | 220 | 0.264 | 730 us |
+| 5.1, 48 kHz, 24-bit | 670 | 0.804 | 1,898 us | 266 | 0.319 | 763 us |
+
+All sixteen decodes match the manifest. A unit is 40, 80 or 160 samples (0.83 ms at 48 kHz), so the slowest
+unit of the C6's 5.1 is 2.3 units of audio and a sink needs a few units of buffer ahead of its output whatever the
+mean.
+
+| | C6 | P4 | Host estimate on this page |
+|---|---:|---:|---:|
+| Heap of one decoder | 157,660 B | 158,020 B | 156,024 B |
+| Stack the decoding task reached | **60,356 B** | **60,368 B** | 32,712 B |
+| Internal RAM free at start of the probe | 347,812 B (largest block 311,296) | 489,076 B (largest 258,048) | |
+| Probe image | 693 KB | 690 KB | |
+
+- **The heap estimate held (within 1 %); the stack estimate did not.** The decoder needs about 60 KB of stack on
+  both RISC-V chips, 1.85 times the x86-64 figure, so the 40,960 B the plan below assumes for the S3 and the P4 is
+  too small. On the C6 a 48 KB task stack faulted (`Stack protection fault`, the stack pointer 10.7 KB past the
+  bound) before the first unit finished. The probe gives the task 128 KB.
+- **`Decoder::reset()` needs the footprint twice.** It builds the new state before the old is released
+  (`impl_ = std::make_unique<Impl>(config)`): 316 KB at the peak, and on the C6, with 190 KB free after the first
+  decoder, a `std::bad_alloc` (the probe's timed passes hit it; it now releases the decoder first). The sink
+  restarts a decoder at every seek and format change, so a decoder that is released first, or reset in place,
+  is part of Phase 1.
+- **The estimates were right for 2.0 and 5.1 at 48 kHz and a little high for the P4.** C6: 0.342 (estimated 0.33
+  to 0.44) and 0.804 (0.75 to 1.00); P4: 0.133 (0.14 to 0.32) and 0.319 (0.33 to 0.74). The C6 cannot decode 2.0 at
+  192 kHz in real time (1.068), and its 96 kHz 2.0 takes 0.6 of the core before Wi-Fi, the network stack and the
+  I2S path, which the DD+ numbers say add a half again.
+- **The C6 stays out**, as question 1 recommended: 158 KB of decoder state plus 60 KB of stack is 218 KB, against
+  a C6 sink that has 25 to 56 KB free in a 2.0 play.
+- **What the probe does not show.** The state is in internal RAM here; in the sink the allocations over a size
+  go to PSRAM on the S3 and the P4 and cost more (the S3 page records 20 ms becoming 28 ms for a burst), the
+  P4's rev v1.x silicon opens only two output channels, and no Wi-Fi or Sendspin traffic ran. The P4 therefore
+  has CPU to spare for every stream tested, and the sink's overhead is still to be measured (Phase 3).
+- **The S3 is not measured.** With a 48 KB stack the decoder hung at the first unit and the interrupt watchdog
+  reset the board without a message (no stack-overflow check is on by default there; the C6's fault names the
+  cause, and a stack of 60 KB on both chips says the S3 did the same, but that is inferred, not seen). A GDB
+  session on its USB-Serial-JTAG port then left the port refusing writes, which only a replug of the cable
+  clears. The image to run with the 128 KB stack is built; the board is owed (question 21 of the
+  Hearth page's list asks for it).
 
 ## Translating the host figures to the tiers
 

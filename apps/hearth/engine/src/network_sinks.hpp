@@ -258,7 +258,7 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // (network_group_sink.hpp) is. Called by the engine as a group opens, so on its thread;
     // the line each member's reason makes is in take_log(). An id this class does not know
     // answers nothing and decides nothing, and the group plays as it would with no planner.
-    [[nodiscard]] std::vector<render::OutputLayout> plan_group(const GroupPlanRequest& request);
+    [[nodiscard]] GroupPlan plan_group(const GroupPlanRequest& request);
 
     // Tells the members of group `group_id` that are sent the stream as it is, and that take the
     // karaoke settings, how to reproduce it: the singer changed the choice (or the vocals) while

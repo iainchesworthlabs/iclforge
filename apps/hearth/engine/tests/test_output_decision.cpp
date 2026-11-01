@@ -615,7 +615,7 @@ TEST_CASE("output decision: the fallback presentation is the output's stated wid
     CHECK_FALSE(choose_output(ac3).presentation.has_value());
 }
 
-TEST_CASE("output decision: a TrueHD item sent to a group is decoded here and each sink is sent PCM",
+TEST_CASE("output decision: a TrueHD item sent to a group goes as it is to a sink that decodes it, and as PCM to the rest",
           "[hearth][output-decision][truehd]") {
     using iclforge::hearth::ItemCodec;
     const std::vector<EndpointFacts> endpoints{analogue("Speakers", 2, true)};
@@ -628,7 +628,7 @@ TEST_CASE("output decision: a TrueHD item sent to a group is decoded here and ea
     CHECK(choice.mode == OutputMode::kNetworkGroup);
     CHECK(choice.group_name == "Living room");
     CHECK(mentions(choice.reason, "TrueHD"));
-    CHECK(mentions(choice.reason, "not available"));
+    CHECK(mentions(choice.reason, "goes as it is to each sink that decodes it"));
     CHECK(mentions(choice.reason, "PCM"));
     // The sentence an item of another codec gets, that the stream travels, is not said.
     CHECK_FALSE(mentions(choice.reason, "what travels is the stream"));

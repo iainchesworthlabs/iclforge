@@ -1207,6 +1207,9 @@ SendspinPlaying sendspin_now_playing() {
             case ac::DataType::kAc4:
                 out.facts.codec = nv::Codec::kAc4;
                 break;
+            case ac::DataType::kTruehd:  // the sink does not list it, so it is never sent
+                out.facts.codec = nv::Codec::kUnknown;
+                break;
         }
         out.facts.have_decoder = true;
         out.facts.acmod = play.decoder.acmod;

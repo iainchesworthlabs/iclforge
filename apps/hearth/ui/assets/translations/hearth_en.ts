@@ -4,7 +4,7 @@
 <context>
     <name>DecoderTruehd</name>
     <message numerus="yes">
-        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <location filename="../qml/DecoderTruehd.qml" line="173"/>
         <source>%1 · %2 kHz · %n substream(s) of %3 channels</source>
         <translation>
             <numerusform>%1 · %2 kHz · %n substream of %3 channels</numerusform>

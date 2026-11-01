@@ -74,9 +74,10 @@ struct Options {
     // two): a player that renders to a layout wider than stereo lists that width.
     std::vector<std::int32_t> pcm_channels{2};
     // The coded formats the extension role lists: what a server may send as bursts. A program lists
-    // the ones its output takes; the test sink's decoders take all three.
+    // the ones its output takes; the test sink's decoders take all four.
     std::vector<sendspin::player::DataType> data_types{
-        sendspin::player::DataType::kAc3, sendspin::player::DataType::kEac3, sendspin::player::DataType::kAc4};
+        sendspin::player::DataType::kAc3, sendspin::player::DataType::kEac3, sendspin::player::DataType::kAc4,
+        sendspin::player::DataType::kTruehd};
     // When set, asked for each connection instead of `data_types`: what the output takes now. A
     // route comes and goes with a TV (an Android box loses its HDMI output when the display sleeps),
     // so what a program could take when the sink started is not what it can when a server dials.
@@ -158,6 +159,11 @@ struct Options {
     // The most frames a second the extension role's support object states it decodes, for every
     // data type it lists; 0 states none.
     std::uint16_t max_frame_rate = 0;
+    // The most coded kbit/s the extension role's support object states it takes, for every data
+    // type it lists; 0 states none.
+    std::uint32_t max_data_rate = 0;
+    // The sample rates the extension role lists for the coded streams it takes.
+    std::vector<std::int32_t> sample_rates{48000};
 };
 
 // What a sink reports, one line at a time, from any of its threads.
