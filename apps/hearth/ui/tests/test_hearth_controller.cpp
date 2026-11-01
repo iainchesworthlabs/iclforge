@@ -911,15 +911,17 @@ TEST_CASE("output_device_row: id/name/channels/speakers/rates/passthrough flags 
     CHECK(rates.at(1).toUInt() == 96000u);
     CHECK(row.value(QStringLiteral("supportsAc3")).toBool());
     CHECK_FALSE(row.value(QStringLiteral("supportsEac3")).toBool());
-    // Not a TrueHD output, and no platform has a run behind it.
+    // Not a TrueHD output. Whether this build's platform has a run behind it is mat_status()'s.
+    const bool run_here = iclforge::hearth::mat_status(iclforge::audio::passthrough_backend()).run ==
+                          iclforge::hearth::MatRun::kRun;
     CHECK_FALSE(row.value(QStringLiteral("supportsMat")).toBool());
-    CHECK_FALSE(row.value(QStringLiteral("matRun")).toBool());
+    CHECK(row.value(QStringLiteral("matRun")).toBool() == run_here);
 
     device.supports_mat_passthrough = true;
     const QVariantMap mat_row = iclforge::hearth::ui::output_device_row(device);
     CHECK(mat_row.value(QStringLiteral("supportsMat")).toBool());
-    // Opening the link is not a run: the row stays "not run" until mat_status() says otherwise.
-    CHECK_FALSE(mat_row.value(QStringLiteral("matRun")).toBool());
+    // Opening the link is not a run: matRun is the platform's, whatever the device does.
+    CHECK(mat_row.value(QStringLiteral("matRun")).toBool() == run_here);
 }
 
 // --- media_info_to_map() (the composite) -----------------------------------
