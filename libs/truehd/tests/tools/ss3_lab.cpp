@@ -297,15 +297,15 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
     const DecoderCounters& c = decoder.counters();
     const std::size_t samples = c.object_first_out.size() / 12;
     const double pi = 3.14159265358979323846;
-    const auto ideal = [&](long n) {
+    const auto ideal = [&](std::int64_t n) {
         return std::llround(amplitude * std::sin(2.0 * pi * hz * static_cast<double>(n) / 48000.0));
     };
-    long best_offset = 0;
+    std::int64_t best_offset = 0;
     double best_cost = 1e300;
-    for (long offset = -400; offset <= 400; ++offset) {
+    for (std::int64_t offset = -400; offset <= 400; ++offset) {
         double cost = 0;
         for (std::size_t i = 1000; i < 3000 && i < samples; ++i) {
-            const long n = static_cast<long>(i) + offset;
+            const std::int64_t n = static_cast<std::int64_t>(i) + offset;
             cost += std::fabs(static_cast<double>(c.object_first_out[i * 12 + static_cast<std::size_t>(channel)]) -
                               static_cast<double>(ideal(n)));
         }
@@ -314,29 +314,32 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
             best_offset = offset;
         }
     }
-    std::printf("sine check of matrix channel %d over %zu samples: best offset %ld (output sample i is "
-                "input sample i + %ld), mean |deviation| %.2f\n",
-                channel, samples, best_offset, best_offset, best_cost / 2000.0);
-    std::vector<long> histogram(41, 0);  // deviation / 16 from -20 to 20, the ends hold the rest
-    std::vector<std::pair<std::size_t, long>> outliers;
+    std::printf("sine check of matrix channel %d over %zu samples: best offset %lld (output sample i is "
+                "input sample i + %lld), mean |deviation| %.2f\n",
+                channel, samples, static_cast<long long>(best_offset),
+                static_cast<long long>(best_offset), best_cost / 2000.0);
+    std::vector<std::int64_t> histogram(41, 0);  // deviation / 16 from -20 to 20, the ends hold the rest
+    std::vector<std::pair<std::size_t, std::int64_t>> outliers;
     for (std::size_t i = 0; i < samples; ++i) {
-        const long dev = static_cast<long>(c.object_first_out[i * 12 + static_cast<std::size_t>(channel)]) -
-                         ideal(static_cast<long>(i) + best_offset);
-        const long bucket = std::clamp(static_cast<long>(std::lround(static_cast<double>(dev) / 16.0)), -20L, 20L);
+        const std::int64_t dev =
+            static_cast<std::int64_t>(c.object_first_out[i * 12 + static_cast<std::size_t>(channel)]) -
+            ideal(static_cast<std::int64_t>(i) + best_offset);
+        const std::int64_t bucket = std::clamp<std::int64_t>(std::llround(static_cast<double>(dev) / 16.0), -20, 20);
         ++histogram[static_cast<std::size_t>(bucket + 20)];
-        if (std::labs(dev) >= 64 && outliers.size() < 40) {
+        if (std::llabs(dev) >= 64 && outliers.size() < 40) {
             outliers.emplace_back(i, dev);
         }
     }
     std::printf("deviation in units of 16 (value: count):");
-    for (long b = -20; b <= 20; ++b) {
+    for (int b = -20; b <= 20; ++b) {
         if (histogram[static_cast<std::size_t>(b + 20)] != 0) {
-            std::printf(" %ld:%ld", b, histogram[static_cast<std::size_t>(b + 20)]);
+            std::printf(" %d:%lld", b,
+                        static_cast<long long>(histogram[static_cast<std::size_t>(b + 20)]));
         }
     }
     std::printf("\nsamples whose deviation is 64 or more (index:deviation, first 40):");
     for (const auto& [index, dev] : outliers) {
-        std::printf(" %zu:%ld", index, dev);
+        std::printf(" %zu:%lld", index, static_cast<long long>(dev));
     }
     std::printf("\n");
 }
@@ -455,6 +458,12 @@ int main(int argc, char** argv) {
         folded.fold_scope = scope;
         settings.push_back({kScopeNames[scope], folded});
     }
+    DecoderLab wrapped = base;
+    wrapped.fold_scope = 20;
+    settings.push_back({"fold: shifted bits wrap round", wrapped});
+    DecoderLab modulo = base;
+    modulo.fold_scope = 21;
+    settings.push_back({"fold: shift modulo 8", modulo});
     static const char* const kUpwardNames[] = {
         "fold: matrix channels 1 up", "fold: matrix channels 2 up", "fold: matrix channels 3 up",
         "fold: matrix channels 4 up", "fold: matrix channels 5 up", "fold: matrix channels 6 up",

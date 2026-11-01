@@ -79,7 +79,9 @@ struct DecoderLab {
     // What the object substream's lossless check folds: 0 the output of every matrix channel;
     // 1 and 2 the output of the coded channels (shifted left by the matrix channel, or by its
     // place among the coded ones); 3 and 4 the same for the channels below them; 5 and 6 the
-    // coded samples before the matrices; 10 + N the output of the matrix channels from N up.
+    // coded samples before the matrices; 10 + N the output of the matrix channels from N up; 20 the
+    // output of every matrix channel with the bits a shift past 32 pushes out wrapped round; 21 the
+    // same with the shift taken modulo 8.
     int fold_scope = 0;
     // How an object matrix's sum exactly between two outputs rounds: 0 down, 1 up, 2 to even;
     // 3 rounds every sum to nearest (a control).
