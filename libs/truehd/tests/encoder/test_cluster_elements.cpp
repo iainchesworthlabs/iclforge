@@ -221,16 +221,14 @@ TEST_CASE("the crossing's bed matrices, a block at a time, rebuild the elements 
                               signal.begin() + static_cast<std::ptrdiff_t>(start + kBlock));
         }
         const std::vector<ObjectPlane> elements = rows;
-        ObjectTimeline timeline;
-        timeline.blocks.push_back(ObjectBlock{0, static_cast<int>(kBlock), chain, false, {}});
         ObjectBypass bypass;
-        REQUIRE(invert_object_timeline(timeline, shape, rows, bypass));
+        REQUIRE(invert_object_chain(chain, shape, rows, bypass));
         for (std::size_t row = 0; row < kBedRows; ++row) {
             for (std::size_t t = 0; t < kBlock; ++t) {
                 decoded[row][start + t] = rows[row][t];
             }
         }
-        apply_object_timeline(timeline, shape, bypass, rows);
+        apply_object_chain(chain, shape, bypass, rows);
         REQUIRE(rows == elements);
     }
     const double db = error_db(intended_bed(objects, samples), decoded);
@@ -493,7 +491,8 @@ TEST_CASE("the crossing is written with the plan's paths and its bed is close to
           "12, 14 and 16",
           "[truehd][encoder][atmos][render][cluster]") {
     const int elements = GENERATE(12, 14, 16);
-    CAPTURE(elements);
+    const bool slopes = GENERATE(false, true);
+    CAPTURE(elements, slopes);
     const std::size_t samples = 24000;
     const std::vector<std::int32_t> a_pcm = tone(samples, 440.0, 2.0e6);
     const std::vector<std::int32_t> b_pcm = tone(samples, 1130.0, 1.5e6);
@@ -514,6 +513,8 @@ TEST_CASE("the crossing is written with the plan's paths and its bed is close to
     writer.object_meaning.dyn_object_only = true;
     writer.object_meaning.lfe_present = true;
     writer.object_paths = object_paths_of(plan);
+    // with the slopes the matrices side works out the deltas (it decides them, not this test)
+    writer.object_extension = slopes ? ObjectExtension::kSlopes : ObjectExtension::kNone;
     writer.verify = true;
     std::vector<std::int32_t> interleaved(samples * static_cast<std::size_t>(elements));
     for (std::size_t t = 0; t < samples; ++t) {

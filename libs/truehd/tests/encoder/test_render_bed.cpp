@@ -16,7 +16,7 @@
 // The render rule of the object encoder (libs/truehd/notes/feature-truehd-atmos-encoder-render.md):
 // where an element sits on the 7.1 bed, the straight-line trajectory of its gains between section
 // boundaries, and the matrices that carry them. [no-external-oracle] for the matrices: the panner
-// is held to libs/render's here, the matrices to the timeline functions of object_bed.hpp (the
+// is held to libs/render's here, the matrices to the chain functions of object_bed.hpp (the
 // decoder's arithmetic) and to the definition written out in the test.
 
 namespace {
@@ -315,11 +315,9 @@ TEST_CASE("the bed-row matrices run backwards exactly and give the definition's 
     shape.quant = 0;
     shape.units = 4;
     shape.nominal = 40;
-    ObjectTimeline timeline;
-    timeline.blocks.push_back(ObjectBlock{0, static_cast<int>(kSamples), chain, false, {}});
     std::vector<ObjectPlane> rows = elements;
     ObjectBypass bypass;
-    REQUIRE(invert_object_timeline(timeline, shape, rows, bypass));
+    REQUIRE(invert_object_chain(chain, shape, rows, bypass));
 
     // bed row j = element j less the matrix's floor of (sum of -raw * element * 8) / 2^15, which is
     // element j plus the rounded-up share of the coded elements
@@ -341,6 +339,6 @@ TEST_CASE("the bed-row matrices run backwards exactly and give the definition's 
         CHECK(rows[c] == elements[c]);
     }
     // and the decoder's side gives the elements back
-    apply_object_timeline(timeline, shape, bypass, rows);
+    apply_object_chain(chain, shape, bypass, rows);
     CHECK(rows == elements);
 }

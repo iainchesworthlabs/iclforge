@@ -171,6 +171,12 @@ The analysis session decoded each control to the 8 channel presentation (L R C L
 Effect on the branch (this commit): the matrices branch (`feature/truehd-atmos-encoder-matrices`, 24d14585d and 51c839c00) is merged in; its `object_paths` is the hook (a caller-made chain is not accepted), and `object_paths_of(RenderPlan)` writes my plan as paths (a knot at every boundary,
 gains at 2^-16, clamped to +-1.98). The chain-level tests use `build`-less timelines (one block of the bed-row matrices) with `invert_object_timeline` and `apply_object_timeline`. The crossing is written with the plan's paths in 12, 14 and 16 element streams: the elements decode back sample for sample and the 7.1 bed is -43.0 dB from the intended one.
 
+### After the matrices branch's rebuild on the slope rule (2026-11-01, merge of 050ea7a73)
+
+`object_ramp` is gone; `EncoderConfig::object_extension = ObjectExtension::kSlopes` asks the writer to send slopes (it decides delta and `ext_field2`; nothing here does). The crossing test now writes the 12, 14 and 16 element streams with `kNone` and with `kSlopes`:
+the elements decode back sample for sample either way and the bed is -42.97 dB from the intended one in both. The two figures are identical to every digit printed, which I have not explained (either the slope writer reproduces the held coefficients at 480-sample
+sections with an update every unit, or the slopes are not engaged in this configuration); I did not check the sections the writer sent. `invert_object_chain` and `apply_object_chain` are the kept wrappers, so the chain-level tests are unchanged.
+
 ## 4. Tests, and what each guards
 
 See the test names; the ones that would pass for a wrong render are the closeness tests, with thresholds set from the measured values (section 6).
