@@ -941,6 +941,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     std::string segment_trace;  // lab: where each block of the segment starts and ends
     state.noise_filled = false;
     while (true) {
+        bool block_header = false;  // lab: what this block's header carried
+        bool block_carries = false;
+        bool block_extension = false;
+        std::uint8_t block_matrices = 0;
         if (reader.read(1) != 0) {
             if (reader.read(1) != 0) {
                 if (auto started = begin_restart(index, state, reader, payload); !started) {
@@ -1038,15 +1042,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 state.running = false;
                 return std::unexpected(applied.error());
             }
-            if (state.context.object_matrices && counters.object_first_out.size() / 12 < 51200) {
-                DecoderCounters::ObjectBlock block;
-                block.sample = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
-                block.size = static_cast<std::uint16_t>(state.block_size);
-                block.carries = header->matrices.has_value();
-                block.matrices = header->matrices ? static_cast<std::uint8_t>(header->matrices->count) : 0;
-                block.extension = header->matrices && header->matrices->extension;
-                counters.object_blocks.push_back(block);
-            }
+            block_header = true;
+            block_carries = header->matrices.has_value();
+            block_matrices = header->matrices ? static_cast<std::uint8_t>(header->matrices->count) : 0;
+            block_extension = header->matrices && header->matrices->extension;
             if (header->matrices) {
                 ++counters.matrix_headers;
                 for (int m = 0; m < header->matrices->count; ++m) {
@@ -1080,6 +1079,17 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             return std::unexpected(
                 make_error(ErrorKind::kBadParameter,
                            "more than 255 samples in an access unit (TH spec §3.3)"));
+        }
+        if (index == kObjectSubstream && state.context.object_matrices &&
+            counters.object_first_out.size() / 12 < 51200) {
+            DecoderCounters::ObjectBlock block;
+            block.sample = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
+            block.size = static_cast<std::uint16_t>(state.block_size);
+            block.header = block_header;
+            block.carries = block_carries;
+            block.matrices = block_matrices;
+            block.extension = block_extension;
+            counters.object_blocks.push_back(block);
         }
         const std::size_t block_start = reader.bit_position();
         if (auto decoded = decode_block(index, state, reader, result.samples, emit); !decoded) {

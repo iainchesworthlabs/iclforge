@@ -223,6 +223,7 @@ struct DecoderCounters {
         std::uint32_t sample = 0;
         std::uint16_t size = 0;
         std::uint8_t matrices = 0;
+        bool header = false;  // the block has a header at all
         bool carries = false;
         bool extension = false;
     };
