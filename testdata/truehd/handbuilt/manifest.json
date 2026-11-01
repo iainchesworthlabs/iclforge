@@ -936,7 +936,7 @@
     {
       "name": "hb_substream3_object_extension_all",
       "file": "hb_substream3_object_extension.thd",
-      "description": "a twelve channel substream 3 whose object matrices carry the extension's finer parts",
+      "description": "a twelve channel substream 3 whose object matrices carry the extension's deltas",
       "features": [
         "substream_3",
         "twelve_channels",
@@ -966,13 +966,13 @@
       "channels": 12,
       "access_units": 16,
       "pcm_samples": 640,
-      "stream_sha256": "b09ba7f6c876203753c24e3da07adcb0eaf2e239cde403d992b1eb7c207c59ec",
+      "stream_sha256": "42379724412fcdea949d303854214d01022b684ab987d7985b3b334a2aa75dab",
       "pcm_sha256": "22b1142fc428a85de6e58ee0906345dc414c53fdbaa8f7b6954143a6302365c5"
     },
     {
       "name": "hb_substream3_object_extension_best",
       "file": "hb_substream3_object_extension.thd",
-      "description": "a twelve channel substream 3 whose object matrices carry the extension's finer parts",
+      "description": "a twelve channel substream 3 whose object matrices carry the extension's deltas",
       "features": [
         "substream_3",
         "twelve_channels",
@@ -1002,7 +1002,7 @@
       "channels": 8,
       "access_units": 16,
       "pcm_samples": 640,
-      "stream_sha256": "b09ba7f6c876203753c24e3da07adcb0eaf2e239cde403d992b1eb7c207c59ec",
+      "stream_sha256": "42379724412fcdea949d303854214d01022b684ab987d7985b3b334a2aa75dab",
       "pcm_sha256": "ef22253b25ff76b00fab9b568fc2d7ff6e0c42fb50aada41258e92c41cfbe8c8"
     },
     {

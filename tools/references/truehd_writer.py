@@ -133,12 +133,13 @@ class Substream:
 
 
 class ObjectSection:
-    """One object matrix section as a block sends it (TH spec 10.2.1a, ERRATA 69): A (the matrices
-    change), B (new headers), the headers (out, frac_bits, f_shift, noise shift), the coefficients
-    of each matrix as {channel: raw} (the keys are the presence mask, so a raw 0 is a present
-    coefficient), then A2, B2, C2, the widths C2 sends, their 2 reserved bits, and the deltas
-    of each matrix with a width, {channel: delta}. `resolve_sections` fills `resolved`, the
-    matrices in force after the section."""
+    """One object matrix section as a block sends it (TH spec 10.2.1a, ERRATA 69): A (coefficients
+    are sent), B (new headers), the headers (out, frac_bits, f_shift, noise shift), the
+    coefficients of each matrix as {channel: raw} (the keys are the presence mask, so a raw 0 is a
+    present coefficient), then A2 (extension present), B2 (deltas sent), C2 (widths sent), the
+    widths C2 sends with their ext_field2 (2 bits), and the deltas of each matrix with a width,
+    {channel: delta}. `resolve_sections` fills `resolved`, the matrices in force after the
+    section."""
 
     def __init__(
         self,
@@ -150,25 +151,26 @@ class ObjectSection:
         b2=False,
         c2=False,
         widths=(),
-        reserved=(),
+        field2=(),
         deltas=(),
     ):
         self.coeffs = [dict(c) for c in coeffs]
         self.headers = list(headers)
         self.a, self.b, self.a2, self.b2, self.c2 = a, b, a2, b2, c2
         self.widths = list(widths)
-        self.reserved = list(reserved) or [0] * len(self.widths)
+        self.field2 = list(field2) or [0] * len(self.widths)
         self.deltas = [dict(d) for d in deltas]
         self.resolved = None
 
 
 def resolve_sections(sections, restarts):
     """The matrices in force after each section ({first sample: ObjectSection}, in order), by the
-    rules of ERRATA 69: new headers (B) keep the width of the matrix at the same place; new
-    coefficients clear the deltas; with A clear the last set stands, deltas and all; C2 replaces
-    the widths, else they stand; a width not 0 takes a delta for each coefficient; a restart
-    (`restarts`: the first samples of the restart blocks) clears the set. Each matrix is a dict
-    with out, frac_bits, f_shift, noise_shift, raw, width and delta."""
+    rules of ERRATA 69: new headers (B) keep the width, ext_field2 and deltas of the matrix at the
+    same place; with A clear the last set stands; without A2 every delta is cleared; with A2 and
+    B2 every delta is replaced (a width not 0 takes one for each coefficient) and C2 replaces the
+    widths and ext_field2, else they stand; a restart (`restarts`: the first samples of the restart
+    blocks) clears the set. Each matrix is a dict with out, frac_bits, f_shift, noise_shift, raw,
+    width, field2 and delta."""
     state = []
     for start in sorted(sections):
         section = sections[start]
@@ -177,17 +179,15 @@ def resolve_sections(sections, restarts):
         if section.a:
             fresh = []
             for place, coeffs in enumerate(section.coeffs):
+                last = state[place] if place < len(state) else None
                 if section.b:
                     out, frac_bits, f_shift, noise_shift = section.headers[place]
-                    width = state[place]["width"] if place < len(state) else 0
                 else:
-                    last = state[place]
-                    out, frac_bits, f_shift, noise_shift, width = (
+                    out, frac_bits, f_shift, noise_shift = (
                         last["out"],
                         last["frac_bits"],
                         last["f_shift"],
                         last["noise_shift"],
-                        last["width"],
                     )
                     if set(coeffs) != set(last["raw"]):
                         raise ValueError("coefficients do not match the headers that stand")
@@ -198,23 +198,76 @@ def resolve_sections(sections, restarts):
                         "f_shift": f_shift,
                         "noise_shift": noise_shift,
                         "raw": dict(coeffs),
-                        "width": width,
-                        "delta": {},
+                        "width": last["width"] if last else 0,
+                        "field2": last["field2"] if last else 0,
+                        "delta": dict(last["delta"]) if last else {},
                     }
                 )
             state = fresh
         else:
             state = [{**m, "delta": dict(m["delta"])} for m in state]
-        if section.a2 and section.b2:
+        if not section.a2:
+            for matrix in state:
+                matrix["delta"] = {}
+        elif section.b2:
             if section.c2:
-                for matrix, width in zip(state, section.widths, strict=True):
-                    matrix["width"] = width
+                for matrix, width, field2 in zip(
+                    state, section.widths, section.field2, strict=True
+                ):
+                    matrix["width"], matrix["field2"] = width, field2
             for matrix, delta in zip(state, section.deltas, strict=True):
                 if matrix["width"] and set(delta) != set(matrix["raw"]):
                     raise ValueError("a delta for every coefficient of a matrix with a width")
                 matrix["delta"] = dict(delta) if matrix["width"] else {}
+        for matrix in state:
+            if not set(matrix["delta"]) <= set(matrix["raw"]):
+                raise ValueError("a delta that stands for a coefficient the mask no longer has")
         section.resolved = [{**m, "delta": dict(m["delta"])} for m in state]
     return state
+
+
+def object_trace(sections, restarts, samples, per_unit, rate_code=0):
+    """What each object matrix has in force at every sample, by the rules of ERRATA 69 (the
+    sections resolved first): trace[i][k] is (c, d, shift, ramp) of matrix k at sample i, with c
+    the running coefficients {channel: value at 2^-18}, d the deltas {channel: delta} (empty
+    without the extension), shift = ext_field2 - f_shift + frac_bits and ramp the matrix's ramp
+    (0 without the extension). The ramp is 0 at the first sample of an access unit and grows by
+    (0x666 >> r) * 4 a sample while the extension is present; at the end of an access unit with
+    the extension every coefficient grows by its delta shifted left by 18 - shift."""
+    step = (0x666 >> (rate_code & 3)) * 4
+    current, running, ramp, extension = [], [], [], False
+    trace = []
+    for i in range(samples):
+        if i % per_unit == 0:
+            ramp = [0] * len(current)
+        if i in restarts:
+            current, running, ramp, extension = [], [], [], False
+        section = sections.get(i)
+        if section is not None:
+            current = section.resolved
+            if section.a:
+                running = [
+                    {
+                        ch: raw << (18 - m["frac_bits"] + m["f_shift"])
+                        for ch, raw in m["raw"].items()
+                    }
+                    for m in current
+                ]
+            extension = section.a2
+            ramp = [ramp[k] if k < len(ramp) else 0 for k in range(len(current))]
+        row = []
+        for k, m in enumerate(current):
+            shift = m["field2"] - m["f_shift"] + m["frac_bits"]
+            row.append((dict(running[k]), dict(m["delta"]), shift, ramp[k]))
+            if extension:
+                ramp[k] += step
+        trace.append(row)
+        if extension and (i + 1) % per_unit == 0:
+            for k, m in enumerate(current):
+                up = 18 - (m["field2"] - m["f_shift"] + m["frac_bits"])
+                for ch, delta in m["delta"].items():
+                    running[k][ch] += delta << up if up >= 0 else delta >> -up
+    return trace
 
 
 def write_object_section(w, sub, section):
@@ -244,9 +297,9 @@ def write_object_section(w, sub, section):
         return
     w.put(1 if section.c2 else 0, 1)
     if section.c2:
-        for width, reserved in zip(section.widths, section.reserved, strict=True):
+        for width, field2 in zip(section.widths, section.field2, strict=True):
             w.put(width, 4)
-            w.put(reserved, 2)
+            w.put(field2, 2)
     for matrix in section.resolved:
         if matrix["width"]:
             for c in sorted(matrix["delta"]):
@@ -1153,23 +1206,35 @@ def case_substream3_object_bypass():
 
 def case_substream3_object_extension():
     """A twelve channel substream 3 whose object matrices carry the extension of the section
-    (ERRATA 69): a finer part for each coefficient, coefficient = base + delta / 2^(width + 1) in
-    units of the base's last place. Four matrices (output 8 to 11, `frac_bits` 12, 13 with
-    `f_shift` 1, 0 and 15; noise shifts 2, 0, 5 and 3), a block of the stream for each case:
+    (ERRATA 69): sixteen access units of 40 samples and four matrices (output 8 to 11, `frac_bits`
+    12, 13 with `f_shift` 1, 0 and 15; noise shifts 2, 0, 5 and 3). A block of the stream for each
+    case; widths and ext_field2 (f2) are given per matrix, A2 is the extension, B2 the deltas, C2
+    the widths:
 
-      sample   0  restart: new headers, C2 with widths 3, 5, 2 and 0 (a matrix with no deltas),
-                  deltas, and a present coefficient of base 0 with a delta
-      sample  80  new headers with different masks, C2 clear: the widths of the matrices at the
-                  same place stand and the deltas follow the new masks
-      sample 160  A clear: the matrices and the deltas stand
-      sample 240  A set, B clear: the headers stand, new coefficients, the widths stand, new deltas
-      sample 320  restart: no deltas (A2 set, B2 clear), which also clears the widths
-      sample 400  A clear with C2: widths 0, 4, 6 and 2 on the matrices that stand, and deltas
-      sample 480  A clear, no extension: the deltas of sample 400 stand
+      sample   0  restart (A, B): new headers; A2, B2, C2 with widths 3, 5, 2, 0 (a matrix with
+                  no deltas) and f2 1, 0, 3, 2; deltas, one of them 0 on a present coefficient
+      sample   8  second block of the restart unit, A clear: A2, B2, no C2: the widths and f2
+                  stand, the deltas are replaced with the ramp already at 8 samples
+      sample  80  A, B: new headers with other masks (channels added; a matrix with no deltas
+                  changes completely), A2 without B2: widths, f2 and deltas stand
+      sample 160  A clear, A2 without B2: the matrices stand, the coefficients with the four
+                  units of slope they took
+      sample 200  A without B: new coefficients, no A2: the extension is off and the deltas clear
+      sample 240  A without B, A2, B2, no C2: new coefficients, the widths and f2 of the matrices
+                  stand, new deltas
+      sample 320  restart: A, B; A2 without B2: the deltas, widths and f2 are cleared
+      sample 360  A without B, A2, B2, no C2: the widths are 0, so no deltas follow
+      sample 400  A clear, A2, B2, C2: widths 5, 4, 6, 2 and f2 3, 2, 1, 0 on the matrices that
+                  stand, and deltas
+      sample 480  A clear, A2 without B2: the deltas of sample 400 stand
+      sample 520  A clear, no A2: the extension is off, the coefficients keep what they took
+      sample 560  A clear, A2 without B2: the extension is on and the deltas are 0
 
-    The coded channels are what the matrices, run backwards in integers, leave of the signal: the
-    sum of a matrix is (base sum + noise) << bits plus the sum of rows times deltas, shifted down
-    by 15 + bits, with bits = width + 1 (0 without a width)."""
+    The deltas stand in the units between sections (no matrices in the block header). The coded
+    channels are what the matrices, run backwards in integers, leave of the signal: the sum of a
+    matrix at 2^-18 is the rows times the running coefficients, plus the rows times the deltas
+    shifted down by ext_field2 - f_shift + frac_bits times the ramp, plus the noise shifted left
+    by its shift + 11, shifted down by 18 (`object_trace`)."""
     n = 40 * 16
     seed = 0x2A5F31
     src = [tone(n, 110 + c, 2**21) for c in range(12)]
@@ -1182,21 +1247,21 @@ def case_substream3_object_extension():
         (10, 0, 0, shifts[2]),
         (11, 15, 0, shifts[3]),
     ]
-    unity = [1 << (frac - fs) for _out, frac, fs, _noise in heads]
+    u = [1 << (frac - fs) for _out, frac, fs, _noise in heads]
     sections = {
         0: ObjectSection(
             coeffs=[
-                {8: unity[0], 1: 777, 4: 0, 3: -1500},
-                {9: unity[1], 8: 2500, 0: -3333},
-                {10: unity[2], 9: 1, 2: -1},
-                {11: unity[3], 10: -20001, 7: 12345},
+                {8: u[0], 1: 777, 4: 0, 3: -1500},
+                {9: u[1], 8: 2500, 0: -3333},
+                {10: u[2], 9: 1, 2: -1},
+                {11: u[3], 10: -20001, 7: 12345},
             ],
             headers=heads,
             a2=True,
             b2=True,
             c2=True,
             widths=[3, 5, 2, 0],
-            reserved=[1, 2, 3, 0],
+            field2=[1, 0, 3, 2],
             deltas=[
                 {8: 0, 1: -5, 4: 6, 3: 7},
                 {9: 0, 8: -23, 0: 17},
@@ -1204,85 +1269,109 @@ def case_substream3_object_extension():
                 {},
             ],
         ),
-        80: ObjectSection(
-            coeffs=[
-                {8: unity[0], 1: -300, 5: 421, 6: 0},
-                {9: unity[1], 8: 2500, 10: -900, 0: 1},
-                {10: unity[2], 9: -1},
-                {11: unity[3], 10: 5000, 7: -12345},
-            ],
-            headers=heads,
+        8: ObjectSection(
+            a=False,
             a2=True,
             b2=True,
             deltas=[
-                {8: 0, 1: 4, 5: -8, 6: 3},
-                {9: 0, 8: 5, 10: 31, 0: -32},
-                {10: 0, 9: 2},
+                {8: 0, 1: 6, 4: -7, 3: 2},
+                {9: 0, 8: 20, 0: -9},
+                {10: 0, 9: -2, 2: 1},
                 {},
             ],
         ),
-        160: ObjectSection(a=False),
+        80: ObjectSection(
+            coeffs=[
+                {8: u[0], 1: -300, 4: 421, 3: 0, 5: -77},
+                {9: u[1], 8: 2500, 0: 1},
+                {10: u[2], 9: -1, 2: 1},
+                {11: u[3], 10: 5000, 7: -12345, 6: 300},
+            ],
+            headers=heads,
+            a2=True,
+        ),
+        160: ObjectSection(a=False, a2=True),
+        200: ObjectSection(
+            coeffs=[
+                {8: u[0], 1: 120, 4: -999, 3: 33, 5: 4000},
+                {9: u[1], 8: -1800, 0: 77},
+                {10: u[2], 9: 1, 2: 0},
+                {11: u[3], 10: 100, 7: 200, 6: -300},
+            ],
+            b=False,
+        ),
         240: ObjectSection(
             coeffs=[
-                {8: unity[0], 1: 512, 5: -77, 6: 0},
-                {9: unity[1], 8: -2100, 10: 333, 0: 200},
-                {10: unity[2], 9: 1},
-                {11: unity[3], 10: -1, 7: 999},
+                {8: u[0], 1: 512, 4: -77, 3: 0, 5: 99},
+                {9: u[1], 8: -2100, 0: 333},
+                {10: u[2], 9: 1, 2: -1},
+                {11: u[3], 10: -1, 7: 999, 6: 5},
             ],
             b=False,
             a2=True,
             b2=True,
             deltas=[
-                {8: 0, 1: 7, 5: -8, 6: -1},
-                {9: 0, 8: 5, 10: -17, 0: 31},
-                {10: 0, 9: -4},
+                {8: 0, 1: 7, 4: -8, 3: -1, 5: 3},
+                {9: 0, 8: 5, 0: -17},
+                {10: 0, 9: -4, 2: 1},
                 {},
             ],
         ),
         320: ObjectSection(
             coeffs=[
-                {8: unity[0], 2: -1234, 3: 1000},
-                {9: unity[1], 8: -1500, 1: 3},
-                {10: unity[2], 8: -1},
-                {11: unity[3], 9: -16000, 0: 1},
+                {8: u[0], 2: -1234, 3: 1000},
+                {9: u[1], 8: -1500, 1: 3},
+                {10: u[2], 8: -1},
+                {11: u[3], 9: -16000, 0: 1},
             ],
             headers=heads,
             a2=True,
+        ),
+        360: ObjectSection(
+            coeffs=[
+                {8: u[0], 2: 500, 3: -77},
+                {9: u[1], 8: 900, 1: -3},
+                {10: u[2], 8: 1},
+                {11: u[3], 9: 2000, 0: -1},
+            ],
+            b=False,
+            a2=True,
+            b2=True,
+            deltas=[{}, {}, {}, {}],
         ),
         400: ObjectSection(
             a=False,
             a2=True,
             b2=True,
             c2=True,
-            widths=[0, 4, 6, 2],
-            reserved=[0, 3, 2, 1],
+            widths=[5, 4, 6, 2],
+            field2=[3, 2, 1, 0],
             deltas=[
-                {},
-                {9: 0, 8: 15, 1: -16},
-                {10: 0, 8: -33},
-                {11: 0, 9: -4, 0: 3},
+                {8: 0, 2: -16, 3: 15},
+                {9: 0, 8: 7, 1: -8},
+                {10: 0, 8: 1},
+                {11: 0, 9: -3, 0: 2},
             ],
         ),
-        480: ObjectSection(a=False),
+        480: ObjectSection(a=False, a2=True),
+        520: ObjectSection(a=False),
+        560: ObjectSection(a=False, a2=True),
     }
     restarts = {0, 320}
     resolve_sections(sections, restarts)
+    trace = object_trace(sections, restarts, n, 40)
     terms = noise1_terms(n, 40, 0, 8, seed, shifts)
-    starts = sorted(sections)
     coded = [list(column) for column in src]
-    for start, end in zip(starts, [*starts[1:], n], strict=True):
-        matrices = sections[start].resolved
-        for i in range(start, end):
-            for k in reversed(range(len(matrices))):
-                m = matrices[k]
-                out, scale = m["out"], 15 - m["frac_bits"] + m["f_shift"]
-                assert m["raw"][out] == 1 << (m["frac_bits"] - m["f_shift"])
-                assert m["delta"].get(out, 0) == 0
-                base = sum(coded[c][i] * (r << scale) for c, r in m["raw"].items() if c != out)
-                fine = sum(coded[c][i] * (d << scale) for c, d in m["delta"].items() if c != out)
-                bits = m["width"] + 1 if m["width"] else 0
-                total = ((base + 2 * terms[k][i]) << bits) + fine
-                coded[out][i] -= total >> (15 + bits)
+    for i in range(n):
+        for k in reversed(range(len(trace[i]))):
+            running, deltas, shift, ramp = trace[i][k]
+            out = heads[k][0]
+            assert running[out] == 1 << 18 and deltas.get(out, 0) == 0
+            total = sum(coded[c][i] * v for c, v in running.items() if c != out)
+            fine = sum(coded[c][i] * d for c, d in deltas.items())
+            total += (fine >> shift if shift >= 0 else fine << -shift) * ramp
+            total += terms[k][i] << 4  # the draw at 2^-18: its shift + 11, the terms hold + 7
+            coded[out][i] -= total >> 18
 
     def sub_for(lo, hi, sync=0x31EA):
         channels = {
@@ -1314,7 +1403,7 @@ def case_substream3_object_extension():
     stream = Stream(subs, n, terminator_b=True, restart_interval=8)
     return (
         stream,
-        "a twelve channel substream 3 whose object matrices carry the extension's finer parts",
+        "a twelve channel substream 3 whose object matrices carry the extension's deltas",
         ["substream_3", "twelve_channels", "object_extension", "object_noise", "matrices_4"],
     )
 

@@ -228,12 +228,12 @@ inline void apply_object_matrix(int block, bool starts_unit, bool ends_unit, int
                                           noise.mask]} *
                 (std::int64_t{1} << noise_shift);
         }
-        std::uint32_t value = static_cast<std::uint32_t>(sum >> kObjectShift);
+        // The quantiser mask applies before the bypass bits are added back. A stream whose bypass
+        // matrix output has no low bits set cannot tell this from no mask (ERRATA.md entry 69).
+        std::uint32_t value = static_cast<std::uint32_t>(sum >> kObjectShift) & keep;
         if (lsb_bypass) {
             const std::uint64_t sent = bypass[static_cast<std::size_t>(i)];
             value += static_cast<std::uint32_t>((sent >> (4 * matrix_index)) & 0xFU);
-        } else {
-            value &= keep;
         }
         row[out] = static_cast<std::int32_t>(value);
     }

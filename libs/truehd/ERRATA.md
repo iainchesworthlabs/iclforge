@@ -1353,3 +1353,15 @@ and `f_shift` 0 to 2 (`SUBSTREAM3.md` section 6 gives numbers). Between sections
 samples that differ from the sine in interval 2 are 9 in this section (4 to 8 off the sine's rounding); a flat 2^-4 or a ramp of 2^-3 over the block leaves none, the rule in force (2^-(w + 1))
 leaves 9. No setting changes a count of passing intervals, so the decoder keeps its rule. Question 65: does a delta of a matrix not followed by another section within one block ramp the
 coefficient over the block to raw + delta / 8, and what do the 10,240 and 10,760 sections (13 and 38 blocks before the next section) do over their blocks? Recommendation: ramp over the block, i / block, until a controlled encode with a longer ramp says otherwise.
+
+**Extension deltas are slopes per access unit (answers question 65; provisional until the repository's own run).** Entry 69's earlier readings of the extension
+(a constant refinement of 2^-(width + 1), then a ramp of delta/8 over a block) are replaced. Found on the owner's controlled encodes `ctl_e` to `ctl_h` (one sine object over a smooth path, a 1 s
+path, a jump, a vertical path): the raw coefficient of a section equals the previous raw plus N times delta / 2^`ext_field2`, N being the number of 40-sample access units between the
+sections, and `ext_field2` (the two bits after each width) is the scale. A session with a private copy of the decoder then fitted the rest and measured it on 42 streams: the object coefficients run at 2^-18
+and keep their running value when a section sends none (A = 0), the deltas stand unless the extension is turned off (A2 = 0) or replaced (B2 = 1), the extension adds
+`(Σ row × delta >> S) × ramp` with S = `ext_field2` - `f_shift` + `frac_bits`, the ramp restarts at 0 in each access unit and grows by 6552 a sample at 48 kHz, and the coefficients move by `delta << (18 - S)` at the
+unit's end. 106,308 of 106,308 substream 3 checks passed there (8 Blu-ray streams, the two long Sollevante encodes, 22 controls), and the object channels of three DEE encodes matched Dolby Reference Player's raw
+output sample for sample. Two details the streams do not distinguish: masking by the quantiser step before or after the bypass bits are added, and the 32-bit truncation of the scaled fine sum; this decoder masks first
+and truncates. 96 and 192 kHz are untested. This repository now implements the rule (`libs/truehd/src/decoder/kernels.hpp`, `apply_object_matrix`) and the hand-built `hb_substream3_object_extension`
+holds it; the run of the lab on the owner's files at this commit is pending. **Question 65 is closed by this**; question 66: at 96 and 192 kHz, is the ramp step (0x666 >> r) × 4 for an access unit of 40 << r samples? Recommendation: keep it until a stream at those rates exists.
+

@@ -263,7 +263,7 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         REQUIRE(state.coeff == before);
     }
 
-    SECTION("an object matrix with the bypass is not masked, one without it is") {
+    SECTION("an object matrix masks to the quantiser step and adds the bypass bits after") {
         const std::array<std::uint8_t, 2> channel = {0, 1};
         std::array<std::uint64_t, kBlock> bypass{};
         for (int i = 0; i < kBlock; ++i) {
@@ -272,9 +272,9 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         kernels::ObjectMatrixState state;
         state.coeff[0] = 1 << 19;  // 2.0
         state.coeff[1] = 3 << 15;
-        auto masked = base;
+        auto plain = base;
         kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
-                                     0xFFFFFFFCU, false, 1, bypass.data(), masked.data(), kStride);
+                                     0xFFFFFFFCU, false, 1, bypass.data(), plain.data(), kStride);
         auto bypassed = base;
         kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
                                      0xFFFFFFFCU, true, 1, bypass.data(), bypassed.data(), kStride);
@@ -282,8 +282,9 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
             const auto sum = (std::int64_t{base[row]} * (1 << 19) + std::int64_t{base[row + 1]} * (3 << 15)) >> 18;
-            REQUIRE(masked[row + 4] == static_cast<std::int32_t>(static_cast<std::uint32_t>(sum) & 0xFFFFFFFCU));
-            REQUIRE(bypassed[row + 4] == static_cast<std::int32_t>(sum + i % 3));
+            const auto masked = static_cast<std::int32_t>(static_cast<std::uint32_t>(sum) & 0xFFFFFFFCU);
+            REQUIRE(plain[row + 4] == masked);
+            REQUIRE(bypassed[row + 4] == masked + i % 3);
             low_bits_differ = low_bits_differ || (static_cast<std::uint32_t>(sum) & 3U) != 0U;
         }
         REQUIRE(low_bits_differ);
