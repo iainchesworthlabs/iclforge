@@ -23,6 +23,8 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder.cpp
     encoder/test_encoder_atmos.cpp
     encoder/test_encoder_object_bed.cpp
+    encoder/test_layout.cpp
+    encoder/test_ratectl.cpp
     encoder/test_signals.cpp
     fuzz/test_truehd_mutator.cpp)
 
@@ -39,7 +41,7 @@ target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::b
 target_include_directories(iclforge-truehd-tests PRIVATE ../fuzz)
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
 # build), so the tests that exercise them compile coding.cpp themselves and see src/.
-target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)
+target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp ../src/encoder/ratectl_shape.cpp)
 target_include_directories(iclforge-truehd-tests PRIVATE ../src)
 
 # The AVX2 kernel of src/internal/avx2, compiled a second time into this binary for the reason
