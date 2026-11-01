@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -285,9 +286,10 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
 // that channel is from the ideal sine (amplitude, frequency in Hz, phase 0, 48 kHz), over the first
 // intervals kept. The offset of the best match is searched, the deviations are listed by size, and
 // the samples that are far from the sine are named.
-void sine_check(const std::vector<std::byte>& stream, int channel, double amplitude, double hz,
-                std::int64_t threshold, std::size_t from_sample) {
+void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, bool brief, int channel,
+                double amplitude, double hz, std::int64_t threshold, std::size_t from_sample) {
     DecoderConfig config;
+    config.lab = lab;
     config.presentation = Presentation::kAll;
     config.strictness = Strictness::kLenient;
     Decoder decoder(config);
@@ -315,10 +317,14 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
             best_offset = offset;
         }
     }
-    std::printf("sine check of matrix channel %d over %zu samples: best offset %lld (output sample i is "
-                "input sample i + %lld), mean |deviation| %.2f\n",
-                channel, samples, static_cast<long long>(best_offset),
-                static_cast<long long>(best_offset), best_cost / 2000.0);
+    if (brief) {
+        std::printf("mean |deviation| %.2f, ", best_cost / 2000.0);
+    } else {
+        std::printf("sine check of matrix channel %d over %zu samples: best offset %lld (output sample i is "
+                    "input sample i + %lld), mean |deviation| %.2f\n",
+                    channel, samples, static_cast<long long>(best_offset),
+                    static_cast<long long>(best_offset), best_cost / 2000.0);
+    }
     std::vector<std::int64_t> histogram(41, 0);  // deviation / 16 from -20 to 20, the ends hold the rest
     std::vector<std::pair<std::size_t, std::int64_t>> outliers;
     std::vector<std::int64_t> per_interval;  // outliers in each 5120-sample interval
@@ -337,6 +343,20 @@ void sine_check(const std::vector<std::byte>& stream, int channel, double amplit
                 outliers.emplace_back(i, dev);
             }
         }
+    }
+    if (brief) {
+        std::int64_t total = 0;
+        for (const std::int64_t n : per_interval) {
+            total += n;
+        }
+        std::printf("misses %lld, by interval:", static_cast<long long>(total));
+        for (std::size_t k = 0; k < per_interval.size(); ++k) {
+            if (per_interval[k] != 0) {
+                std::printf(" %zu:%lld", k, static_cast<long long>(per_interval[k]));
+            }
+        }
+        std::printf("\n");
+        return;
     }
     std::printf("deviation in units of 16 (value: count):");
     for (int b = -20; b <= 20; ++b) {
@@ -363,7 +383,7 @@ int main(int argc, char** argv) {
     if (argc != 2 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sine CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
+                     "       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -376,12 +396,6 @@ int main(int argc, char** argv) {
     std::vector<std::byte> stream(raw.size());
     for (std::size_t i = 0; i < raw.size(); ++i) {
         stream[i] = static_cast<std::byte>(raw[i]);
-    }
-    if (argc >= 6) {
-        sine_check(stream, std::atoi(argv[3]), std::atof(argv[4]), std::atof(argv[5]),
-                   argc > 6 ? std::atoll(argv[6]) : 64,
-                   argc > 7 ? static_cast<std::size_t>(std::atoll(argv[7])) : 0);
-        return 0;
     }
     std::vector<Setting> settings;
     DecoderLab base;
@@ -494,6 +508,21 @@ int main(int argc, char** argv) {
         DecoderLab folded = base;
         folded.fold_scope = 10 + from;
         settings.push_back({kUpwardNames[from - 1], folded});
+    }
+    if (argc >= 6) {
+        const bool sweep = std::strcmp(argv[2], "sinesweep") == 0;
+        for (const Setting& setting : settings) {
+            if (!sweep && &setting != &settings.front()) {
+                break;
+            }
+            if (sweep) {
+                std::printf("%-52s ", setting.name);
+            }
+            sine_check(stream, setting.lab, sweep, std::atoi(argv[3]), std::atof(argv[4]), std::atof(argv[5]),
+                       argc > 6 ? std::atoll(argv[6]) : 64,
+                       argc > 7 ? static_cast<std::size_t>(std::atoll(argv[7])) : 0);
+        }
+        return 0;
     }
     bool first = true;
     for (const Setting& setting : settings) {
