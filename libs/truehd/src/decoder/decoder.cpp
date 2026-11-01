@@ -990,6 +990,30 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 if (header->matrices->count > 0) {
                     ++state.object_updates;
                 }
+                if (header->matrices->count > 0 && counters.object_first_out.size() / 12 < 51200) {
+                    DecoderCounters::ObjectSection section;
+                    section.sample = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
+                    section.extension = header->matrices->extension;
+                    for (unsigned m = 0; m < header->matrices->count; ++m) {
+                        const MatrixSpec& spec = header->matrices->items[m];
+                        DecoderCounters::ObjectMatrixHeader row;
+                        row.out = spec.out_ch;
+                        row.frac_bits = spec.frac_bits;
+                        row.f_shift = spec.f_shift;
+                        row.field_2b = spec.field_2b;
+                        row.field_m4 = spec.field_m4;
+                        row.ext_width = spec.ext_width;
+                        for (int c = 0; c < kMaxChannels; ++c) {
+                            row.coeff[static_cast<std::size_t>(c)] = spec.coeff[static_cast<std::size_t>(c)];
+                            row.ext_value[static_cast<std::size_t>(c)] = spec.ext_value[static_cast<std::size_t>(c)];
+                            if (spec.present[static_cast<std::size_t>(c)]) {
+                                row.mask |= static_cast<std::uint16_t>(1U << c);
+                            }
+                        }
+                        section.items.push_back(row);
+                    }
+                    counters.object_sections.push_back(std::move(section));
+                }
                 if (header->matrices->count > 0 && counters.object_first_matrices.empty()) {
                     for (unsigned m = 0; m < header->matrices->count; ++m) {
                         const MatrixSpec& spec = header->matrices->items[m];

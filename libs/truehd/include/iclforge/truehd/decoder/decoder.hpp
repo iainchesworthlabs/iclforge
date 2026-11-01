@@ -204,8 +204,18 @@ struct DecoderCounters {
         std::uint8_t field_m4 = 0;
         std::uint16_t mask = 0;
         std::array<std::int32_t, kMaxChannels> coeff{};  // as sent (raw)
+        std::uint8_t ext_width = 0;
+        std::array<std::int32_t, kMaxChannels> ext_value{};  // the extension's deltas as sent
     };
     std::vector<ObjectMatrixHeader> object_first_matrices;
+    // Every matrix section of the object substream sent in the first ten intervals: the output
+    // sample it was sent at and its matrices (for the lab; no audio).
+    struct ObjectSection {
+        std::uint32_t sample = 0;
+        bool extension = false;
+        std::vector<ObjectMatrixHeader> items;
+    };
+    std::vector<ObjectSection> object_sections;
     std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};
     // The first three intervals of the object substream, by matrix channel: the smallest and the
     // largest value and the number of samples that differ from the one before, in the rows as

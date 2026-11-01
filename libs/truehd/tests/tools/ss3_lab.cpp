@@ -286,6 +286,38 @@ void run(const std::vector<std::byte>& stream, const char* name, const DecoderLa
 // that channel is from the ideal sine (amplitude, frequency in Hz, phase 0, 48 kHz), over the first
 // intervals kept. The offset of the best match is searched, the deviations are listed by size, and
 // the samples that are far from the sine are named.
+// Every matrix section sent between two output samples, with the extension's width and deltas.
+void print_sections(const std::vector<std::byte>& stream, std::size_t from, std::size_t to) {
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    config.strictness = Strictness::kLenient;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    while (const auto unit = reader.next()) {
+        (void)decoder.decode(*unit);
+    }
+    const DecoderCounters& c = decoder.counters();
+    std::printf("matrix sections of the first ten intervals sent at output samples %zu to %zu "
+                "(sample, extension flag, matrices):\n", from, to);
+    for (const auto& section : c.object_sections) {
+        if (section.sample < from || section.sample >= to) {
+            continue;
+        }
+        std::printf("  at %u ext %d:\n", section.sample, section.extension ? 1 : 0);
+        for (const auto& m : section.items) {
+            std::printf("    out %2u frac %2u f_shift %2d 2b %u m4 %u width %u  coeff(raw)/delta:", m.out,
+                        m.frac_bits, m.f_shift, m.field_2b, m.field_m4, m.ext_width);
+            for (int ch = 0; ch < 16; ++ch) {
+                if ((m.mask & (1U << ch)) != 0) {
+                    std::printf(" %d:%d/%d", ch, m.coeff[static_cast<std::size_t>(ch)],
+                                m.ext_value[static_cast<std::size_t>(ch)]);
+                }
+            }
+            std::printf("\n");
+        }
+    }
+}
+
 void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, bool brief, int channel,
                 double amplitude, double hz, std::int64_t threshold, std::size_t from_sample) {
     DecoderConfig config;
@@ -380,10 +412,10 @@ void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, boo
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2 && (argc < 6 || argc > 8)) {
+    if (argc != 2 && argc != 5 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
+                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -553,6 +585,11 @@ int main(int argc, char** argv) {
         DecoderLab folded = base;
         folded.fold_scope = 10 + from;
         settings.push_back({kUpwardNames[from - 1], folded});
+    }
+    if (argc == 5 && std::strcmp(argv[2], "sections") == 0) {
+        print_sections(stream, static_cast<std::size_t>(std::atoll(argv[3])),
+                       static_cast<std::size_t>(std::atoll(argv[4])));
+        return 0;
     }
     if (argc >= 6) {
         const bool sweep = std::strcmp(argv[2], "sinesweep") == 0;
