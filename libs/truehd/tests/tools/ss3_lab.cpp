@@ -326,6 +326,64 @@ void print_sections(const std::vector<std::byte>& stream, std::size_t from, std:
     }
 }
 
+// Every matrix channel against a sine of the given frequency whose amplitude, sign and place are
+// fitted on the quiet part of the stream (samples 20000 to 40000): the misses per interval.
+void sine_fit(const std::vector<std::byte>& stream, const DecoderLab& lab, double hz, std::int64_t threshold,
+              std::size_t interval) {
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    config.strictness = Strictness::kLenient;
+    config.lab = lab;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    while (const auto unit = reader.next()) {
+        (void)decoder.decode(*unit);
+    }
+    const DecoderCounters& c = decoder.counters();
+    const std::size_t samples = c.object_first_out.size() / 12;
+    const double pi = 3.14159265358979323846;
+    const auto unit_sine = [&](std::int64_t n) { return std::sin(2.0 * pi * hz * static_cast<double>(n) / 48000.0); };
+    std::int64_t total = 0;
+    std::printf("misses in interval %zu by channel:", interval);
+    for (int ch = 0; ch < 12; ++ch) {
+        const auto value = [&](std::size_t i) {
+            return static_cast<double>(c.object_first_out[i * 12 + static_cast<std::size_t>(ch)]);
+        };
+        double best_cost = 1e300;
+        double best_amplitude = 0;
+        std::int64_t best_offset = 0;
+        for (std::int64_t offset = -400; offset <= 400; ++offset) {
+            double dot = 0;
+            double norm = 0;
+            for (std::size_t i = 20000; i < 22000 && i < samples; ++i) {
+                const double s = unit_sine(static_cast<std::int64_t>(i) + offset);
+                dot += value(i) * s;
+                norm += s * s;
+            }
+            const double amplitude = norm > 0 ? dot / norm : 0;
+            double cost = 0;
+            for (std::size_t i = 20000; i < 22000 && i < samples; ++i) {
+                cost += std::fabs(value(i) - amplitude * unit_sine(static_cast<std::int64_t>(i) + offset));
+            }
+            if (cost < best_cost) {
+                best_cost = cost;
+                best_amplitude = amplitude;
+                best_offset = offset;
+            }
+        }
+        std::int64_t misses = 0;
+        for (std::size_t i = interval * 5120; i < (interval + 1) * 5120 && i < samples; ++i) {
+            const double expected = best_amplitude * unit_sine(static_cast<std::int64_t>(i) + best_offset);
+            if (std::fabs(value(i) - std::round(expected)) >= static_cast<double>(threshold)) {
+                ++misses;
+            }
+        }
+        total += misses;
+        std::printf(" %d:%lld", ch, static_cast<long long>(misses));
+    }
+    std::printf("  total %lld\n", static_cast<long long>(total));
+}
+
 void sine_check(const std::vector<std::byte>& stream, const DecoderLab& lab, bool brief, int channel,
                 double amplitude, double hz, std::int64_t threshold, std::size_t from_sample) {
     DecoderConfig config;
@@ -423,7 +481,7 @@ int main(int argc, char** argv) {
     if (argc != 2 && argc != 5 && (argc < 6 || argc > 8)) {
         std::fprintf(stderr,
                      "usage: iclforge-truehd-ss3-lab STREAM\n"
-                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
+                     "       iclforge-truehd-ss3-lab STREAM sections FROM_SAMPLE TO_SAMPLE\n       iclforge-truehd-ss3-lab STREAM sinefit HZ THRESHOLD INTERVAL\n       iclforge-truehd-ss3-lab STREAM sine|sinesweep CHANNEL AMPLITUDE HZ [THRESHOLD [FROM_SAMPLE]]\n");
         return 2;
     }
     std::ifstream in(argv[1], std::ios::binary);
@@ -610,6 +668,15 @@ int main(int argc, char** argv) {
     if (argc == 5 && std::strcmp(argv[2], "sections") == 0) {
         print_sections(stream, static_cast<std::size_t>(std::atoll(argv[3])),
                        static_cast<std::size_t>(std::atoll(argv[4])));
+        return 0;
+    }
+    if (argc == 6 && std::strcmp(argv[2], "sinefit") == 0) {
+        // sinefit HZ THRESHOLD INTERVAL _ : every channel against its own fitted sine, per switch
+        for (const Setting& setting : settings) {
+            std::printf("%-52s ", setting.name);
+            sine_fit(stream, setting.lab, std::atof(argv[3]), std::atoll(argv[4]),
+                     static_cast<std::size_t>(std::atoll(argv[5])));
+        }
         return 0;
     }
     if (argc >= 6) {
