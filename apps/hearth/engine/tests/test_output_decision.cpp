@@ -439,7 +439,7 @@ using iclforge::hearth::MatPlatformStatus;
 using iclforge::hearth::MatRun;
 using iclforge::truehd::Presentation;
 
-EndpointFacts mat_receiver(std::string name, PassthroughBackend backend = PassthroughBackend::kAlsa,
+EndpointFacts mat_receiver(std::string name, PassthroughBackend backend = PassthroughBackend::kWasapi,
                            std::uint16_t channels = 8, bool is_default = false) {
     EndpointFacts facts = receiver(std::move(name), /*eac3=*/true, /*ac3=*/true, is_default);
     facts.channels = channels;
@@ -462,7 +462,7 @@ MatPlatformStatus every_platform_run(PassthroughBackend backend) {
 
 }  // namespace
 
-TEST_CASE("output decision: every platform's MAT output is not run, and says what it does instead",
+TEST_CASE("output decision: only the platforms a receiver has named TrueHD through are run",
           "[hearth][output-decision][truehd]") {
     for (const auto backend :
          {PassthroughBackend::kAlsa, PassthroughBackend::kPipeWire, PassthroughBackend::kWasapi,
@@ -470,8 +470,10 @@ TEST_CASE("output decision: every platform's MAT output is not run, and says wha
         const MatPlatformStatus status = iclforge::hearth::mat_status(backend);
         // This is the table the owner's rule is kept in: a platform becomes "run" in the same
         // commit as the page that records a run that passed on a receiver, and this test changes
-        // with it. Until then no platform may claim it.
-        CHECK(status.run == MatRun::kNotRun);
+        // with it. Run on 2026-11-01, Raspberry Pi 4B into an Onkyo TX-RZ740: ALSA and PipeWire.
+        const bool run = backend == PassthroughBackend::kAlsa ||
+                         backend == PassthroughBackend::kPipeWire;
+        CHECK(status.run == (run ? MatRun::kRun : MatRun::kNotRun));
         CHECK(status.backend == backend);
         CHECK_FALSE(status.basis.empty());
     }
@@ -485,7 +487,7 @@ TEST_CASE("output decision: a platform not run is decoded here and the reason sa
     CHECK_FALSE(choice.stream.has_value());
     CHECK(mentions(choice.reason, "takes TrueHD (MAT)"));
     CHECK(mentions(choice.reason, "has not been run against a receiver"));
-    CHECK(mentions(choice.reason, "ALSA"));
+    CHECK(mentions(choice.reason, "WASAPI"));
     CHECK(mentions(choice.reason, "Pin Bitstream"));
     // The decode still states the presentation it plays.
     CHECK(choice.presentation == Presentation::k8ch);
@@ -504,6 +506,12 @@ TEST_CASE("output decision: a platform that has been run gets the stream as MAT 
     // A run that passed leaves nothing to warn about.
     CHECK_FALSE(mentions(choice.reason, "not been run"));
     CHECK_FALSE(choice.presentation.has_value());
+
+    // The real table: a run on ALSA is chosen unprompted, the same endpoint on WASAPI is not.
+    const std::vector<EndpointFacts> alsa = {mat_receiver("Receiver", PassthroughBackend::kAlsa)};
+    CHECK(choose_output(truehd_request(alsa)).mode == OutputMode::kBitstream);
+    const std::vector<EndpointFacts> wasapi = {mat_receiver("Receiver", PassthroughBackend::kWasapi)};
+    CHECK(choose_output(truehd_request(wasapi)).mode == OutputMode::kLocalPcm);
 
     // The output that does not take MAT is passed over for the one that does.
     const std::vector<EndpointFacts> two = {receiver("Soundbar", true, true), mat_receiver("Receiver")};

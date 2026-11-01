@@ -179,12 +179,16 @@ TestCase {
         // a bitstream.
         verify(H.textContaining(picker.contentItem, "AC-3 ✓ · E-AC-3 ✓") !== null,
                "the passthrough section does not list the receiver");
-        // It opens TrueHD's eight-channel link too, and says it has not been run rather than
-        // showing a tick: no platform has played MAT to a receiver that named it TrueHD.
-        verify(H.textContaining(picker.contentItem, "TrueHD (MAT) opens, not run") !== null,
-               "the receiver's TrueHD mark does not say it is not run");
-        verify(H.textContaining(picker.contentItem, "TrueHD (MAT) ✓") === null,
-               "a TrueHD tick appeared for a platform that has not been run");
+        // It opens TrueHD's eight-channel link too. A tick only for a platform a receiver has
+        // named TrueHD through (matRun, this build's); "opens, not run" for any other.
+        const receiverRow = HearthController.outputDevices.filter(function(d) { return d.id === "fake-receiver"; })[0];
+        verify(receiverRow.supportsMat, "the receiver's row does not open the TrueHD link");
+        const matText = receiverRow.matRun ? "TrueHD (MAT) ✓" : "TrueHD (MAT) opens, not run";
+        const otherText = receiverRow.matRun ? "TrueHD (MAT) opens, not run" : "TrueHD (MAT) ✓";
+        verify(H.textContaining(picker.contentItem, matText) !== null,
+               "the receiver's TrueHD mark does not read \"" + matText + "\"");
+        verify(H.textContaining(picker.contentItem, otherText) === null,
+               "the receiver's TrueHD mark also reads \"" + otherText + "\"");
         // The current endpoint starts selected.
         compare(picker.selectedDeviceId, "fake-speakers");
         mouseClick(findChild(win, "outputPickerCancel"));
