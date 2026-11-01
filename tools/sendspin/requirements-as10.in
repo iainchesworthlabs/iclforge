@@ -6,7 +6,7 @@
 # Compiled under Python 3.14, the container's python3. Move requirements.in to 10.2.1 and delete
 # this pair once aiosendspin_exit.py and aiosendspin_group_exit.py pass on it.
 aiosendspin==10.2.1
-av==19.0.1
+av==19.0.2
 numpy==2.5.4
 pillow==13.0.0
 pytest==9.1.1
