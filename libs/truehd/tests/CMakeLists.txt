@@ -28,6 +28,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_render_bed.cpp
     encoder/test_layout.cpp
     encoder/test_ratectl.cpp
+    encoder/test_ratectl_motion.cpp
     encoder/test_signals.cpp
     fuzz/test_truehd_mutator.cpp)
 

@@ -92,3 +92,13 @@ build.
 - Round trip with the matrices session's chain: nothing in rate control depends on the chain, but "run the whole round trip" waits for that
   branch to land.
 - `forge probe` does not yet report the model at the chosen bitrate next to the declared one in one run (two runs do).
+
+## Round trip with the matrices branch (feature/truehd-atmos-encoder-matrices, 24d14585d and 51c839c00)
+
+Replayed on top of it (this branch's commits on its tip, which is based on 56b4346; the base of the rate control branch has since
+moved with the decoder's slope rule, so merging the two branches also meets the decoder's changes to `syntax.hpp` and the Python
+reference, which is not this session's to resolve). Two trivial conflicts only (the `encoder.hpp` include list and the test sources);
+`encoder.cpp` merged by itself. On the replayed tree: all of `[encoder]`, the matrices session's object-motion tests, the layout and rate
+tests and the CLI rate tests pass, and `test_ratectl_motion.cpp` adds the one case that needs both: moving objects (`object_paths`, flat
+and with the ramp), shaped to a bitrate, decoded by the encoder's own `verify`, no late unit, four checked segments in every unit.
+Rate control does not depend on the matrix chain: shaping rounds the object planes before the chain is built from them.
