@@ -256,7 +256,7 @@ counts in N. VERIFIED: `z_short.mlp` passes 18 of 18 intervals with it and `hb_s
 
 Status: **substream 3 is solved** (ERRATA 69). With the rule of section 3, 42 streams (13.5 million access units, eight Blu-ray streams, the two long
 Sollevante encodes and all 22 controls) pass 106,308 of 106,308 substream 3 checks, and the object channels of `soll_e12`, `soll_e14` and `soll_e16`
-match Dolby Reference Player's raw output in all 60,490,752 samples. (Measured on a private copy of the decoder; the run on this repository's code is pending.) Everything that was
+match Dolby Reference Player's raw output in all 60,490,752 samples. (Measured on a private copy of the decoder, then on this repository's code: all 14 of the owner's excerpts and DEE controls, `ctl_e` to `ctl_h` included, pass every interval of the lab, 1,477 of 1,477 checks.) Everything that was
 tried before is
 listed here with what it showed, as a record; none of it is in the decoder, and the switches that tested it were removed from `DecoderLab`.
 Counts of the earlier runs were made with a fold that shifted by the channel instead of the channel modulo 8 (ERRATA 69) and are not comparable.
