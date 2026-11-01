@@ -94,9 +94,8 @@ Steps 2, 3 and 4 are built and tested on hand-built and encoder-made streams; st
 **Status of substream 3 (2026-11-01).** [libs/truehd/SUBSTREAM3.md](../../libs/truehd/SUBSTREAM3.md) records the object substream as it is now
 implemented and evidenced: the block header and the object matrix section as bit tables with an evidence tag for each field, one matrix
 worked in integer form, the restart procedure, what was tried and rejected, the open items and how to run `iclforge-truehd-ss3-lab`.
-**Step 1 is done for 48 kHz:** with the extension read as a per-access-unit slope on coefficients that run at 2^-18 (ERRATA 69), the owner's 14 excerpts and controls
-(including a moving object, a jump and a fast move) pass every lossless-check interval, 1,477 of 1,477, and a private copy of the same rule passed 106,308 of 106,308 checks on
-42 streams including the long Sollevante encodes and eight Blu-ray streams. Open: 96 and 192 kHz (ERRATA question 66), the mask order with the LSB bypass (not distinguished by the streams), and the
+**Step 1 is done for 48 kHz:** with the extension read as a per-access-unit slope on coefficients that run at 2^-18 (ERRATA 69), 42 streams (the owner's excerpts and controls with a moving object, a jump and a fast move, the long Sollevante encodes and eight Blu-ray streams) pass every
+lossless-check interval, 106,308 of 106,308, on this repository's code at 39f303f and on a private copy of the same rule. Open: 96 and 192 kHz (ERRATA question 66), the mask order with the LSB bypass (not distinguished by the streams), and the
 steps after this one (bed export, objects and render from the metadata, a real encoder that writes moving objects and the extension).
 
 ## Status (2026-10-31, the object layer of `forge decode` reviewed against the owner's facts)

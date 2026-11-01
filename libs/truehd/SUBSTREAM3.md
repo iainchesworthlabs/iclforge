@@ -256,7 +256,7 @@ counts in N. VERIFIED: `z_short.mlp` passes 18 of 18 intervals with it and `hb_s
 
 Status: **substream 3 is solved** (ERRATA 69). With the rule of section 3, 42 streams (13.5 million access units, eight Blu-ray streams, the two long
 Sollevante encodes and all 22 controls) pass 106,308 of 106,308 substream 3 checks, and the object channels of `soll_e12`, `soll_e14` and `soll_e16`
-match Dolby Reference Player's raw output in all 60,490,752 samples. (Measured on a private copy of the decoder, then on this repository's code: all 14 of the owner's excerpts and DEE controls, `ctl_e` to `ctl_h` included, pass every interval of the lab, 1,477 of 1,477 checks.) Everything that was
+match Dolby Reference Player's raw output in all 60,490,752 samples. (Measured on a private copy of the decoder, then on this repository's code at commit 39f303f: the same 42 streams, 106,308 of 106,308 checks, no parse error, and the owner's 14 excerpts and controls, `ctl_e` to `ctl_h` included, 1,477 of 1,477. The comparison with Dolby Reference Player's raw output was made on the private copy only.) Everything that was
 tried before is
 listed here with what it showed, as a record; none of it is in the decoder, and the switches that tested it were removed from `DecoderLab`.
 Counts of the earlier runs were made with a fold that shifted by the channel instead of the channel modulo 8 (ERRATA 69) and are not comparable.
@@ -278,7 +278,7 @@ Counts of the earlier runs were made with a fold that shifted by the channel ins
 corpus is 48 kHz. The step for 96 and 192 kHz is the rule's reading, untested.
 
 **The quantiser mask with the LSB bypass.** The streams pass the same whether the mask is applied before the bypass bits are added or not; this decoder
-masks first. Likewise the truncation of the scaled fine sum to 32 bits is not distinguished by the streams.
+masks first. A private copy that did not mask passed the whole corpus too. Likewise the truncation of the scaled fine sum to 32 bits is not distinguished by the streams.
 
 **Cases without a stream.** A restart header with the extension active in its first block, a delta for a mask bit that a later set clears (the delta
 stands in the decoder but the sum covers present channels only), and A2 = 1 with B2 = 0 before any delta was sent.
