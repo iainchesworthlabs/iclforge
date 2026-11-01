@@ -131,7 +131,7 @@ jobs:
       # and Qt is a prebuilt dependency (cmake/FindQt6.cmake), never a vcpkg
       # port - see _build.yml's own precedent for this exact install step.
       - name: Install Qt (prebuilt)
-        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           version: ${{ needs.toolchain-versions.outputs.qt_version }}
           aqtsource: ${{ needs.toolchain-versions.outputs.aqt_source }}
@@ -207,7 +207,7 @@ jobs:
       # No explicit category: the SARIF's own tool name (PREfast) is what the
       # alert history is keyed by, and it has been since the first upload.
       - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: ${{ steps.run-analysis.outputs.sarif }}
 
