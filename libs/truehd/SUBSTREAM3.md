@@ -25,7 +25,7 @@ the lab tool (section 7).
 A TrueHD Atmos stream has four substreams. Substreams 0 to 2 are the ordinary ones: they carry the rows of a 7.1 bed in the usual
 way (2 channels, then 6, then 8 as the presentations a decoder may stop at). Substream 3 carries the object channels. The major
 sync of such a stream has four substreams, `substream_info` `0xFC`, `extended_substream_info` 3 (the low pair of its four bits) and the
-16-channel extension (ERRATA 47, 63). The segment of substream 3 may end in terminatorB, `0x1234`, or in zero padding.
+16-channel extension (ERRATA 47, 63). The segment of substream 3 may end in zero padding; terminatorB, `0x1234`, is for the last access unit only: the Dolby player rejects it at the end of any other segment (error 0xE5), which this decoder accepts. A declared `peak_data_rate` that is too small stops the player (0x79); this decoder does not check it (spec section 18.2).
 
 All substreams share one buffer of rows for the access unit: one row for each sample time, holding the matrix channels 0 to 15
 and two noise columns. Each substream codes a range of rows, `min_chan` to `max_chan`, and its matrices combine rows into rows.
@@ -174,7 +174,7 @@ and a `ramp` (int32). They are the evidence of ERRATA 69.
 4. **Noise.** If `field_m4` (the shift s) is not 0, add `buffer[index] × 2^(s + 11)` (the same noise as 2^(s + 8) at 2^-15). The buffer, its index and its stride are in section 4.
 5. **Shift and mask.** `value = (int32)(sum >> 18) & keep`, an arithmetic shift. `keep` clears the low `quant_step[out]` bits of the output row.
 6. **LSB bypass.** If the matrix has bypass, `value += bits`, where `bits` are the `field_2b` bits the block data sent for this matrix and this sample, read as a number, first bit most significant.
-   The streams do not tell whether the mask is applied before the bits are added: they pass the same either way, and this decoder masks first.
+   A matrix without bypass masks the whole sum, its own term included; a matrix with bypass is not masked, and its bits are added to the unmasked value. DEE's own streams cannot tell this from mask-then-add, because it gives a bypass row a quantiser step of 0; a stream built to separate them decodes this way in the Dolby player.
 7. **End of the access unit** (the block that reaches its last sample), with the extension on: `c[ch] += (int32)d[ch] << (18 - S)`. So a delta is a change of `d / 2^ext_field2` raw
    places in every unit, for as long as it stands.
 8. The result replaces `row[out]`. Matrices run in the order of the list, each seeing the previous ones' results.
@@ -281,8 +281,7 @@ one matrix moves by 1.04 in 360 samples while the object moves 0.0015 of the roo
 **Sample rates other than 48 kHz.** The ramp's step and the length of the access unit (40 << r samples) are measured at 48 kHz only; every stream in the
 corpus is 48 kHz. The step for 96 and 192 kHz is the rule's reading, untested.
 
-**The quantiser mask with the LSB bypass.** The streams pass the same whether the mask is applied before the bypass bits are added or not; this decoder
-masks first. A private copy that did not mask passed the whole corpus too. Likewise the truncation of the scaled fine sum to 32 bits is not distinguished by the streams.
+**Truncation of the scaled fine sum.** The truncation to 32 bits is not distinguished by the streams. (The quantiser mask with the bypass is settled: section 3, step 6.)
 
 **Cases without a stream.** A restart header with the extension active in its first block, a delta for a mask bit that a later set clears (the delta
 stands in the decoder but the sum covers present channels only), and A2 = 1 with B2 = 0 before any delta was sent.
