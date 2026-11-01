@@ -2834,6 +2834,9 @@ def generate(out):
                 "stream_sha256": hashlib.sha256(data).hexdigest(),
             }
         )
+    # Streams another tool built (listed under "supplied"): kept as they stand, checked by `check`.
+    previous = out / "manifest.json"
+    supplied = json.loads(previous.read_text()).get("supplied", []) if previous.is_file() else []
     comment = (
         "Made by tools/references/truehd_writer.py. pcm_sha256 is the SHA-256 of the signal each "
         "was built from, as 32-bit little-endian samples (the 24-bit value shifted left by 8). "
@@ -2849,6 +2852,7 @@ def generate(out):
         "ffmpeg_version": FFMPEG_VERSION,
         "fixtures": fixtures,
         "refused": refused,
+        "supplied": supplied,
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for fixture in fixtures:
@@ -2865,6 +2869,22 @@ def check(directory):
         good = hashlib.sha256(s32le(rows)).hexdigest() == fixture["pcm_sha256"]
         failures += not good
         print(f"{'ok  ' if good else 'FAIL'} {fixture['name']}")
+    for fixture in manifest.get("supplied", []):
+        data = (directory / fixture["file"]).read_bytes()
+        rows, _rate, _channels = ref.decode_stream(data, fixture["presentation"])
+        wav = (directory / fixture["wav"]).read_bytes()
+        at = wav.index(b"data") + 8
+        pcm = wav[at : at + int.from_bytes(wav[at - 4 : at], "little")]
+        samples = [
+            int.from_bytes(pcm[k : k + 3], "little", signed=True) for k in range(0, len(pcm), 3)
+        ]
+        good = (
+            hashlib.sha256(data).hexdigest() == fixture["stream_sha256"]
+            and hashlib.sha256(wav).hexdigest() == fixture["wav_sha256"]
+            and samples == [v for row in rows for v in row]
+        )
+        failures += not good
+        print(f"{'ok  ' if good else 'FAIL'} {fixture['name']} (supplied)")
     for fixture in manifest.get("refused", []):
         data = (directory / fixture["file"]).read_bytes()
         try:

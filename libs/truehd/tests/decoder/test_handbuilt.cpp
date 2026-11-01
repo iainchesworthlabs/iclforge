@@ -543,3 +543,63 @@ TEST_CASE("the object matrices' extension runs the coefficients as slopes, sampl
     CHECK(decoder.counters().lossless_check_failures == 0);
     CHECK(decoder.counters().check_failures == 0);
 }
+
+TEST_CASE("an object matrix with the LSB bypass is not masked, one without it masks its whole sum",
+          "[truehd][handbuilt][no-external-oracle]") {
+    // ss3_mask_regress.thd is a 40 access unit object stream built from the specification, in
+    // which the quantiser step is 2 on matrix rows 0 to 7, two of them rows of a matrix with the
+    // LSB bypass (field_2b 1 and 2). The coded rows are not multiples of 4 in three quarters of
+    // their samples, so the three places a mask can go (before the bits, after them, none) give
+    // different samples; the Dolby player decodes it as the .wav holds, and the three lossless
+    // checks (at access units 10, 20 and 30) pass only under that reading. The .wav holds the
+    // intended decoded channels: 12 channels, 48 kHz, 24-bit, 1,600 frames.
+    const std::vector<std::byte> wav = read_file(dir() + "/ss3_mask_regress.wav");
+    REQUIRE(wav.size() > 44);
+    const auto le32 = [&](std::size_t at) {
+        return static_cast<std::uint32_t>(wav[at]) | static_cast<std::uint32_t>(wav[at + 1]) << 8U |
+               static_cast<std::uint32_t>(wav[at + 2]) << 16U |
+               static_cast<std::uint32_t>(wav[at + 3]) << 24U;
+    };
+    std::size_t data_at = 0;
+    std::size_t data_size = 0;
+    for (std::size_t at = 12; at + 8 <= wav.size();) {
+        const std::string id{reinterpret_cast<const char*>(wav.data() + at), 4};
+        const std::size_t size = le32(at + 4);
+        if (id == "data") {
+            data_at = at + 8;
+            data_size = size;
+            break;
+        }
+        at += 8 + size + (size & 1U);
+    }
+    REQUIRE(data_at != 0);
+    REQUIRE(data_size == 1600U * 12U * 3U);
+
+    const std::vector<std::byte> stream = read_file(dir() + "/ss3_mask_regress.thd");
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    std::vector<std::int32_t> decoded_pcm;
+    while (const auto unit = reader.next()) {
+        auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        REQUIRE((*decoded)->channels == 12);
+        decoded_pcm.insert(decoded_pcm.end(), (*decoded)->pcm.begin(), (*decoded)->pcm.end());
+    }
+    REQUIRE(decoded_pcm.size() == 1600U * 12U);
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < decoded_pcm.size(); ++i) {
+        const std::size_t at = data_at + i * 3U;
+        const auto word = static_cast<std::uint32_t>(wav[at]) |
+                          static_cast<std::uint32_t>(wav[at + 1]) << 8U |
+                          static_cast<std::uint32_t>(wav[at + 2]) << 16U;
+        const auto expected = static_cast<std::int32_t>(word << 8U) >> 8;
+        differing += decoded_pcm[i] != expected ? 1U : 0U;
+    }
+    CHECK(differing == 0);
+    CHECK(decoder.counters().lossless_ok_by_substream[3] == 3);
+    CHECK(decoder.counters().lossless_failed_by_substream[3] == 0);
+    CHECK(decoder.counters().lossless_check_failures == 0);
+}

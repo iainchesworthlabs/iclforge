@@ -1152,5 +1152,29 @@
       "extra_data_first_hex": "02c0350bc2250000510863402048c92e81009c7e02048d44e0100b2c502048df730100cb0402048ea968100e14e02048f5b60100f7950200012800"
     }
   ],
-  "refused": []
+  "refused": [],
+  "supplied": [
+    {
+      "name": "ss3_mask_regress",
+      "file": "ss3_mask_regress.thd",
+      "wav": "ss3_mask_regress.wav",
+      "description": "A 40 access unit object stream built from the specification, with a quantiser step of 2 on matrix rows 0 to 7, two of them rows of a matrix with the LSB bypass: it separates masking before, after and not at all",
+      "features": [
+        "substream_3",
+        "twelve_channels",
+        "lsb_bypass",
+        "quantiser_mask",
+        "extension"
+      ],
+      "oracle": "spec-built; the Dolby player decodes its 8-channel presentation to the coded bed rows",
+      "codec": "truehd",
+      "presentation": "all",
+      "sample_rate": 48000,
+      "channels": 12,
+      "access_units": 40,
+      "pcm_samples": 1600,
+      "stream_sha256": "11c756aea6487b9c06e1feac2bf24ad2f2eb68acb2a5fc4a1a16d24e47b24cc0",
+      "wav_sha256": "706b24e0837fe0ad6de2f9a3fbcec4a59b115806cf96244f6dd7f18daae4ebe3"
+    }
+  ]
 }

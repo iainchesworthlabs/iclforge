@@ -30,7 +30,7 @@ FIXTURES = REPO / "testdata" / "truehd"
 # Each manifest's lists of entries.
 SECTIONS = {
     "manifest.json": ("fixtures", "spliced"),
-    "handbuilt/manifest.json": ("fixtures", "refused"),
+    "handbuilt/manifest.json": ("fixtures", "refused", "supplied"),
 }
 
 

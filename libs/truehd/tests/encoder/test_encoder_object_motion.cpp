@@ -451,10 +451,10 @@ TEST_CASE("every form of section is read back as written",
                     continue;
                 }
                 const int limit = 1 << (matrix.frac_bits + 1);
-                matrix.coeff[c] = form.change ? pick(2 * limit) - limit : 0;
+                matrix.coeff[c] = form.change ? pick(static_cast<std::uint32_t>(2 * limit)) - limit : 0;
                 if (form.deltas && matrix.ext_width != 0) {
                     const int reach = 1 << matrix.ext_width;
-                    matrix.ext_value[c] = pick(2 * reach) - reach;
+                    matrix.ext_value[c] = pick(static_cast<std::uint32_t>(2 * reach)) - reach;
                 }
             }
         }
