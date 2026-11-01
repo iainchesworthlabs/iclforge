@@ -582,8 +582,9 @@ H4) and 8 (the last part of H0).
 ## H6 to H8: the local and Android endpoints (2026-10-31)
 
 Branch `feature/truehd-hearth-endpoints`, WP2's items 6 and 7. This section is what was built without hardware, what each platform's
-output does, and the questions that are the owner's. Entries 120 to 129 are this block's; the numbering is the work packages' README. **Nothing here has been run
-against a receiver**, on any platform, and the output decision says so (`apps/hearth/engine/src/mat_status.hpp` is the list).
+output does, and the questions that are the owner's. Entries 120 to 129 are this block's; the numbering is the work packages' README. **ALSA and PipeWire have been
+run against a receiver (2026-11-01, entry 120); WASAPI, Core Audio and Android have not**, and the output decision says so
+(`apps/hearth/engine/src/mat_status.hpp` is the list).
 
 **The carrier.** The owner's decision of 2026-10-29: eight channels of 16 bits, 192 kHz for the 48 kHz family and 176.4 kHz for the 44.1 kHz
 family, 3,840 link frames to a 61,440-byte burst. `iclforge::audio::BitstreamFormat::kMat` carries it (`link_rate()`, `carrier_channels()`,
@@ -591,8 +592,8 @@ family, 3,840 link frames to a 61,440-byte burst. `iclforge::audio::BitstreamFor
 
 | Platform | What the backend does | Checked against | Run |
 |---|---|---|---|
-| ALSA | Opens 8 channels S16 at the link rate on a `hdmi` or `iec958` name with the non-audio channel status at that rate; refuses a device that cannot be eight wide | ALSA's `null` and `file` devices on Ubuntu 24.04: a MAT burst reaches an 8-channel device byte for byte | not run |
-| PipeWire | Negotiates SPA's `TRUEHD` codec on the link rate with 16-byte frames; the node's `iec958.codecs` must list `TrueHD` | The codec mapping and the list reading, headless; no sink | not run |
+| ALSA | Opens 8 channels S16 at the link rate on a `hdmi` or `iec958` name with the non-audio channel status at that rate; refuses a device that cannot be eight wide | ALSA's `null` and `file` devices on Ubuntu 24.04: a MAT burst reaches an 8-channel device byte for byte | **run** (2026-11-01, Pi 4B into an Onkyo TX-RZ740: `aplay` and this library\'s sink; TrueHD by status and on the LCD as DTHD) |
+| PipeWire | Negotiates SPA's `TRUEHD` codec on the link rate with 16-byte frames; the node's `iec958.codecs` must list `TrueHD` | The codec mapping and the list reading, headless; no sink | **run** (2026-11-01, library sink on the Pi: TrueHD by status; stream and sink formats seen in `pw-dump`) |
 | WASAPI | Exclusive mode, `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, 8 channels, the 7.1 mask | Every field of the format, against the SDK's own GUID; never opened on a device | not run |
 | Core Audio | Refuses (`kUnsupportedFormat`); no format ID is known | The refusal | not run, not offered |
 | Android | Two optional bridge methods open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND`; a bridge without them refuses | The pure half (`android_support.hpp`) only; **not built** (no NDK on the machine) | not run |
@@ -600,7 +601,7 @@ family, 3,840 link frames to a 61,440-byte burst. `iclforge::audio::BitstreamFor
 **The output decision.** For a TrueHD item (MLP has no carriage) on a build whose player can send MAT (`OutputRequest::mat_passthrough`, false
 until the player is wired, see 127): an output that takes MAT through a platform that has been run is chosen automatically; one that
 takes it through a platform that has not is decoded here with the reason saying *which* platform has not been run and why, and **pinning
-Bitstream sends it anyway**, with the same warning. The Output picker lists such an output as "TrueHD (MAT) opens, not run". With
+Bitstream sends it anyway**, with the same warning. The Output picker lists such an output as "TrueHD (MAT) opens, not run", and as "TrueHD (MAT) ✓" on a platform that has been run. With
 `mat_passthrough` false the decision is what it was before.
 
 **The fallback chain (H8, no transcode).** When a TrueHD or MLP item is decoded, `truehd_fallback_presentation()` gives the stream's own
@@ -609,20 +610,33 @@ one; `follow=off`, or no output that can take PCM, refuses. It is carried in `Ou
 
 **Entries.**
 
-120. **The carrier is provisional until one receiver names a stream TrueHD** (`libs/containers/ERRATA.md`, question 7 stays open). Every
-     platform above is "not run". *Recommend:* the first run is the Raspberry Pi (ALSA) into the Onkyo TX-RZ740 with `forge spdif`'s eight-channel WAV
-     of a fixture, played with the device name the library builds for `AES3=0x0e`
-     (`aplay -D "hdmi:CARD=<card>,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e" mat.wav`; untried here); then Windows; Core Audio last.
-     WP6's session was said to be producing MAT bursts for the Shield and the Onkyo: its branch (`feature/truehd-validation`) held none when this was
-     written, so the bursts for the first run are `forge spdif` of the 25 fixtures.
+120. **The carrier is seen to work on one receiver, and ALSA and PipeWire are run (2026-11-01); the other platforms are not.**
+     Raspberry Pi 4B (vc4hdmi0) into an Onkyo TX-RZ740, Direct mode, the owner present, the Pi session driving it, main at `2e2ed98e6`.
+     *Step A, `aplay` of a `forge spdif` WAV* (8 channels, 16 bits, 192,000 Hz) with the device name the library builds
+     (`aplay -D "hdmi:CARD=vc4hdmi0,DEV=0,AES0=0x06,AES1=0x82,AES2=0x00,AES3=0x0e" mat.wav`): the receiver's eISCP status (IFAQSTN) said "Dolby Audio - TrueHD,
+     48 kHz, 5.1 ch" (and "Dolby TrueHD SUR, 48 kHz, 2.0 ch" for the stereo files, "TrueHD, 96 kHz, 2.0 ch" for a 96 kHz one, which uses the same 192 kHz link).
+     The first time the owner saw no format word on the LCD (the display line showed only the input name and the volume). On the repeat, with the volume at
+     -50 dB and the owner stepping through the display pages, the LCD showed "fs: 96kHz" and "DD DTHD 2.0" (a Dolby double-D glyph, "DTHD", the channels), with
+     HDMI and the Dolby logo lit, while IFAQSTN agreed. The LCD never spells "TrueHD" in full. *Step B, this library's `PassthroughSink` on ALSA* (a small program
+     outside the repository feeding `wrap_mat_stream`'s bursts, 1,300 of them over 26 s): `enumerate_render_devices(48000)` listed vc4hdmi0 as taking MAT (and
+     not vc4hdmi1 or the headphones), 0 underruns for the 26 s, submitted = rendered = 1,300, IFAQSTN TrueHD 48 kHz 5.1 ch from 3.3 s. *Step C, the PipeWire backend*
+     (built with ALSA off): the HDMI sink listed as taking MAT, 0 underruns, IFAQSTN TrueHD from 3.0 s. Panel not read for B and C.
+     **The owner's decision of 2026-11-01:** "DTHD" is this Onkyo's abbreviation for Dolby TrueHD, and a status report alone counts as run for the library's sink; so
+     `mat_status.hpp` marks ALSA and PipeWire run. **Not run:** WASAPI, Core Audio, Android; 176.4 kHz; any other receiver. **Findings for the player:** the fixtures
+     are 8 and 13 bursts (0.2 s), too short for the receiver to lock; lock took 1.5 to 4.8 s from the start of the carrier, with the HDMI label flashing meanwhile, so
+     the link must start before the first burst and the player must not expect sound in its first seconds; the 5.1 fixture looped four times a second "pulsed", which
+     is the loop and not a decode fault. No `dmesg` audio errors, no throttling. *Recommend:* next, Windows (WASAPI) from the owner's PC into the same Onkyo, then a
+     Shield run for entry 125; Core Audio last.
 121. **A platform marked "not run" is never chosen automatically.** The user can pin Bitstream to try it. *Recommend:* keep, and flip a platform to
      "run" only in the commit that records a run that passed (the table has a test that pins it).
 122. **WASAPI's MLP format fields.** `dwEncodedSamplesPerSec` is the content rate and `dwEncodedChannelCount` 8, as the other two families have
      them; the mask is `KSAUDIO_SPEAKER_7POINT1_SURROUND`. Microsoft's description of the MLP format would settle them; this project has not seen a driver
      accept or refuse them. *Recommend:* the Windows run with the receiver; if `IsFormatSupported` refuses, try the link rate in
      `dwEncodedSamplesPerSec` and record which one a driver takes. Please supply the Microsoft text if you have it.
-123. **PipeWire's TRUEHD stream.** The rate (the link's) and the frame (16 bytes) it expects are assumed from how E-AC-3 is handled here.
-     *Recommend:* the first PipeWire run reads them from `pw-dump` on the sink's node.
+123. **PipeWire's TRUEHD stream (answered 2026-11-01).** `pw-dump` during the Pi run shows both the stream node ("iclforge passthrough") and the sink node with
+     Format {mediaSubtype iec958, iec958Codec TrueHD, rate 192000}, PortConfig passthrough, one port each. An iec958 format carries a codec and a rate only: no channel
+     count and no frame size appear in it, so the 16-byte frame is not visible there, and it worked. The rate is the link's, as assumed. (The raw dump is on the Pi, in
+     `~iain/mat-tests/pw-dump-during.json`.)
 124. **Core Audio.** No format ID for TrueHD is known to the backend; the session had no Mac. A Mac may offer eight channels of 192 kHz linear PCM on
      HDMI, in which MAT could be sent as data. *Recommend:* leave refused; ask a Mac owner to list the HDMI stream's physical formats (the backend's
      `kAudioStreamPropertyAvailablePhysicalFormats`) before any code.

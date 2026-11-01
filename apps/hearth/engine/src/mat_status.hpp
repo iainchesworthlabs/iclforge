@@ -10,10 +10,12 @@
 // (planning/truehd-parity-hearth-player.md, H6; libs/containers/ERRATA.md, question 7).
 //
 // The output decision reads this and says so in its reason: Hearth does not claim what it has not
-// tried (the document's definition of first class, point 7). Every platform here is NOT RUN, and
-// stays so until a run passes: a receiver that names the stream TrueHD, played from that platform
-// by someone with the receiver on the desk. What the code does is a different thing from what has
-// been seen to work, and this file is where the two are kept apart.
+// tried (the document's definition of first class, point 7). A platform is NOT RUN until a run
+// passes: a receiver that names the stream TrueHD, played from that platform by someone with the
+// receiver on the desk. What the code does is a different thing from what has been seen to work,
+// and this file is where the two are kept apart. Run on 2026-11-01, from a Raspberry Pi 4B into
+// an Onkyo TX-RZ740 (Direct mode, status by eISCP, and for the aplay run the LCD): ALSA and
+// PipeWire, each through this library's own PassthroughSink.
 //
 // To mark a platform as run: the owner (or a session working with the owner's receiver) plays a
 // MAT stream through it to a receiver that shows TrueHD, the result goes into docs/platforms and
@@ -26,7 +28,7 @@ namespace iclforge::hearth {
 enum class MatRun : std::uint8_t {
     // The code exists (or does not) and no run on a receiver has shown it to work.
     kNotRun,
-    // A run passed. No platform is here yet.
+    // A run passed.
     kRun,
 };
 
@@ -43,13 +45,14 @@ struct MatPlatformStatus {
     using audio::PassthroughBackend;
     switch (backend) {
         case PassthroughBackend::kAlsa:
-            return {backend, MatRun::kNotRun,
-                    "it opens 8 channels of 16 bits at 192 kHz (176.4 kHz) with the non-audio "
-                    "status bit, and has been checked against software devices only"};
+            return {backend, MatRun::kRun,
+                    "an Onkyo TX-RZ740 reported TrueHD (and its display showed DTHD) for this "
+                    "library's sink and for aplay on a Raspberry Pi 4B on 2026-11-01, at 48 kHz "
+                    "and 96 kHz content"};
         case PassthroughBackend::kPipeWire:
-            return {backend, MatRun::kNotRun,
-                    "it negotiates SPA's TrueHD codec on the same link, and no sink has been "
-                    "asked for it"};
+            return {backend, MatRun::kRun,
+                    "an Onkyo TX-RZ740 reported TrueHD for this library's sink on a Raspberry "
+                    "Pi 4B on 2026-11-01, at 48 kHz content"};
         case PassthroughBackend::kWasapi:
             return {backend, MatRun::kNotRun,
                     "it offers the Dolby MLP subtype on 8 channels at 192 kHz (176.4 kHz) in "

@@ -130,9 +130,13 @@ stream; that is tested on synthetic carriers, and no capture device or receiver 
 
 ### TrueHD (MAT)
 
-!!! warning "Not run on any platform"
-    TrueHD over HDMI (MAT) has been **built, and tested against software devices, and has not been run against a receiver on
-    Linux, ALSA or PipeWire**. Nothing here says a receiver names the stream TrueHD. The code does what the carrier decision of 2026-10-29
+!!! success "Run on one receiver: ALSA and PipeWire, from a Raspberry Pi 4B into an Onkyo TX-RZ740"
+    On 2026-11-01 a WAV made by `forge spdif` and played with `aplay` on a Raspberry Pi 4B (vc4hdmi0, ALSA) into an Onkyo TX-RZ740 was reported as
+    TrueHD by the receiver's eISCP status ("Dolby Audio - TrueHD, 48 kHz, 5.1 ch"), and its LCD showed "DD DTHD 2.0" (the receiver's abbreviation, to be confirmed
+    by the owner), at 48 kHz and 96 kHz content. The carrier below worked for that receiver.
+    This library's `PassthroughSink` was then run on ALSA and on PipeWire, 26 seconds each with no underruns, and the receiver's status reported TrueHD
+    each time. The receiver took 1.5 to 4.8 seconds to lock from the start of the carrier, so the link must start before the first burst. The other
+    platforms are not run. The code does what the carrier decision of 2026-10-29
     says, which is itself provisional ([libs/containers/ERRATA.md](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/containers/ERRATA.md),
     question 7): eight channels of 16 bits at 192 kHz for content in the 48 kHz family and 176.4 kHz for the 44.1 kHz family,
     3,840 frames to a 61,440-byte burst. The list of what has been run is `apps/hearth/engine/src/mat_status.hpp`, and
@@ -144,9 +148,8 @@ at 192 kHz, so a S/PDIF output answers no, and a device that is stereo only is r
 channels, where a MAT burst would be noise. The sink's descriptor read now reports a MAT entry (CEA-861 audio format code 12) beside AC-3 and
 E-AC-3, from the ELD under ALSA and from the `iec958.codecs` list under PipeWire.
 
-PipeWire negotiates SPA's `TRUEHD` codec (the Pi's Atmos receiver listed `TrueHD` unprompted, above) on the same link rate and 16-byte
-frames. That PipeWire reads a `TRUEHD` stream's rate and frame so is an assumption modelled on how E-AC-3 is handled, and no sink has
-been asked.
+PipeWire negotiates SPA's `TRUEHD` codec (the Pi's Atmos receiver listed `TrueHD` unprompted, above) on the link rate. `pw-dump` during the
+run shows the stream and the sink node both as an iec958 format with codec TrueHD and rate 192000; that format has no channel count or frame size to read.
 
 Tested: the device names, the channel status, the codec list and the ELD parse (headless); the ALSA open against ALSA's `null`
 and `file` devices, with a 61,440-byte burst read back from an eight-channel device byte for byte
