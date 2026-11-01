@@ -93,12 +93,15 @@ build.
   branch to land.
 - `forge probe` does not yet report the model at the chosen bitrate next to the declared one in one run (two runs do).
 
-## Round trip with the matrices branch (feature/truehd-atmos-encoder-matrices, 24d14585d and 51c839c00)
+## Round trip with the matrices branch (feature/truehd-atmos-encoder-matrices, tip 050ea7a73)
 
-Replayed on top of it (this branch's commits on its tip, which is based on 56b4346; the base of the rate control branch has since
-moved with the decoder's slope rule, so merging the two branches also meets the decoder's changes to `syntax.hpp` and the Python
-reference, which is not this session's to resolve). Two trivial conflicts only (the `encoder.hpp` include list and the test sources);
-`encoder.cpp` merged by itself. On the replayed tree: all of `[encoder]`, the matrices session's object-motion tests, the layout and rate
-tests and the CLI rate tests pass, and `test_ratectl_motion.cpp` adds the one case that needs both: moving objects (`object_paths`, flat
-and with the ramp), shaped to a bitrate, decoded by the encoder's own `verify`, no late unit, four checked segments in every unit.
-Rate control does not depend on the matrix chain: shaping rounds the object planes before the chain is built from them.
+Replayed on top of the matrices branch's tip 050ea7a73, which has merged atmos-bed with the decoder's slope rule (the old ramp options are gone;
+a moving object is `ObjectExtension::kSlopes`). The conflicts were the include list of `encoder.hpp` and the two CMake source lists;
+`encoder.cpp` merged by itself, because the retry loop wraps the old interval body and the matrices work changed the object stage inside
+it. On the replayed tree all of `[encoder]`, the matrices session's object-motion tests, the layout and rate tests and the CLI rate tests
+pass, and `test_ratectl_motion.cpp` adds the one case that needs both: moving objects (`object_paths`, without the extension and with
+the slopes), shaped to a bitrate, decoded by the encoder's own `verify`, no late unit, four checked segments in every unit. Rate control
+does not depend on the matrix chain: shaping rounds the object planes before the chain is built from them, and the retry restores the
+stream's counters, so the matrices session's two counters are not counted twice.
+Merging the matrices branch with atmos-bed directly is not this session's: the replayed branch is
+`feature/truehd-atmos-encoder-stream-on-matrices`.

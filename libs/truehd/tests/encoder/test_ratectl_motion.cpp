@@ -14,7 +14,7 @@
 // Rate control with the moving objects of the object substream (EncoderConfig::object_paths,
 // ERRATA.md entries 69 and 70, ERRATA.md entry 71): the objects give up low bits before the
 // matrices that mix them into the bed are built, and the matrix sections that change from block to
-// block still decode, with the decoder's own check of the ramp (lab settings) where the stream has
+// block still decode, with the decoder's own slope rule where the stream has
 // one. [no-external-oracle].
 
 namespace {
@@ -27,7 +27,7 @@ constexpr int kBed = 8;
 constexpr int kRowOfObject[8] = {0, 1, 2, 4, 5, 6, 7, 3};
 constexpr std::int32_t kGain = 46341;  // 1/sqrt(2) in units of 2^-16
 
-EncoderConfig moving_config(ObjectRamp ramp) {
+EncoderConfig moving_config(ObjectExtension ramp) {
     EncoderConfig config;
     config.channels = kBed;
     config.object_channels = kObjects;
@@ -53,13 +53,13 @@ EncoderConfig moving_config(ObjectRamp ramp) {
         }
         config.object_paths.push_back(path);
     }
-    config.object_ramp = ramp;
+    config.object_extension = ramp;
     return config;
 }
 
 TEST_CASE("objects that move still decode when they give up bits to fit a bitrate",
           "[truehd][rate][ratectl][object-motion]") {
-    for (const ObjectRamp ramp : {ObjectRamp::kNone, ObjectRamp::kEnd}) {
+    for (const ObjectExtension ramp : {ObjectExtension::kNone, ObjectExtension::kSlopes}) {
         const MixedSignal signal{.bed = 0, .objects = kObjects, .object_noise_bits = 15};
         EncoderConfig lossless = moving_config(ramp);
         const StreamOut base = encode_signal(lossless, signal, 48000 * 3);
@@ -73,9 +73,9 @@ TEST_CASE("objects that move still decode when they give up bits to fit a bitrat
         config.rate_control.mode = RateMode::kShape;
         config.rate_control.target_bitrate_bps = target;
         config.verify =
-            true;  // the encoder's own strict decode of every unit, ramp settings included
+            true;  // the encoder's own strict decode of every unit, slopes included
         const StreamOut out = encode_signal(config, signal, 48000 * 3);
-        CAPTURE(ramp == ObjectRamp::kEnd);
+        CAPTURE(ramp == ObjectExtension::kSlopes);
         CHECK(out.stats.shaped_intervals > 0);
         CHECK(out.stats.rate_violations == 0);
         CHECK(out.stats.verified_units == out.stats.access_units);
