@@ -23,6 +23,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder.cpp
     encoder/test_encoder_atmos.cpp
     encoder/test_encoder_object_bed.cpp
+    encoder/test_encoder_object_motion.cpp
     encoder/test_signals.cpp
     fuzz/test_truehd_mutator.cpp)
 
@@ -38,8 +39,9 @@ target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::b
 # tree, on this target's path only.
 target_include_directories(iclforge-truehd-tests PRIVATE ../fuzz)
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
-# build), so the tests that exercise them compile coding.cpp themselves and see src/.
-target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)
+# build), so the tests that exercise them compile coding.cpp themselves and see src/. The same goes
+# for the object substream's matrix planner (object_bed.cpp).
+target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp ../src/encoder/object_bed.cpp)
 target_include_directories(iclforge-truehd-tests PRIVATE ../src)
 
 # The AVX2 kernel of src/internal/avx2, compiled a second time into this binary for the reason
@@ -65,6 +67,15 @@ endif()
 add_executable(iclforge-truehd-encode-tool tools/encode_tool.cpp)
 target_link_libraries(iclforge-truehd-encode-tool PRIVATE iclforge::truehd iclforge::warnings)
 add_dependencies(iclforge-tests iclforge-truehd-encode-tool)
+
+# iclforge-truehd-object-plan-tool - what the encoder's planner of moving objects makes of a request,
+# for tools/checks/verify_truehd_object_bed.py to hold to the Python reference writer's. It compiles
+# object_bed.cpp itself, which the library keeps to itself.
+add_executable(iclforge-truehd-object-plan-tool tools/object_plan_tool.cpp ../src/encoder/object_bed.cpp)
+target_link_libraries(iclforge-truehd-object-plan-tool PRIVATE iclforge::truehd iclforge::base_headers
+    iclforge::warnings)
+target_include_directories(iclforge-truehd-object-plan-tool PRIVATE ../src)
+add_dependencies(iclforge-tests iclforge-truehd-object-plan-tool)
 
 # iclforge-truehd-ss3-lab - the decoder under each setting of DecoderLab, for the owner to run on a
 # TrueHD Atmos stream (libs/truehd/ERRATA.md entry 69).

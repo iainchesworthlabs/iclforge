@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
 #include "iclforge/truehd/export.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
@@ -177,6 +178,28 @@ struct EncoderConfig {
     // the encoder leaves the bits below the output shift's reach in the samples (a 16 bit source
     // loses the one bit of saving it would otherwise have).
     bool object_lsb_bypass = false;
+    // kBedMatrices only: the bits a sample the LSB bypass matrix sends, 1 to 3 (its coefficient on
+    // itself is 2^n and its header's two bits are n).
+    int object_bypass_bits = 1;
+    // kBedMatrices only: where the objects sit in the bed over time (object_paths.hpp). Empty: each
+    // object is mixed into its own bed row at -3 dB for the whole stream, as before. Otherwise the
+    // matrices that mix the objects into the bed follow the paths: the matrix sections of
+    // substream 3 change from block to block.
+    std::vector<ObjectPath> object_paths{};
+    // kBedMatrices with paths: an update every this many access units (the first access unit
+    // updates at each of its two blocks). A coefficient holds from one update to the next.
+    int object_update_units = 1;
+    // kBedMatrices with paths: send the extension, ramping each coefficient across the block
+    // (object_paths.hpp). PROVISIONAL: the ramp is a reading of one controlled encode, and the
+    // stream only decodes under the decoder's lab settings for it. Needs an update at every block.
+    ObjectRamp object_ramp = ObjectRamp::kNone;
+    // kBedMatrices with paths: a mixing matrix whose coefficients are all 0 in a block is left out
+    // of that block's list (the section sends new headers when the list changes).
+    bool object_drop_idle_matrices = false;
+    // kBedMatrices with paths: one mixing matrix for each object a bed row takes, not one for each
+    // bed row (so that an object that moves between rows has a matrix on each, and a stream can
+    // carry up to the 16 matrices of the section; more is refused).
+    bool object_split_mixes = false;
     // The 16-channel fields of the major sync (§14.2). `sixteench_channel_count` is filled in by
     // the encoder: the object channels, less the LFE of a dynamic-object-only programme, which is
     // how the owner's discs count them. Used only with object_channels.

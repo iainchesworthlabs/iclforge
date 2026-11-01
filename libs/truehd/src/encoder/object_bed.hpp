@@ -1,16 +1,30 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <expected>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
+#include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
 
 // The matrices of an object substream written the way the owner's streams have it (ERRATA.md
 // entry 69, 70): substream 3 codes the channels from 8 up and its primitive matrices rebuild the
 // output channels from the 7.1 bed rows of substreams 0 to 2 and those coded channels. The encoder
 // runs the matrices backwards over the object signals it is given, in integer arithmetic that
-// includes the matrices' noise and LSB bypass, and so finds the rows it has to code. Everything
-// here is a pure function of its arguments.
+// includes the matrices' noise, LSB bypass and (provisionally) coefficient ramps, and so finds the
+// rows it has to code.
+//
+// The matrices change from block to block. A *timeline* holds, for each block of a restart
+// interval, the matrices in force and the section that block's header sends to get there (nothing,
+// new coefficients, new deltas, or new headers); the same timeline drives the backward run, the
+// forward check and the block data's bypass bits. Everything here is a pure function of its
+// arguments. Agreement with this library's decoder is not agreement with Dolby's: the sections are
+// read back by this library's reader and the arithmetic mirrors this library's kernels.
 
 namespace iclforge::truehd::detail {
 
@@ -22,24 +36,112 @@ inline constexpr int kBedChannels = 8;  // rows 0 to 7 come from substreams 0 to
 // streams restart every 128 access units).
 inline constexpr std::uint32_t kObjectNoiseSeed = 0x2A5F31;
 
-// How many gain steps make_object_bed_chain knows: the mix of the objects above the bed into the
-// bed at full gain, half, a quarter and none.
+// How many gain steps the mix of the objects into the bed knows: full gain, half, a quarter and
+// none (the encoder takes the first whose bed stays within 24 bits).
 inline constexpr int kObjectMixSteps = 4;
 
-// The matrices, in the order the decoder applies them, for `objects` (9 to 16) output channels:
-//   1. out 8, frac_bits 0, f_shift -1: -1.0 on itself (the sparse matrix of the owner's streams);
-//   2. with `lsb_bypass`, out objects - 1: 2.0 on itself (frac_bits 12, f_shift 1) and the matrix's
-//      LSB bypass, which sends the bit the doubling loses;
-//   3. for each object above the bed (8 and up) a matrix on one bed row: 1.0 on itself and the
-//      negative of the object's gain on the object, so that the bed row is the object channel plus
-//      the mixed-in objects. Which bed row an object goes to is a fixed table.
-// Every matrix of 2 and 3 carries `noise_shift` (0 to 15; 0 draws no noise). The gain of 3 is
-// 1/sqrt(2) halved `mix_step` times, none at the last step.
-[[nodiscard]] std::vector<MatrixSpec> make_object_bed_chain(int objects, int mix_step,
-                                                            int noise_shift, bool lsb_bypass);
+// The gain of an object with no path, into its own bed row: 1/sqrt(2), -3 dB, in units of
+// 2^-kObjectGainBits.
+inline constexpr std::int32_t kDefaultMixGain = 46341;
 
-// What running a chain over a block of rows needs besides the chain: the quantiser step the rows
-// share, the restart header's noise seed, and the shape of the interval.
+// The extension's delta is read in eighths of the coefficient's last place (SUBSTREAM3.md section
+// 6, provisional); it is added across the block by a ramp.
+inline constexpr int kRampScaleBits = 3;
+
+// The widest delta the extension carries: width 15 is 16 bits, signed.
+inline constexpr int kMaxDeltaWidth = 15;
+
+// The longest stretch of samples between two knots of a path (keeps the integer arithmetic of the
+// trajectory in 64 bits).
+inline constexpr std::int64_t kMaxKnotSpan = std::int64_t{1} << 26;
+
+// The bed row (L R C LFE Ls Rs Lrs Rrs) each object above the bed is mixed into when it has no
+// path: object 8 into L, 9 into R, 10 into C, and so on round the surrounds, the LFE last. A
+// placeholder for a renderer (ERRATA.md entry 70): the encoder makes a valid bed, not Dolby's.
+inline constexpr int kBedRowOfObject[kBedChannels] = {0, 1, 2, 4, 5, 6, 7, 3};
+
+// --- arithmetic shared with the Python reference (tools/references/truehd_writer.py) -----------
+
+// numerator / denominator rounded to the nearest whole number, halves away from zero (what lround
+// does); denominator > 0.
+[[nodiscard]] constexpr std::int64_t round_div(std::int64_t numerator,
+                                               std::int64_t denominator) noexcept {
+    const std::int64_t magnitude = numerator < 0 ? -numerator : numerator;
+    const std::int64_t quotient = (2 * magnitude + denominator) / (2 * denominator);
+    return numerator < 0 ? -quotient : quotient;
+}
+
+// A path's gain into one bed row at one sample, as the fraction `numerator / denominator` in units
+// of 2^-kObjectGainBits (the knots' units). Between knots it is linear; outside them it holds; at a
+// knot's own sample the later knot of that sample holds.
+struct GainFraction {
+    std::int64_t numerator = 0;
+    std::int64_t denominator = 1;
+};
+[[nodiscard]] GainFraction path_gain(const ObjectPath& path, int row, std::int64_t sample) noexcept;
+
+// --- the plan -----------------------------------------------------------------------------------
+
+// One block of an interval: where it is, the matrices in force while it plays (raw coefficients in
+// `coeff`, the extension's widths in `ext_width` and its deltas in `ext_value`), and the section
+// its header sends, if any.
+struct ObjectBlock {
+    std::size_t start = 0;  // first sample, counted from the interval's
+    int size = 0;
+    std::vector<MatrixSpec> matrices;
+    bool send = false;  // the header carries `section`
+    MatrixSet section;
+};
+
+struct ObjectTimeline {
+    std::vector<ObjectBlock> blocks;
+    ObjectRamp ramp = ObjectRamp::kNone;
+};
+
+// What the encoder asks of the plan.
+struct ObjectTimelineRequest {
+    int objects = 12;     // channels of substream 3, 9 to 16
+    int noise_shift = 0;  // every matrix but the sign flip
+    int bypass_bits = 0;  // 0: no LSB bypass matrix; 1 to 3: its bits a sample
+    int mix_step = 0;     // 0 to kObjectMixSteps - 1: the gains halved this many times, none at 3
+    std::vector<ObjectPath> paths;
+    ObjectRamp ramp = ObjectRamp::kNone;
+    int update_units = 1;  // updates every this many access units (without a ramp)
+    bool drop_idle = false;
+    bool split_mixes = false;  // one mixing matrix for each object a bed row takes, not one a row
+    std::int64_t first_sample = 0;  // the stream's sample the interval starts at
+    int nominal = 40;               // samples to an access unit
+    // The interval's blocks: first sample (from the interval's) and size.
+    std::vector<std::pair<std::size_t, int>> blocks;
+};
+
+// The timeline of the interval, or why the request cannot be planned (in words).
+[[nodiscard]] std::expected<ObjectTimeline, std::string_view> build_object_timeline(
+    const ObjectTimelineRequest& request);
+
+// The words for a path that is not valid, empty when it is (objects in 8..objects-1, knots in
+// ascending order within kMaxKnotSpan of each other, gains within +-1.98).
+[[nodiscard]] std::string_view object_path_problem(const ObjectPath& path, int objects);
+
+// --- sections -----------------------------------------------------------------------------------
+
+// What the decoder holds after a section, from what it held before (empty after a restart): this
+// library's reading of ERRATA.md entry 69 (new headers keep the widths of the matrix at the same
+// place, new coefficients clear the deltas, A clear keeps the set and its deltas, C2 replaces the
+// widths, B2 the deltas).
+[[nodiscard]] std::vector<MatrixSpec> apply_object_section(const std::vector<MatrixSpec>& before,
+                                                           const MatrixSet& section);
+
+// The section that takes the decoder from `before` (empty at a restart) to `after`, or nothing to
+// send when they are the same. The cheapest form that does it: new deltas on the set that stands
+// (A clear), new coefficients on the headers that stand (B clear), or new headers.
+[[nodiscard]] std::pair<bool, MatrixSet> plan_object_section(const std::vector<MatrixSpec>& before,
+                                                             const std::vector<MatrixSpec>& after);
+
+// --- running the matrices -----------------------------------------------------------------------
+
+// What running the matrices needs besides them: the quantiser step the rows share, the restart
+// header's noise seed, and the shape of the interval.
 struct ObjectChainShape {
     int quant = 0;
     std::uint32_t noise_seed = kObjectNoiseSeed;
@@ -48,20 +150,29 @@ struct ObjectChainShape {
     int noise_size = 64;  // entries of generator 1's buffer (core/noise.hpp)
 };
 
-// Runs the chain backwards: on entry `rows` are the output channels (in units of 2^quant, all
-// multiples of it); on return they are the rows the decoder starts from, the bed rows 0 to 7 and
-// the coded channels. `bypass[k]` is, for the k-th matrix with LSB bypass, the bit sent for each
-// sample. False when the chain cannot be run (a matrix that is not primitive, a bypass matrix with
-// a quantiser step).
-[[nodiscard]] bool invert_object_chain(const std::vector<MatrixSpec>& chain,
-                                       const ObjectChainShape& shape,
-                                       std::vector<ObjectPlane>& rows,
-                                       std::vector<std::vector<std::uint8_t>>& bypass);
+// The bits the LSB bypass matrices send: `bits[k][t]` is the value (0 to 2^n - 1) for the k-th
+// matrix with bypass in the list in force at sample t.
+using ObjectBypass = std::vector<std::vector<std::uint8_t>>;
 
-// The decoder's side of the chain, applied to `rows` in place: the check that invert_object_chain
-// gave the rows back.
-void apply_object_chain(const std::vector<MatrixSpec>& chain, const ObjectChainShape& shape,
-                        const std::vector<std::vector<std::uint8_t>>& bypass,
-                        std::vector<ObjectPlane>& rows);
+// Runs the matrices backwards: on entry `rows` are the output channels (in units of 2^quant, all
+// multiples of it); on return they are the rows the decoder starts from, the bed rows 0 to 7 and
+// the coded channels. False when the matrices cannot be run (one that is not primitive, a bypass
+// matrix with a quantiser step).
+[[nodiscard]] bool invert_object_timeline(const ObjectTimeline& timeline,
+                                          const ObjectChainShape& shape,
+                                          std::vector<ObjectPlane>& rows, ObjectBypass& bypass);
+
+// The decoder's side, applied to `rows` in place: the check that invert_object_timeline gave the
+// rows back.
+void apply_object_timeline(const ObjectTimeline& timeline, const ObjectChainShape& shape,
+                           const ObjectBypass& bypass, std::vector<ObjectPlane>& rows);
+
+// The bypass bits of sample `i` of block `block`, in the order of the matrices that have them
+// (first bit of each value first), as the block data carries them ahead of the residuals.
+void put_object_bypass(BitWriter& writer, const ObjectTimeline& timeline,
+                       const ObjectBypass& bypass, std::size_t block, int i);
+
+// The most matrices any block's list holds.
+[[nodiscard]] std::size_t object_matrices_used(const ObjectTimeline& timeline) noexcept;
 
 }  // namespace iclforge::truehd::detail

@@ -144,12 +144,28 @@ struct MatrixSpec {
     friend bool operator==(const MatrixSpec&, const MatrixSpec&) = default;
 };
 
+// What write_object_matrices sends of an object-audio section (ERRATA.md entry 69). The reader
+// does not fill it in. The default is a full section: A and B set, every header and coefficient, no
+// second precision term.
+struct ObjectSectionForm {
+    // A: the matrices change; clear, the last set and its deltas stand
+    bool change = true;
+    // B (with A): the headers follow; clear, coefficients alone on the headers that stand
+    bool headers = true;
+    // A2 and B2: a delta for each coefficient of a matrix with a width follows
+    bool deltas = false;
+    // C2 (with deltas): each matrix's width and reserved field follow
+    bool widths = false;
+    friend bool operator==(const ObjectSectionForm&, const ObjectSectionForm&) = default;
+};
+
 // The matrices a block header sends: `count` of `items` are used. A fixed array, so that reading a
 // header does not allocate.
 struct MatrixSet {
     std::array<MatrixSpec, kMaxObjectMatrices> items{};
     std::uint8_t count = 0;
     bool extension = false;  // object-audio matrices: a second precision term followed
+    ObjectSectionForm form;  // object-audio matrices: how the writer sends the set; not read back
     friend bool operator==(const MatrixSet&, const MatrixSet&) = default;
 };
 

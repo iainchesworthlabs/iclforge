@@ -5,10 +5,17 @@
 //
 //   iclforge-truehd-encode-tool in.wav out.thd [bits=N] [restart=N] [order=N] [matrix=0|1]
 //       [verify=0|1] [chunk=N] [peak=BPS] [assignment=0xNNNN] [stereo-mode=N] [rate-violations=0|1]
-//       [object-bed=0|1] [object-noise=N] [object-bypass=0|1]
+//       [object-bed=0|1] [object-noise=N] [object-bypass=0|1] [object-bypass-bits=1..3]
+//       [object-motion=static|slow|jump] [object-ramp=none|end|start] [object-update=N]
+//       [object-drop=0|1] [object-split=0|1] [object-stretch=N]
 //
 // object-bed=1 reads the file's 9 to 16 channels as the objects of an Atmos stream whose 7.1 bed is
 // made from them (EncoderConfig::object_layout kBedMatrices, ERRATA.md entry 70, 48 kHz).
+// object-motion moves the objects in the bed (tools/checks/verify_truehd_object_bed.py defines the
+// same paths): every `object-stretch` samples (24,000) object k goes from its own bed row to the
+// next object's (slow: a straight line across the stretch; jump: a step at its end), alternating.
+// object-ramp sends the provisional extension; it needs object-update=1 and decodes only under the
+// decoder's lab settings for it.
 //
 // Reads 16, 24 or 32 bit integer PCM (WAVE_FORMAT_PCM or EXTENSIBLE). `bits` is the width of the
 // samples to code (default: the file's, at most 24); a 24 bit file given bits=16 must carry 16 bit
@@ -118,6 +125,35 @@ bool option(std::string_view arg, std::string_view key, std::string& value) {
 
 }  // namespace
 
+// The paths of the object-motion presets (verify_truehd_object_bed.py has the same rule): object k
+// (channel 8 + k) sits on its own bed row at -3 dB for a stretch of samples, then on the next
+// object's row for a stretch, and so on. In "slow" the gain moves in a straight line from one
+// stretch to the next; in "jump" it holds and steps.
+std::vector<ObjectPath> motion_paths(int objects, std::size_t frames, std::int64_t kStretch,
+                                     bool jump) {
+    constexpr std::int32_t kGain = 46341;
+    constexpr int kRowOfObject[8] = {0, 1, 2, 4, 5, 6, 7, 3};
+    std::vector<ObjectPath> paths;
+    for (int k = 0; k + 8 < objects; ++k) {
+        ObjectPath path;
+        path.object = 8 + k;
+        const auto stretches = static_cast<std::int64_t>(frames) / kStretch + 2;
+        for (std::int64_t n = 0; n < stretches; ++n) {
+            const int row = kRowOfObject[(k + static_cast<int>(n % 2)) % 8];
+            ObjectGainKnot knot;
+            knot.sample = n * kStretch;
+            knot.gain[static_cast<std::size_t>(row)] = kGain;
+            path.knots.push_back(knot);
+            if (jump) {
+                knot.sample = (n + 1) * kStretch;
+                path.knots.push_back(knot);
+            }
+        }
+        paths.push_back(std::move(path));
+    }
+    return paths;
+}
+
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: %s in.wav out.thd [key=value ...]\n", argv[0]);
@@ -135,6 +171,8 @@ int main(int argc, char** argv) {
     config.bits = std::min(wav.bits, 24);
     std::size_t chunk = 4096;
     bool object_bed = false;
+    std::string object_motion = "static";
+    std::int64_t object_stretch = 24000;
     for (int i = 3; i < argc; ++i) {
         std::string value;
         const std::string_view arg = argv[i];
@@ -168,6 +206,22 @@ int main(int argc, char** argv) {
             config.object_noise_shift = std::atoi(value.c_str());
         } else if (option(arg, "object-bypass", value)) {
             config.object_lsb_bypass = value != "0";
+        } else if (option(arg, "object-bypass-bits", value)) {
+            config.object_bypass_bits = std::atoi(value.c_str());
+        } else if (option(arg, "object-motion", value)) {
+            object_motion = value;
+        } else if (option(arg, "object-ramp", value)) {
+            config.object_ramp = value == "end"     ? ObjectRamp::kEnd
+                                 : value == "start" ? ObjectRamp::kStart
+                                                    : ObjectRamp::kNone;
+        } else if (option(arg, "object-update", value)) {
+            config.object_update_units = std::atoi(value.c_str());
+        } else if (option(arg, "object-split", value)) {
+            config.object_split_mixes = value != "0";
+        } else if (option(arg, "object-stretch", value)) {
+            object_stretch = std::atoll(value.c_str());
+        } else if (option(arg, "object-drop", value)) {
+            config.object_drop_idle_matrices = value != "0";
         } else {
             std::fprintf(stderr, "error: unknown option %s\n", argv[i]);
             return 2;
@@ -179,6 +233,11 @@ int main(int argc, char** argv) {
         config.object_layout = ObjectLayout::kBedMatrices;
         config.object_meaning.dyn_object_only = true;
         config.object_meaning.lfe_present = true;
+        if (object_motion != "static") {
+            config.object_paths = motion_paths(
+                wav.channels, wav.samples.size() / static_cast<std::size_t>(wav.channels),
+                object_stretch, object_motion == "jump");
+        }
     }
     // A file wider than the coded width carries the samples in its high bits.
     const int file_bits = std::min(wav.bits, 24);
