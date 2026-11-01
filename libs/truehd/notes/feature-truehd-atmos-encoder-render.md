@@ -135,6 +135,22 @@ size 0.15, decorrelation on; `ctl_e` object 3 from [-1, 1, 0] to [1, 1, 0] along
 
 Effect on this branch: none in code. `RenderSection`'s begin/end gains map to DEE's wire form (a section, deltas to the next base) with `ext_field2` 3 as DEE's choice for 9 units.
 
+### Third reading: the static point objects `ctl_i` and `ctl_j` (analysis session, lab-out30; PROVISIONAL)
+
+`ctl_i` (object 3 at DAMF [-1, 0.5, 0], size 0): ch_assign [2,0,3,4,...,11,1]; output on matrix channel 11 alone (+-838,880); coded rows m0 +-322,984, m2 +-774,180, m11 +-9,488. `ctl_j` (object 3 at [0.5, 0.3, 0]):
+ch_assign [1,3,0,4,...,11,2]; output on matrix channel 0 alone (+-209,720 = 838,861 / 4, output shift 2, quantiser step 2 on m0); coded rows m0 +-37,904, m1 +-206,257, m11 +-49,446. One section at 0, no extension, in the first 5,120 samples of each.
+
+1. **Question 10 is answered for a point object: one element.** In `ctl_b`, `ctl_e`, `ctl_i` and `ctl_j` (every case with one size-0 object) exactly one output channel is non-zero, and the object is on **output 1** in all four
+   (`ch_assign[m] = 1` for m = 1, 11, 11, 0), wherever it is. So the hard one-element-per-object assignment is what DEE does for a lone point object, and the output slot is not a function of the position.
+   The seven-element spread of `ctl_c` object 8 (size 0.15, decorrelation on) is therefore a size/decorrelation effect, not a pan; the split is not added.
+2. **The bed shares of a point object are unit-power across two or three rows.** `ctl_i`: 0.385 and 0.923 of the object on m0 and m2 (squares 1.00). `ctl_j`: 0.181, 0.983 and 0.236 on m0, m1 and m11 (squares 1.06). `ctl_b`: all of it on one row (m1).
+3. **DEE's pan is not my pan.** With the room mapped as x_room = (x + 1) / 2, y_room = (1 - y) / 2, my panner gives `ctl_b` R 0.89 + Rs 0.46, `ctl_i` L 0.63 + Ls 0.78 and `ctl_j` Rs 0.69 + R 0.73, against DEE's one row for
+   `ctl_b` (a position 0.15 from the front-right corner, which looks like a snap to the corner speaker) and a 0.39 / 0.92 split for `ctl_i` where the position is half way up the left wall. So DEE pans in the room
+   (cuboid) and not on the azimuth ring, at least near walls and corners. The matrix channel to speaker mapping is not known (m0, m2 for `ctl_i` are not L and Ls in any order I can name), so this is a comparison of the shape of
+   the shares, not of the speakers. The test only holds my panner to `libs/render`'s, which is the decode-side panner, and nothing here claims DEE's bed.
+4. **The matrix side's interface is compatible.** `feature/truehd-atmos-encoder-matrices` (24d14585d, 51c839c00) takes `object_paths`: per object from channel 8 up, knots of (sample, gain into each of the 8 bed rows in units of 2^-16), linear between knots.
+   My plan maps onto that one for one: object 8 + k is free element k, a knot at every section boundary with gain[row][k] * 65536. I have not merged that branch or written the adapter (it needs their public header); that is the next step once both are merged.
+
 ## 4. Tests, and what each guards
 
 See the test names; the ones that would pass for a wrong render are the closeness tests, with thresholds set from the measured values (section 6).
@@ -179,4 +195,5 @@ wall position is the centre speaker's and the centre speaker is tried first.
 7. **LFE.** `lfe_send` of a dynamic object and the LFE object's filtering are not handled; the LFE is whatever is pinned to row 3.
 8. **Height.** 7.1.2's top-middle pair are ordinary free elements here; the bed they make has no height. Nothing says DEE does otherwise.
 9. **Section length.** 480 samples. DEE's metadata cadence is 1,536 (38.4 units, WP1 status); a longer section means a longer straight line between boundaries and a larger panning error, a shorter one more matrix sections on the wire.
-10. **Split an object over elements?** Item 5 above suggests DEE pans an object over several elements. Recommendation: add an optional second-nearest-element split to `cluster_elements` (gain-weighted, power-preserving) only after the analysis session gives `ch_assign` and the objects' positions for `ctl_c`, so the split can be compared with the shares in item 5.
+10. **(Answered for a point object, see the third reading: one element; recommendation withdrawn.) Split an object over elements?** Item 5 above suggests DEE pans an object over several elements. Recommendation: add an optional second-nearest-element split to `cluster_elements` (gain-weighted, power-preserving) only after the analysis session gives `ch_assign` and the objects' positions for `ctl_c`, so the split can be compared with the shares in item 5.
+11. **Pan in the room, not on the ring?** DEE's shares for `ctl_b`, `ctl_i` and `ctl_j` differ from the azimuth ring's (third reading, item 3). Recommendation: after `ctl_k` and `ctl_l` (a wall path and an interior path), fit a cuboid pan (speakers at the room's corners and wall midpoints, power-normalised between the nearest) to the shares, and replace `pan_to_bed` only if it explains all four static and moving cases; keep the `libs/render` agreement test for the ring either way, since that is what the decoder side renders.
