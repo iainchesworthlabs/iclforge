@@ -1257,3 +1257,37 @@ golden bytes of the 3 to 6 channel tests. **Done:** `noise_flag` now returns tru
 the regression seeds with none failing, and the 158 TrueHD and forge tests pass (one skipped here). Both retail layouts (two substreams of 2
 and 6 channels at 48 and 192 kHz) are now what forge writes, which answers question 90's last doubt about a Dolby decoder: the retail
 discs are what such decoders play.
+
+**98. When an access unit starts to arrive, and `substream_info` for three substreams (TH spec §3.4, §6.4, §18.1; the Dolby Reference Player).**
+The Dolby Reference Player (DRP 4.3.0.19359, a black box: its messages and the decoded audio only) refused two of the streams
+`forge truehd-encode` wrote. **(a) 7.1:** presentation 8 of a three substream stream failed with 12000 x `0x6f Incompatible ch_count/ch_assign
+combination` (presentations 2 and 6 decoded exactly). Everything `forge probe detail=structure` prints of the stream matches the committed
+Dolby-made 2, 6 and 8 channel stream (syncs, channels of each substream, header size) except the major sync's `substream_info` byte: the encoder wrote
+0x3C (the two substream value, ERRATA question 15) and Dolby's stream has **0x7C**; DRP decodes forge's Atmos beds (0xFC, four substreams) on
+presentation 8. The bytes of 1, 2, 3 and 4 substreams are 0x14, 0x3C, 0x7C and 0xFC, so the encoder now writes 0x7C for three. **(b) 192 kHz 5.1:** every presentation failed from 5.0 s with 92 x `0x78 Access unit latency above spec limit`, 2 x
+`0x75 AU transmission duration exceeds latency` and 2 x `0x79 Access unit latency below spec limit`, and the audio was wrong from the first loud
+unit on. The cause is the encoder's timing, not the audio: it stamped every unit's `input_timing` exactly one unit (160 samples) ahead of its decode
+time, whatever the unit's size. A unit that takes more channel time than that at the declared peak rate (here 170 samples, a noise burst at 5 s, 1.06
+units) arrived after it was due, and since each unit starts when the channel is free the lead of every unit after it was smaller: 150, 140, ... 42,
+-82, -92 samples (read from the stream with the unit prefix `forge`'s own parser documents), which DRP names in the order it printed: the unit
+takes longer than its lead (0x75), the lead is below the limit (0x79), and the negative lead as an unsigned 16 bit number is above it (0x78). The
+old model checked something else: that the unit arrived within 75 ms *after* its slot, which is not what DRP checks. What a real encoder does is on the
+owner's discs: in the 48 kHz 5.1 TrueHD track of a UHD Blu-ray (read with the unit prefix) the lead is 40 samples, one unit, for every unit except the
+few with a major sync, which are larger and have a lead of `ceil(bytes x 8 x rate / declared peak rate)`: 390 bytes at 2.835 Mbit/s is 52.8 samples
+and its lead 53, 324 bytes 44 and 44, and the unit after it is back at 40. So a unit is stamped `max(one unit, its channel time)` ahead, and one
+that needs more than a unit takes the time from the units before it, which have idle channel time. The encoder now finds the starts from the end
+backwards over the units it has written and not released (the channel carries one unit at a time, a unit is due at its decode time, no unit is more
+than one unit ahead unless it needs more, and none more than 75 ms ahead): where no unit needs more than a unit the result is the old timing, byte
+for byte (the four DRP-accepted streams of the acceptance run are unchanged); the burst's units are met by about 13 units before it, a lead of
+at most 412 samples, 2.15 ms. A unit is released when the 75 ms (90 units) after it are written, so the encoder holds 75 ms more back than
+before (a restart interval and 90 units). **Consequences:** a stream that needs more than the peak rate for longer than the 75 ms of lead the
+channel can build is now `kRateExceeded` from its first unit that is late, where the old model let it go for 75 ms of lateness (the interop case
+`synth-71-96-s24`, white noise in 8 channels at 96 kHz, 18.4 Mbit/s raw, now uses `rate-violations=1`); the limit of the lookahead is the
+restart interval (a stream written with `restart_interval_units` 8 sees 98 units, not the 218 of the default). **Not known:** DRP's own limits
+(whether it also refuses a lead of more than 75 ms, or one below one unit by less than the unit's need) were read from this one stream, not from
+a table; the encoder keeps every lead between `max(one unit, need)` and 75 ms. **Confirmed by DRP 4.3.0.19359 on the corrected streams (2026-11-03, `D:/ac3bld/drp-acceptance/results-r2.md`):** plain-71 and downmix-71 decode
+presentation 8 with no message and 0 differing samples in 8 channels (was 12000 x 0x6f); plain-51-192k24 has no 0x75, 0x78 or 0x79 and its 2 and 6
+channel presentations are exact over the whole 1,920,000 frames, from 5.0 s on too (was wrong from frame 959960); plain-20, plain-51-48k24,
+plain-51-96k24 and plain-51-48k16, byte-identical to the first round's, are accepted and exact as before. DRP's own limits are still not known. Tests: `a burst that needs more than a unit of channel time is met by the units before it` (inside a
+restart interval and across the boundary of two; fails with the old fixed lead), `a stream that never needs more than a unit of channel time keeps one
+unit of lead` and `the substream info byte follows the number of substreams`.

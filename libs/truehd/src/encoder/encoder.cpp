@@ -4,6 +4,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <limits>
 #include <optional>
 
 #include "encoder/coding.hpp"
@@ -592,6 +593,18 @@ std::uint32_t default_channel_assignment(int channels) noexcept {
     }
 }
 
+// A written access unit whose input timing is not set yet: it waits for the units after it, whose
+// sizes decide how early it has to start to arrive (see Encoder::Impl::schedule).
+struct HeldUnit {
+    EncodedAccessUnit unit;
+    std::optional<MajorSync> major_sync;
+    std::array<SubstreamEntry, kMaxSubstreams> entries{};
+    std::size_t total = 0;         // bytes of the unit
+    std::size_t prefix_bytes = 0;  // bytes of its prefix, which carries the input timing
+    std::int64_t decode_time = 0;  // the sample the unit's first sample is decoded at
+    std::int64_t need = 0;         // samples of channel time the unit takes at the peak data rate
+};
+
 struct Encoder::Impl {
     explicit Impl(const EncoderConfig& configuration)
         : config(configuration),
@@ -633,8 +646,9 @@ struct Encoder::Impl {
     std::uint64_t unit_index = 0;       // access units written in this stream
     std::uint64_t sample_position = 0;  // samples per channel written in this stream
     std::vector<std::uint8_t> previous_check;
-    std::int64_t last_start = 0;
-    std::int64_t last_arrival_end = 0;
+    std::vector<HeldUnit> held;  // written, waiting for the next interval's sizes
+    // When the last released unit finishes arriving; far in the past before the first.
+    std::int64_t last_arrival_end = std::numeric_limits<std::int64_t>::min() / 4;
     EncoderStats stats;
     std::unique_ptr<Decoder> verifier;
 
@@ -645,8 +659,12 @@ struct Encoder::Impl {
         return static_cast<std::size_t>(interval_units) * static_cast<std::size_t>(nominal);
     }
 
-    [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> process_interval(
+    [[nodiscard]] std::expected<std::vector<HeldUnit>, EncodeError> process_interval(
         std::size_t valid_frames, int units);
+    // Sets the input timing of the held units and releases the ones that are settled: all of them
+    // at the end of the stream, otherwise those written before `fresh`.
+    [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> schedule(
+        std::vector<HeldUnit> fresh, bool final);
     [[nodiscard]] MajorSync make_major_sync() const;
     [[nodiscard]] std::vector<std::byte> frame_extra_data(std::span<const std::byte> payload) const;
     void reset_stream();
@@ -749,8 +767,8 @@ void Encoder::Impl::reset_stream() {
     unit_index = 0;
     sample_position = 0;
     std::fill(previous_check.begin(), previous_check.end(), std::uint8_t{0});
-    last_start = 0;
-    last_arrival_end = 0;
+    held.clear();
+    last_arrival_end = std::numeric_limits<std::int64_t>::min() / 4;
     if (verifier) {
         verifier->reset();
     }
@@ -790,9 +808,10 @@ MajorSync Encoder::Impl::make_major_sync() const {
     sync.num_substreams = static_cast<std::uint8_t>(stages.size());
     sync.extended_substream_info = 0;
     // TH spec §6.4's bit table does not fit the streams (ERRATA.md entry 17): 0x14 with one
-    // substream and 0x3C with two. Nothing shows the byte for three; it repeats the two substream
-    // value.
-    sync.substream_info = stages.size() == 1 ? 0x14 : 0x3C;
+    // substream, 0x3C with two, 0x7C with three (Dolby's own 2, 6 and 8 channel streams; the Dolby
+    // Reference Player refuses the 8 channel presentation of a three substream stream that has
+    // 0x3C, ERRATA.md entry 98) and 0xFC with four.
+    sync.substream_info = stages.size() == 1 ? 0x14 : stages.size() == 2 ? 0x3C : 0x7C;
     sync.channel_meaning = config.channel_meaning;
     sync.size_bytes = kMajorSyncBaseBytes;
     return sync;
@@ -858,12 +877,16 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
 
     std::vector<EncodedAccessUnit> out;
     while (impl.pending_frames() >= impl.interval_frames()) {
-        auto units = impl.process_interval(impl.interval_frames(), impl.interval_units);
-        if (!units) {
-            return std::unexpected(units.error());
+        auto fresh = impl.process_interval(impl.interval_frames(), impl.interval_units);
+        if (!fresh) {
+            return std::unexpected(fresh.error());
         }
         impl.pending_start += impl.interval_frames() * channels;
-        for (EncodedAccessUnit& unit : *units) {
+        auto settled = impl.schedule(std::move(*fresh), false);
+        if (!settled) {
+            return std::unexpected(settled.error());
+        }
+        for (EncodedAccessUnit& unit : *settled) {
             out.push_back(std::move(unit));
         }
     }
@@ -879,7 +902,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::encode(
 
 std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::flush() {
     Impl& impl = *impl_;
-    std::vector<EncodedAccessUnit> out;
+    std::vector<HeldUnit> fresh;
     const std::size_t frames = impl.pending_frames();
     if (frames > 0) {
         const int units = static_cast<int>((frames + static_cast<std::size_t>(impl.nominal) - 1) /
@@ -888,15 +911,86 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::flush() {
         if (!encoded) {
             return std::unexpected(encoded.error());
         }
-        out = std::move(*encoded);
+        fresh = std::move(*encoded);
     }
+    auto settled = impl.schedule(std::move(fresh), true);
+    if (!settled) {
+        return std::unexpected(settled.error());
+    }
+    std::vector<EncodedAccessUnit> out = std::move(*settled);
     impl.pending.clear();
     impl.pending_start = 0;
     impl.reset_stream();
     return out;
 }
 
-std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::process_interval(
+// The input timing of an access unit is when it starts to arrive over the channel, which carries
+// the stream at no more than its peak data rate and is decoded `lead` samples later: the unit has
+// to have arrived by its decode time (the lead is at least the channel time it takes, `need`), it
+// starts no sooner than one unit ahead of it unless it takes longer than that (the lead is at least
+// one unit: a Dolby encoder's units are stamped `max(one unit, need)` ahead, ERRATA.md entry 98),
+// and no earlier than 75 ms ahead (TH spec §3.4, §18.1). A unit that needs more than one unit of
+// channel time therefore starts earlier, and so do the units before it that the channel would still
+// be busy with: the starts are found from the end backwards, over the units written and not yet
+// released, so a burst is met by the quiet units before it and not by the ones after. A unit is
+// released when the 75 ms after it are written: a unit further on cannot move it, for it would
+// have to start more than 75 ms ahead.
+std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::schedule(
+    std::vector<HeldUnit> fresh, bool final) {
+    for (HeldUnit& unit : fresh) {
+        held.push_back(std::move(unit));
+    }
+    const std::int64_t latency_limit =
+        static_cast<std::int64_t>(config.sample_rate) * kLatencyMs / 1000;
+    const std::size_t count = held.size();
+    const auto lookahead = static_cast<std::size_t>((latency_limit + nominal - 1) / nominal);
+    const std::size_t settled = final ? count : (count > lookahead ? count - lookahead : 0);
+    std::vector<std::int64_t> start(count);
+    for (std::size_t i = count; i-- > 0;) {
+        const std::int64_t deadline = i + 1 < count ? start[i + 1] : held[i].decode_time;
+        start[i] = std::min<std::int64_t>(held[i].decode_time - nominal, deadline - held[i].need);
+    }
+    // Forward again: nothing starts before the unit released last has arrived.
+    std::int64_t channel_free = last_arrival_end;
+    bool late = false;
+    for (std::size_t i = 0; i < count; ++i) {
+        start[i] = std::max(start[i], channel_free);
+        channel_free = start[i] + held[i].need;
+        if (i < settled && (channel_free > held[i].decode_time ||
+                            held[i].decode_time - start[i] > latency_limit)) {
+            late = true;
+        }
+    }
+    if (late) {
+        ++stats.rate_violations;
+        if (!config.allow_rate_violations) {
+            return std::unexpected(make_error(
+                EncodeErrorKind::kRateExceeded,
+                "the stream cannot be sent within the peak data rate and 75 ms (TH spec §18)"));
+        }
+    }
+    std::vector<EncodedAccessUnit> out;
+    out.reserve(settled);
+    for (std::size_t i = 0; i < settled; ++i) {
+        HeldUnit& h = held[i];
+        const auto input_timing =
+            static_cast<std::uint16_t>(static_cast<std::uint64_t>(start[i]) & 0xFFFFU);
+        auto prefix = write_access_unit_prefix(
+            h.major_sync, std::span<const SubstreamEntry>(h.entries.data(), stages.size()),
+            input_timing, h.total);
+        if (!prefix || prefix->size() != h.prefix_bytes) {
+            return std::unexpected(
+                make_error(EncodeErrorKind::kInternal, "the access unit prefix does not write"));
+        }
+        std::copy(prefix->begin(), prefix->end(), h.unit.bytes.begin());
+        last_arrival_end = start[i] + h.need;
+        out.push_back(std::move(h.unit));
+    }
+    held.erase(held.begin(), held.begin() + static_cast<std::ptrdiff_t>(settled));
+    return out;
+}
+
+std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::process_interval(
     std::size_t valid_frames, int units) {
     const int channels = config.channels;
     IntervalShape shape;
@@ -1178,7 +1272,7 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
     }
 
     // --- the access units --------------------------------------------------------------------
-    std::vector<EncodedAccessUnit> units_out;
+    std::vector<HeldUnit> units_out;
     units_out.reserve(static_cast<std::size_t>(units));
     for (int au = 0; au < units; ++au) {
         const bool first = au == 0;
@@ -1326,41 +1420,21 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
                                               "an access unit longer than 4095 words"));
         }
 
-        // The rate model: the unit may start to arrive when its slot opens, when the previous unit
-        // has arrived and no sooner than one unit duration after the previous start (TH spec §3.4).
-        const std::int64_t slot = static_cast<std::int64_t>(first_sample) - nominal;
-        std::int64_t start = slot;
-        if (this_unit > 0) {
-            start = std::max({slot, last_arrival_end, last_start + nominal});
-        }
-        const std::int64_t arrival =
+        // The channel time the unit takes at the peak data rate, in samples; when it starts to
+        // arrive is decided later, with the units after it (Encoder::Impl::schedule).
+        const std::int64_t need =
             static_cast<std::int64_t>((static_cast<std::uint64_t>(total) * 8U * config.sample_rate +
                                        config.peak_data_rate_bps - 1U) /
                                       config.peak_data_rate_bps);
-        const std::int64_t latency_limit =
-            static_cast<std::int64_t>(config.sample_rate) * kLatencyMs / 1000;
-        if (start + arrival - slot > latency_limit) {
-            ++stats.rate_violations;
-            if (!config.allow_rate_violations) {
-                return std::unexpected(make_error(
-                    EncodeErrorKind::kRateExceeded,
-                    "the stream cannot be sent within the peak data rate and 75 ms (TH spec §18)"));
-            }
-        }
-        last_start = start;
-        last_arrival_end = start + arrival;
         stats.max_unit_bytes =
             std::max<std::uint32_t>(stats.max_unit_bytes, static_cast<std::uint32_t>(total));
         stats.max_unit_rate_bps = std::max<std::uint64_t>(
             stats.max_unit_rate_bps, static_cast<std::uint64_t>(total) * 8U * config.sample_rate /
                                          static_cast<std::uint64_t>(nominal));
-        const auto input_timing =
-            static_cast<std::uint16_t>(static_cast<std::uint64_t>(start) & 0xFFFFU);
 
         auto prefix = write_access_unit_prefix(
-            major_sync, std::span<const SubstreamEntry>(entries.data(), stage_count), input_timing,
-            total);
-        if (!prefix) {
+            major_sync, std::span<const SubstreamEntry>(entries.data(), stage_count), 0, total);
+        if (!prefix || prefix->size() != prefix_bytes) {
             return std::unexpected(
                 make_error(EncodeErrorKind::kInternal, "the access unit prefix does not write"));
         }
@@ -1395,7 +1469,15 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::proces
             }
             ++stats.verified_units;
         }
-        units_out.push_back(std::move(unit));
+        HeldUnit held_unit;
+        held_unit.unit = std::move(unit);
+        held_unit.major_sync = major_sync;
+        held_unit.entries = entries;
+        held_unit.total = total;
+        held_unit.prefix_bytes = prefix_bytes;
+        held_unit.decode_time = static_cast<std::int64_t>(first_sample);
+        held_unit.need = need;
+        units_out.push_back(std::move(held_unit));
     }
     for (std::size_t s = 0; s < stage_count; ++s) {
         previous_check[s] = work[s].check;

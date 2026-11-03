@@ -155,8 +155,10 @@ are. An MLP stream (its bytes at that place are not described), a stream with no
 and then nothing is written. `forge metadata` and `forge normalize` are the commands over it.
 
 The stream is held to the peak data rate it declares (18 Mbps by default, Blu-ray's) and to the 75 ms latency of the
-specification's FIFO model: a stream that cannot be sent in time is `EncodeErrorKind::kRateExceeded`, or with
-`allow_rate_violations` is written and counted. `verify` decodes every unit with this library's decoder as it is
+specification's FIFO model: each access unit has arrived by the time it is decoded, starts no sooner than 75 ms before it
+and no later than one unit before it unless it takes longer than that to send, in which case it starts as much earlier,
+and so do the units before it that the channel is busy with (the encoder holds 75 ms back to see them). A stream that
+cannot be sent in time is `EncodeErrorKind::kRateExceeded`, or with `allow_rate_violations` is written and counted. `verify` decodes every unit with this library's decoder as it is
 produced and compares it with the input. `extra_data` frames a payload into a unit's extra data and never looks
 inside it. The restart interval is 1 or at least 8 access units; a longer interval makes a smaller stream and a shorter
 one a quicker random access.
