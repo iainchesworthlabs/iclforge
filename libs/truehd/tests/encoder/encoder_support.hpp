@@ -64,6 +64,10 @@ inline Encoded encode_all(const EncoderConfig& config, std::span<const std::int3
     const std::size_t step = chunk_frames == 0 ? pcm.size() : chunk_frames * channels;
     for (std::size_t at = 0; at < pcm.size(); at += step) {
         auto units = encoder->encode(pcm.subspan(at, std::min(step, pcm.size() - at)));
+        if (!units) {
+            UNSCOPED_INFO("encode failed: " << to_string(units.error().kind) << ": "
+                                            << units.error().detail);
+        }
         REQUIRE(units.has_value());
         for (auto& unit : *units) {
             out.units.push_back(std::move(unit));

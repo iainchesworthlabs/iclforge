@@ -557,6 +557,8 @@ configurations set 80; the default is 0, none), the component's
 | `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` is refused until it is built) |
 | `GET /dim-after` | `never`, or the minutes with nothing touched after which that screen dims, as text, on a board with a panel; `404` on a board with none |
 | `PUT /dim-after` | body: `never`, or whole minutes from 1 to 240. Stored, and followed at once. `400` for any other body, `409` where there is no panel |
+| `GET /idle-view` | `lit`, `dim`, `clock` or `dark`, as text, on a board with a panel: what the waiting screen (nothing playing, the board paired) does once the dim time has passed with nothing touched ([planning](../../planning/p4x-now-playing.md), "The waiting screen"); `404` on a board with none |
+| `PUT /idle-view` | body: one of those words. Stored (`idle_view`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
 | `GET /speakers-style` | `glow` or `pulse`, as text, on a board with a panel: how the speakers view shows a level (`pulse` makes each speaker's filled circle grow and shrink a little with it; [planning](../../planning/p4x-speakers-options.md)); `404` on a board with none |
 | `PUT /speakers-style` | body: `glow` or `pulse`. Stored (`np_style`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
 | `GET /dynamic-range` | `standard` or `late-night`, as text, on a board with a Sendspin player: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range the listener wants ([planning](../../planning/hearth-late-night.md)); `404` on a board with none |

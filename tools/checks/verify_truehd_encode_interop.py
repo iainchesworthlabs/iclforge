@@ -256,7 +256,8 @@ def cases(full):
     extra = [
         ("music-st48-s24-long", ("flac", "programme_music_stereo.flac"), 48000, 2, 24, 20.0, []),
         ("ref51-44-s24", ("ref51",), 44100, 6, 24, 3.0, []),
-        ("synth-71-96-s24", ("synth", "noise"), 96000, 8, 24, 1.0, []),
+        # White noise in 8 channels at 96 kHz is 18.4 Mbit/s raw, more than the 18 Mbit/s peak rate.
+        ("synth-71-96-s24", ("synth", "noise"), 96000, 8, 24, 1.0, ["rate-violations=1"]),
         ("synth-6ch-192", ("synth", "mixed"), 192000, 6, 24, 1.0, ["rate-violations=1"]),
         ("synth-71-44-s16", ("synth", "mixed"), 44100, 8, 16, 1.5, []),
         ("synth-st176-s24", ("synth", "mixed"), 176400, 2, 24, 1.0, []),

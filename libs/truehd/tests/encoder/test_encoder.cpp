@@ -90,7 +90,9 @@ TEST_CASE("at 176.4 and 192 kHz three or more channels are two substreams",
             auto encoder = Encoder::create(config);
             REQUIRE(encoder.has_value());
             CHECK(encoder->substreams() == (channels > 2 ? 2 : 1));
-            const auto pcm = make_pcm(channels, static_cast<int>(rate / 16), 24,
+            // 12 bit noise: 24 bit noise in 6 channels at 192 kHz is more than the 18 Mbit/s peak
+            // rate.
+            const auto pcm = make_pcm(channels, static_cast<int>(rate / 16), 12,
                                       static_cast<std::uint32_t>(channels + 5));
             const Encoded encoded = encode_all(config, pcm);
             REQUIRE(encoded.stats.verified_units == encoded.units.size());
@@ -384,8 +386,8 @@ TEST_CASE("a restart header carries the lossless check of the interval before it
 
 TEST_CASE("the declared peak data rate is kept or the encoder says it cannot",
           "[truehd][encoder][rate]") {
-    // White noise at 192 kHz in 6 channels needs about 27 Mbps, more than 18; the lag behind real
-    // time passes the 75 ms of TH spec §18 after about 150 ms of it.
+    // White noise at 192 kHz in 6 channels needs about 27 Mbps, more than 18: the first unit that
+    // needs more channel time than the one unit it may start ahead is not sent in time.
     EncoderConfig config;
     config.sample_rate = 192000;
     config.channels = 6;
@@ -426,6 +428,115 @@ TEST_CASE("the declared peak data rate is kept or the encoder says it cannot",
             REQUIRE(static_cast<std::uint16_t>(parsed->input_timing - previous) == 40);
         }
         previous = parsed->input_timing;
+    }
+}
+
+TEST_CASE("a burst that needs more than a unit of channel time is met by the units before it",
+          "[truehd][encoder][rate]") {
+    // The Dolby Reference Player refused a 192 kHz 5.1 stream from the first loud unit on: the
+    // units were stamped one unit ahead of their decode time, so a unit that needs more channel
+    // time than that (here 1.06 units) arrived after it was due, and every unit after it lagged
+    // more. A Dolby encoder stamps `max(one unit, channel time)` ahead; the units before a burst
+    // start earlier (ERRATA.md entry 98).
+    constexpr int kRate = 192000;
+    constexpr int kChannels = 6;
+    constexpr int kFrames = 96000;
+    constexpr std::int64_t kNominal = 160;
+    constexpr std::int64_t kPeak = 18'000'000;
+    for (const int burst_at : {48000, 60800}) {  // inside a restart interval, and across two
+        CAPTURE(burst_at);
+        std::vector<std::int32_t> pcm(static_cast<std::size_t>(kChannels) * kFrames);
+        std::uint32_t state = 5;
+        for (int t = 0; t < kFrames; ++t) {
+            const bool burst = t >= burst_at && t < burst_at + 3840;
+            for (int c = 0; c < kChannels; ++c) {
+                state = state * 1664525U + 1013904223U;
+                const double noise = static_cast<double>(state >> 8U) / 16777216.0 - 0.5;
+                const double tone =
+                    0.1 * std::sin(2.0 * std::numbers::pi * (220.0 + 137.0 * c) * t / kRate);
+                const double v = tone + (burst ? 0.007 : 0.0007) * noise;
+                pcm[static_cast<std::size_t>(t) * kChannels + static_cast<std::size_t>(c)] =
+                    static_cast<std::int32_t>(std::lround(v * 8388607.0));
+            }
+        }
+        EncoderConfig config;
+        config.sample_rate = kRate;
+        config.channels = kChannels;
+        const Encoded encoded = encode_all(config, pcm);
+        REQUIRE(encoded.stats.rate_violations == 0);
+
+        std::int64_t previous_start = 0;
+        std::int64_t previous_end = 0;
+        std::int64_t most_needed = 0;
+        std::int64_t least_needed = 1 << 20;
+        for (std::size_t n = 0; n < encoded.units.size(); ++n) {
+            auto parsed = parse_access_unit(encoded.units[n].bytes, 2, true);
+            REQUIRE(parsed.has_value());
+            const std::int64_t need =
+                (static_cast<std::int64_t>(encoded.units[n].bytes.size()) * 8 * kRate + kPeak - 1) /
+                kPeak;
+            // The 16 bit input timing, unwrapped: the first unit is stamped before time 0.
+            std::int64_t start = static_cast<std::int16_t>(parsed->input_timing);
+            if (n > 0) {
+                start = previous_start +
+                        static_cast<std::int16_t>(parsed->input_timing - (previous_start & 0xFFFF));
+            }
+            const std::int64_t lead = static_cast<std::int64_t>(n) * kNominal - start;
+            CAPTURE(n, lead, need);
+            CHECK(lead >= kNominal);           // never later than a unit before its time
+            CHECK(lead >= need);               // has arrived when it is decoded
+            CHECK(lead <= kRate * 75 / 1000);  // and is not older than 75 ms
+            if (n > 0) {
+                CHECK(start >= previous_end);  // the channel carries one unit at a time
+            }
+            previous_start = start;
+            previous_end = start + need;
+            most_needed = std::max(most_needed, need);
+            least_needed = std::min(least_needed, need);
+        }
+        // The material is what the test is about: quiet units fit in a unit, the burst's do not.
+        CHECK(least_needed < kNominal);
+        CHECK(most_needed > kNominal);
+    }
+}
+
+TEST_CASE("a stream that never needs more than a unit of channel time keeps one unit of lead",
+          "[truehd][encoder][rate]") {
+    EncoderConfig config;
+    config.restart_interval_units = 8;
+    const Encoded encoded = encode_all(config, make_pcm(2, 40 * 600, 24, 4));
+    std::int64_t previous = 0;
+    for (std::size_t n = 0; n < encoded.units.size(); ++n) {
+        auto parsed = parse_access_unit(encoded.units[n].bytes, 1, true);
+        REQUIRE(parsed.has_value());
+        std::int64_t start = static_cast<std::int16_t>(parsed->input_timing);
+        if (n > 0) {
+            start =
+                previous + static_cast<std::int16_t>(parsed->input_timing - (previous & 0xFFFF));
+        }
+        CHECK(static_cast<std::int64_t>(n) * 40 - start == 40);
+        previous = start;
+    }
+}
+
+TEST_CASE("the substream info byte follows the number of substreams", "[truehd][encoder][stream]") {
+    // 0x14, 0x3C and 0x7C: Dolby's own streams of 1, 2 and 3 substreams (2, 6 and 8 channels). With
+    // 0x3C on a three substream stream the Dolby Reference Player refused the 8 channel
+    // presentation ("Incompatible ch_count/ch_assign combination", ERRATA.md entry 98).
+    struct Case {
+        int channels;
+        std::uint8_t info;
+    };
+    for (const Case& c : {Case{2, 0x14}, Case{6, 0x3C}, Case{8, 0x7C}}) {
+        CAPTURE(c.channels);
+        EncoderConfig config;
+        config.channels = c.channels;
+        config.restart_interval_units = 8;
+        const Encoded encoded = encode_all(config, make_pcm(c.channels, 40 * 20, 24, 3));
+        auto parsed = parse_access_unit(encoded.units[0].bytes, 1, true);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->major_sync.has_value());
+        CHECK(parsed->major_sync->substream_info == c.info);
     }
 }
 
