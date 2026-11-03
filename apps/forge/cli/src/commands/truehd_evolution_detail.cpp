@@ -332,6 +332,7 @@ void EvolutionDetail::add(std::uint64_t unit_index, const th::ExtraData& extra,
 
     // The shape: what a signature per frame or per stream would show in.
     std::vector<std::uint64_t> ids;
+    ids.reserve(payloads.size());
     for (const PayloadShape& payload : payloads) {
         ids.push_back(payload.id);
     }

@@ -13,10 +13,12 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/base/loudness.hpp"
 #include "iclforge/base/speaker.hpp"
 #include "iclforge/containers/iec61937/mat.hpp"
@@ -28,8 +30,9 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
-#include "iclforge/ac3/meta/loudness.hpp"
+#include "probe_truehd.hpp"
 #include "truehd.hpp"
+#include "truehd_meaning.hpp"
 
 // TrueHD and MLP in the container, transport and analysis commands (planning/truehd.md, phase
 // T2c). The containers library knows no codec, so the facts a track description needs (the
