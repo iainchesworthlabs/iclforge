@@ -2427,7 +2427,7 @@ an embedded timecode, and four lengths that are not a whole number of access uni
 2026-10-31, with forge built from `1e4ee5c3e`, they give 11 PASS, 2 UNEXPLAINED (the two 96 kHz legs) and 0 FAIL.
 
 The full set was scored on 2026-10-29 before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of 128). **Rescored on 2026-10-31** with forge at `1e4ee5c3e` plus the alternative-reading
-switches (142 legs: the 128 of the set and the 14 of the group `truehd-last`, made the same day; [planning/truehd-validation.md](../planning/truehd-validation.md)): **87 PASS, 9 ALTER,
+switches (142 legs: the 128 of the set and the 14 of the group `truehd-last`, made the same day; [planning/truehd-validation.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-validation.md)): **87 PASS, 9 ALTER,
 46 UNEXPLAINED, 0 FAIL**, 34,600 lossless-check intervals ok and none failed; the three 300 s programmes (2.0, 5.1 and 7.1) 3 PASS (16,872 intervals ok, none failed). The five Atmos legs made
 from the owner's DAMF master (`obj-thd-atmos-sollevante`, `-dmx`, `-e12`, `-e14`, `-e16`) have no PCM source for the scorer and are test inputs for the decoder only (SKIP). The 46 UNEXPLAINED
 are 25 legs at 96 kHz and 21 stepped-tone legs at 48 kHz (a difference of one 24-bit step in 52,022 to 182,077 values whatever the DRC profile, the data-rate option or the loudness path), every
