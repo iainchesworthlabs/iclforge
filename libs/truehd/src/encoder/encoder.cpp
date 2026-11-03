@@ -1310,7 +1310,9 @@ std::expected<std::vector<EncodedAccessUnit>, EncodeError> Encoder::Impl::code_i
             request.noise_shift = config.object_noise_shift;
             request.bypass_bits = config.object_lsb_bypass ? config.object_bypass_bits : 0;
             request.mix_step = step;
-            request.paths = config.object_paths;
+            // Copy-constructed and moved in: GCC 16 reads the element-wise copy assignment of a
+            // vector of ObjectPath as a possible null dereference (-Werror=null-dereference).
+            request.paths = std::vector<ObjectPath>(config.object_paths);
             request.extension = config.object_extension;
             request.update_units = config.object_update_units;
             request.drop_idle = config.object_drop_idle_matrices;

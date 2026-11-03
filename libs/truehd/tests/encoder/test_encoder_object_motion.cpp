@@ -247,7 +247,9 @@ TEST_CASE("a slope adds its share across the access unit and moves the coefficie
     timeline.blocks.push_back(block);
     d::ObjectBlock second = block;
     second.start = kNominal;
-    second.run[0].coeff[8] = 105 << 6;
+    auto changed = run;
+    changed.coeff[8] = 105 << 6;
+    second.run = {changed};
     timeline.blocks.push_back(second);
     d::ObjectChainShape shape;
     shape.units = 2;
