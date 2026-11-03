@@ -1,5 +1,6 @@
 #include "audio_io.hpp"
 
+#include <fmt/base.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -7,7 +8,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <fmt/base.h>
 #include <fstream>
 #include <ios>
 #include <optional>
@@ -23,11 +23,12 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
-#include "iclforge/ac3/io/wav.hpp"
-#include "truehd.hpp"
-#include "truehd_encode_core.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
+#include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
+#include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/encoder/plan.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/audio/capture.hpp"
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/audio/passthrough.hpp"
@@ -36,18 +37,18 @@
 #include "iclforge/audio/spatial.hpp"
 #include "iclforge/audio/speakers.hpp"
 #include "iclforge/audio/watchdog.hpp"
-#include "iclforge/ac3/core/eac3_tables.hpp"
-#include "iclforge/ac3/decoder/decoder.hpp"
-#include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/render/identify.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
+#include "iclforge/truehd/encoder/encoder.hpp"
 #include "live_audio.hpp"
 #include "recording_sink.hpp"
 #include "sink_wait.hpp"
 #include "stream_playback.hpp"
 #include "stream_tools.hpp"
+#include "truehd.hpp"
+#include "truehd_encode_core.hpp"
 
 namespace forge_cli::commands {
 

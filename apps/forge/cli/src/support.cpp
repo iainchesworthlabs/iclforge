@@ -1,5 +1,8 @@
 #include "support.hpp"
 
+#include <fmt/base.h>
+#include <fmt/chrono.h>  // IWYU pragma: keep - fmt::formatter<time_point> for "{:%FT%TZ}" below
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -12,9 +15,6 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
-#include <fmt/base.h>
-#include <fmt/chrono.h>  // IWYU pragma: keep - fmt::formatter<time_point> for "{:%FT%TZ}" below
-#include <fmt/format.h>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -30,6 +30,11 @@
 #include <utility>
 #include <vector>
 
+#include "associated_mix.hpp"
+#include "code_pages.hpp"
+#include "commands/truehd.hpp"
+#include "container_input.hpp"
+#include "exit_codes.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
@@ -40,39 +45,35 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
-#include "iclforge/ac3/io/object_strip.hpp"
-#include "iclforge/ac4/decoder/config.hpp"
-#include "iclforge/ac4/decoder/decoder.hpp"
-#include "iclforge/ac4/decoder/frame.hpp"
-#include "iclforge/ac4/decoder/presentation.hpp"
-#include "iclforge/ac4/encoder/config.hpp"
-#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/io/object_strip.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 #include "iclforge/ac3/meta/qc.hpp"
-#include "iclforge/containers/mp4/dash.hpp"
-#include "iclforge/containers/mp4/mp4.hpp"
-#include "iclforge/objects/joc_domain.hpp"
-#include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 #include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/karaoke.hpp"
-#include "iclforge/ac4/io/carriage.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
-#include "iclforge/ac4/core/toc.hpp"
-#include "iclforge/ac4/encoder/encoder.hpp"
-#include "associated_mix.hpp"
-#include "code_pages.hpp"
-#include "commands/truehd.hpp"
-#include "container_input.hpp"
-#include "exit_codes.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/mp4/dash.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
+#include "iclforge/objects/joc_domain.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 #include "platform/stdio_binary.hpp"
 #include "recording_sink.hpp"
 #include "stream_playback.hpp"

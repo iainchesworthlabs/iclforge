@@ -1,7 +1,10 @@
 #include "iclforge/truehd/core/format.hpp"
 
-#include <bit>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include "iclforge/truehd/core/error.hpp"
 

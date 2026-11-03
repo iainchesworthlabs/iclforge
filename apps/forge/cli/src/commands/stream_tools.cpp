@@ -1,13 +1,14 @@
 #include "stream_tools.hpp"
 
+#include <fmt/base.h>
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
-#include <fmt/base.h>
-#include <fmt/format.h>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -21,18 +22,11 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
-#include "truehd.hpp"
-#include "iclforge/ac3/core/types.hpp"
-#include "iclforge/ac4/core/toc.hpp"
-#include "iclforge/ac4/decoder/config.hpp"
-#include "iclforge/ac4/decoder/frame.hpp"
-#include "iclforge/ac4/decoder/presentation.hpp"
-#include "iclforge/ac4/encoder/config.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
-#include "iclforge/ac4/decoder/decoder.hpp"
+#include "ac4_channels.hpp"
 #include "analysis.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
@@ -45,8 +39,15 @@
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
-#include "ac4_channels.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "stream_playback.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 

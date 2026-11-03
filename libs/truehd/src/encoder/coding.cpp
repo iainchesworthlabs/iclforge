@@ -1,13 +1,20 @@
 #include "encoder/coding.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <numbers>
+#include <span>
+#include <vector>
 
 #include "core/huffman.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "iclforge/base/detail/cpu_features.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
 #include "internal/avx2/coded_bits_avx2.hpp"
 
 namespace iclforge::truehd::detail {
