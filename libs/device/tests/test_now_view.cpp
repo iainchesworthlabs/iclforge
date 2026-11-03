@@ -617,3 +617,155 @@ TEST_CASE("now_view: the night schedule covers the idle screen only when it is t
     night.enabled = false;
     CHECK_FALSE(nv::night_covers_idle(night, 23 * 60));
 }
+
+// --- the waiting screen ------------------------------------------------------------------------------------------
+
+TEST_CASE("now_view: the waiting screen's four choices and their words", "[now_view]") {
+    CHECK(std::string(nv::idle_view_name(nv::IdleView::kLit)) == "lit");
+    CHECK(std::string(nv::idle_view_name(nv::IdleView::kDim)) == "dim");
+    CHECK(std::string(nv::idle_view_name(nv::IdleView::kClock)) == "clock");
+    CHECK(std::string(nv::idle_view_name(nv::IdleView::kDark)) == "dark");
+    for (const nv::IdleView view : {nv::IdleView::kLit, nv::IdleView::kDim, nv::IdleView::kClock, nv::IdleView::kDark}) {
+        const auto parsed = nv::parse_idle_view(nv::idle_view_name(view));
+        REQUIRE(parsed.has_value());
+        CHECK(*parsed == view);
+        CHECK(nv::parse_idle_view(std::string(nv::idle_view_name(view)) + "\n") == view);
+    }
+    CHECK_FALSE(nv::parse_idle_view("Dim").has_value());
+    CHECK_FALSE(nv::parse_idle_view("speakers").has_value());
+    CHECK_FALSE(nv::parse_idle_view("").has_value());
+    // The default is a dim: a screen that is on for hours is not the default any more.
+    CHECK(nv::kDefaultIdleView == nv::IdleView::kDim);
+}
+
+TEST_CASE("now_view: the waiting screen is stored as a number that is never renumbered", "[now_view]") {
+    // These numbers are in boards' NVS: a change turns every board's waiting screen into another one.
+    CHECK(static_cast<int>(nv::IdleView::kLit) == 0);
+    CHECK(static_cast<int>(nv::IdleView::kDim) == 1);
+    CHECK(static_cast<int>(nv::IdleView::kClock) == 2);
+    CHECK(static_cast<int>(nv::IdleView::kDark) == 3);
+    for (std::int32_t stored = 0; stored <= 3; ++stored) {
+        const auto view = nv::idle_view_from_stored(stored);
+        REQUIRE(view.has_value());
+        CHECK(static_cast<std::int32_t>(*view) == stored);
+    }
+    CHECK_FALSE(nv::idle_view_from_stored(-1).has_value());
+    CHECK_FALSE(nv::idle_view_from_stored(4).has_value());
+}
+
+TEST_CASE("now_view: a board is set up with a server paired or connected and no pairing code on show", "[now_view]") {
+    CHECK(nv::board_set_up(false, 1, 0));
+    CHECK(nv::board_set_up(false, 0, 1));
+    CHECK(nv::board_set_up(false, 3, 1));
+    CHECK_FALSE(nv::board_set_up(false, 0, 0));
+    CHECK_FALSE(nv::board_set_up(true, 1, 0));
+    CHECK_FALSE(nv::board_set_up(true, 1, 1));
+}
+
+namespace {
+
+constexpr std::uint32_t kMinute = 60'000;
+constexpr std::uint32_t kHours = 6 * 3600 * 1000U;
+
+// Nothing was touched since the waiting screen began: the touch before it (inactive_ms) is older than it.
+nv::IdleScreen waiting(nv::IdleView view, std::uint32_t showing_ms, int minutes = 5, bool set_up = true,
+                       bool clock_known = true, bool carried = false) {
+    return nv::idle_state(view, set_up, clock_known, carried, minutes, showing_ms + 3600 * 1000U, showing_ms);
+}
+
+}  // namespace
+
+TEST_CASE("now_view: the waiting screen is lit for the dim time, then it is the view chosen", "[now_view]") {
+    for (const nv::IdleView view : {nv::IdleView::kDim, nv::IdleView::kClock, nv::IdleView::kDark}) {
+        CHECK(waiting(view, 0).dim == nv::Dim::kNone);
+        CHECK(waiting(view, 5 * kMinute - 1).dim == nv::Dim::kNone);
+    }
+    CHECK(waiting(nv::IdleView::kDim, 5 * kMinute) == nv::IdleScreen{nv::Dim::kDimmed, false});
+    CHECK(waiting(nv::IdleView::kClock, 5 * kMinute) == nv::IdleScreen{nv::Dim::kDimmed, true});
+    CHECK(waiting(nv::IdleView::kDark, 5 * kMinute) == nv::IdleScreen{nv::Dim::kDark, false});
+    // The time is the dim time the person set.
+    CHECK(waiting(nv::IdleView::kDim, 59'999, 1).dim == nv::Dim::kNone);
+    CHECK(waiting(nv::IdleView::kDim, 60'000, 1).dim == nv::Dim::kDimmed);
+    CHECK(waiting(nv::IdleView::kDim, 239 * kMinute, 240).dim == nv::Dim::kNone);
+    CHECK(waiting(nv::IdleView::kDim, 240 * kMinute, 240).dim == nv::Dim::kDimmed);
+}
+
+TEST_CASE("now_view: a waiting screen left lit stays lit, and so does one that never dims", "[now_view]") {
+    CHECK(waiting(nv::IdleView::kLit, 10'000 * kMinute) == nv::IdleScreen{});
+    CHECK(waiting(nv::IdleView::kDim, 10'000 * kMinute, nv::kDimNever) == nv::IdleScreen{});
+    CHECK(waiting(nv::IdleView::kDark, 10'000 * kMinute, nv::kDimNever) == nv::IdleScreen{});
+}
+
+TEST_CASE("now_view: a board still to be set up keeps its waiting screen lit, whatever was chosen", "[now_view]") {
+    for (const nv::IdleView view : {nv::IdleView::kDim, nv::IdleView::kClock, nv::IdleView::kDark}) {
+        CHECK(waiting(view, 600 * kMinute, 5, /*set_up=*/false) == nv::IdleScreen{});
+        CHECK(waiting(view, 600 * kMinute, 5, /*set_up=*/false, true, /*carried=*/true) == nv::IdleScreen{});
+    }
+}
+
+TEST_CASE("now_view: the clock saver is a plain dim until the board knows the time", "[now_view]") {
+    CHECK(waiting(nv::IdleView::kClock, 5 * kMinute, 5, true, /*clock_known=*/false) ==
+          nv::IdleScreen{nv::Dim::kDimmed, false});
+    CHECK(waiting(nv::IdleView::kClock, 5 * kMinute, 5, true, /*clock_known=*/true) ==
+          nv::IdleScreen{nv::Dim::kDimmed, true});
+}
+
+TEST_CASE("now_view: a touch lights the waiting screen and the dim time begins again", "[now_view]") {
+    // It had been waiting for an hour; a touch 30 s ago.
+    const std::uint32_t showing = 60 * kMinute;
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, false, 5, 30'000, showing).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, false, 5, 5 * kMinute - 1, showing).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, false, 5, 5 * kMinute, showing).dim == nv::Dim::kDimmed);
+    // The touch that wakes a dark screen is activity: lit, for the dim time and not the dark view's thirty seconds.
+    CHECK(nv::idle_state(nv::IdleView::kDark, true, true, false, 5, 0, showing).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kDark, true, true, false, 5, 2 * kMinute, showing).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kDark, true, true, false, 5, 5 * kMinute, showing).dim == nv::Dim::kDark);
+}
+
+TEST_CASE("now_view: a waiting screen begun on a panel nobody has touched for hours is not dimmed at once", "[now_view]") {
+    // Hours since the last touch, but the waiting screen began a second ago (a stream that ended).
+    for (const nv::IdleView view : {nv::IdleView::kDim, nv::IdleView::kClock, nv::IdleView::kDark}) {
+        CHECK(nv::idle_state(view, true, true, false, 5, kHours, 1000).dim == nv::Dim::kNone);
+    }
+}
+
+TEST_CASE("now_view: a screen already dimmed or dark as the stream ends stays so until a touch", "[now_view]") {
+    for (const nv::IdleView view : {nv::IdleView::kDim, nv::IdleView::kClock, nv::IdleView::kDark}) {
+        // Begun a second ago, untouched since: carried, so the saver at once, whatever the dim time.
+        CHECK(nv::idle_state(view, true, true, true, 5, kHours, 1000).dim != nv::Dim::kNone);
+        CHECK(nv::idle_state(view, true, true, true, nv::kDimNever, kHours, 1000).dim != nv::Dim::kNone);
+        // A touch since it began lights it, for the dim time.
+        CHECK(nv::idle_state(view, true, true, true, 5, 500, 1000).dim == nv::Dim::kNone);
+        CHECK(nv::idle_state(view, true, true, true, 5, 5 * kMinute, 6 * kMinute).dim != nv::Dim::kNone);
+    }
+    // A carried screen with the waiting screen left lit is still lit: the person asked for it.
+    CHECK(nv::idle_state(nv::IdleView::kLit, true, true, true, 5, kHours, 1000).dim == nv::Dim::kNone);
+    // With a dim time of never, a touch ends a carried screen for good.
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, true, nv::kDimNever, 500, 1000).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, true, nv::kDimNever, 100 * kMinute, 200 * kMinute).dim ==
+          nv::Dim::kNone);
+}
+
+TEST_CASE("now_view: the night schedule's idle switch makes the waiting screen the dark view", "[now_view]") {
+    nv::NightSchedule night;
+    night.enabled = true;
+    night.idle = true;
+    const std::optional<int> at_23 = 23 * 60;
+    // Dark from the moment the waiting screen begins, whatever the view chosen (even lit) and whether set up or not.
+    for (const nv::IdleView view : {nv::IdleView::kLit, nv::IdleView::kDim, nv::IdleView::kClock, nv::IdleView::kDark}) {
+        CHECK(nv::idle_state(view, true, true, false, 5, kHours, 1000, night, at_23) ==
+              nv::IdleScreen{nv::Dim::kDark, false});
+    }
+    CHECK(nv::idle_state(nv::IdleView::kLit, false, false, false, 5, kHours, 1000, night, at_23).dim == nv::Dim::kDark);
+    // A touch after it began lights it for the dark view's thirty seconds.
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, false, 5, 10'000, 60'000, night, at_23).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kDim, true, true, false, 5, nv::kDarkAwakeMs, 60'000, night, at_23).dim ==
+          nv::Dim::kDark);
+    // Without the switch, or outside the night, or with no time known, the rule is the ordinary one.
+    night.idle = false;
+    CHECK(nv::idle_state(nv::IdleView::kLit, true, true, false, 5, kHours, 1000, night, at_23).dim == nv::Dim::kNone);
+    night.idle = true;
+    CHECK(nv::idle_state(nv::IdleView::kLit, true, true, false, 5, kHours, 1000, night, 12 * 60).dim == nv::Dim::kNone);
+    CHECK(nv::idle_state(nv::IdleView::kLit, true, true, false, 5, kHours, 1000, night, std::nullopt).dim ==
+          nv::Dim::kNone);
+}

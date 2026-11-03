@@ -84,6 +84,8 @@ void panel_set_view(iclforge::nowview::View view);
 void panel_set_dim_after(int minutes);
 // How the speakers view shows a level (iclforge::nowview::SpeakersStyle, planning/p4x-speakers-options.md).
 void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style);
+// What the waiting screen does once the dim time has passed with nothing touched (iclforge::nowview::IdleView).
+void panel_set_idle_view(iclforge::nowview::IdleView view);
 
 // What a person chose for the screen (planning/p4x-preferences.md), followed at once: the backlight's lit level,
 // percent from iclforge::nowview::kBrightnessMin to kBrightnessMax (the dimmed floor stays under it), and how the

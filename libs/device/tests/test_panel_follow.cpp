@@ -60,6 +60,7 @@ TEST_CASE("the panel follows the defaults the settings start from", "[panel_foll
     CHECK(follow.view() == nv::kDefaultView);
     CHECK(follow.dim_after_minutes() == nv::kDefaultDimMinutes);
     CHECK(follow.speakers_style() == nv::kDefaultSpeakersStyle);
+    CHECK(follow.idle_view() == nv::kDefaultIdleView);
     CHECK(follow.brightness() == nv::kDefaultBrightness);
     CHECK(follow.clock_format() == wc::ClockFormat{});
     CHECK(follow.night() == nv::NightSchedule{});
@@ -72,6 +73,7 @@ TEST_CASE("every setter is read back whole", "[panel_follow]") {
     follow.set_view(nv::View::kClock);
     follow.set_dim_after(30);
     follow.set_speakers_style(nv::SpeakersStyle::kPulse);
+    follow.set_idle_view(nv::IdleView::kClock);
     follow.set_brightness(40);
     follow.set_clock_format({.twelve_hour = true, .seconds = true});
     const nv::NightSchedule night{.enabled = true, .from_min = 23 * 60 + 15, .to_min = 6 * 60, .idle = true};
@@ -79,6 +81,7 @@ TEST_CASE("every setter is read back whole", "[panel_follow]") {
     CHECK(follow.view() == nv::View::kClock);
     CHECK(follow.dim_after_minutes() == 30);
     CHECK(follow.speakers_style() == nv::SpeakersStyle::kPulse);
+    CHECK(follow.idle_view() == nv::IdleView::kClock);
     CHECK(follow.brightness() == 40);
     CHECK(follow.clock_format() == wc::ClockFormat{.twelve_hour = true, .seconds = true});
     CHECK(follow.night() == night);
@@ -114,6 +117,7 @@ TEST_CASE("a setter called while the panel's lock is held does not wait for it",
         follow.set_view(round % 2 == 0 ? nv::View::kSpeakers : nv::View::kClock);
         follow.set_dim_after(round % 240 + 1);
         follow.set_speakers_style(round % 2 == 0 ? nv::SpeakersStyle::kGlow : nv::SpeakersStyle::kPulse);
+        follow.set_idle_view(round % 2 == 0 ? nv::IdleView::kDim : nv::IdleView::kDark);
         follow.set_brightness(10 + round % 91);
         follow.set_clock_format({.twelve_hour = round % 2 == 0, .seconds = round % 3 == 0});
         follow.set_night({.enabled = round % 2 == 0, .from_min = round % 1440, .to_min = (round * 7) % 1440, .idle = false});
@@ -185,8 +189,9 @@ TEST_CASE("no panel_set_* of the firmware takes the panel's lock or touches the 
         ++found;
         at = name_end;
     }
-    // View, dim, speakers' style, brightness, clock format and night schedule: a setter added without the rule is read too.
-    CHECK(found >= 6);
+    // View, dim, speakers' style, waiting screen, brightness, clock format and night schedule: a setter added without the
+    // rule is read too.
+    CHECK(found >= 7);
     // The one reader of g_stats that may be asked on the panel's own task does not wait for itself.
     const std::size_t stats = source.find("PanelStats panel_stats()");
     REQUIRE(stats != std::string::npos);
