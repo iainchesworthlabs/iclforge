@@ -1285,7 +1285,9 @@ channel can build is now `kRateExceeded` from its first unit that is late, where
 `synth-71-96-s24`, white noise in 8 channels at 96 kHz, 18.4 Mbit/s raw, now uses `rate-violations=1`); the limit of the lookahead is the
 restart interval (a stream written with `restart_interval_units` 8 sees 98 units, not the 218 of the default). **Not known:** DRP's own limits
 (whether it also refuses a lead of more than 75 ms, or one below one unit by less than the unit's need) were read from this one stream, not from
-a table; the encoder keeps every lead between `max(one unit, need)` and 75 ms. **Provisional until DRP's result for the corrected streams
-(`D:/ac3bld/drp-acceptance/streams-r2`) is in.** Tests: `a burst that needs more than a unit of channel time is met by the units before it` (inside a
+a table; the encoder keeps every lead between `max(one unit, need)` and 75 ms. **Confirmed by DRP 4.3.0.19359 on the corrected streams (2026-11-03, `D:/ac3bld/drp-acceptance/results-r2.md`):** plain-71 and downmix-71 decode
+presentation 8 with no message and 0 differing samples in 8 channels (was 12000 x 0x6f); plain-51-192k24 has no 0x75, 0x78 or 0x79 and its 2 and 6
+channel presentations are exact over the whole 1,920,000 frames, from 5.0 s on too (was wrong from frame 959960); plain-20, plain-51-48k24,
+plain-51-96k24 and plain-51-48k16, byte-identical to the first round's, are accepted and exact as before. DRP's own limits are still not known. Tests: `a burst that needs more than a unit of channel time is met by the units before it` (inside a
 restart interval and across the boundary of two; fails with the old fixed lead), `a stream that never needs more than a unit of channel time keeps one
 unit of lead` and `the substream info byte follows the number of substreams`.
