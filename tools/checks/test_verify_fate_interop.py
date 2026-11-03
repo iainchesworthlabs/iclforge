@@ -250,7 +250,7 @@ class Harness(unittest.TestCase):
 
         def urlopen(url, timeout=None):
             return Response(DATA["a.ac3"][:10], length=len(DATA["a.ac3"]))
-        rc, out = self.run_down(urlopen=urlopen)
+        rc, _ = self.run_down(urlopen=urlopen)
         self.assertEqual(rc, 1)
         self.assertEqual(sorted(p.name for p in self.cache.iterdir()), ["b.eac3", "c.eac3"])
 
