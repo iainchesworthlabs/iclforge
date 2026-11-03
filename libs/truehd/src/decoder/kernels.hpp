@@ -200,8 +200,9 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
+            const int fold_channel = fold_by_position ? ch : source_channel[ch];
             fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output),
-                                      fold_by_position ? ch : source_channel[ch]);
+                                      static_cast<std::uint32_t>(fold_channel));
             if (pcm != nullptr) {
                 pcm[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
             }

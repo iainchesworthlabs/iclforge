@@ -89,7 +89,7 @@ struct AlternativeReadings {
 struct DecoderConfig {
     Presentation presentation = Presentation::kBest;
     Strictness strictness = Strictness::kStrict;
-    AlternativeReadings readings;
+    AlternativeReadings readings{};
 };
 
 // One decoded access unit. The views point into the decoder and stay valid until its next decode()
