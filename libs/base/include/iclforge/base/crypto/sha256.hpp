@@ -22,10 +22,10 @@ class Sha256 {
 public:
     Sha256() { reset(); }
 
-    void reset();
-    void update(std::span<const std::byte> data);
+    ICLFORGE_BASE_EXPORT void reset();
+    ICLFORGE_BASE_EXPORT void update(std::span<const std::byte> data);
     // Finalizes into `out` and leaves the object reset(), ready to reuse.
-    void finish(std::span<std::byte, 32> out);
+    ICLFORGE_BASE_EXPORT void finish(std::span<std::byte, 32> out);
 
 private:
     // Runs `blocks` consecutive 64-byte blocks through the compression function: the CPU's SHA

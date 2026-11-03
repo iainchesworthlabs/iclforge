@@ -565,12 +565,11 @@ Each has a recommendation, and none is settled here.
     this library's encoder by default), so a sink that states 12 Mbit/s refuses every stream the encoder writes with its default,
     though most never pass 5. *Recommend:* leave it; a stream's declared peak is what a sink must be able to take, and the
     encoder's peak is a setting (`truehd-peak-rate=`).
-21. **The S3 needs a cable replug.** The decoder probe ran on the C6 and the P4 (bit-exact, figures in
-    [the sinks page](truehd-parity-esp32-sinks.md#measured-on-the-c6-and-the-p4-2026-11-01)); the S3 on COM16 (bench `S3b`,
-    192.168.1.45, lock name `s3a`) stopped accepting writes on its USB-Serial-JTAG port after a GDB session, and a PnP restart
-    needs administrator rights. It holds the probe image in `ota_0` with `otadata` erased; the as-found `ota_0` head and
-    `otadata` are in `D:\ac3bld\truehd-probe-backup\s3b`. *Recommend:* unplug and replug that board's USB cable; then
-    the probe is flashed, read, and the board restored from the backup (the commands are in `firmware/truehd-probe/README.md`).
+21. **The S3 is measured and restored (2026-11-04).** Bit-exact on all eight fixtures; 2.0 at 48 kHz runs at 0.52 to 0.56 of
+    the core, but 5.1 is past real time (1.03 to 1.13) and 2.0 at 192 kHz is 1.7 (figures in
+    [the sinks page](truehd-parity-esp32-sinks.md#measured-on-the-c6-and-the-p4-2026-11-01)). *Recommend:* the S3 is a 2.0 TrueHD
+    decoder only (or stays on the PCM/Opus path with the server decoding); the Hearth sink's form negotiation should not
+    offer it a 6-channel `truehd` form.
 22. **The decoder's stack and `reset()`.** Measured: 60 KB of stack on both RISC-V chips (the host estimate was 33 KB), and
     `Decoder::reset()` builds the new state before releasing the old, so a reset peaks at 316 KB. *Recommend:* approve the
     footprint work (Phase 1 of the sinks plan) in `libs/truehd`, which WP1 and WP5 also edit; first, release the old state
