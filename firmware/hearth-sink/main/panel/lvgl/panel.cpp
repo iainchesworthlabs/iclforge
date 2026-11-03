@@ -264,6 +264,7 @@ NowSettings read_now_settings() {
     settings.view = g_follow.view();
     settings.dim_after_minutes = g_follow.dim_after_minutes();
     settings.speakers_style = g_follow.speakers_style();
+    settings.idle_view = g_follow.idle_view();
     settings.night = g_follow.night();
     // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
     if (settings.night.enabled) {
@@ -741,6 +742,8 @@ void panel_set_dim_after(int minutes) { g_follow.set_dim_after(minutes); }
 
 void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_follow.set_speakers_style(style); }
 
+void panel_set_idle_view(iclforge::nowview::IdleView view) { g_follow.set_idle_view(view); }
+
 void panel_set_brightness(int percent) { g_follow.set_brightness(percent); }
 
 void panel_set_clock_format(iclforge::wallclock::ClockFormat format) { g_follow.set_clock_format(format); }
@@ -758,6 +761,7 @@ bool panel_start() {
     g_follow.set_view(settings().now_view);
     g_follow.set_dim_after(settings().dim_after_minutes);
     g_follow.set_speakers_style(settings().speakers_style);
+    g_follow.set_idle_view(settings().idle_view);
     g_follow.set_brightness(settings().brightness_percent);
     g_follow.set_clock_format(settings().clock_format);
     g_follow.set_night(settings().night);

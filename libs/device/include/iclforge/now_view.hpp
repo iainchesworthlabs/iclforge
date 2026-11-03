@@ -438,6 +438,107 @@ inline constexpr int kNightStepMinutes = 15;
     return dimmed(true, minutes, quiet) ? Dim::kDimmed : Dim::kNone;
 }
 
+// --- the waiting screen -------------------------------------------------------------------------------------------
+
+// What the screen does once it has waited for something to play, with nothing touched, for the dim time (PUT /idle-view).
+// The waiting screen is the one a set-up board shows between servers' streams: its name, address and "Waiting for
+// something to play". The stored values are these numbers: never renumbered, never reused.
+enum class IdleView : std::uint8_t {
+    kLit = 0,    // stays as it is: the screen this replaced, lit for hours
+    kDim = 1,    // a black cover with one line, the backlight at its floor
+    kClock = 2,  // the time, the backlight at its floor (a dim, where no time is known, until a time server answers)
+    kDark = 3,   // nothing lit: the backlight off
+};
+
+inline constexpr IdleView kDefaultIdleView = IdleView::kDim;
+
+[[nodiscard]] constexpr const char* idle_view_name(IdleView view) {
+    switch (view) {
+        case IdleView::kLit:
+            return "lit";
+        case IdleView::kClock:
+            return "clock";
+        case IdleView::kDark:
+            return "dark";
+        case IdleView::kDim:
+            break;
+    }
+    return "dim";
+}
+
+// One of the four words, with or without a line ending after it.
+[[nodiscard]] constexpr std::optional<IdleView> parse_idle_view(std::string_view text) {
+    text = detail::trimmed(text);
+    for (const IdleView view : {IdleView::kLit, IdleView::kDim, IdleView::kClock, IdleView::kDark}) {
+        if (text == idle_view_name(view)) {
+            return view;
+        }
+    }
+    return std::nullopt;
+}
+
+// A stored number, or nothing for one this build does not know (a partition written by another build).
+[[nodiscard]] constexpr std::optional<IdleView> idle_view_from_stored(std::int32_t value) {
+    if (value >= static_cast<std::int32_t>(IdleView::kLit) && value <= static_cast<std::int32_t>(IdleView::kDark)) {
+        return static_cast<IdleView>(value);
+    }
+    return std::nullopt;
+}
+
+// Whether the board is set up, so that a waiting screen is the board resting and not the board asking for something: no
+// pairing code on show, and a server paired with it or connected to it. A board still to be paired keeps its screen lit
+// and saying so.
+[[nodiscard]] constexpr bool board_set_up(bool pairing_code_shown, unsigned paired, unsigned connections) {
+    return !pairing_code_shown && (paired > 0 || connections > 0);
+}
+
+// What the waiting screen is doing with the glass: how it is dimmed, and whether the time is what it shows through a dim.
+struct IdleScreen {
+    Dim dim = Dim::kNone;
+    bool clock = false;
+
+    friend constexpr bool operator==(const IdleScreen&, const IdleScreen&) = default;
+};
+
+// The waiting screen's rule. `view` is what the person chose, `set_up` is board_set_up(), `clock_known` that a time
+// server has answered (the clock saver is a plain dim until it has), and `minutes` the dim time. `inactive_ms` is the time
+// since anything touched the glass, `showing_ms` the time since the waiting screen began to show.
+//
+// It is lit for the dim time from the last touch, or from when it began to show if nothing has touched the glass since,
+// and then it is the view chosen. It counts from when it began so that a stream that ends on a panel nobody has touched
+// for hours does not start dimmed, except when the screen was already dimmed or dark as the stream ended (`carried`): then
+// it stays so until a touch, and the status does not flash on between two songs of a playlist. A touch lights it, and the
+// dim time begins again. A dim time of never keeps it lit, but not a carried screen, which a touch is the only end of.
+//
+// The night schedule's idle switch makes it the dark view while the night is in force, as it does for any view.
+[[nodiscard]] constexpr IdleScreen idle_state(IdleView view, bool set_up, bool clock_known, bool carried, int minutes,
+                                              std::uint32_t inactive_ms, std::uint32_t showing_ms,
+                                              const NightSchedule& night = {},
+                                              std::optional<int> minute_of_day = std::nullopt) {
+    if (night_covers_idle(night, minute_of_day)) {
+        return {dark_state(inactive_ms, showing_ms), false};
+    }
+    if (!set_up || view == IdleView::kLit) {
+        return {};
+    }
+    const bool touched_since_it_began = inactive_ms < showing_ms;
+    const std::uint32_t quiet = carried ? inactive_ms : (touched_since_it_began ? inactive_ms : showing_ms);
+    const bool saved = (carried && !touched_since_it_began) || dimmed(true, minutes, quiet);
+    if (!saved) {
+        return {};
+    }
+    switch (view) {
+        case IdleView::kDark:
+            return {Dim::kDark, false};
+        case IdleView::kClock:
+            return {Dim::kDimmed, clock_known};
+        case IdleView::kDim:
+        case IdleView::kLit:
+            break;
+    }
+    return {Dim::kDimmed, false};
+}
+
 // --- what the stream is called ------------------------------------------------------------------------
 
 // kUnknown is a coded stream before its first unit has decoded.

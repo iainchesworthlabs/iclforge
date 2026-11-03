@@ -87,6 +87,9 @@ struct Settings {
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
     // How the speakers view shows a level: glow or pulse (planning/p4x-speakers-options.md).
     iclforge::nowview::SpeakersStyle speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
+    // What the waiting screen (nothing playing, the board set up) does after the dim time with nothing touched: stay lit,
+    // dim, show the clock or go dark (planning/p4x-now-playing.md, "The waiting screen").
+    iclforge::nowview::IdleView idle_view = iclforge::nowview::kDefaultIdleView;
     // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): the backlight when
     // lit, percent, and how the clock view writes the time. Read by every build and acted on by the one with a panel.
     int brightness_percent = iclforge::nowview::kDefaultBrightness;
@@ -154,6 +157,7 @@ void settings_load();
 [[nodiscard]] bool settings_set_now_view(iclforge::nowview::View view);
 [[nodiscard]] bool settings_set_dim_after(int minutes);
 [[nodiscard]] bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style);
+[[nodiscard]] bool settings_set_idle_view(iclforge::nowview::IdleView view);
 [[nodiscard]] bool settings_set_brightness(int percent);
 [[nodiscard]] bool settings_set_clock_format(iclforge::wallclock::ClockFormat format);
 [[nodiscard]] bool settings_set_night(const iclforge::nowview::NightSchedule& night);
