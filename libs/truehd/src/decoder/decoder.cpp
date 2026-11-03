@@ -2,6 +2,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <vector>
 
 #include "core/huffman.hpp"
@@ -10,7 +17,11 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {
 
@@ -983,9 +994,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             block_extension = header->matrices && header->matrices->extension;
             if (header->matrices) {
                 ++counters.matrix_headers;
-                for (int m = 0; m < header->matrices->count; ++m) {
+                const auto& matrices = *header->matrices;
+                for (int m = 0; m < matrices.count; ++m) {
                     counters.lsb_bypass_matrices +=
-                        header->matrices->items[static_cast<std::size_t>(m)].lsb_bypass ? 1U : 0U;
+                        matrices.items[static_cast<std::size_t>(m)].lsb_bypass ? 1U : 0U;
                 }
             }
         } else if (!state.running) {
@@ -1161,7 +1173,8 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
     }
     ++impl.counters.units_decoded;
     DecodedAccessUnit decoded;
-    decoded.sample_rate = impl.major_sync->sample_rate();
+    // A unit decoded, so a restart header, which a major sync carries, has been accepted.
+    decoded.sample_rate = impl.major_sync ? impl.major_sync->sample_rate() : 0;
     if (last.padding_samples > last.samples) {
         lost_data();
         return std::unexpected(

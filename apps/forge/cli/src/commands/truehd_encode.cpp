@@ -6,9 +6,7 @@
 #include <fmt/base.h>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cctype>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -24,8 +22,8 @@
 #include "../exit_codes.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/base/wav.hpp"
-#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"

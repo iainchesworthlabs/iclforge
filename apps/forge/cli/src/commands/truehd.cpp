@@ -14,6 +14,7 @@
 #include <iostream>
 #include <optional>
 #include <ostream>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>

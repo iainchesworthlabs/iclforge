@@ -1,6 +1,16 @@
 #include "iclforge/truehd/io/elementary.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <optional>
+#include <span>
 
 #include "iclforge/base/bitreader.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {
 
@@ -141,6 +151,9 @@ std::expected<StreamInfo, Error> probe_stream(std::span<const std::byte> data) {
     auto first_unit = parse_access_unit(data.subspan(first), 0, true);
     if (!first_unit) {
         return std::unexpected(first_unit.error());
+    }
+    if (!first_unit->major_sync) {
+        return std::unexpected(Error{ErrorKind::kBadSync, "no access unit with a major sync"});
     }
     StreamInfo info;
     info.major_sync = *first_unit->major_sync;

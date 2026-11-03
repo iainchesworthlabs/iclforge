@@ -1,11 +1,19 @@
 #include "iclforge/truehd/core/syntax.hpp"
 
-#include <algorithm>
-#include <utility>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <span>
+#include <string_view>
 
 #include "core/bit_io.hpp"
 #include "core/huffman.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 
 namespace iclforge::truehd {
 

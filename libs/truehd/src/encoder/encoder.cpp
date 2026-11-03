@@ -4,8 +4,16 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <limits>
+#include <memory>
 #include <optional>
+#include <span>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "core/noise.hpp"
 #include "encoder/coding.hpp"
@@ -14,11 +22,13 @@
 #include "encoder/verify.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/encoder/layout.hpp"
 #include "iclforge/truehd/encoder/ratectl.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {
 
