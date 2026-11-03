@@ -367,7 +367,7 @@ jobs:
       # pip; the container is thrown away at the end of the job. The action exports QT_ROOT_DIR,
       # which cmake/FindQt6.cmake reads, and the library path the offscreen tests load Qt from.
       - name: Install Qt (prebuilt)
-        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         env:
           PIP_BREAK_SYSTEM_PACKAGES: "1"
         with:
@@ -1368,6 +1368,12 @@ jobs:
 
       - name: TrueHD in MP4, Matroska, MPEG-TS and MAT against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_containers.py --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
+
+      # Crucible's pinned TrueHD 5.1 mode: the bursts its output stage hands a sink, unwrapped and held
+      # to FFmpeg's strict decode against the 24-bit integers the stage was given (the stage's own
+      # tests hold them to this library's decoder; this is the other one).
+      - name: Crucible's TrueHD 5.1 leg against FFmpeg's strict decode (bit-exact)
+        run: python3 tools/checks/verify_crucible_truehd_leg.py --tests build/config-linux-llvm/bin/iclforge-crucible-tests --tool build/config-linux-llvm/bin/iclforge-truehd-container-tool
 
       # The fixture set must still carry every feature it was made for (the gate's static job runs
       # this too, without a build), and forge's decode of stand-ins for the Blu-ray layouts (a BDAV

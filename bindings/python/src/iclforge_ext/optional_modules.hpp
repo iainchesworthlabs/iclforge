@@ -45,4 +45,8 @@ void register_ac4(pybind11::module_& m);
 // iclforge::lyrics behind it (the minimum-footprint profiles leave it out).
 void register_lyrics(pybind11::module_& m);
 
+// Adds the `truehd` submodule to `m`, or does nothing in a build with no
+// iclforge::truehd behind it (ICLFORGE_BUILD_TRUEHD off).
+void register_truehd(pybind11::module_& m);
+
 }  // namespace iclforge::python

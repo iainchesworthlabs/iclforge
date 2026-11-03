@@ -37,7 +37,14 @@ enum class DataType : std::uint8_t {
     kEac3,
     // IEC 61937-14's four burst types, whichever the server's packer chose.
     kAc4,
+    // TrueHD and MLP as access units, up to 24 to a chunk (a MAT frame's worth, 20 ms), not as the
+    // padded MAT burst: Pc 22 and a Pd in bytes (planning/hearth-sendspin-extension.md, TrueHD).
+    // Added to the data_types a sink lists, not a new version of the role.
+    kTruehd,
 };
+
+// How many data types there are; the per-type limits below are indexed by DataType.
+inline constexpr std::size_t kDataTypeCount = 4;
 
 [[nodiscard]] std::string_view data_type_name(DataType type);
 // The burst type a stream of `type` is sent as: for AC-4, its first, the one on
@@ -116,7 +123,7 @@ struct Support {
     // that type, indexed by DataType; 0 when it states none, which a server reads as "no limit
     // stated" and not as "none". A sink that refuses a wider syncframe states the figure it refuses
     // at, so a server can send that stream another way rather than find out one burst at a time.
-    std::array<std::uint8_t, 3> max_coded_channels{};
+    std::array<std::uint8_t, kDataTypeCount> max_coded_channels{};
 
     [[nodiscard]] std::uint8_t max_coded_channels_of(DataType type) const {
         return max_coded_channels[static_cast<std::size_t>(type)];
@@ -126,7 +133,7 @@ struct Support {
     // statement, not an absence: the sink decodes the bed and does not reconstruct objects. A
     // stream with more objects than a sink states is decoded as its bed by the sink itself, so a
     // server that wants them placed sends it PCM rendered on its own side.
-    std::array<std::optional<std::uint8_t>, 3> max_objects{};
+    std::array<std::optional<std::uint8_t>, kDataTypeCount> max_objects{};
 
     [[nodiscard]] std::optional<std::uint8_t> max_objects_of(DataType type) const {
         return max_objects[static_cast<std::size_t>(type)];
@@ -137,10 +144,20 @@ struct Support {
     // for max_coded_channels: an ESP32-S3 keeps up with AC-4 at 25 frames a second and falls behind
     // at 29.97, where a frame's decode, the frame-rate converter's, takes the same time. A frame
     // rate is compared as it is, so a limit of 30 takes 29.97 and 30 and one of 25 takes 24 and 25.
-    std::array<std::uint16_t, 3> max_frame_rate{};
+    std::array<std::uint16_t, kDataTypeCount> max_frame_rate{};
 
     [[nodiscard]] std::uint16_t max_frame_rate_of(DataType type) const {
         return max_frame_rate[static_cast<std::size_t>(type)];
+    }
+    // Per data type, the most coded data a sink takes of a stream of that type, in kbit/s, taken
+    // over the longest burst chunk (so a peak of 24 TrueHD access units, 20 ms, is what counts, not
+    // an average); 0 when it states none, which a server reads as "no limit stated". A stream whose
+    // peak is higher is sent another way, as for max_coded_channels. Stated by a sink whose link or
+    // ring cannot hold what the stream's declared peak rate allows.
+    std::array<std::uint32_t, kDataTypeCount> max_data_rate{};
+
+    [[nodiscard]] std::uint32_t max_data_rate_of(DataType type) const {
+        return max_data_rate[static_cast<std::size_t>(type)];
     }
     // The most bytes of lyric document (an LRC text, UTF-8) the sink holds for the item playing,
     // 1 to kMaxLyricsBytes; 0 when it does not say, which is a sink that takes no lyrics. A sink

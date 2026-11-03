@@ -25,13 +25,22 @@ bool same_guid(const GUID& a, const GUID& b) {
     return std::memcmp(&a, &b, sizeof(GUID)) == 0;
 }
 
+// The SDK's STATIC_KSDATAFORMAT_SUBTYPE_* macros expand to the eleven values of a GUID, flat. As the
+// arguments of a function they build one without the braces around the last eight bytes that
+// an aggregate initialiser would need (clang-cl's -Wmissing-braces).
+GUID guid_of(unsigned long data1, unsigned short data2, unsigned short data3, unsigned char b0,
+             unsigned char b1, unsigned char b2, unsigned char b3, unsigned char b4,
+             unsigned char b5, unsigned char b6, unsigned char b7) {
+    return GUID{data1, data2, data3, {b0, b1, b2, b3, b4, b5, b6, b7}};
+}
+
 }  // namespace
 
 TEST_CASE("the Dolby MLP subtype is the SDK's, and the other two are unchanged") {
     // Compared with the SDK's own initialisers, so a mistyped digit cannot agree with itself.
-    const GUID sdk_mlp = {STATIC_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP};
-    const GUID sdk_dd = {STATIC_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL};
-    const GUID sdk_ddp = {STATIC_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS};
+    const GUID sdk_mlp = guid_of(STATIC_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP);
+    const GUID sdk_dd = guid_of(STATIC_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL);
+    const GUID sdk_ddp = guid_of(STATIC_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS);
     CHECK(same_guid(kSubtypeIec61937DolbyMlp, sdk_mlp));
     CHECK(same_guid(kSubtypeIec61937DolbyDigital, sdk_dd));
     CHECK(same_guid(kSubtypeIec61937DolbyDigitalPlus, sdk_ddp));

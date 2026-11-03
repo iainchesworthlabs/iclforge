@@ -534,11 +534,13 @@ TEST_CASE("network sinks rows: a group is planned by what each member takes",
     (void)rig.sinks->take_log();
 
     const std::vector<iclforge::render::OutputLayout> variants =
-        rig.sinks->plan_group({.group_name = group,
-                               .stream = iclforge::audio::BitstreamFormat::kAc3,
-                               .sample_rate = 48000,
-                               .coded_channels = 6,
-                               .layout = *master});
+        rig.sinks
+            ->plan_group({.group_name = group,
+                          .stream = iclforge::audio::BitstreamFormat::kAc3,
+                          .sample_rate = 48000,
+                          .coded_channels = 6,
+                          .layout = *master})
+            .variants;
     // One render beyond the player's: the stereo player's 2.0.
     REQUIRE(variants.size() == 1);
     CHECK(variants.front().slots() == 2);
@@ -613,5 +615,5 @@ TEST_CASE("network sinks rows: a group is planned by what each member takes",
                             .sample_rate = 48000,
                             .coded_channels = 6,
                             .layout = *master})
-              .empty());
+              .variants.empty());
 }

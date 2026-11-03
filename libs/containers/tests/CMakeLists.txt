@@ -23,7 +23,15 @@ target_compile_definitions(iclforge-containers-tests PRIVATE
 if(ICLFORGE_BUILD_IAMF)
     target_sources(iclforge-containers-tests PRIVATE
         iamf/test_iamf.cpp iamf/test_iamf_container.cpp iamf/test_iamf_objects.cpp
-        iamf/test_iamf_coded.cpp iamf/test_iamf_scalable.cpp iamf/test_iamf_sequence.cpp)
+        iamf/test_iamf_coded.cpp iamf/test_iamf_scalable.cpp iamf/test_iamf_sequence.cpp
+        iamf/test_iamf_seeds.cpp)
+    target_compile_definitions(iclforge-containers-tests PRIVATE
+        "ICLFORGE_IAMF_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/containers/fuzz/seeds/fuzz_iamf_parse\"")
+
+    # fuzz_iamf_parse's seeds, made by the module's own writers (tools/fuzz/generate-seeds.sh runs it).
+    add_executable(iclforge-iamf-seed-tool iamf/iamf_seed_tool.cpp)
+    target_link_libraries(iclforge-iamf-seed-tool PRIVATE iclforge::containers iclforge::warnings iclforge::fmt)
+    add_dependencies(iclforge-tests iclforge-iamf-seed-tool)
 endif()
 
 # iec61937/test_iec61937_ac4.cpp reads std::getenv, for the census directory it packs - the C4996

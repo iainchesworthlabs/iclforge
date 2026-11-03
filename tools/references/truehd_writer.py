@@ -926,6 +926,46 @@ def case_ch_assign_changes():
     )
 
 
+def case_ch_assign_cycle():
+    """A ch_assign that is a six-cycle: every matrix channel goes to another output position, and
+    the assignment is not its own inverse, so the two readings of the field (ERRATA 42: output p
+    takes the matrix channel m with ch_assign[m] == p, or the matrix channel ch_assign[p]) decode it
+    to different channels. The identity and a swap, which most of the streams carry, are their own
+    inverses; hb_output_shift_permuted has a three-cycle but ties it to output shifts. Nothing else
+    here: no matrix and no shift, so that a change of reading is the only way to get other samples.
+    The shape is the one FFmpeg's encoder writes for 5.1, a substream of two channels and one of six
+    (the six-channel substream alone is a stream FFmpeg 8.0.1 refuses, as it does the other
+    hand-built streams of more than two channels in the first substream: see the manifest)."""
+    n = 40 * 24
+    assign = [1, 2, 3, 4, 5, 0]  # matrix channel m goes to output position assign[m]
+    wanted = [tone(n, 140 + p, 2**21) for p in range(6)]  # by output position
+    coded = {m: wanted[position] for m, position in enumerate(assign)}  # by matrix channel
+    channels = {m: Channel(huff_type=m % 4) for m in range(6)}
+    stereo = Substream(
+        0,
+        1,
+        1,
+        {m: channels[m] for m in range(2)},
+        list(zip(coded[0], coded[1], strict=True)),
+        {m: coded[m] for m in range(2)},
+    )
+    six = Substream(
+        2,
+        5,
+        5,
+        {m: channels[m] for m in range(2, 6)},
+        list(zip(*wanted, strict=True)),
+        {m: coded[m] for m in range(2, 6)},
+        ch_assign=assign,
+    )
+    return (
+        Stream([stereo, six], n),
+        "ch_assign [1, 2, 3, 4, 5, 0], a six-cycle, "
+        "in a substream of six channels after one of two",
+        ["ch_assign", "ch_assign_cycle", "substreams_2"],
+    )
+
+
 def case_output_shift_negative():
     """A negative output shift is valid and scales the output down by an arithmetic right shift
     (TH spec 8.2.1): the coded values are the output shifted up, with low bits that the shift
@@ -1177,6 +1217,7 @@ CASES = {
     "hb_iir_state": case_iir_state,
     "hb_output_shift_permuted": case_output_shift_permuted,
     "hb_ch_assign_changes": case_ch_assign_changes,
+    "hb_ch_assign_cycle": case_ch_assign_cycle,
     "hb_output_shift_negative": case_output_shift_negative,
     "hb_mlp_word16": case_mlp_word16,
     "hb_noise_generator_0": case_noise,

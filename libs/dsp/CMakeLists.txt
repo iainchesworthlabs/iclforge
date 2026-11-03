@@ -22,6 +22,7 @@ iclforge_add_library(dsp
         src/fft.cpp
         src/qmf.cpp
         src/resampler.cpp
+        src/stream_resampler.cpp
         src/tiered/resampler.cpp
     DEPENDS base
     PRIVATE_INCLUDES

@@ -1471,6 +1471,17 @@ std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std
                                                     const TrackFn& on_track,
                                                     const Reader::SampleFn& on_sample,
                                                     const ReadOptions& options) {
+    return demux_seekable_at(
+        read_at, size, on_track,
+        [&on_sample](std::span<const std::byte> sample, std::uint64_t) { on_sample(sample); },
+        options);
+}
+
+std::expected<ReadTrack, DemuxError> demux_seekable_at(const ReadAtFn& read_at,
+                                                       std::uint64_t size, const TrackFn& on_track,
+                                                       const SampleAtFn& on_sample,
+                                                       const ReadOptions& options,
+                                                       std::vector<SkippedTrack>* skipped) {
     detail::ReaderState s;
     s.options = options;
 
@@ -1481,6 +1492,9 @@ std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std
     const auto verdict = finish_verdict(s);
     if (!verdict.has_value()) {
         return std::unexpected(verdict.error());
+    }
+    if (skipped != nullptr) {
+        *skipped = s.skipped;
     }
     if (on_track) {
         on_track(s.track);
@@ -1502,7 +1516,7 @@ std::expected<ReadTrack, DemuxError> demux_seekable(const ReadAtFn& read_at, std
         if (read_at(ref.offset, sample) != ref.size) {
             break;
         }
-        on_sample(sample);
+        on_sample(sample, ref.offset);
         ++s.samples_read;
     }
     return s.track;

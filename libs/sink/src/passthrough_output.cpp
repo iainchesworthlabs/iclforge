@@ -36,6 +36,7 @@ namespace ac = sendspin::player;
         case ac::DataType::kEac3:
             return std::uint16_t{0x0015};
         case ac::DataType::kAc4:
+        case ac::DataType::kTruehd:  // access units, not IEC 61937 bursts: this output does not take them
             break;
     }
     return std::nullopt;

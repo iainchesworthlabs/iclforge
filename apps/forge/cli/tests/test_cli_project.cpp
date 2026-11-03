@@ -236,3 +236,51 @@ TEST_CASE("forge project says what is wrong with a file that is not a project",
     CHECK(run_cli("project " + quoted(gone), log) == 2);
     CHECK(read_bytes(log).find("was not found") != std::string::npos);
 }
+
+TEST_CASE("forge project of a TrueHD project runs truehd-encode, and the stream decodes to the WAV",
+          "[cli][project][truehd]") {
+    const auto dir = scratch_dir();
+    // A real WAV: the example's own backing track, which the encode of the karaoke example reads.
+    const fs::path wav = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts" / "backing.wav";
+    const auto project = dir / "lossless.forgeproj";
+    {
+        std::ofstream out{project, std::ios::binary | std::ios::trunc};
+        out << R"({
+  "format": "iclforge-project",
+  "version": 1,
+  "sources": [{"path": ")" << wav.generic_string() << R"("}],
+  "encode": {"codec": "truehd", "container": "elementary", "bitrateKbps": 448,
+             "truehd": {"verify": true}}
+})";
+    }
+    const auto result = dir / "lossless.thd";
+    fs::remove(result);
+    const auto log = dir / "lossless.log";
+    SECTION("print shows the command and runs nothing") {
+        REQUIRE(run_cli("project " + quoted(project) + " " + quoted(result) + " print", log) == 0);
+        const std::string text = read_bytes(log);
+        INFO(text);
+        CHECK(text.rfind("forge truehd-encode ", 0) == 0);
+        CHECK(text.find(" verify") != std::string::npos);
+        CHECK_FALSE(fs::exists(result));
+    }
+    SECTION("run writes a TrueHD stream that decodes") {
+        REQUIRE(run_cli("project " + quoted(project), log) == 0);
+        INFO(read_bytes(log));
+        REQUIRE(fs::exists(result));
+        const auto decoded = dir / "lossless_decoded.wav";
+        REQUIRE(run_cli("decode " + quoted(result) + " " + quoted(decoded), log) == 0);
+        CHECK(fs::file_size(decoded) > 1000);
+    }
+    SECTION("what a lossless encode does not have is refused, with words") {
+        const auto bad = dir / "bad.forgeproj";
+        {
+            std::ofstream out{bad, std::ios::binary | std::ios::trunc};
+            out << R"({"format": "iclforge-project", "version": 1,
+  "sources": [{"path": ")" << wav.generic_string() << R"("}],
+  "encode": {"codec": "truehd", "container": "fmp4"}})";
+        }
+        CHECK(run_cli("project " + quoted(bad) + " " + quoted(dir / "bad_out") + " print", log) != 0);
+        CHECK(read_bytes(log).find("fragmented MP4") != std::string::npos);
+    }
+}

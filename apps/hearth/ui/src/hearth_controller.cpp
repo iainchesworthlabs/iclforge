@@ -1012,6 +1012,29 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     return iclforge::truehd::Presentation::kBest;
 }
 
+// iclforge::hearth::TrackPreference as the Decoder page's TrueHD tab names it.
+[[nodiscard]] QString track_preference_name(iclforge::hearth::TrackPreference track) {
+    switch (track) {
+        case iclforge::hearth::TrackPreference::kBest:
+            return QStringLiteral("truehd");
+        case iclforge::hearth::TrackPreference::kCompressed:
+            return QStringLiteral("compressed");
+        case iclforge::hearth::TrackPreference::kAutomatic:
+        default:
+            return QStringLiteral("automatic");
+    }
+}
+
+[[nodiscard]] iclforge::hearth::TrackPreference track_preference_from_name(const QString& name) {
+    if (name == QLatin1String("truehd")) {
+        return iclforge::hearth::TrackPreference::kBest;
+    }
+    if (name == QLatin1String("compressed")) {
+        return iclforge::hearth::TrackPreference::kCompressed;
+    }
+    return iclforge::hearth::TrackPreference::kAutomatic;
+}
+
 [[nodiscard]] QString dual_mono_name(iclforge::hearth::DualMonoChoice choice) {
     switch (choice) {
         case iclforge::hearth::DualMonoChoice::kFirst:
@@ -1217,6 +1240,8 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     // TrueHD and MLP's own (DecoderTruehd.qml).
     map[QStringLiteral("truehdPresentation")] = truehd_presentation_name(settings.truehd.presentation);
     map[QStringLiteral("truehdLenient")] = settings.truehd.lenient;
+    // Which track of a file with several plays (DecoderTruehd.qml).
+    map[QStringLiteral("track")] = track_preference_name(settings.track);
     return map;
 }
 
@@ -1333,6 +1358,9 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     }
     if (map.contains(QStringLiteral("truehdLenient"))) {
         out.truehd.lenient = map[QStringLiteral("truehdLenient")].toBool();
+    }
+    if (map.contains(QStringLiteral("track"))) {
+        out.track = track_preference_from_name(map[QStringLiteral("track")].toString());
     }
     return out;
 }

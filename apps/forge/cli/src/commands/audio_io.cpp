@@ -23,7 +23,9 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "truehd.hpp"
+#include "truehd_encode_core.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/audio/capture.hpp"
@@ -232,8 +234,121 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
 
 }  // namespace
 
+// `record ... codec=truehd`: a lossless take of what the device hears, held as PCM for the length of
+// the take and coded when it ends (a TrueHD encode is not frame by frame as AC-3's is, and a take
+// is seconds), written as a bare .thd. The channels are the device's, in its order, and the stream
+// carries as many as the device has (one to eight); the rate is the device's, which TrueHD takes at
+// 44.1, 48, 88.2, 96, 176.4 and 192 kHz (planning/truehd-parity-forge.md, row P7).
+// What a TrueHD take refuses is refused before a device is asked for: the options it does not
+// apply, an output that is not a .thd, a take of no seconds.
+int check_truehd_take(std::string_view out_path, std::uint32_t seconds, const Options& meta) {
+    if (const int refused =
+            check_options_applied(meta, {"codec=truehd", "watchdog=", "device="});
+        refused != kExitOk) {
+        return refused;
+    }
+    if (!is_stdio_path(out_path) && !out_path.ends_with(".thd")) {
+        fmt::println(stderr,
+                     "error: record codec=truehd writes a bare stream: name the output .thd "
+                     "(got '{}')",
+                     out_path);
+        return kExitUsage;
+    }
+    if (seconds == 0) {
+        fmt::println(stderr, "error: a take of no seconds has nothing to code");
+        return kExitUsage;
+    }
+    return kExitOk;
+}
+
+int record_truehd(std::string_view out_path, std::uint32_t seconds, const auto& device,
+                  const Options& meta) {
+    (void)meta;  // its options were checked before a device was asked for (check_truehd_take)
+    iclforge::audio::Capture capture;
+    const auto started = capture.start(device.id, device.kind);
+    if (!started.has_value()) {
+        fmt::println(stderr, "error: {}", iclforge::audio::describe(started.error()));
+        return kExitUnavailable;
+    }
+    const auto channels = static_cast<std::size_t>(capture.channels());
+    const auto rate = static_cast<std::uint32_t>(capture.sample_rate());
+    if (channels < 1 || channels > 8) {
+        fmt::println(stderr, "error: the device has {} channels; TrueHD takes one to eight", channels);
+        return kExitUsage;
+    }
+    if (rate != 44100 && rate != 48000 && rate != 88200 && rate != 96000 && rate != 176400 &&
+        rate != 192000) {
+        fmt::println(stderr, "error: the device runs at {} Hz; TrueHD takes 44.1, 48, 88.2, 96, 176.4 or 192 kHz",
+                     rate);
+        return kExitUsage;
+    }
+    const std::size_t total = static_cast<std::size_t>(seconds) * rate;
+    iclforge::ac3::io::WavData wav;
+    wav.sample_rate = rate;
+    wav.channels.resize(channels);
+    for (auto& plane : wav.channels) {
+        plane.reserve(total);
+    }
+    std::vector<float> block(channels * 1024);
+    auto silent_since = std::chrono::steady_clock::now();
+    while (wav.channels[0].size() < total) {
+        const std::size_t want = std::min<std::size_t>(1024, total - wav.channels[0].size());
+        const auto got =
+            capture.buffer()->read(std::span<float>(block).first(want * channels));
+        if (got == 0) {
+            if (std::chrono::steady_clock::now() - silent_since > std::chrono::seconds(3)) {
+                fmt::println(stderr, "error: the device stopped delivering audio ({})",
+                             kOutputGoneReasons);
+                return kExitRuntime;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            continue;
+        }
+        silent_since = std::chrono::steady_clock::now();
+        const std::size_t whole = got / channels;
+        for (std::size_t f = 0; f < whole; ++f) {
+            for (std::size_t c = 0; c < channels; ++c) {
+                wav.channels[c].push_back(block[f * channels + c]);
+            }
+        }
+    }
+    capture.stop();
+    const auto layout = iclforge::apps::truehd_encode::layout_of(wav);
+    if (!layout) {
+        fmt::println(stderr, "error: {}", layout.error());
+        return kExitInternal;
+    }
+    const auto outcome = iclforge::apps::truehd_encode::encode_wav(
+        wav, *layout, iclforge::truehd::EncoderConfig{});
+    if (!outcome) {
+        fmt::println(stderr, "error: truehd: {}{}{}",
+                     iclforge::truehd::to_string(outcome.error().error.kind),
+                     outcome.error().error.detail.empty() ? "" : ": ", outcome.error().error.detail);
+        return kExitUsage;
+    }
+    EncodedStreamSink sink;
+    if (!sink.open(out_path, /*keep_partial=*/false)) {
+        return kExitOutput;
+    }
+    if (!sink.push(std::span<const std::byte>(outcome->stream)) || !sink.close()) {
+        sink.abort();
+        return kExitOutput;
+    }
+    status_println(status_stream(out_path),
+                   "recorded {} s from \"{}\" ({} channel(s) at {} Hz): {} access units, {} bytes "
+                   "to {}",
+                   seconds, device.name, channels, rate, outcome->access_units,
+                   outcome->stream.size(), out_path);
+    return kExitOk;
+}
+
 int run_record(std::string_view out_path, std::uint32_t seconds, std::uint32_t bitrate,
                int device_index, const Options& meta) {
+    if (meta.take_truehd) {
+        if (const int refused = check_truehd_take(out_path, seconds, meta); refused != kExitOk) {
+            return refused;
+        }
+    }
     const auto devices = iclforge::audio::enumerate_devices();
     if (!devices.has_value()) {
         fmt::println(stderr, "error: {}", iclforge::audio::describe(devices.error()));
@@ -250,6 +365,9 @@ int run_record(std::string_view out_path, std::uint32_t seconds, std::uint32_t b
     }
     const auto& device = (*devices)[static_cast<std::size_t>(device_index)];
 
+    if (meta.take_truehd) {
+        return record_truehd(out_path, seconds, device, meta);
+    }
     iclforge::ac3::SampleRate sr{};
     bool encodable_rate = true;
     switch (device.sample_rate) {

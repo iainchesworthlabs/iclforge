@@ -55,13 +55,15 @@ std::string_view describe(ChunkError error) {
         case ChunkError::kReservedBits:
             return "an AC-3 or E-AC-3 burst with Pc bits 5 or 6 set";
         case ChunkError::kUnknownDataType:
-            return "a burst whose data type is none of AC-3, E-AC-3 and AC-4";
+            return "a burst whose data type is none of AC-3, E-AC-3, AC-4 and TrueHD";
         case ChunkError::kLengthMismatch:
             return "a burst whose Pd, or AC-4 frame size, disagrees with its payload";
         case ChunkError::kPayloadTooLarge:
             return "a burst payload larger than its data type allows";
         case ChunkError::kNoSyncword:
             return "a burst payload that does not start with a syncframe";
+        case ChunkError::kNotWholeUnits:
+            return "a TrueHD burst payload that is not 1 to 24 whole access units";
     }
     return "unknown error";
 }
@@ -101,6 +103,24 @@ bool write_player_chunk_header(std::span<std::uint8_t> out, std::int64_t timesta
     return true;
 }
 
+std::optional<std::size_t> count_truehd_units(std::span<const std::uint8_t> payload) {
+    std::size_t at = 0;
+    std::size_t count = 0;
+    while (at < payload.size()) {
+        if (payload.size() - at < 4) {
+            return std::nullopt;
+        }
+        const std::size_t words = (static_cast<std::size_t>(payload[at] & 0x0FU) << 8U) | payload[at + 1];
+        const std::size_t size = words * 2;
+        if (size < 4 || size > payload.size() - at) {
+            return std::nullopt;
+        }
+        at += size;
+        ++count;
+    }
+    return count == 0 ? std::nullopt : std::optional<std::size_t>{count};
+}
+
 std::expected<BurstChunk, ChunkError> parse_burst_chunk(std::span<const std::uint8_t> message) {
     if (message.empty() || message.front() != message_id::kIclforgeBurst) {
         return std::unexpected(message.empty() ? ChunkError::kTooShort : ChunkError::kWrongId);
@@ -122,7 +142,8 @@ std::expected<BurstChunk, ChunkError> parse_burst_chunk(std::span<const std::uin
         return std::unexpected(ChunkError::kReservedBits);
     }
     if (!ac4 && conventional != static_cast<std::uint16_t>(BurstDataType::kAc3) &&
-        conventional != static_cast<std::uint16_t>(BurstDataType::kEac3)) {
+        conventional != static_cast<std::uint16_t>(BurstDataType::kEac3) &&
+        conventional != static_cast<std::uint16_t>(BurstDataType::kTruehd)) {
         return std::unexpected(ChunkError::kUnknownDataType);
     }
     const BurstDataType type = burst.data_type();
@@ -133,6 +154,15 @@ std::expected<BurstChunk, ChunkError> parse_burst_chunk(std::span<const std::uin
     if (burst.pd != burst_length_code(type, payload.size()) ||
         (type == BurstDataType::kAc4Hbr16 && payload.size() % 8 != 0)) {
         return std::unexpected(ChunkError::kLengthMismatch);
+    }
+    if (type == BurstDataType::kTruehd) {
+        // Whole access units, one to a chunk's 24: a sink joins at one, and what the burst holds
+        // is counted in them.
+        const std::optional<std::size_t> units = count_truehd_units(payload);
+        if (!units || *units > kTruehdUnitsPerChunk) {
+            return std::unexpected(ChunkError::kNotWholeUnits);
+        }
+        return burst;
     }
     if (!ac4) {
         if (payload.size() < 2 || payload[0] != 0x0B || payload[1] != 0x77) {

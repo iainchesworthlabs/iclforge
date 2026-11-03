@@ -119,77 +119,82 @@
 <context>
     <name>CrucibleController</name>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="115"/>
+        <location filename="../../src/crucible_controller.cpp" line="117"/>
         <source>Atmos</source>
         <translation>Atmos</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="116"/>
+        <location filename="../../src/crucible_controller.cpp" line="118"/>
         <source>Dolby Digital Plus 5.1</source>
         <translation>Dolby Digital Plus 5.1</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="117"/>
+        <location filename="../../src/crucible_controller.cpp" line="119"/>
         <source>Dolby Digital 5.1</source>
         <translation>Dolby Digital 5.1</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="118"/>
+        <location filename="../../src/crucible_controller.cpp" line="120"/>
+        <source>TrueHD 5.1</source>
+        <translation>TrueHD 5.1</translation>
+    </message>
+    <message>
+        <location filename="../../src/crucible_controller.cpp" line="121"/>
         <source>PCM surround</source>
         <translation>Surround PCM</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="119"/>
+        <location filename="../../src/crucible_controller.cpp" line="122"/>
         <source>Headphones</source>
         <translation>Auriculares</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="120"/>
+        <location filename="../../src/crucible_controller.cpp" line="123"/>
         <source>Stereo</source>
         <translation>Estéreo</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="121"/>
+        <location filename="../../src/crucible_controller.cpp" line="124"/>
         <source>No output</source>
         <translation>Sin salida</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="770"/>
+        <location filename="../../src/crucible_controller.cpp" line="774"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>Esta compilación no lleva ningún archivo de avisos incrustado (:/notices/NOTICES.txt no se compiló); el NOTICES.txt que está junto a la aplicación y el LICENSE del repositorio indican lo que se distribuye.</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1265"/>
+        <location filename="../../src/crucible_controller.cpp" line="1269"/>
         <source>saved to %1</source>
         <translation>guardado en %1</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1268"/>
+        <location filename="../../src/crucible_controller.cpp" line="1272"/>
         <source>could not write %1: %2</source>
         <translation>no se pudo escribir %1: %2</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1056"/>
+        <location filename="../../src/crucible_controller.cpp" line="1060"/>
         <source>installing, answer the elevation prompt ...</source>
         <translation>instalando, responda a la solicitud de elevación…</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1071"/>
+        <location filename="../../src/crucible_controller.cpp" line="1075"/>
         <source>removing, answer the elevation prompt ...</source>
         <translation>quitando, responda a la solicitud de elevación…</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1091"/>
+        <location filename="../../src/crucible_controller.cpp" line="1095"/>
         <source>installed</source>
         <translation>instalado</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1091"/>
+        <location filename="../../src/crucible_controller.cpp" line="1095"/>
         <source>removed</source>
         <translation>quitado</translation>
     </message>
     <message>
-        <location filename="../../src/crucible_controller.cpp" line="1095"/>
+        <location filename="../../src/crucible_controller.cpp" line="1099"/>
         <source>%1 failed (exit code %2)</source>
         <translation>%1 falló (código de salida %2)</translation>
     </message>
@@ -660,61 +665,66 @@
     </message>
     <message>
         <location filename="../qml/Main.qml" line="462"/>
+        <source>TrueHD 5.1</source>
+        <translation>TrueHD 5.1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Main.qml" line="463"/>
         <source>PCM surround</source>
         <translation>Surround PCM</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="469"/>
+        <location filename="../qml/Main.qml" line="470"/>
         <source>Headphones</source>
         <translation>Auriculares</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="470"/>
+        <location filename="../qml/Main.qml" line="471"/>
         <source>Stereo</source>
         <translation>Estéreo</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="474"/>
+        <location filename="../qml/Main.qml" line="475"/>
         <source>Default output: %1</source>
         <translation>Salida predeterminada: %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="475"/>
+        <location filename="../qml/Main.qml" line="476"/>
         <source>Move default output to %1</source>
         <translation>Mover la salida predeterminada a %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="480"/>
+        <location filename="../qml/Main.qml" line="481"/>
         <source>previous default output</source>
         <translation>la salida predeterminada anterior</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="480"/>
+        <location filename="../qml/Main.qml" line="481"/>
         <source>Restore %1</source>
         <translation>Restaurar %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="485"/>
+        <location filename="../qml/Main.qml" line="486"/>
         <source>Objects on · key loaded</source>
         <translation>Objetos activados · clave cargada</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="485"/>
+        <location filename="../qml/Main.qml" line="486"/>
         <source>Objects off · no key</source>
         <translation>Objetos desactivados · sin clave</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="486"/>
+        <location filename="../qml/Main.qml" line="487"/>
         <source>Settings…</source>
         <translation>Ajustes…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="487"/>
+        <location filename="../qml/Main.qml" line="488"/>
         <source>About…</source>
         <translation>Acerca de…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="489"/>
+        <location filename="../qml/Main.qml" line="490"/>
         <source>Quit</source>
         <translation>Salir</translation>
     </message>
@@ -722,305 +732,330 @@
 <context>
     <name>OutputPage</name>
     <message>
-        <location filename="../qml/OutputPage.qml" line="41"/>
+        <location filename="../qml/OutputPage.qml" line="42"/>
         <source>SIGNAL PATH</source>
         <translation>RUTA DE LA SEÑAL</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="44"/>
+        <location filename="../qml/OutputPage.qml" line="45"/>
         <source>two devices, two stages: applications play into one, you hear the result on the other</source>
         <translation>dos dispositivos, dos etapas: las aplicaciones suenan en uno, el resultado se oye en el otro</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="59"/>
+        <location filename="../qml/OutputPage.qml" line="60"/>
         <source>WHAT YOU HEAR IT AS</source>
         <translation>CÓMO LO OYES</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="48"/>
+        <location filename="../qml/OutputPage.qml" line="49"/>
         <source>Every application plays into the system default output. With the silent &quot;%1&quot; device as that default, nothing is heard from it; this app taps each application there, places it in the room, encodes the scene, and sends the result to the endpoint the pin and the hardware choose. That endpoint is the only thing you hear.</source>
         <translation>Cada aplicación reproduce en la salida predeterminada del sistema. Con el dispositivo silencioso &quot;%1&quot; como esa predeterminada, no se oye nada de él; esta aplicación toma allí cada aplicación, la coloca en la sala, codifica la escena y envía el resultado al punto de salida que eligen la fijación y el hardware. Ese punto de salida es lo único que oyes.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="70"/>
+        <location filename="../qml/OutputPage.qml" line="71"/>
         <source>%1 · E-AC-3 JOC over HDMI</source>
         <translation>%1 · E-AC-3 JOC por HDMI</translation>
     </message>
     <message>
         <location filename="../qml/OutputPage.qml" line="71"/>
+        <source>%1 · lossless bed in MAT over HDMI, no objects</source>
+        <translation>%1 · cama sin pérdidas en MAT por HDMI, sin objetos</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="72"/>
         <source>%1 The endpoint follows the hardware: pull HDMI and it moves to the next best one below.</source>
         <translation>%1 El punto de salida sigue al hardware: desconecta HDMI y pasa al siguiente mejor de abajo.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="79"/>
+        <location filename="../qml/OutputPage.qml" line="80"/>
         <source>PIN</source>
         <extracomment>Kicker over the pin control (the verb: pin the stream to this mode)</extracomment>
         <translation>FIJAR</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="85"/>
+        <location filename="../qml/OutputPage.qml" line="86"/>
         <source>Pin</source>
         <translation>Fijar</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="102"/>
+        <location filename="../qml/OutputPage.qml" line="103"/>
         <source>Automatic · best the hardware can carry</source>
         <translation>Automático · lo mejor que admite el hardware</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="103"/>
+        <location filename="../qml/OutputPage.qml" line="104"/>
         <source>Atmos</source>
         <translation>Atmos</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="104"/>
+        <location filename="../qml/OutputPage.qml" line="105"/>
         <source>Dolby Digital Plus 5.1</source>
         <translation>Dolby Digital Plus 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="105"/>
+        <location filename="../qml/OutputPage.qml" line="106"/>
         <source>Dolby Digital 5.1</source>
         <translation>Dolby Digital 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="106"/>
+        <location filename="../qml/OutputPage.qml" line="107"/>
+        <source>TrueHD 5.1</source>
+        <translation>TrueHD 5.1</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="108"/>
         <source>PCM surround</source>
         <translation>Surround PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="107"/>
+        <location filename="../qml/OutputPage.qml" line="109"/>
         <source>Headphones · spatial sound</source>
         <translation>Auriculares · sonido espacial</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="164"/>
+        <location filename="../qml/OutputPage.qml" line="166"/>
         <source>What the probe found on each render endpoint. &quot;Hear it here&quot; chooses one: it gets the best mode it can carry, the pin when it can, and &quot;Automatic&quot; hands the choice back (the best endpoint for the best mode, a receiver first). &quot;Send applications here&quot; is the other stage, the system default: on a real device you would hear every application directly, so the silent device is the one to send them to.</source>
         <translation>Lo que la sonda encontró en cada punto de salida de reproducción. &quot;Oírlo aquí&quot; elige uno: recibe el mejor modo que puede transportar, y la fijación cuando puede; &quot;Automático&quot; devuelve la elección (el mejor punto de salida para el mejor modo, primero un receptor). &quot;Enviar aquí las aplicaciones&quot; es la otra etapa, la predeterminada del sistema: en un dispositivo real oirías cada aplicación directamente, así que el dispositivo silencioso es al que hay que enviarlas.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="176"/>
+        <location filename="../qml/OutputPage.qml" line="178"/>
         <source>Endpoints</source>
         <translation>Puntos de salida</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="211"/>
+        <location filename="../qml/OutputPage.qml" line="193"/>
+        <source>TRUEHD</source>
+        <translation>TRUEHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="215"/>
         <source>no E-AC-3</source>
         <translation>sin E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="212"/>
+        <location filename="../qml/OutputPage.qml" line="216"/>
         <source>no AC-3</source>
         <translation>sin AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="213"/>
+        <location filename="../qml/OutputPage.qml" line="217"/>
+        <source>TrueHD</source>
+        <translation>TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="217"/>
+        <source>no TrueHD</source>
+        <translation>sin TrueHD</translation>
+    </message>
+    <message>
+        <location filename="../qml/OutputPage.qml" line="218"/>
         <source>%1 PCM channels</source>
         <translation>%1 canales PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="213"/>
+        <location filename="../qml/OutputPage.qml" line="218"/>
         <source>no PCM</source>
         <translation>sin PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="214"/>
+        <location filename="../qml/OutputPage.qml" line="219"/>
         <source>spatial</source>
         <translation>espacial</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="275"/>
+        <location filename="../qml/OutputPage.qml" line="281"/>
         <source>the silent device · applications play here · never heard</source>
         <translation>el dispositivo silencioso · las aplicaciones reproducen aquí · nunca se oye</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="276"/>
+        <location filename="../qml/OutputPage.qml" line="282"/>
         <source>the silent device · never heard</source>
         <translation>el dispositivo silencioso · nunca se oye</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="321"/>
+        <location filename="../qml/OutputPage.qml" line="328"/>
         <source>Applications play to &lt;b&gt;%1&lt;/b&gt;, the system default output and the silent device: nothing is heard from it, and this app taps each application there.</source>
         <translation>Las aplicaciones reproducen en &lt;b&gt;%1&lt;/b&gt;, la salida predeterminada del sistema y el dispositivo silencioso: no se oye nada de él, y esta aplicación toma allí cada aplicación.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="108"/>
+        <location filename="../qml/OutputPage.qml" line="110"/>
         <source>Stereo</source>
         <translation>Estéreo</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="137"/>
+        <location filename="../qml/OutputPage.qml" line="139"/>
         <source>A pin holds as long as some endpoint can carry it, then falls back and says why.</source>
         <translation>Una fijación se mantiene mientras algún punto final pueda llevarla; luego retrocede y explica por qué.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="147"/>
+        <location filename="../qml/OutputPage.qml" line="149"/>
         <source>No headphones entry here — %1.</source>
         <translation>Aquí no hay entrada de auriculares — %1.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="158"/>
+        <location filename="../qml/OutputPage.qml" line="160"/>
         <source>ENDPOINTS · WHERE YOU CAN HEAR IT</source>
         <translation>PUNTOS DE SALIDA · DÓNDE PUEDES OÍRLO</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="251"/>
+        <location filename="../qml/OutputPage.qml" line="257"/>
         <source>Automatic</source>
         <translation>Automático</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="251"/>
+        <location filename="../qml/OutputPage.qml" line="257"/>
         <source>Hear it here</source>
         <translation>Oírlo aquí</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="261"/>
+        <location filename="../qml/OutputPage.qml" line="267"/>
         <source>Applications play here</source>
         <translation>Las aplicaciones suenan aquí</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="261"/>
+        <location filename="../qml/OutputPage.qml" line="267"/>
         <source>Send applications here</source>
         <translation>Enviar las aplicaciones aquí</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="273"/>
+        <location filename="../qml/OutputPage.qml" line="279"/>
         <source>your choice, but it cannot be used: see the reason above</source>
         <translation>tu elección, pero no se puede usar: mira el motivo arriba</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="277"/>
+        <location filename="../qml/OutputPage.qml" line="283"/>
         <source>applications play here · a real device, so heard directly</source>
         <translation>las aplicaciones suenan aquí · un dispositivo real, así que se oye directamente</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="313"/>
+        <location filename="../qml/OutputPage.qml" line="320"/>
         <source>WHERE APPLICATIONS PLAY</source>
         <translation>DÓNDE SUENAN LAS APLICACIONES</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="322"/>
+        <location filename="../qml/OutputPage.qml" line="329"/>
         <source>nothing</source>
         <translation>nada</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="322"/>
+        <location filename="../qml/OutputPage.qml" line="329"/>
         <source>Applications play to &lt;b&gt;%1&lt;/b&gt;, the system default output, which is a real device: you hear each application directly as well as through this app, and a receiver on it cannot be opened exclusively while they do.</source>
         <translation>Las aplicaciones reproducen en &lt;b&gt;%1&lt;/b&gt;, la salida predeterminada del sistema, que es un dispositivo real: oyes cada aplicación directamente además de a través de esta aplicación, y un receptor conectado a él no se puede abrir en modo exclusivo mientras eso ocurre.</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="331"/>
+        <location filename="../qml/OutputPage.qml" line="338"/>
         <source>Restore %1</source>
         <translation>Restaurar %1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="331"/>
+        <location filename="../qml/OutputPage.qml" line="338"/>
         <source>the previous output</source>
         <translation>la salida anterior</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="331"/>
+        <location filename="../qml/OutputPage.qml" line="338"/>
         <source>Send applications to %1</source>
         <translation>Enviar las aplicaciones a %1</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="160"/>
+        <location filename="../qml/OutputPage.qml" line="162"/>
         <source>re-probed on every device change</source>
         <translation>re-sondeado en cada cambio de dispositivo</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="187"/>
+        <location filename="../qml/OutputPage.qml" line="189"/>
         <source>ENDPOINT</source>
         <translation>PUNTO FINAL</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="188"/>
-        <location filename="../qml/OutputPage.qml" line="211"/>
+        <location filename="../qml/OutputPage.qml" line="190"/>
+        <location filename="../qml/OutputPage.qml" line="215"/>
         <source>E-AC-3</source>
         <translation>E-AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="189"/>
-        <location filename="../qml/OutputPage.qml" line="212"/>
+        <location filename="../qml/OutputPage.qml" line="191"/>
+        <location filename="../qml/OutputPage.qml" line="216"/>
         <source>AC-3</source>
         <translation>AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="191"/>
+        <location filename="../qml/OutputPage.qml" line="195"/>
         <source>PCM CH</source>
         <translation>CAN. PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="193"/>
+        <location filename="../qml/OutputPage.qml" line="197"/>
         <source>SPATIAL</source>
         <translation>ESPACIAL</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="194"/>
+        <location filename="../qml/OutputPage.qml" line="198"/>
         <source>NOTE</source>
         <translation>NOTA</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="278"/>
+        <location filename="../qml/OutputPage.qml" line="284"/>
         <source>spatial sound on · headphones fallback</source>
         <translation>sonido espacial activado · alternativa de auriculares</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="279"/>
+        <location filename="../qml/OutputPage.qml" line="285"/>
         <source>surround PCM fallback</source>
         <translation>alternativa surround PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="279"/>
+        <location filename="../qml/OutputPage.qml" line="285"/>
         <source>stereo fallback</source>
         <translation>alternativa estéreo</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="285"/>
+        <location filename="../qml/OutputPage.qml" line="292"/>
         <source>you hear it here · your choice · exclusive mode</source>
         <translation>lo oyes aquí · tu elección · modo exclusivo</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="286"/>
+        <location filename="../qml/OutputPage.qml" line="293"/>
         <source>you hear it here · your choice</source>
         <translation>lo oyes aquí · tu elección</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="288"/>
+        <location filename="../qml/OutputPage.qml" line="295"/>
         <source>you hear it here · automatic · exclusive mode</source>
         <translation>lo oyes aquí · automático · modo exclusivo</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="289"/>
+        <location filename="../qml/OutputPage.qml" line="296"/>
         <source>you hear it here · automatic</source>
         <translation>lo oyes aquí · automático</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="296"/>
+        <location filename="../qml/OutputPage.qml" line="303"/>
         <source>no render endpoints probed yet</source>
         <translation>aún no se han sondeado puntos finales de renderizado</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="335"/>
+        <location filename="../qml/OutputPage.qml" line="342"/>
         <source>Open Sound settings</source>
         <translation>Abrir la configuración de sonido</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="336"/>
+        <location filename="../qml/OutputPage.qml" line="343"/>
         <source>Re-probe</source>
         <translation>Re-sondear</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="347"/>
+        <location filename="../qml/OutputPage.qml" line="354"/>
         <source>CODEC PATH</source>
         <translation>RUTA DEL CÓDEC</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="352"/>
+        <location filename="../qml/OutputPage.qml" line="359"/>
         <source>Bypass the codec on headphones and PCM</source>
         <translation>Omitir el códec en auriculares y PCM</translation>
     </message>
     <message>
-        <location filename="../qml/OutputPage.qml" line="353"/>
+        <location filename="../qml/OutputPage.qml" line="360"/>
         <source>Off: headphones, PCM and stereo play a decode of the E-AC-3 stream, so what you hear went through the codec. On: headphones render the engine&apos;s own objects and PCM and stereo take its 5.1 bed, codec out of the loop.</source>
         <translation>Desactivado: los auriculares, el PCM y el estéreo reproducen una decodificación del flujo E-AC-3, así que lo que oyes pasó por el códec. Activado: los auriculares renderizan los objetos propios del motor y el PCM y el estéreo toman su cama 5.1, códec fuera del bucle.</translation>
     </message>
@@ -1778,202 +1813,212 @@
         <translation>La baja latencia acorta la trama E-AC-3 a un bloque y sube la tasa de bits a unos 1,5 Mb/s para que aún quepan los metadatos de quince objetos. El retardo de decodificación propio del receptor no cambia. Cambiar esto reinicia el flujo.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="333"/>
+        <location filename="../qml/SettingsPage.qml" line="328"/>
+        <source>Not applicable to TrueHD 5.1, which has no short-frame form: its encoder works in intervals of about a tenth of a second and the stream leaves in 20 ms bursts, so it adds that delay before the receiver&apos;s own. It has not been measured end to end.</source>
+        <translation>No se aplica a TrueHD 5.1, que no tiene una forma de trama corta: su codificador trabaja en intervalos de aproximadamente una décima de segundo y el flujo sale en ráfagas de 20 ms, de modo que añade ese retardo antes del propio del receptor. No se ha medido de extremo a extremo.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="334"/>
         <source>CODEC</source>
         <translation>CÓDEC</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="335"/>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="336"/>
+        <location filename="../qml/SettingsPage.qml" line="342"/>
         <source>Bitrate</source>
         <translation>Tasa de bits</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="345"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>automatic</source>
         <translation>automático</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="345"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>256 kb/s</source>
         <translation>256 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="345"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>384 kb/s</source>
         <translation>384 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="346"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>448 kb/s</source>
         <translation>448 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="346"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>640 kb/s</source>
         <translation>640 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="346"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>1024 kb/s</source>
         <translation>1024 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="347"/>
+        <location filename="../qml/SettingsPage.qml" line="348"/>
         <source>1536 kb/s</source>
         <translation>1536 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="347"/>
+        <location filename="../qml/SettingsPage.qml" line="348"/>
         <source>2048 kb/s</source>
         <translation>2048 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="372"/>
+        <location filename="../qml/SettingsPage.qml" line="373"/>
         <source>E-AC-3 · 5.1 bed + up to 15 objects · automatic is 448 kb/s, or 1536 kb/s in low latency</source>
         <translation>E-AC-3 · cama 5.1 + hasta 15 objetos · automático es 448 kb/s, o 1536 kb/s en baja latencia</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="374"/>
+        <location filename="../qml/SettingsPage.qml" line="375"/>
+        <source>Not applicable to TrueHD 5.1. It is lossless from the 24-bit values the mix is rounded to, and its rate follows the music, so there is no bitrate to set.</source>
+        <translation>No se aplica a TrueHD 5.1. Es sin pérdidas a partir de los valores de 24 bits a los que se redondea la mezcla, y su tasa sigue a la música, por lo que no hay tasa de bits que ajustar.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="376"/>
         <source>Split stereo applications into two objects</source>
         <translation>Dividir las aplicaciones estéreo en dos objetos</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="447"/>
+        <location filename="../qml/SettingsPage.qml" line="449"/>
         <source>System follows the language the desktop is set to. The translations are machine-made and have not been read by a speaker.</source>
         <translation>Sistema sigue el idioma configurado en el escritorio. Las traducciones están hechas por una máquina y no las ha leído ningún hablante.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="450"/>
-        <location filename="../qml/SettingsPage.qml" line="457"/>
+        <location filename="../qml/SettingsPage.qml" line="452"/>
+        <location filename="../qml/SettingsPage.qml" line="459"/>
         <source>Text size</source>
         <translation>Tamaño del texto</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="460"/>
+        <location filename="../qml/SettingsPage.qml" line="462"/>
         <source>Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%, so on a desktop whose base size is larger the window starts larger too.</source>
         <translation>Todos los tamaños de la ventana siguen esto; 100 % es el tamaño con el que se dibuja. Sistema toma el tamaño de texto que informa el escritorio y cuenta 9 pt como 100 %, así que en un escritorio cuyo tamaño base sea mayor la ventana también empieza más grande.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="463"/>
-        <location filename="../qml/SettingsPage.qml" line="469"/>
+        <location filename="../qml/SettingsPage.qml" line="465"/>
+        <location filename="../qml/SettingsPage.qml" line="471"/>
         <source>Motion</source>
         <translation>Movimiento</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="466"/>
+        <location filename="../qml/SettingsPage.qml" line="468"/>
         <source>Reduced</source>
         <translation>Reducido</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="467"/>
+        <location filename="../qml/SettingsPage.qml" line="469"/>
         <source>Full</source>
         <translation>Completo</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="472"/>
+        <location filename="../qml/SettingsPage.qml" line="474"/>
         <source>Reduced stops the room&apos;s markers and level bars easing between readings: each shows the latest one at once. System follows the desktop&apos;s own setting for animation.</source>
         <translation>Reducido hace que los marcadores de la sala y las barras de nivel dejen de deslizarse entre lecturas: cada uno muestra la última al instante. Sistema sigue el ajuste de animación del escritorio.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="512"/>
+        <location filename="../qml/SettingsPage.qml" line="514"/>
         <source>Show applications with no audio</source>
         <translation>Mostrar aplicaciones sin audio</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="513"/>
+        <location filename="../qml/SettingsPage.qml" line="515"/>
         <source>Running applications with a window but no audio session, greyed until they play. Off hides them unless they are placed.</source>
         <translation>Aplicaciones en ejecución con ventana pero sin sesión de audio, en gris hasta que reproducen. Desactivado las oculta salvo que estén colocadas.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="519"/>
+        <location filename="../qml/SettingsPage.qml" line="521"/>
         <source>Show background processes in the room</source>
         <translation>Mostrar procesos en segundo plano en la sala</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="520"/>
+        <location filename="../qml/SettingsPage.qml" line="522"/>
         <source>Processes with sound but no window of their own (a virtual machine&apos;s backend, the text-input host). They stay in the bed either way.</source>
         <translation>Procesos con sonido pero sin ventana propia (el motor de una máquina virtual, el host de entrada de texto). Se quedan en la cama de todos modos.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <location filename="../qml/SettingsPage.qml" line="534"/>
         <source>DIAGNOSTICS</source>
         <translation>DIAGNÓSTICO</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="533"/>
+        <location filename="../qml/SettingsPage.qml" line="535"/>
         <source>A text file for a bug report: the version and platform, the engine&apos;s counters, the endpoints the probe found, the two devices of the signal path, this app&apos;s settings and its recent messages. It does not carry the signing key, the path to it, or any environment variable&apos;s value; it does name your audio devices and running applications, so read it before you attach it.</source>
         <translation>Un archivo de texto para un informe de error: la versión y la plataforma, los contadores del motor, los puntos de salida que encontró la sonda, los dos dispositivos de la ruta de la señal, la configuración de esta aplicación y sus mensajes recientes. No lleva la clave de firma, ni la ruta hasta ella, ni el valor de ninguna variable de entorno; sí nombra tus dispositivos de audio y las aplicaciones en marcha, así que léelo antes de adjuntarlo.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <location filename="../qml/SettingsPage.qml" line="539"/>
         <source>Save diagnostics…</source>
         <translation>Guardar el diagnóstico…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="548"/>
+        <location filename="../qml/SettingsPage.qml" line="550"/>
         <source>LYRIC EVENTS OUT</source>
         <translation>EVENTOS DE LETRA (SALIDA)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="552"/>
+        <location filename="../qml/SettingsPage.qml" line="554"/>
         <source>Send the lyric strip&apos;s events over OSC</source>
         <translation>Enviar los eventos de la franja de letra por OSC</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="553"/>
+        <location filename="../qml/SettingsPage.qml" line="555"/>
         <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
         <translation>La línea y la palabra que se canta, como mensajes OSC por UDP, para un equipo de iluminación o control de espectáculos que los siga. Desactivado hasta que lo active.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="560"/>
-        <location filename="../qml/SettingsPage.qml" line="563"/>
+        <location filename="../qml/SettingsPage.qml" line="562"/>
+        <location filename="../qml/SettingsPage.qml" line="565"/>
         <source>Send to</source>
         <translation>Enviar a</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="571"/>
-        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <location filename="../qml/SettingsPage.qml" line="573"/>
+        <location filename="../qml/SettingsPage.qml" line="576"/>
         <source>Port</source>
         <translation>Puerto</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <location filename="../qml/SettingsPage.qml" line="592"/>
         <source>Lines</source>
         <translation>Líneas</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="598"/>
+        <location filename="../qml/SettingsPage.qml" line="600"/>
         <source>Words</source>
         <translation>Palabras</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="606"/>
+        <location filename="../qml/SettingsPage.qml" line="608"/>
         <source>Position, ten times a second</source>
         <translation>Posición, diez veces por segundo</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="612"/>
+        <location filename="../qml/SettingsPage.qml" line="614"/>
         <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
         <translation>Cada mensaje empieza con el nombre de la aplicación. /crucible/lyrics/state dice following, stopped o cleared; /line da el número, el texto y los tiempos de la línea; /word lo mismo para una palabra de una línea con tiempos por palabra; /position el punto de la canción en milisegundos. Los tiempos son milisegundos desde el inicio de la canción.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="622"/>
+        <location filename="../qml/SettingsPage.qml" line="624"/>
         <source>ABOUT</source>
         <translation>ACERCA DE</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="623"/>
+        <location filename="../qml/SettingsPage.qml" line="625"/>
         <source>What this is, the version and build it came from, and the licences it carries.</source>
         <translation>Qué es, la versión y la compilación de la que procede, y las licencias que incluye.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="627"/>
+        <location filename="../qml/SettingsPage.qml" line="629"/>
         <source>About Crucible…</source>
         <translation>Acerca de Crucible…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="374"/>
+        <location filename="../qml/SettingsPage.qml" line="376"/>
         <source>Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application&apos;s row can override it.</source>
         <translation>Cuesta dos ranuras por aplicación; el par se sitúa a ambos lados de la posición colocada, y una aplicación que no consigue dos ranuras libres espera en la cama. Se aplica a las aplicaciones que el motor encuentre a partir de ahora; la fila de cada aplicación puede anularlo.</translation>
     </message>
@@ -2015,44 +2060,44 @@
         <translation>Dispositivo silencioso</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
+        <location filename="../qml/SettingsPage.qml" line="382"/>
         <source>APPEARANCE</source>
         <translation>APARIENCIA</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="382"/>
-        <location filename="../qml/SettingsPage.qml" line="386"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="388"/>
         <source>Theme</source>
         <translation>Tema</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
-        <location filename="../qml/SettingsPage.qml" line="393"/>
-        <location filename="../qml/SettingsPage.qml" line="414"/>
-        <location filename="../qml/SettingsPage.qml" line="455"/>
-        <location filename="../qml/SettingsPage.qml" line="466"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
+        <location filename="../qml/SettingsPage.qml" line="395"/>
+        <location filename="../qml/SettingsPage.qml" line="416"/>
+        <location filename="../qml/SettingsPage.qml" line="457"/>
+        <location filename="../qml/SettingsPage.qml" line="468"/>
         <source>System</source>
         <translation>Sistema</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Light</source>
         <translation>Claro</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Dark</source>
         <translation>Oscuro</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="406"/>
-        <location filename="../qml/SettingsPage.qml" line="410"/>
+        <location filename="../qml/SettingsPage.qml" line="408"/>
+        <location filename="../qml/SettingsPage.qml" line="412"/>
         <source>Language</source>
         <translation>Idioma</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="391"/>
-        <location filename="../qml/SettingsPage.qml" line="401"/>
+        <location filename="../qml/SettingsPage.qml" line="393"/>
+        <location filename="../qml/SettingsPage.qml" line="403"/>
         <source>Palette</source>
         <translation>Paleta</translation>
     </message>
@@ -2087,60 +2132,60 @@
         <translation>Dónde están install.ps1, remove.ps1 y el paquete compilado: junto a esta app por defecto, o apps/crucible/windows/driver en un árbol de fuentes.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="395"/>
+        <location filename="../qml/SettingsPage.qml" line="397"/>
         <source>Signal</source>
         <extracomment>Palette name. A product name: leave it as it is unless the language has an established rendering of its own.</extracomment>
         <translation>Señal</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="397"/>
+        <location filename="../qml/SettingsPage.qml" line="399"/>
         <source>Ink</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>Tinta</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="399"/>
+        <location filename="../qml/SettingsPage.qml" line="401"/>
         <source>Console</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>Consola</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="475"/>
+        <location filename="../qml/SettingsPage.qml" line="477"/>
         <source>3D layout</source>
         <translation>Disposición 3D</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="477"/>
+        <location filename="../qml/SettingsPage.qml" line="479"/>
         <source>Auto</source>
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="479"/>
+        <location filename="../qml/SettingsPage.qml" line="481"/>
         <source>3D reference layout</source>
         <translation>Disposición de referencia 3D</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="482"/>
+        <location filename="../qml/SettingsPage.qml" line="484"/>
         <source>The speakers the 3D room draws for reference. Auto shows 5.1 while the stream is bed only and 7.1.4 once objects are on.</source>
         <translation>Los altavoces que la sala 3D dibuja como referencia. Auto muestra 5.1 mientras el flujo sea solo la cama y 7.1.4 cuando los objetos estén activos.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="489"/>
+        <location filename="../qml/SettingsPage.qml" line="491"/>
         <source>BEHAVIOUR</source>
         <translation>COMPORTAMIENTO</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="492"/>
+        <location filename="../qml/SettingsPage.qml" line="494"/>
         <source>Move the default output to the silent device on launch</source>
         <translation>Mover la salida predeterminada al dispositivo silencioso al iniciar</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="493"/>
+        <location filename="../qml/SettingsPage.qml" line="495"/>
         <source>Restored to the previous device on quit.</source>
         <translation>Restaurado al dispositivo anterior al salir.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="500"/>
+        <location filename="../qml/SettingsPage.qml" line="502"/>
         <source>Keep running in the tray when the window is closed</source>
         <translation>Seguir ejecutándose en la bandeja al cerrar la ventana</translation>
     </message>

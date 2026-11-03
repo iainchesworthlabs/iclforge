@@ -119,6 +119,14 @@ struct StreamNeeds {
     // ItemFacts::frame_rate: the frames a second the programme is coded at, which a sink's
     // stated limit (`max_frame_rate`) is compared with; 0 where it is not known, and not compared.
     double frame_rate = 0.0;
+    // ItemFacts::peak_kbps: the coded kbit/s the programme is declared to need at most, which a
+    // sink's stated `max_data_rate`, and the size of a chunk it is sent, are compared with; 0
+    // where it is not known and not compared.
+    std::uint32_t peak_kbps = 0;
+    // ItemFacts::presentations: the channels of each presentation a TrueHD stream's first substreams
+    // make, lowest first. With more than one, a sink that cannot take the stream's best can be sent
+    // a lower one (plan_group_forms()).
+    std::vector<std::uint16_t> presentations{};
     // Set for a karaoke AC-3 stream whose reproduction is wanted (ItemFacts::karaoke with a
     // reproduction other than "as coded"), which a sink must be told for itself or be sent PCM
     // that has it applied. Unset for every other stream, and for a karaoke one played as coded.
@@ -146,6 +154,13 @@ struct SinkFormPolicy {
     // person has chosen it for that lists it (SinkFacts::opus_fallback). Where the stream's
     // rate is not 48 kHz, or the sink lists no Opus, it is PCM as before.
     bool opus = false;
+    // Whether a sink whose PCM is not at the stream's rate is sent PCM converted to a rate it
+    // lists (a 96 kHz item to a board that plays 48 kHz), by a converter in this app. Off, it is
+    // sent nothing and the reason says which rates it lists.
+    bool convert_rate = true;
+    // The rate to send PCM at, when the group has settled on one (plan_group_forms()): a sink that
+    // does not list it is sent nothing. 0 takes the stream's rate, or the nearest the sink lists.
+    std::uint32_t pcm_rate = 0;
     // A sentence added to the reason of a sink that is sent PCM: what may go wrong with it on
     // this board. Empty for a sink with nothing to add.
     std::string pcm_caveat{};
@@ -157,6 +172,9 @@ struct SinkChoice {
     std::optional<render::OutputLayout> layout{};
     // kPcm: the codec it is sent in.
     PcmCodec codec = PcmCodec::kPcm;
+    // kPcm: the rate it is sent at when that is not the stream's, so that the audio is converted
+    // here; 0 for the stream's own.
+    std::uint32_t sample_rate = 0;
     // One sentence, for the sink's row: what is sent and, when it is not the
     // stream as it is, which of the sink's own limits it was.
     std::string reason{};
@@ -184,6 +202,8 @@ struct MemberForm {
     // kPcm: the width the sink is asked for, and the codec it is asked to be played in.
     std::int32_t channels = 0;
     PcmCodec codec = PcmCodec::kPcm;
+    // kPcm: the rate it is sent at when that is not the stream's (SinkChoice::sample_rate).
+    std::uint32_t sample_rate = 0;
     // What the sink is sent, in a few words, for the column of a table: "E-AC-3 as it is",
     // "PCM · 2.0", "Opus · 2.0", "Nothing · held back". The reason is choice.reason.
     std::string label{};
@@ -195,6 +215,14 @@ struct GroupFormPlan {
     // The layouts the members chosen for PCM take beyond the player's own, distinct by
     // width: a player lists a width, and a group sends one render of each.
     std::vector<render::OutputLayout> variants{};
+    // The rate every member sent PCM is sent it at when that is not the stream's, and 0 when it is.
+    // A group sends one rate: its members that list it get the audio converted here, and one that
+    // does not is held back with the reason.
+    std::uint32_t pcm_rate = 0;
+    // For a TrueHD stream: how many of its first substreams the members sent it as it is get, when
+    // that is fewer than it has (0 for all of them). No sink took the stream's best presentation and
+    // some took a lower one, so the coded stream is cut to it for them; the others are sent PCM.
+    int coded_substreams = 0;
 };
 
 // The policy for one sink: whether it may be sent PCM decoded here when it cannot take the

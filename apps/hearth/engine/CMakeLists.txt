@@ -32,7 +32,6 @@ add_library(hearth_engine STATIC
     src/stream_decoder.cpp
     src/take_recorder.cpp
     src/transport.cpp
-    src/truehd_index.cpp
     src/unit_reports.cpp)
 target_include_directories(hearth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(hearth_engine PUBLIC cxx_std_23)
@@ -82,6 +81,7 @@ endif()
 # take it up too.
 target_sources(hearth_engine PRIVATE
     "${PROJECT_SOURCE_DIR}/apps/shared/media/src/probe_json.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/truehd_stream.cpp"
     "${PROJECT_SOURCE_DIR}/apps/shared/media/src/ac4_object_render.cpp")
 target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
 
@@ -96,7 +96,7 @@ target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/shar
 # whether frames carry an authenticity tag. iclforge::truehd decodes a TrueHD or MLP item
 # (src/truehd_index.hpp, src/stream_decoder.hpp).
 target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin
-                                          iclforge::lyrics iclforge::pitch iclforge::truehd)
+                                          iclforge::lyrics iclforge::pitch iclforge::truehd iclforge::dsp)
 # iclforge::coverage (coverage floors, tools/checks/coverage_report.sh's "apps/hearth" row) instruments
 # this target's OWN sources - apps/forge/cli/src's own comment on its matching link explains why the
 # instrumented EXECUTABLE that eventually links this library is not enough on its own: --coverage

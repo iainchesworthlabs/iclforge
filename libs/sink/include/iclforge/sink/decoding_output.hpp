@@ -20,6 +20,7 @@
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sink/sink.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 
 // A burst output that decodes what it is sent (planning/hearth-android-phases-4-5.md, phase 4):
 // each stream's bursts of AC-3 or E-AC-3 with any object layer, or of AC-4, decoded and rendered to
@@ -43,6 +44,14 @@
 // placed and written in the order they arrive, and a unit still held when the stream ends is not
 // written. A burst that does not decode resets the decoders, and the stream carries on from the
 // next.
+//
+// TrueHD (planning/truehd-parity-hearth-player.md, H5): a chunk is one to 24 whole access units,
+// which iclforge::truehd::Decoder decodes (all the substreams its presentation `best` takes, strict
+// checking) to 24-bit integers, and which are rendered by the bed the stream's channel names make
+// (truehd_bed()), a unit at a time (40, 80 or 160 samples). A chunk's duration is its units' at the
+// stream's rate. A unit that does not decode, or comes before the stream's first restart header,
+// plays as silence for its samples, and the decoder waits for the next restart header on its own;
+// the sample count of the output is the chunks' whatever is lost.
 //
 // Not thread-safe: the sink calls it from the session's callbacks, under the session's lock.
 
@@ -90,6 +99,13 @@ class PcmSink {
 // Table E2.5 has no location for 22.2's bottom channels or 9.X.4's screen pair. A frame of a wider
 // layout, 22.2's, is refused rather than placed on some of its channels.
 [[nodiscard]] bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers);
+
+// The coded layout a TrueHD stream's channels make, for the renderer: each speaker at the location
+// of the same place in Table E2.5. Nothing for no channels, more than the renderer takes, or a
+// channel named twice. (Hearth's engine has the same function for its own decode,
+// apps/hearth/engine/src/stream_decoder.hpp: it does not link this library.)
+[[nodiscard]] std::optional<ac3::eac3::chanmap::Layout> truehd_bed(
+    std::span<const iclforge::truehd::Channel> channels);
 
 class DecodingBurstOutput : public BurstStreamOutput {
    public:
@@ -139,6 +155,11 @@ class DecodingBurstOutput : public BurstStreamOutput {
     void decode_unit(std::span<const std::byte> unit);
     void place(const ac3::PcmBlock& block);
     void write_ac4(const sendspin::BurstChunk& chunk, std::int64_t local_time);
+    void write_truehd(const sendspin::BurstChunk& chunk, std::int64_t local_time);
+    void decode_truehd_unit(std::span<const std::byte> unit, std::size_t samples);
+    void place_truehd(const iclforge::truehd::DecodedAccessUnit& decoded);
+    // `samples` frames of silence on every slot, in blocks.
+    void emit_silence(std::size_t samples);
     void render_ac4(const iclforge::ac4::DecodedFrame& frame);
     // Hands the first `n` samples of every slot of block_ to the sink.
     void emit(std::size_t n);
@@ -152,6 +173,9 @@ class DecodingBurstOutput : public BurstStreamOutput {
     std::optional<ac3::FrameDecoder> ac3_decoder_;
     std::optional<ac3::Eac3Decoder> eac3_decoder_;
     std::optional<iclforge::ac4::Decoder> ac4_decoder_;
+    std::optional<iclforge::truehd::Decoder> truehd_decoder_;
+    std::vector<float> truehd_planar_;
+    std::vector<std::span<const float>> truehd_spans_;
     // One span per decoded AC-4 channel, a block's worth of it at a time.
     std::vector<std::span<const float>> ac4_block_;
     std::optional<int> programme_;

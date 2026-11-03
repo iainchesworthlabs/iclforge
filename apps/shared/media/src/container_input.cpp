@@ -1,9 +1,13 @@
 #include "container_input.hpp"
+#include "container_stream.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <expected>
 #include <limits>
+#include <memory>
+#include <vector>
 #include <optional>
 #include <span>
 #include <string>
@@ -147,11 +151,12 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     return (whole * to) + part;
 }
 
-[[nodiscard]] ContainerFacts facts_of(const iclforge::containers::mp4::Demuxed& demuxed) {
-    const iclforge::containers::mp4::ReadTrack& track = demuxed.track;
+[[nodiscard]] ContainerFacts mp4_facts(
+    const iclforge::containers::mp4::ReadTrack& track,
+    const std::vector<iclforge::containers::mp4::SkippedTrack>& skipped, std::size_t samples) {
     ContainerFacts facts;
     facts.kind = ContainerKind::kMp4;
-    for (const auto& other : demuxed.skipped) {
+    for (const auto& other : skipped) {
         OtherTrack listed{.id = other.track_id,
                           .kind = std::string{describe(other.kind)},
                           .codec_id = other.codec_id,
@@ -175,7 +180,7 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     facts.codec_id = track.codec_id;
     facts.track = track.track_id;
     facts.language = track.language;
-    facts.samples = demuxed.samples.size();
+    facts.samples = samples;
     facts.sample_rate = track.sample_rate;
     facts.channels = track.channels;
     facts.timescale = track.timescale;
@@ -211,22 +216,33 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     return facts;
 }
 
-[[nodiscard]] ContainerFacts facts_of(const iclforge::containers::matroska::Demuxed& demuxed) {
+[[nodiscard]] ContainerFacts facts_of(const iclforge::containers::mp4::Demuxed& demuxed) {
+    return mp4_facts(demuxed.track, demuxed.skipped, demuxed.samples.size());
+}
+
+[[nodiscard]] ContainerFacts matroska_facts(
+    const iclforge::containers::matroska::ReadTrack& track,
+    const std::vector<iclforge::containers::matroska::SkippedTrack>& skipped,
+    std::size_t frames) {
     ContainerFacts facts;
     facts.kind = ContainerKind::kMatroska;
-    for (const auto& other : demuxed.skipped) {
+    for (const auto& other : skipped) {
         facts.other_tracks.push_back(OtherTrack{.id = other.track_number,
                                                 .kind = std::string{describe(other.kind)},
                                                 .codec_id = other.codec_id,
                                                 .language = other.language});
     }
-    facts.codec_id = demuxed.track.codec_id;
-    facts.track = demuxed.track.track_number;
-    facts.language = demuxed.track.language;
-    facts.samples = demuxed.frames.size();
-    facts.sample_rate = demuxed.track.sample_rate;
-    facts.channels = demuxed.track.channels;
+    facts.codec_id = track.codec_id;
+    facts.track = track.track_number;
+    facts.language = track.language;
+    facts.samples = frames;
+    facts.sample_rate = track.sample_rate;
+    facts.channels = track.channels;
     return facts;
+}
+
+[[nodiscard]] ContainerFacts facts_of(const iclforge::containers::matroska::Demuxed& demuxed) {
+    return matroska_facts(demuxed.track, demuxed.skipped, demuxed.frames.size());
 }
 
 [[nodiscard]] std::string_view signalling_token(
@@ -556,6 +572,268 @@ ElementaryStreamResult elementary_stream_from_bytes(std::span<const std::byte> f
         }
     }
     return {.bytes = {}, .error = "unrecognised container"};
+}
+
+// ---------------------------------------------------------------------------------------------
+// A container's track where it lies (container_stream.hpp)
+// ---------------------------------------------------------------------------------------------
+
+void ExtentMap::add(std::uint64_t file_offset, std::size_t length, bool join) {
+    if (length == 0) {
+        return;
+    }
+    if (join && !runs_.empty()) {
+        Run& last = runs_.back();
+        if (last.file_offset + last.length == file_offset &&
+            length <= std::numeric_limits<std::uint32_t>::max() - last.length) {
+            last.length += static_cast<std::uint32_t>(length);
+            size_ += length;
+            return;
+        }
+    }
+    // A frame is far below four gibibytes (the readers refuse elements past 16 MiB); split one that
+    // is not rather than let its length wrap.
+    while (length > std::numeric_limits<std::uint32_t>::max()) {
+        constexpr std::uint32_t kPiece = std::numeric_limits<std::uint32_t>::max();
+        runs_.push_back({.stream_offset = size_, .file_offset = file_offset, .length = kPiece});
+        size_ += kPiece;
+        file_offset += kPiece;
+        length -= kPiece;
+    }
+    runs_.push_back({.stream_offset = size_,
+                     .file_offset = file_offset,
+                     .length = static_cast<std::uint32_t>(length)});
+    size_ += length;
+}
+
+std::size_t ExtentMap::read(ByteSource& file, std::uint64_t offset, std::span<std::byte> out) const {
+    if (offset >= size_ || out.empty()) {
+        return 0;
+    }
+    // The last run that begins at or before `offset`.
+    auto it = std::upper_bound(
+        runs_.begin(), runs_.end(), offset,
+        [](std::uint64_t at, const Run& run) { return at < run.stream_offset; });
+    --it;
+    std::size_t done = 0;
+    for (; it != runs_.end() && done < out.size(); ++it) {
+        const std::uint64_t into = offset + done - it->stream_offset;
+        const std::size_t want =
+            std::min<std::size_t>(out.size() - done, static_cast<std::size_t>(it->length - into));
+        const std::size_t got = file.read(it->file_offset + into, out.subspan(done, want));
+        done += got;
+        if (got < want) {
+            break;
+        }
+    }
+    return done;
+}
+
+namespace {
+
+// The error the batch path words for a container this build cannot demux.
+[[nodiscard]] std::string cannot_demux(std::string_view container, std::string_view why) {
+    return std::string{container} + " file this build cannot demux (" + std::string{why} + ")";
+}
+
+[[nodiscard]] StreamedTrack failed(std::string error) {
+    StreamedTrack out;
+    out.error = std::move(error);
+    return out;
+}
+
+[[nodiscard]] StreamedTrack declined_track(std::string_view container, TrackCodec codec,
+                                           ContainerFacts facts) {
+    StreamedTrack out;
+    out.error = std::string{container} + " file whose audio is " + std::string{codec_name(codec)} +
+                ", which this program does not read";
+    out.declined_codec = codec;
+    out.container = std::move(facts);
+    return out;
+}
+
+[[nodiscard]] StreamedTrack index_matroska(ByteSource& file, const CodecSet& codecs,
+                                           std::size_t window_bytes) {
+    namespace mkv = iclforge::containers::matroska;
+    std::vector<std::byte> window(window_bytes);
+    const std::uint64_t size = file.size();
+
+    // Feeds the file to a reader in windows until the file ends, or `stop` says to; `on_frame`
+    // gets each frame's place.
+    const auto feed = [&](mkv::Reader& reader, const mkv::Reader::FrameAtFn& on_frame,
+                          const auto& stop) -> std::expected<void, mkv::DemuxError> {
+        for (std::uint64_t at = 0; at < size && !stop();) {
+            const std::size_t got = file.read(at, window);
+            if (got == 0) {
+                break;
+            }
+            if (auto pushed =
+                    reader.push_at(std::span<const std::byte>{window}.first(got), on_frame);
+                !pushed.has_value()) {
+                return std::unexpected(pushed.error());
+            }
+            at += got;
+        }
+        return reader.finish();
+    };
+
+    StreamedTrack out;
+    std::size_t frames = 0;
+    mkv::Reader reader(mkv::ReadOptions{.auto_select = {.ac3 = codecs.ac3,
+                                                        .eac3 = codecs.eac3,
+                                                        .truehd = codecs.truehd}});
+    const auto verdict = feed(
+        reader,
+        [&](std::span<const std::byte> frame, std::uint64_t at) {
+            out.extents.add(at, frame.size());
+            ++frames;
+        },
+        [] { return false; });
+    if (!verdict.has_value()) {
+        if (verdict.error() == mkv::DemuxError::kNoAudioTrack && !allows_every_codec(codecs)) {
+            // Nothing in a codec the caller can use: look at the Tracks element again with every
+            // codec allowed, to say what the file holds. The frames are not wanted.
+            mkv::Reader every;
+            const auto looked = feed(
+                every, [](std::span<const std::byte>, std::uint64_t) {},
+                [&every] { return every.track_found(); });
+            (void)looked;
+            if (every.track_found()) {
+                if (const auto codec = codec_of_matroska(every.track().codec_id)) {
+                    return declined_track("Matroska/WebM", *codec,
+                                          matroska_facts(every.track(), every.skipped(), 0));
+                }
+            }
+        }
+        return failed(cannot_demux("Matroska/WebM", mkv::describe(verdict.error())));
+    }
+    out.container = matroska_facts(reader.track(), reader.skipped(), frames);
+    out.codec = codec_of_matroska(reader.track().codec_id);
+    return out;
+}
+
+[[nodiscard]] StreamedTrack index_mp4(ByteSource& file, const CodecSet& codecs) {
+    namespace mp4 = iclforge::containers::mp4;
+    const auto read_at = [&file](std::uint64_t offset, std::span<std::byte> out) {
+        return file.read(offset, out);
+    };
+    const std::uint64_t size = file.size();
+
+    StreamedTrack out;
+    std::vector<mp4::SkippedTrack> skipped;
+    std::size_t samples = 0;
+    bool join = true;
+    const auto track = mp4::demux_seekable_at(
+        read_at, size, [&](const mp4::ReadTrack& t) { join = t.codec_id != mp4::kCodecAc4; },
+        [&](std::span<const std::byte> sample, std::uint64_t at) {
+            // AC-4 samples are wrapped one by one when they are read back, so each stays a run.
+            out.extents.add(at, sample.size(), join);
+            ++samples;
+        },
+        mp4::ReadOptions{.auto_select = {.ac3 = codecs.ac3,
+                                         .eac3 = codecs.eac3,
+                                         .ac4 = codecs.ac4,
+                                         .truehd = codecs.truehd}},
+        &skipped);
+    if (!track.has_value()) {
+        if (track.error() == mp4::DemuxError::kNoAudioTrack && !allows_every_codec(codecs)) {
+            // As for Matroska: the track the reader would have taken, found without reading a
+            // sample. Once the boxes are read the source answers nothing more.
+            bool boxes_done = false;
+            std::vector<mp4::SkippedTrack> other;
+            mp4::ReadTrack seen;
+            const auto every = mp4::demux_seekable_at(
+                [&](std::uint64_t offset, std::span<std::byte> bytes) -> std::size_t {
+                    return boxes_done ? 0 : file.read(offset, bytes);
+                },
+                size,
+                [&](const mp4::ReadTrack& t) {
+                    boxes_done = true;
+                    seen = t;
+                },
+                [](std::span<const std::byte>, std::uint64_t) {}, mp4::ReadOptions{}, &other);
+            if (every.has_value()) {
+                if (const auto codec = codec_of_mp4(seen.codec_id)) {
+                    return declined_track("MP4", *codec, mp4_facts(seen, other, 0));
+                }
+            }
+        }
+        if (track.error() == mp4::DemuxError::kProtectedTrack) {
+            // Which track, and with what scheme and KID, is what a person needs to hear first: the
+            // file is not damaged, its audio is encrypted. The generic sentence stands in if the
+            // second walk finds nothing to name.
+            const auto refused = mp4::list_refused_tracks(read_at, size);
+            const std::string named = refused.has_value()
+                                          ? mp4::describe_refusal(*refused)
+                                          : std::string{mp4::describe(track.error())};
+            return failed("MP4 file this build cannot demux: " + named);
+        }
+        return failed(cannot_demux("MP4", mp4::describe(track.error())));
+    }
+    out.container = mp4_facts(*track, skipped, samples);
+    out.codec = codec_of_mp4(track->codec_id);
+    if (track->codec_id != mp4::kCodecAc4) {
+        out.trim = trim_from_edit_list(*track, out.trim_note);
+    }
+    return out;
+}
+
+}  // namespace
+
+StreamedTrack index_container_track(ByteSource& file, const CodecSet& codecs,
+                                    const StreamOptions& options) {
+    std::vector<std::byte> head(
+        static_cast<std::size_t>(std::min<std::uint64_t>(file.size(), kContainerSniffBytes)));
+    head.resize(file.read(0, head));
+    switch (sniff_container(head)) {
+        case ContainerKind::kUnknown: {
+            StreamedTrack out;
+            out.bare = true;
+            return out;
+        }
+        case ContainerKind::kMatroska:
+            return index_matroska(file, codecs, std::max<std::size_t>(options.window_bytes, 4096));
+        case ContainerKind::kMp4: return index_mp4(file, codecs);
+        case ContainerKind::kMpegTs: {
+            StreamedTrack out;
+            out.whole_file = true;
+            out.container.kind = ContainerKind::kMpegTs;
+            return out;
+        }
+    }
+    return failed("unrecognised container");
+}
+
+std::vector<std::byte> read_track_bytes(ByteSource& file, const StreamedTrack& track) {
+    std::vector<std::byte> out;
+    if (track.codec != TrackCodec::kAc4 || track.container.kind != ContainerKind::kMp4) {
+        out.resize(static_cast<std::size_t>(track.extents.size()));
+        out.resize(track.extents.read(file, 0, out));
+        return out;
+    }
+    // An 'ac-4' sample is the raw_ac4_frame alone (TS 103 190-2 Annex E.4): wrapped in Annex
+    // G.3.1's ac4_syncframe, as elementary_stream_from_bytes does for the same samples.
+    std::vector<std::byte> sample;
+    for (const auto& run : track.extents.all()) {
+        sample.resize(run.length);
+        if (track.extents.read(file, run.stream_offset, sample) != run.length) {
+            break;
+        }
+        const auto put = [&out](std::uint32_t v, int bytes) {
+            for (int b = bytes - 1; b >= 0; --b) {
+                out.push_back(static_cast<std::byte>((v >> (8 * b)) & 0xFFu));
+            }
+        };
+        put(0xAC40u, 2);
+        if (sample.size() >= 0xFFFF) {
+            put(0xFFFFu, 2);
+            put(static_cast<std::uint32_t>(sample.size()), 3);
+        } else {
+            put(static_cast<std::uint32_t>(sample.size()), 2);
+        }
+        out.insert(out.end(), sample.begin(), sample.end());
+    }
+    return out;
 }
 
 }  // namespace iclforge::apps

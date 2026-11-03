@@ -1058,3 +1058,52 @@ TEST_CASE("iclforge_player: a server acts on the keys a sink listed as requestab
     CHECK_FALSE(with_requests("[1]"));
     CHECK_FALSE(with_requests("null"));
 }
+
+TEST_CASE("iclforge_player: a sink lists TrueHD and states its limits", "[sendspin][iclforge][truehd]") {
+    const auto read_text = [](std::string source) { return ac::read_support(Parsed(std::move(source)).root()); };
+    const std::string outputs = R"("outputs":{"count":2,"bit_depth":16,"bit_depths":[16]},"layout_grammar":1,)";
+    const std::string management =
+        R"("management":{"routing":false,"trim_db":[0,0],"delay_ms":[0,0],"crossover_hz":[80,80],"identify":false},)";
+    const std::string tail = R"("decoder_settings":[],"buffer_capacity":262144})";
+
+    const std::optional<ac::Support> support = read_text(
+        R"({"data_types":["ac3","eac3","truehd"],"sample_rates":[48000,96000],)"
+        R"("max_coded_channels":{"truehd":6},"max_frame_rate":{"truehd":50},)"
+        R"("max_data_rate":{"truehd":12000},"max_objects":{"truehd":0},)" +
+        outputs + management + tail);
+    REQUIRE(support.has_value());
+    CHECK(support->data_types ==
+          std::vector<ac::DataType>{ac::DataType::kAc3, ac::DataType::kEac3, ac::DataType::kTruehd});
+    CHECK(support->max_coded_channels_of(ac::DataType::kTruehd) == 6);
+    CHECK(support->max_frame_rate_of(ac::DataType::kTruehd) == 50);
+    CHECK(support->max_data_rate_of(ac::DataType::kTruehd) == 12000);
+    CHECK(support->max_objects_of(ac::DataType::kTruehd) == 0);
+    // Nothing is stated for the types the object does not name.
+    CHECK(support->max_data_rate_of(ac::DataType::kEac3) == 0);
+    CHECK(support->max_coded_channels_of(ac::DataType::kAc3) == 0);
+
+    // And it writes what it read, the limit with the type's name.
+    const std::string text = written(*support, ac::write_support);
+    CHECK(text.find(R"("data_types":["ac3","eac3","truehd"])") != std::string::npos);
+    CHECK(text.find(R"("max_data_rate":{"truehd":12000})") != std::string::npos);
+    const std::optional<ac::Support> again = read_text(text);
+    REQUIRE(again.has_value());
+    CHECK(again->max_data_rate_of(ac::DataType::kTruehd) == 12000);
+
+    // A sink from before the type has no TrueHD in it, and an older reader of this object would
+    // skip the name: the role still has its other data types.
+    const std::optional<ac::Support> before = read_text(
+        R"({"data_types":["ac3","eac3"],"sample_rates":[48000],)" + outputs + management + tail);
+    REQUIRE(before.has_value());
+    CHECK(std::ranges::find(before->data_types, ac::DataType::kTruehd) == before->data_types.end());
+    // A data rate that is not a rate refuses the object, as the frame rate does.
+    CHECK_FALSE(read_text(R"({"data_types":["truehd"],"sample_rates":[48000],"max_data_rate":{"truehd":0},)" +
+                          outputs + management + tail));
+    CHECK_FALSE(read_text(R"({"data_types":["truehd"],"sample_rates":[48000],"max_data_rate":[],)" + outputs +
+                          management + tail));
+    // The burst type a stream of the type is sent as.
+    CHECK(ac::burst_data_type(ac::DataType::kTruehd) == iclforge::sendspin::BurstDataType::kTruehd);
+    CHECK(ac::carries(ac::DataType::kTruehd, iclforge::sendspin::BurstDataType::kTruehd));
+    CHECK_FALSE(ac::carries(ac::DataType::kTruehd, iclforge::sendspin::BurstDataType::kEac3));
+    CHECK(ac::data_type_name(ac::DataType::kTruehd) == "truehd");
+}

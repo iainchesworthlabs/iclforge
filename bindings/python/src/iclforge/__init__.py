@@ -91,6 +91,17 @@ except ImportError:
 else:
     _HAS_LYRICS = True
 
+# The TrueHD and MLP codec is a submodule the extension has only when it was built with
+# iclforge::truehd (ICLFORGE_BUILD_TRUEHD). Every wheel has it; a trimmed developer build may not,
+# and importing it with the names above would take `import iclforge` with it there. Absent,
+# `iclforge.truehd` is an AttributeError.
+try:
+    from ._iclforge import TruehdError, truehd
+except ImportError:
+    _HAS_TRUEHD = False
+else:
+    _HAS_TRUEHD = True
+
 try:
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as _pkg_version
@@ -148,6 +159,7 @@ __all__ = [
     "StreamType",
     "SubstreamService",
     "SurroundMixLevel",
+    "TruehdError",
     "__version__",
     "ac4",
     "access_unit_at_sample",
@@ -171,8 +183,12 @@ __all__ = [
     "stream_bsid",
     "stream_duration_samples",
     "stream_duration_seconds",
+    "truehd",
     "uniform_access_unit_samples",
     "verify",
 ]
 if not _HAS_LYRICS:
     __all__.remove("lyrics")
+if not _HAS_TRUEHD:
+    __all__.remove("truehd")
+    __all__.remove("TruehdError")

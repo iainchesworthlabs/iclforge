@@ -1,4 +1,4 @@
-#include "truehd_index.hpp"
+#include "truehd_stream.hpp"
 
 #include <algorithm>
 #include <fmt/format.h>
@@ -7,9 +7,9 @@
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
-// See truehd_index.hpp.
+// See truehd_stream.hpp.
 
-namespace iclforge::hearth {
+namespace iclforge::apps {
 
 namespace th = iclforge::truehd;
 
@@ -245,4 +245,4 @@ std::expected<TruehdIndex, std::string> index_truehd(ByteSource& source,
     return index;
 }
 
-}  // namespace iclforge::hearth
+}  // namespace iclforge::apps

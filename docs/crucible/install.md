@@ -156,7 +156,7 @@ crucible-run [--null-sink SUBSTR] [--key PATH] [--pin MODE] [--low-latency]
 Options:
   --null-sink SUBSTR       silent endpoint applications render into
   --key PATH               signing key file; otherwise use ICLFORGE_SIGNING_KEY*
-  --pin MODE               start in atmos, ddplus, dd, pcm, headphones, or stereo
+  --pin MODE               start in atmos, ddplus, dd, truehd, pcm, headphones, or stereo
   --low-latency            use one-block frames and the smallest PCM sink period
   --bitrate KBPS           fixed bit rate; default 448, or 1536 with --low-latency
   --set-default SUBSTR     move the default output before starting; restore it on quit

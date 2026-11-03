@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -82,9 +83,15 @@ enum class ChunkError : std::uint8_t {
     kLengthMismatch,   // Pd, or an AC-4 frame's own size, disagrees with the payload
     kPayloadTooLarge,  // more payload than the data type's burst can carry
     kNoSyncword,       // a payload that does not start with 0x0B77, or 0xAC40/0xAC41 for AC-4
+    kNotWholeUnits,    // a TrueHD payload that is not 1 to 24 whole access units
 };
 
 [[nodiscard]] std::string_view describe(ChunkError error);
+
+// How many whole TrueHD access units `payload` holds: each opens with a check nibble and a 12-bit
+// length in 16-bit words counting the unit (TH spec section 3.1), at least 4 bytes. Nothing when
+// the payload is not a whole number of them, or holds none.
+[[nodiscard]] std::optional<std::size_t> count_truehd_units(std::span<const std::uint8_t> payload);
 
 // player@v1's chunk, ID 4, in `dialect`'s form. The frame may be empty; the codec
 // judges it.
@@ -101,12 +108,21 @@ bool write_player_chunk_header(std::span<std::uint8_t> out, std::int64_t timesta
 // them.
 enum class BurstDataType : std::uint8_t {
     kAc3 = 1,
+    kTruehd = 22,    // MAT's data type (IEC 61937-1 Table 2); here access units, not the MAT burst
     kEac3 = 21,
     kAc4 = 24,       // IEC 61937-14: data type 24, subdata type 0
     kAc4Hbr4 = 56,   // 24, subdata type 1
     kAc4Hbr16 = 88,  // 24, subdata type 2
     kAc4Ld = 120,    // 24, subdata type 3
 };
+
+// TrueHD access units travel in groups of up to this many to a chunk: a MAT frame's worth (TH spec
+// section 3.1 gives each unit its own length), 20 ms at 48 kHz.
+inline constexpr std::size_t kTruehdUnitsPerChunk = 24;
+// The most bytes of a TrueHD chunk's payload: the MAT frame's payload size, 61,424 (61,440 less the
+// 16 bytes of the burst's own preamble and padding), which 24 units never pass at the rate TrueHD
+// allows, and which, with the 17-byte header, fits one encrypted message (65,518).
+inline constexpr std::size_t kMaxTruehdChunkBytes = 61'424;
 
 [[nodiscard]] constexpr bool is_ac4(BurstDataType type) {
     return (static_cast<unsigned>(type) & 0x1FU) == 24U;
@@ -130,6 +146,8 @@ enum class BurstDataType : std::uint8_t {
             return 131072 - 8;
         case BurstDataType::kAc4Ld:
             return 1920 - 8;
+        case BurstDataType::kTruehd:
+            return kMaxTruehdChunkBytes;
     }
     return 0;
 }
@@ -152,6 +170,7 @@ struct BurstChunk {
     switch (type) {
         case BurstDataType::kEac3:
         case BurstDataType::kAc4Hbr4:
+        case BurstDataType::kTruehd:
             return static_cast<std::uint16_t>(payload_bytes);
         case BurstDataType::kAc4Hbr16:
             return static_cast<std::uint16_t>((payload_bytes + 7) / 8);

@@ -12,6 +12,7 @@ std::string_view describe(OutputMode mode) {
         case OutputMode::kPcmSurround: return "PCM surround (decoded)";
         case OutputMode::kHeadphones: return "headphones (decoded objects, Windows Spatial Sound)";
         case OutputMode::kStereo: return "stereo (decoded Lo/Ro)";
+        case OutputMode::kTrueHd51: return "TrueHD 5.1 over HDMI (MAT, lossless bed)";
         case OutputMode::kNone: return "no usable output";
     }
     return "unknown output mode";
@@ -20,7 +21,8 @@ std::string_view describe(OutputMode mode) {
 namespace {
 
 bool is_bitstream(OutputMode mode) {
-    return mode == OutputMode::kAtmos || mode == OutputMode::kDdPlus51 || mode == OutputMode::kDd51;
+    return mode == OutputMode::kAtmos || mode == OutputMode::kDdPlus51 || mode == OutputMode::kDd51 ||
+           mode == OutputMode::kTrueHd51;
 }
 
 // Whether `endpoint` can carry `mode` at all, ignoring the default-endpoint
@@ -30,6 +32,7 @@ bool carries(const EndpointFacts& endpoint, OutputMode mode, bool key) {
         case OutputMode::kAtmos: return endpoint.accepts_eac3 && key;
         case OutputMode::kDdPlus51: return endpoint.accepts_eac3 && !key;
         case OutputMode::kDd51: return endpoint.accepts_ac3;
+        case OutputMode::kTrueHd51: return endpoint.accepts_truehd;
         case OutputMode::kPcmSurround: return endpoint.shared_channels >= 6;
         // Decoded objects need a signed stream to exist at all (the decoder
         // reconstructs JOC only behind the authenticity gate), so headphones
@@ -99,6 +102,9 @@ std::string carried_as(const EndpointFacts& endpoint, OutputMode mode) {
         case OutputMode::kDdPlus51:
             return "it accepts E-AC-3 but no signing key is loaded: 5.1 bed only, positions panned";
         case OutputMode::kDd51: return "it accepts AC-3 but not E-AC-3: 5.1 bed, positions panned";
+        case OutputMode::kTrueHd51:
+            return "it accepts TrueHD and the mode is pinned: lossless 5.1 bed, positions panned, "
+                   "no objects whatever key is loaded";
         case OutputMode::kPcmSurround:
             return "it takes " + std::to_string(endpoint.shared_channels) +
                    " PCM channels, so the stream is decoded and played as surround";
@@ -232,6 +238,11 @@ OutputChoice choose_output(const OutputPolicyInput& input) {
                               candidate.endpoint->name +
                               "\" has a spatial sound format enabled, so decoded objects go through "
                               "Windows Spatial Sound";
+                    break;
+                case OutputMode::kTrueHd51:
+                    // Never reached from the automatic choice (kPreference leaves it out);
+                    // the pinned path above words its own reason.
+                    reason += "\"" + candidate.endpoint->name + "\" accepts TrueHD";
                     break;
                 case OutputMode::kStereo:
                     reason += "nothing better than stereo on \"" + candidate.endpoint->name +

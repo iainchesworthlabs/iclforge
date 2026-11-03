@@ -520,6 +520,15 @@ private:
     // The output a session's item would be played through, as the decision
     // has it, asked while the open output is held.
     [[nodiscard]] OutputChoice decide(const Session& session) const;
+    // A TrueHD item's units to a network group, up to 24 to a chunk (sendspin::kTruehdUnitsPerChunk).
+    void send_truehd_unit_to_group(std::span<const std::byte> unit, std::uint32_t samples,
+                                   std::uint64_t start);
+    // Queues the chunk in progress, if there is one: at 24 units, and when the item ends.
+    void flush_truehd_chunk();
+    // Opens `path` as the settings say, which for a file with a TrueHD track first and a
+    // compressed one after it (settings_.track) includes which of the two plays: the compressed one
+    // where the output decision for it is a bitstream, else the TrueHD, decoded here.
+    [[nodiscard]] std::expected<Session, std::string> open_session(const std::string& path) const;
     [[nodiscard]] HeldOutput held_output() const;
     // Why the prepared item cannot join the open output although the
     // transport would join it, or empty: another endpoint, or units the
@@ -654,6 +663,14 @@ private:
     // group_payload_ was last empty (send_unit_to_group()).
     std::vector<std::byte> group_payload_;
     std::int64_t group_burst_start_frame_ = 0;
+    // A TrueHD chunk in progress in group_payload_: its access units, and the samples they code
+    // (send_truehd_unit_to_group()).
+    std::uint32_t group_truehd_units_ = 0;
+    // The first substreams of a TrueHD item the group's coded members take (0: all), from the plan
+    // the group opened with, and how many the stream has.
+    int group_coded_substreams_ = 0;
+    int group_stream_substreams_ = 0;
+    std::uint64_t group_truehd_samples_ = 0;
     // Bursts complete and waiting for room in the group, and how far into
     // the PCM ring's head block drain_group() has got (Pending's own
     // comment on why bursts are not pending_'s own entries).

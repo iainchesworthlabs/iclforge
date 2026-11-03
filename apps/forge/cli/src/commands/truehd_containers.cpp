@@ -28,6 +28,7 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "iclforge/ac3/meta/loudness.hpp"
 #include "truehd.hpp"
 
 // TrueHD and MLP in the container, transport and analysis commands (planning/truehd.md, phase
@@ -576,6 +577,15 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
         return kExitRuntime;
     }
     fmt::println("  integrated loudness {:.1f} LKFS (BS.1770-5 Annex 3 weights)", *lkfs);
+    // As for E-AC-3: the loudness as the dialnorm it implies (ATSC A/85 section 8), beside the one
+    // the stream stores for the presentation decoded.
+    const int implied = iclforge::ac3::meta::dialnorm_from_lkfs(*lkfs);
+    if (const auto stored = stored_dialnorm(stream, meta.truehd_presentation)) {
+        fmt::println("  dialnorm {} implied; the stream's own dialnorm {}{}", implied, *stored,
+                     implied == *stored ? "" : " (they differ)");
+    } else {
+        fmt::println("  dialnorm {} implied; the stream stores no dialogue norm", implied);
+    }
     if (const auto peak = meter->true_peak_dbtp()) {
         fmt::println("  true peak {:.1f} dBTP", *peak);
     }
@@ -584,61 +594,6 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
 
 namespace {
 
-// TH spec §18's model of the transmission of a stream (RateReport): the encoder's own, so that a
-// stream it wrote within the rate is within it here.
-class RateModel {
-   public:
-    void add(std::size_t unit_bytes, const std::optional<th::MajorSync>& first_sync) {
-        if (!started_) {
-            if (!first_sync) {
-                return;
-            }
-            started_ = true;
-            rate_ = first_sync->sample_rate();
-            nominal_ = th::nominal_samples_per_access_unit(first_sync->ratebits());
-            // TH spec v3.9 section 4.4 (ERRATA.md question 12): bits per second.
-            report_.declared_bps = first_sync->peak_data_rate_bps();
-            limit_ = static_cast<std::int64_t>(rate_) * 75 / 1000;
-        }
-        if (report_.declared_bps == 0 || nominal_ <= 0) {
-            return;
-        }
-        const std::int64_t slot = position_ - nominal_;
-        std::int64_t start = slot;
-        if (units_ > 0) {
-            start = std::max({slot, last_arrival_end_, last_start_ + nominal_});
-        }
-        const auto bits_at_rate = static_cast<std::uint64_t>(unit_bytes) * 8U * rate_;
-        const auto arrival = static_cast<std::int64_t>((bits_at_rate + report_.declared_bps - 1U) /
-                                                       report_.declared_bps);
-        const std::int64_t latency = start + arrival - slot;
-        if (latency > limit_) {
-            ++report_.violations;
-        }
-        report_.worst_latency_ms =
-            std::max(report_.worst_latency_ms,
-                     1000.0 * static_cast<double>(latency) / static_cast<double>(rate_));
-        report_.max_unit_rate_bps = std::max<std::uint64_t>(
-            report_.max_unit_rate_bps, bits_at_rate / static_cast<std::uint64_t>(nominal_));
-        last_start_ = start;
-        last_arrival_end_ = start + arrival;
-        position_ += nominal_;
-        ++units_;
-    }
-
-    [[nodiscard]] const RateReport& report() const noexcept { return report_; }
-
-   private:
-    RateReport report_{};
-    bool started_ = false;
-    std::uint32_t rate_ = 0;
-    int nominal_ = 0;
-    std::int64_t limit_ = 0;
-    std::int64_t position_ = 0;
-    std::int64_t last_start_ = 0;
-    std::int64_t last_arrival_end_ = 0;
-    std::uint64_t units_ = 0;
-};
 
 th::Presentation decoder_presentation(MeaningPresentation presentation) {
     switch (presentation) {
@@ -682,7 +637,7 @@ std::optional<TruehdMeasurement> measure_truehd(std::span<const std::byte> strea
             th::DecoderConfig{.presentation = th::Presentation::kAll, .strictness = strictness});
     }
     TruehdMeasurement out;
-    RateModel rate;
+    iclforge::apps::truehd_probe::RateModel rate;
     th::ElementaryReader reader(stream);
     std::vector<std::vector<float>> planes;
     while (true) {

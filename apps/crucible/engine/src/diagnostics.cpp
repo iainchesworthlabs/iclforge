@@ -243,7 +243,7 @@ std::string render_report(const ReportFacts& facts, const EngineStatus& engine, 
         }
         line(quoted(e.name) + "  id=" + e.id + "  default=" + std::string(yes_no(e.is_default)) + "  silent=" +
              std::string(yes_no(e.is_null_sink)) + "  eac3=" + std::string(yes_no(e.accepts_eac3)) + "  ac3=" +
-             std::string(yes_no(e.accepts_ac3)) + "  pcm=" + std::to_string(e.shared_channels) + "ch  spatial=" +
+             std::string(yes_no(e.accepts_ac3)) + "  truehd=" + std::string(yes_no(e.accepts_truehd)) + "  pcm=" + std::to_string(e.shared_channels) + "ch  spatial=" +
              spatial);
     }
 

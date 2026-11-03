@@ -38,9 +38,7 @@ NOT_IN_BASE_TARGETS = {
 }
 # Harnesses with a gap that is known and recorded, so that the check passes while the gap stands:
 # harness -> what is missing. Each is reported on every run.
-KNOWN_GAPS = {
-    "fuzz_iamf_parse": "no seeds and no place in the run list (reported to the owner)",
-}
+KNOWN_GAPS: dict[str, str] = {}
 DIFFERENTIAL_PREFIX = "fuzz_differential_"
 # The jobs of fuzz.yml that run every differential harness, each with a replay and a mutation step.
 DIFFERENTIAL_JOBS = 2

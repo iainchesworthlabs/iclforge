@@ -280,8 +280,8 @@ OutputChoice choose_output(const OutputRequest& request) {
                 .endpoint_name = {},
                 .group_name = request.group_name,
                 .reason = fmt::format(
-                    "Playing to the group \"{}\". Sending {} to a network sink as it is is not "
-                    "available, so it is decoded here and each sink is sent PCM.",
+                    "Playing to the group \"{}\". {} goes as it is to each sink that decodes it and "
+                    "is decoded here, and sent as PCM, for each that does not.",
                     request.group_name, lossless_name(request.codec))};
         }
         if (request.group_ready) {

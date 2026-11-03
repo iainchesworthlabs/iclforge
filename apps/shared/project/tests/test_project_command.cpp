@@ -425,3 +425,80 @@ TEST_CASE("project command: a line is quoted where a person would have to", "[pr
     CHECK(project::command_text(step) ==
           "forge encode \"my song.wav\" out.ac3 \"\" \"src=a b.wav\" plain \"say \\\"hi\\\"\"");
 }
+
+TEST_CASE("project command: TrueHD is truehd-encode with its own two options, and a container wraps it",
+          "[project][command][truehd]") {
+    const Folder folder;
+    folder.touch("a.wav");
+    SECTION("the bare stream: one command, the window's bit rate left out") {
+        const auto plan = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}],
+                            "encode": {"codec": "truehd", "bitrateKbps": 448}})"),
+            request(folder));
+        REQUIRE(plan.has_value());
+        REQUIRE(plan->steps.size() == 1);
+        CHECK(plan->scratch_files.empty());
+        CHECK(plan->output == folder.path() / "song.thd");
+        CHECK(plan->steps[0].argv ==
+              std::vector<std::string>{"truehd-encode", g(folder.path() / "a.wav"),
+                                       g(folder.path() / "song.thd")});
+    }
+    SECTION("verify and the folded-down presentations are the command's words") {
+        const auto plan = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}],
+                            "encode": {"codec": "truehd",
+                                       "truehd": {"verify": true, "downmix": "standard"}}})"),
+            request(folder));
+        REQUIRE(plan.has_value());
+        const auto& argv = plan->steps[0].argv;
+        CHECK(std::vector<std::string>(argv.begin() + 3, argv.end()) ==
+              std::vector<std::string>{"truehd-downmix=standard", "verify"});
+        // downmix "none" is the command's own default and is not written.
+        const auto plain = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}],
+                            "encode": {"codec": "truehd", "truehd": {"downmix": "none"}}})"),
+            request(folder));
+        REQUIRE(plain.has_value());
+        CHECK(plain->steps[0].argv.size() == 3);
+    }
+    SECTION("a container is wrapped from the stream by its own command, as for any codec") {
+        for (const auto& [container, command, suffix] :
+             {std::tuple{"matroska", "mkv", ".mkv"}, std::tuple{"mp4", "mp4", ".mp4"},
+              std::tuple{"mpegts", "ts", ".ts"}, std::tuple{"spdif", "spdif", ".wav"}}) {
+            DYNAMIC_SECTION(container) {
+                const auto plan = project::command_plan(
+                    Json::parse(std::string(R"({"sources": [{"path": "a.wav"}],
+                                    "encode": {"codec": "truehd", "container": ")") +
+                                container + R"("}})"),
+                    request(folder));
+                REQUIRE(plan.has_value());
+                REQUIRE(plan->steps.size() == 2);
+                CHECK(plan->steps[0].argv[0] == "truehd-encode");
+                CHECK(plan->steps[1].argv[0] == command);
+                CHECK(plan->steps[1].argv[1] == plan->steps[0].argv[2]);
+                CHECK(plan->output.extension() == suffix);
+                CHECK(plan->scratch_files.size() == 1);
+            }
+        }
+    }
+    SECTION("what a lossless encode does not have is refused, not dropped") {
+        const auto fails = [&](const char* text) {
+            const auto plan = project::command_plan(Json::parse(text), request(folder));
+            REQUIRE_FALSE(plan.has_value());
+            return plan.error().code;
+        };
+        folder.touch("b.wav");
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}], "encode": {"codec": "truehd",
+                         "container": "fmp4"}})") == "truehd-no-fmp4");
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav"}],
+                         "encode": {"codec": "truehd"}})") == "truehd-one-source");
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}], "atmos": true,
+                         "encode": {"codec": "truehd"}})") == "truehd-no-atmos");
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}],
+                         "assignments": [{"source": 0, "channel": 0, "to": "L"}],
+                         "encode": {"codec": "truehd"}})") == "truehd-no-assignments");
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}],
+                         "encode": {"codec": "truehd", "options": {"dialnorm": 27}}})") ==
+              "truehd-no-options");
+    }
+}

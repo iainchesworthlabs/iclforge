@@ -155,6 +155,28 @@
       "pcm_sha256": "4db822d1ecb3f975fc2f70d34bec3b8569cb6fac651d389a27a21f7a320b0b14"
     },
     {
+      "name": "hb_ch_assign_cycle",
+      "file": "hb_ch_assign_cycle.thd",
+      "description": "ch_assign [1, 2, 3, 4, 5, 0], a six-cycle, in a substream of six channels after one of two",
+      "features": [
+        "ch_assign",
+        "ch_assign_cycle",
+        "substreams_2"
+      ],
+      "oracle": "ffmpeg",
+      "ffmpeg": {
+        "outcome": "equal"
+      },
+      "codec": "truehd",
+      "presentation": "best",
+      "sample_rate": 48000,
+      "channels": 6,
+      "access_units": 24,
+      "pcm_samples": 960,
+      "stream_sha256": "37f1e882441418ad46e564cc26b18f6c7b8b30ae77a4f7e7ee7ddeb6314fbaf5",
+      "pcm_sha256": "f0e3094e415fc728c2121937e43fdaff5590a90f87bc705833a65db2c78c91f7"
+    },
+    {
       "name": "hb_output_shift_negative",
       "file": "hb_output_shift_negative.thd",
       "description": "negative output shifts -1 and -3: an arithmetic right shift of the coded values",

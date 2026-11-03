@@ -221,13 +221,13 @@ int run_words(const std::vector<std::string>& words) {
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
 constexpr std::array<Command, 49> kCommands{{
-    {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
+    {"silence", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
          const auto seconds = x.whole_seconds(2, 5);
          return seconds ? run_silence(x.str(1), *seconds, x.u32(3, 192)) : kExitUsage;
      }},
-    {"sine", 2, "<out.ac3> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]", "",
+    {"sine", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]", "",
      topic::kLayout | topic::kMeta,
      Needs::kNothing,
      [](const Args& x) {
@@ -460,7 +460,7 @@ constexpr std::array<Command, 49> kCommands{{
      "track; table or documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
-    {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
+    {"transcode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
      "decode and re-encode, carrying dialnorm, compr and the mix metadata across - the "
      "DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or "
      "E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the "
@@ -490,18 +490,22 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_normalize(x.str(1), x.str(2), x.meta); }},
-    {"cut", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3> [start_seconds] [duration_seconds]",
-     "extract on access-unit boundaries; nothing is re-encoded", topic::kStreamTools,
+    {"cut", 3, "<in.ac3|in.ec3|in.thd|in.mlp> <out> [start_seconds] [duration_seconds]",
+     "extract on access-unit boundaries; nothing is re-encoded. A TrueHD or MLP stream is "
+     "cut from the first access unit with a major sync at or after the start, and the time "
+     "used is printed",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
-     [](const Args& x) { return run_cut(x.str(1), x.str(2), x.str(3), x.str(4)); }},
-    {"cat", 4, "<out.ac3|out.ec3> <in1> <in2> [in3...]",
+     [](const Args& x) { return run_cut(x.str(1), x.str(2), x.str(3), x.str(4), x.meta); }},
+    {"cat", 4, "<out> <in1> <in2> [in3...]",
      "join streams end to end (output FIRST, since the input list is variadic); refuses "
-     "inputs whose codec, rate, layout or substream shape differ",
-     topic::kStreamTools,
+     "inputs whose codec, rate, layout or substream shape differ, and, for TrueHD or MLP, an "
+     "input that does not open with a major sync",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) {
          const auto inputs = x.tail(2);
-         return run_cat(x.str(1), inputs);
+         return run_cat(x.str(1), inputs, x.meta);
      }},
     {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts>",
      "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded "

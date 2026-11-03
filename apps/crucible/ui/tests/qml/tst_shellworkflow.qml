@@ -153,7 +153,7 @@ TestCase {
         const heading = trayEntry(window, "Signal path · auto");
         verify(heading, "the heading reads the current pin");
         compare(heading.enabled, false);
-        for (const entry of [["Atmos", "atmos"], ["Dolby Digital Plus 5.1", "ddplus"], ["Dolby Digital 5.1", "dd"],
+        for (const entry of [["Atmos", "atmos"], ["Dolby Digital Plus 5.1", "ddplus"], ["Dolby Digital 5.1", "dd"], ["TrueHD 5.1", "truehd"],
                              ["PCM surround", "pcm"], ["Stereo", "stereo"], ["Automatic", "auto"]]) {
             const item = trayEntry(window, entry[0]);
             verify(item, "the tray offers " + entry[0]);

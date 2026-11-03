@@ -6,6 +6,7 @@
 #include <cmath>
 #include <utility>
 
+#include "iclforge/dsp/stream_resampler.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
@@ -73,8 +74,12 @@ public:
      // they are to be sent PCM at, beyond the player's layout, comes back.
      std::vector<render::OutputLayout> variants;
      std::vector<m::AudioFormat> more_pcm;
+     // The rate the members are sent PCM at, when it is not the stream's: the audio is converted
+     // to it here.
+     std::uint32_t group_rate = format.sample_rate;
+     int coded_substreams = 0;
      if (plan_) {
-         const std::vector<render::OutputLayout> planned =
+         const GroupPlan group_plan =
              plan_({.group_name = group_name,
                     .stream = format.stream,
                     .sample_rate = format.sample_rate,
@@ -82,8 +87,15 @@ public:
                     .objects = format.objects,
                     .objects_alone = format.objects_alone,
                     .frame_rate = format.frame_rate,
+                    .peak_kbps = format.peak_kbps,
+                    .presentations = format.presentations,
                     .karaoke = format.karaoke,
                     .layout = format.layout});
+         const std::vector<render::OutputLayout>& planned = group_plan.variants;
+         if (group_plan.pcm_rate != 0) {
+             group_rate = group_plan.pcm_rate;
+         }
+         coded_substreams = group_plan.coded_substreams;
          for (const render::OutputLayout& layout : planned) {
              // One variant per width: a player lists a width, not a layout,
              // and the group refuses two of one.
@@ -98,11 +110,21 @@ public:
              variants.push_back(layout);
              more_pcm.push_back({.codec = m::Codec::kPcm,
                                  .channels = width,
-                                 .sample_rate = static_cast<std::int32_t>(format.sample_rate),
+                                 .sample_rate = static_cast<std::int32_t>(group_rate),
                                  .bit_depth = kBitDepth});
          }
      }
-     if (!group->start({.pcm = pcm, .more_pcm = more_pcm, .bursts = bursts, .buffered = true})) {
+     const bool converting = group_rate != format.sample_rate;
+     if (converting) {
+         // The planner sends PCM at another rate only to a group none of whose members take the
+         // stream as it is (sink_form.hpp, plan_group_forms()), so there are no bursts to send,
+         // and burst frames counted at the stream's rate would not fit a timeline run at this one.
+         bursts.reset();
+     }
+     m::AudioFormat group_pcm = pcm;
+     group_pcm.sample_rate = static_cast<std::int32_t>(group_rate);
+     if (!group->start(
+             {.pcm = group_pcm, .more_pcm = more_pcm, .bursts = bursts, .buffered = true})) {
          return std::unexpected(fmt::format("The group \"{}\" would not start.", group_name));
      }
      group_ = std::move(group);
@@ -110,6 +132,19 @@ public:
      variants_ = std::move(variants);
      channels_ = static_cast<std::size_t>(channels);
      sample_rate_ = format.sample_rate;
+     group_rate_ = group_rate;
+     coded_substreams_ = coded_substreams;
+     converters_.clear();
+     pending_.clear();
+     pending_frames_ = 0;
+     if (converting) {
+         // One converter for each layout the group renders: the player's first, then the variants.
+         converters_.emplace_back(format.sample_rate, group_rate, channels_);
+         for (const render::OutputLayout& layout : variants_) {
+             converters_.emplace_back(format.sample_rate, group_rate, layout.slots());
+         }
+         pending_.resize(converters_.size());
+     }
      taken_ = 0;
      flushed_ = 0;
      lyrics_item_.reset();
@@ -131,6 +166,9 @@ public:
         }
         group_.reset();
         variants_.clear();
+        converters_.clear();
+        pending_.clear();
+        pending_frames_ = 0;
         channels_ = 0;
         taken_ = 0;
         flushed_ = 0;
@@ -187,6 +225,7 @@ public:
     }
 
     [[nodiscard]] std::vector<render::OutputLayout> variants() const override { return variants_; }
+    [[nodiscard]] int coded_substreams() const override { return coded_substreams_; }
 
     std::size_t submit_pcm(std::span<const std::span<const float>> slots, std::size_t frames) override {
         if (!group_) {
@@ -197,6 +236,9 @@ public:
             // that has none for them sends them silence, which keeps the
             // layouts in step rather than leaving the group to take nothing.
             return submit_pcm_variants(slots, {}, frames);
+        }
+        if (!converters_.empty()) {
+            return submit_converted(slots, {}, frames);
         }
         interleave(slots, frames, channels_, interleaved_);
         const std::size_t taken = group_->push(interleaved_);
@@ -213,6 +255,9 @@ public:
         }
         if (variants_.empty()) {
             return submit_pcm(slots, frames);
+        }
+        if (!converters_.empty()) {
+            return submit_converted(slots, variants, frames);
         }
         interleave(slots, frames, channels_, interleaved_);
         variant_buffers_.resize(variants_.size());
@@ -238,6 +283,9 @@ public:
         if (!group_) {
             return false;
         }
+        if (!converters_.empty()) {
+            return true;  // no member of a converting group takes bursts (open())
+        }
         // Group::Burst::payload is std::span<const std::uint8_t> - sendspin's
         // own byte type, not forge's std::byte this interface otherwise
         // matches (network_group_sink.hpp's own submit_burst() comment).
@@ -248,10 +296,76 @@ public:
             {.pc = pc, .pd = pd, .payload = bytes, .frame = frame, .frames = frames});
     }
 
+    // The audio of one block, at the stream's rate, converted to the group's and queued for it. The
+    // group takes what its timeline allows, so what it has not yet taken waits here; this takes
+    // the block (and returns its frames, which are in the stream's rate) while that is under
+    // kPendingSeconds, and none otherwise, so the caller offers the same block again. Every layout
+    // is converted alike, so their queues stay the same length.
+    std::size_t submit_converted(
+        std::span<const std::span<const float>> slots,
+        std::span<const std::span<const std::span<const float>>> variants, std::size_t frames) {
+        constexpr std::size_t kPendingDivisor = 4;  // a quarter of a second
+        std::size_t consumed = 0;
+        if (pending_frames_ < group_rate_ / kPendingDivisor) {
+            std::size_t produced = 0;
+            for (std::size_t index = 0; index < converters_.size(); ++index) {
+                const std::span<const std::span<const float>> block =
+                    index == 0 ? slots
+                    : index - 1 < variants.size() ? variants[index - 1]
+                                                  : std::span<const std::span<const float>>{};
+                converted_.clear();
+                converters_[index].process(block, frames, converted_);
+                const std::size_t width = converters_[index].channels();
+                const std::size_t out_frames = converted_.empty() ? 0 : converted_[0].size();
+                std::vector<std::int32_t>& queue = pending_[index];
+                const std::size_t before = queue.size();
+                queue.resize(before + out_frames * width);
+                for (std::size_t frame = 0; frame < out_frames; ++frame) {
+                    for (std::size_t channel = 0; channel < width; ++channel) {
+                        queue[before + (frame * width) + channel] = to_sample(converted_[channel][frame]);
+                    }
+                }
+                produced = out_frames;
+            }
+            pending_frames_ += produced;
+            consumed = frames;
+            taken_ += frames;
+        }
+        push_pending();
+        return consumed;
+    }
+
+    // Gives the group what it will take of the converted audio waiting for it. Also called from
+    // position(), which the player asks at every turn: after the last block of an item the player
+    // has nothing more to submit, and what is still waiting would otherwise never be sent.
+    void push_pending() const {
+        if (pending_frames_ == 0 || !group_) {
+            return;
+        }
+        std::vector<std::span<const std::int32_t>> blocks;
+        blocks.reserve(pending_.size());
+        for (const std::vector<std::int32_t>& queue : pending_) {
+            blocks.emplace_back(queue);
+        }
+        const std::size_t pushed =
+            pending_.size() == 1 ? group_->push(blocks[0]) : group_->push_variants(blocks);
+        if (pushed == 0) {
+            return;
+        }
+        for (std::size_t index = 0; index < pending_.size(); ++index) {
+            const std::size_t width = converters_[index].channels();
+            pending_[index].erase(
+                pending_[index].begin(),
+                pending_[index].begin() + static_cast<std::ptrdiff_t>(pushed * width));
+        }
+        pending_frames_ -= pushed;
+    }
+
     [[nodiscard]] std::optional<audio::MonitorPosition> position() const override {
         if (!group_) {
             return std::nullopt;
         }
+        push_pending();
         // Played is what the group's timeline has run through - the frame
         // every member is playing now - and never more than has been taken.
         std::uint64_t played = 0;
@@ -273,6 +387,14 @@ public:
         // frame taken is frame flushed_ of its timeline.
         flushed_ += taken_;
         taken_ = 0;
+        // What was converted and not yet taken is not played, and the converters start again.
+        for (std::vector<std::int32_t>& queue : pending_) {
+            queue.clear();
+        }
+        pending_frames_ = 0;
+        for (dsp::StreamResampler& converter : converters_) {
+            converter.reset();
+        }
     }
 
     bool pause() override { return true; }
@@ -333,6 +455,15 @@ private:
     std::vector<std::vector<std::int32_t>> variant_buffers_;
     std::size_t channels_ = 0;
     std::uint32_t sample_rate_ = 0;
+    // The rate the group is sent PCM at: the stream's, or another that the audio is converted to
+    // (GroupPlan::pcm_rate), with a converter for each layout, the player's first, and what each
+    // has made that the group has not yet taken, interleaved, and its frames.
+    std::uint32_t group_rate_ = 0;
+    int coded_substreams_ = 0;
+    std::vector<dsp::StreamResampler> converters_;
+    mutable std::vector<std::vector<std::int32_t>> pending_;
+    mutable std::size_t pending_frames_ = 0;
+    std::vector<std::vector<float>> converted_;
     std::uint64_t taken_ = 0;
     // Frames taken before the last flush() since open().
     std::uint64_t flushed_ = 0;

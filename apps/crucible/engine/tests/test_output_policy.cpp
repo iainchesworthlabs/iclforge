@@ -21,6 +21,12 @@ EndpointFacts avr(bool is_default = false) {
             .accepts_ac3 = true, .shared_channels = 8};
 }
 
+EndpointFacts avr_truehd(bool is_default = false) {
+    EndpointFacts endpoint = avr(is_default);
+    endpoint.accepts_truehd = true;
+    return endpoint;
+}
+
 EndpointFacts dd_only() {
     return {.id = "spdif", .name = "Optical", .accepts_ac3 = true, .shared_channels = 2};
 }
@@ -202,10 +208,78 @@ TEST_CASE("a chosen endpoint that is absent or silent falls back and says so", "
     CHECK(silent.reason.find("silent device") != std::string::npos);
 }
 
+// TrueHD 5.1 (planning/truehd-parity-crucible.md, questions 1 and 3): pin-only until a receiver
+// has read it, so the automatic choice must not move for a receiver that merely accepts it.
+
+TEST_CASE("a receiver that takes TrueHD is not given it unless the mode is pinned", "[crucible]") {
+    const std::vector<EndpointFacts> endpoints = {null_sink(), avr_truehd()};
+    const auto with_key = choose_output({.endpoints = endpoints, .signing_key_loaded = true, .pinned = std::nullopt});
+    CHECK(with_key.mode == OutputMode::kAtmos);
+    const auto without_key = choose_output({.endpoints = endpoints, .signing_key_loaded = false, .pinned = std::nullopt});
+    CHECK(without_key.mode == OutputMode::kDdPlus51);
+
+    const std::vector<EndpointFacts> truehd_only = {null_sink(), tv(), [] {
+        EndpointFacts e{.id = "thd", .name = "TrueHD only", .shared_channels = 2};
+        e.accepts_truehd = true;
+        return e;
+    }()};
+    const auto alone = choose_output({.endpoints = truehd_only, .signing_key_loaded = false, .pinned = std::nullopt});
+    CHECK(alone.mode == OutputMode::kPcmSurround);  // not TrueHD, though "thd" accepts it
+    CHECK(alone.endpoint_id == "tv");
+}
+
+TEST_CASE("a pinned TrueHD mode lands on an endpoint that accepts it, with or without a key", "[crucible]") {
+    const std::vector<EndpointFacts> endpoints = {null_sink(), headphones(), avr_truehd()};
+    for (const bool key : {false, true}) {
+        const auto choice = choose_output({.endpoints = endpoints, .signing_key_loaded = key,
+                                           .pinned = OutputMode::kTrueHd51});
+        CHECK(choice.mode == OutputMode::kTrueHd51);
+        CHECK(choice.endpoint_id == "avr");
+        CHECK(choice.reason.find("pinned by the user") != std::string::npos);
+    }
+}
+
+TEST_CASE("a pinned TrueHD mode that no endpoint can carry falls back and says so", "[crucible]") {
+    const std::vector<EndpointFacts> endpoints = {null_sink(), avr()};  // E-AC-3 and AC-3, not TrueHD
+    const auto choice = choose_output({.endpoints = endpoints, .signing_key_loaded = false,
+                                       .pinned = OutputMode::kTrueHd51});
+    CHECK(choice.mode == OutputMode::kDdPlus51);
+    CHECK(choice.reason.find("TrueHD") != std::string::npos);
+    CHECK(choice.reason.find("falling back") != std::string::npos);
+}
+
+TEST_CASE("TrueHD is never opened exclusively on the default endpoint", "[crucible]") {
+    const std::vector<EndpointFacts> endpoints = {null_sink(false), avr_truehd(/*is_default=*/true), tv()};
+    const auto choice = choose_output({.endpoints = endpoints, .signing_key_loaded = false,
+                                       .pinned = OutputMode::kTrueHd51});
+    CHECK(choice.mode != OutputMode::kTrueHd51);
+    CHECK(choice.reason.find("default") != std::string::npos);
+
+    // The user's own choice of that endpoint is held to the same rule.
+    const auto chosen = choose_output({.endpoints = endpoints, .signing_key_loaded = false,
+                                       .pinned = OutputMode::kTrueHd51, .preferred_endpoint_id = "avr"});
+    CHECK(chosen.mode != OutputMode::kTrueHd51);
+    CHECK(chosen.reason.find("applications play to it") != std::string::npos);
+}
+
+TEST_CASE("a chosen endpoint carries the pinned TrueHD mode when it can", "[crucible]") {
+    const std::vector<EndpointFacts> endpoints = {null_sink(), avr_truehd(), headphones()};
+    const auto choice = choose_output({.endpoints = endpoints, .signing_key_loaded = true,
+                                       .pinned = OutputMode::kTrueHd51, .preferred_endpoint_id = "avr"});
+    CHECK(choice.mode == OutputMode::kTrueHd51);
+    CHECK(choice.reason.find("lossless 5.1 bed") != std::string::npos);
+    CHECK(choice.reason.find("no objects") != std::string::npos);
+
+    // Without the pin the same chosen endpoint gets the best of the rest.
+    const auto unpinned = choose_output({.endpoints = endpoints, .signing_key_loaded = true,
+                                         .pinned = std::nullopt, .preferred_endpoint_id = "avr"});
+    CHECK(unpinned.mode == OutputMode::kAtmos);
+}
+
 TEST_CASE("every output mode describes itself", "[crucible]") {
     for (const auto mode : {OutputMode::kAtmos, OutputMode::kDdPlus51, OutputMode::kDd51,
                             OutputMode::kPcmSurround, OutputMode::kHeadphones, OutputMode::kStereo,
-                            OutputMode::kNone}) {
+                            OutputMode::kTrueHd51, OutputMode::kNone}) {
         CHECK_FALSE(iclforge::crucible::describe(mode).empty());
         CHECK(iclforge::crucible::describe(mode) != "unknown output mode");
     }

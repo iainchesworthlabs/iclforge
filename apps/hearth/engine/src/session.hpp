@@ -17,6 +17,7 @@
 #include "item_source.hpp"
 #include "container_input.hpp"
 #include "queue.hpp"
+#include "decoder_settings.hpp"
 #include "stream_decoder.hpp"
 #include "truehd_index.hpp"
 
@@ -111,6 +112,10 @@ struct LoadedItem {
     // What the file's container said about the stream, for the media
     // information; empty for a bare elementary stream.
     apps::ContainerFacts container{};
+    // Set when the file holds an AC-3, E-AC-3 or AC-4 track beside the one this item is (which is
+    // TrueHD, the first track Hearth can play, as a remux has it first): reads that track in its
+    // place. A Session opened with TrackPreference::kCompressed calls it.
+    std::function<std::expected<LoadedItem, std::string>()> compressed_track{};
 };
 
 using ItemLoader =
@@ -143,7 +148,8 @@ public:
     [[nodiscard]] static std::expected<Session, std::string> open(
         const std::string& path, const ItemLoader& loader,
         std::optional<int> programme = std::nullopt,
-        const iclforge::ac4::PresentationChoice& presentation = {});
+        const iclforge::ac4::PresentationChoice& presentation = {},
+        TrackPreference track = TrackPreference::kBest);
 
     // Movable: the access units are views of the item's own buffer, and a
     // moved vector keeps its buffer, so the views move with it.
@@ -170,6 +176,9 @@ public:
     [[nodiscard]] bool first_programme() const { return first_programme_; }
     // Whether the item is AC-4.
     [[nodiscard]] bool ac4() const { return ac4_; }
+    // The file holds an AC-3, E-AC-3 or AC-4 track that this item is not, because the track it
+    // plays came first: opening the item again with TrackPreference::kCompressed plays that one.
+    [[nodiscard]] bool has_compressed_track() const { return has_compressed_track_; }
     // Whether the item is TrueHD or MLP, and what the index of its stream says.
     [[nodiscard]] bool truehd() const { return index_.has_value(); }
     [[nodiscard]] const TruehdIndex* truehd_index() const { return index_ ? &*index_ : nullptr; }
@@ -293,6 +302,7 @@ private:
     // AC-4: the first frame's table of contents, and which units are
     // I-frames (sized with the units, set by index).
     bool ac4_ = false;
+    bool has_compressed_track_ = false;
     iclforge::ac4::Toc ac4_toc_{};
     std::vector<bool> iframes_;
     // TrueHD and MLP: where the stream is read from, the index of its restarts, the cursor on

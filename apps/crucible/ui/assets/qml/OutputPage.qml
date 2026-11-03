@@ -17,7 +17,7 @@ Flickable {
     clip: true
     readonly property real innerWidth: width - Theme.space6 * 2
     readonly property bool twoUp: innerWidth >= 900
-    readonly property bool wideTable: innerWidth >= 760
+    readonly property bool wideTable: innerWidth >= 820
     // The endpoint table's fixed columns, each as wide as its own heading
     // where the English width is not enough, so a translated head widens
     // its column instead of eliding and the cells under it follow the
@@ -25,6 +25,7 @@ Flickable {
     // columns: a tick, a dash or a channel count sits below it.
     readonly property real eac3Column: Math.max(56, eac3Head.implicitWidth + 8)
     readonly property real ac3Column: Math.max(48, ac3Head.implicitWidth + 8)
+    readonly property real truehdColumn: Math.max(64, truehdHead.implicitWidth + 8)
     readonly property real pcmColumn: Math.max(56, pcmHead.implicitWidth + 8)
     readonly property real spatialColumn: Math.max(60, spatialHead.implicitWidth + 8)
     readonly property real noteColumn: Math.max(220, noteHead.implicitWidth + 8)
@@ -67,7 +68,7 @@ Flickable {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignTop
                     spacing: Theme.space2
-                    Text { Layout.fillWidth: true; text: CrucibleController.modeKey === "atmos" ? qsTr("%1 · E-AC-3 JOC over HDMI").arg(CrucibleController.modeName) : CrucibleController.modeName; color: Theme.text; font.family: Theme.headingFamily; font.pixelSize: Theme.fontTitle; font.weight: Font.Bold; wrapMode: Text.WordWrap }
+                    Text { Layout.fillWidth: true; text: CrucibleController.modeKey === "atmos" ? qsTr("%1 · E-AC-3 JOC over HDMI").arg(CrucibleController.modeName) : CrucibleController.modeKey === "truehd" ? qsTr("%1 · lossless bed in MAT over HDMI, no objects").arg(CrucibleController.modeName) : CrucibleController.modeName; color: Theme.text; font.family: Theme.headingFamily; font.pixelSize: Theme.fontTitle; font.weight: Font.Bold; wrapMode: Text.WordWrap }
                     Text { Layout.fillWidth: true; text: qsTr("%1 The endpoint follows the hardware: pull HDMI and it moves to the next best one below.").arg(CrucibleController.outputReason); color: Theme.textMuted; font.pixelSize: Theme.fontBody; wrapMode: Text.WordWrap }
                 }
                 ColumnLayout {
@@ -103,6 +104,7 @@ Flickable {
                             { label: qsTr("Atmos"), value: "atmos" },
                             { label: qsTr("Dolby Digital Plus 5.1"), value: "ddplus" },
                             { label: qsTr("Dolby Digital 5.1"), value: "dd" },
+                            { label: qsTr("TrueHD 5.1"), value: "truehd" },
                             { label: qsTr("PCM surround"), value: "pcm" },
                             { label: qsTr("Headphones · spatial sound"), value: "headphones" },
                             { label: qsTr("Stereo"), value: "stereo" }]
@@ -187,6 +189,8 @@ Flickable {
                     Text { Layout.fillWidth: true; Layout.minimumWidth: 140; text: qsTr("ENDPOINT"); color: Theme.textMuted; font.pixelSize: Theme.fontMono; font.letterSpacing: 1 }
                     Text { id: eac3Head; Layout.preferredWidth: page.eac3Column; text: qsTr("E-AC-3"); color: Theme.textMuted; font.pixelSize: Theme.fontMono; font.letterSpacing: 1; horizontalAlignment: Text.AlignHCenter }
                     Text { id: ac3Head; Layout.preferredWidth: page.ac3Column; text: qsTr("AC-3"); color: Theme.textMuted; font.pixelSize: Theme.fontMono; font.letterSpacing: 1; horizontalAlignment: Text.AlignHCenter }
+                    //: Column head: whether the endpoint takes TrueHD as a bitstream
+                    Text { id: truehdHead; Layout.preferredWidth: page.truehdColumn; text: qsTr("TRUEHD"); color: Theme.textMuted; font.pixelSize: Theme.fontMono; font.letterSpacing: 1; horizontalAlignment: Text.AlignHCenter }
                     //: Column head over the endpoint's PCM channel count
                     Text { id: pcmHead; Layout.preferredWidth: page.pcmColumn; text: qsTr("PCM CH"); color: Theme.textMuted; font.pixelSize: Theme.fontMono; font.letterSpacing: 1; horizontalAlignment: Text.AlignHCenter }
                     //: Column head: whether the endpoint carries spatial sound
@@ -210,6 +214,7 @@ Flickable {
                         Accessible.description: [
                             endpointRow.modelData.eac3 ? qsTr("E-AC-3") : qsTr("no E-AC-3"),
                             endpointRow.modelData.ac3 ? qsTr("AC-3") : qsTr("no AC-3"),
+                            endpointRow.modelData.truehd ? qsTr("TrueHD") : qsTr("no TrueHD"),
                             endpointRow.modelData.pcmChannels > 0 ? qsTr("%1 PCM channels").arg(endpointRow.modelData.pcmChannels) : qsTr("no PCM"),
                             endpointRow.modelData.spatial ? qsTr("spatial") : "",
                             endpointRow.note
@@ -230,6 +235,7 @@ Flickable {
                             }
                             Text { Layout.preferredWidth: page.eac3Column; text: endpointRow.modelData.eac3 ? "✓" : "—"; color: endpointRow.modelData.eac3 ? Theme.text : Theme.textMuted; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Theme.fontBody }
                             Text { Layout.preferredWidth: page.ac3Column; text: endpointRow.modelData.ac3 ? "✓" : "—"; color: endpointRow.modelData.ac3 ? Theme.text : Theme.textMuted; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Theme.fontBody }
+                            Text { Layout.preferredWidth: page.truehdColumn; text: endpointRow.modelData.truehd ? "✓" : "—"; color: endpointRow.modelData.truehd ? Theme.text : Theme.textMuted; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Theme.fontBody }
                             Text { Layout.preferredWidth: page.pcmColumn; text: endpointRow.modelData.pcmChannels > 0 ? endpointRow.modelData.pcmChannels : "—"; color: endpointRow.modelData.pcmChannels > 0 ? Theme.text : Theme.textMuted; horizontalAlignment: Text.AlignHCenter; font.family: Theme.monoFamily; font.pixelSize: Theme.fontSmall }
                             Text { Layout.preferredWidth: page.spatialColumn; text: endpointRow.modelData.spatial ? "✓" : "—"; color: endpointRow.modelData.spatial ? Theme.text : Theme.textMuted; horizontalAlignment: Text.AlignHCenter; font.pixelSize: Theme.fontBody }
                             Text {
@@ -280,7 +286,8 @@ Flickable {
                         function chosenNote() {
                             const exclusive = CrucibleController.modeKey === "atmos"
                                 || CrucibleController.modeKey === "ddplus"
-                                || CrucibleController.modeKey === "dd";
+                                || CrucibleController.modeKey === "dd"
+                                || CrucibleController.modeKey === "truehd";
                             if (endpointRow.modelData.preferred) {
                                 return exclusive ? qsTr("you hear it here · your choice · exclusive mode")
                                                  : qsTr("you hear it here · your choice");

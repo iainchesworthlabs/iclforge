@@ -29,6 +29,7 @@
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
+#include "truehd_encode_core.hpp"
 #include "truehd_meaning.hpp"
 
 namespace forge_cli::commands {
@@ -37,8 +38,6 @@ namespace {
 
 namespace th = iclforge::truehd;
 
-constexpr std::size_t kChunkFrames = 65536;
-constexpr double kFullScale = 8388608.0;  // 2^23: a 24-bit sample against the WAV reader's [-1, 1)
 
 enum class Output : std::uint8_t { kRaw, kMatroska, kMp4, kTransport, kUnknown };
 
@@ -69,137 +68,6 @@ Output output_kind(std::string_view out_path) {
     return Output::kUnknown;
 }
 
-// The TrueHD channel a WAVE_FORMAT_EXTENSIBLE speaker bit (0-based) stands for: the inverse of what
-// `decode` writes in its channel mask. A back pair is the surround pair when the file has no side
-// pair (the usual 5.1 mask is front, LFE and back), and the rear surround pair when it has both
-// (the usual 7.1 mask). This is this program's reading, not the specification's (libs/truehd
-// ERRATA.md, open question 16).
-std::optional<th::Channel> channel_of_speaker_bit(unsigned bit, bool has_side_pair) {
-    switch (bit) {
-        case 0:
-            return th::Channel::kL;
-        case 1:
-            return th::Channel::kR;
-        case 2:
-            return th::Channel::kC;
-        case 3:
-            return th::Channel::kLfe;
-        case 4:
-            return has_side_pair ? th::Channel::kLrs : th::Channel::kLs;
-        case 5:
-            return has_side_pair ? th::Channel::kRrs : th::Channel::kRs;
-        case 6:
-            return th::Channel::kLc;
-        case 7:
-            return th::Channel::kRc;
-        case 8:
-            return th::Channel::kCs;
-        case 9:
-            return th::Channel::kLs;
-        case 10:
-            return th::Channel::kRs;
-        case 11:
-            return th::Channel::kTs;
-        case 12:
-            return th::Channel::kLvh;
-        case 13:
-            return th::Channel::kCvh;
-        case 14:
-            return th::Channel::kRvh;
-        default:
-            return std::nullopt;
-    }
-}
-
-// How the WAV's channels go into the stream: its channel assignment (0 for the encoder's default
-// for the count) and, for stream channel k, the WAV channel that carries it.
-struct Layout {
-    std::uint32_t assignment = 0;
-    std::vector<std::size_t> wav_index;
-};
-
-// A file with no channel mask is taken in the order `decode` writes (the default layout of its
-// count). One with a mask names its speakers, which are put into the order of the assignment they
-// make; a mask that names speakers TrueHD has no channel for, or that is not one assignment, is an
-// error.
-std::optional<Layout> layout_of(const iclforge::ac3::io::WavData& wav) {
-    const std::size_t count = wav.channels.size();
-    Layout layout;
-    layout.wav_index.resize(count);
-    for (std::size_t i = 0; i < count; ++i) {
-        layout.wav_index[i] = i;
-    }
-    if (wav.channel_mask == 0) {
-        return layout;
-    }
-    if (static_cast<std::size_t>(std::popcount(wav.channel_mask)) != count) {
-        fmt::println(
-            stderr,
-            "warning: the WAV's channel mask names {} speakers for {} channels; the channels "
-            "are taken in the order decode writes them",
-            std::popcount(wav.channel_mask), count);
-        return layout;
-    }
-    const bool has_side_pair = (wav.channel_mask & 0x600U) != 0;
-    std::vector<th::Channel> speakers;
-    for (unsigned bit = 0; bit < 32; ++bit) {
-        if ((wav.channel_mask & (1U << bit)) == 0) {
-            continue;
-        }
-        const auto channel = channel_of_speaker_bit(bit, has_side_pair);
-        if (!channel) {
-            fmt::println(
-                stderr,
-                "error: the WAV's channel mask has a speaker (bit {}) that TrueHD has no channel "
-                "for",
-                bit);
-            return std::nullopt;
-        }
-        speakers.push_back(*channel);
-    }
-    const auto has = [&](th::Channel channel) {
-        return std::ranges::find(speakers, channel) != speakers.end();
-    };
-    std::size_t covered = 0;
-    for (unsigned bit = 0; bit < th::kChannelAssignmentBits; ++bit) {
-        const std::vector<th::Channel> named = th::channels_of_assignment(1U << bit);
-        if (!named.empty() && std::ranges::all_of(named, has)) {
-            layout.assignment |= 1U << bit;
-            covered += named.size();
-        }
-    }
-    if (covered != speakers.size()) {
-        fmt::println(
-            stderr,
-            "error: the WAV's speakers are not a TrueHD channel assignment (L R, C, LFE, Ls "
-            "Rs, Lvh Rvh, Lc Rc, Lrs Rrs, Cs, Ts, Lsd Rsd, Lw Rw, Cvh, LFE2 as pairs and "
-            "singles)");
-        return std::nullopt;
-    }
-    const std::vector<th::Channel> order = th::channels_of_assignment(layout.assignment);
-    for (std::size_t k = 0; k < order.size() && k < count; ++k) {
-        layout.wav_index[k] =
-            static_cast<std::size_t>(std::ranges::find(speakers, order[k]) - speakers.begin());
-    }
-    return layout;
-}
-
-// The WAV reader's [-1, 1) floats back to the integers they were read from: a 16 or 24 bit PCM
-// sample survives the trip exactly (a float32 holds 24 bits), and a wider one or a float is rounded
-// to 24 bits. Stream channel k comes from WAV channel `wav_index[k]`.
-void interleave(const iclforge::ac3::io::WavData& wav, std::span<const std::size_t> wav_index,
-                std::size_t begin, std::size_t end, std::vector<std::int32_t>& out) {
-    const std::size_t channels = wav.channels.size();
-    out.resize((end - begin) * channels);
-    for (std::size_t i = begin; i < end; ++i) {
-        for (std::size_t c = 0; c < channels; ++c) {
-            const double scaled =
-                std::nearbyint(static_cast<double>(wav.channels[wav_index[c]][i]) * kFullScale);
-            out[(i - begin) * channels + c] =
-                static_cast<std::int32_t>(std::clamp(scaled, -kFullScale, kFullScale - 1.0));
-        }
-    }
-}
 
 int exit_code_for(th::EncodeErrorKind kind) {
     switch (kind) {
@@ -288,9 +156,13 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         return kExitInput;
     }
 
-    const auto layout = layout_of(*wav);
+    const auto layout = iclforge::apps::truehd_encode::layout_of(*wav);
     if (!layout) {
+        fmt::println(stderr, "error: {}", layout.error());
         return kExitInput;
+    }
+    for (const std::string& warning : layout->warnings) {
+        fmt::println(stderr, "warning: {}", warning);
     }
 
     th::EncoderConfig config;
@@ -326,39 +198,16 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
     }
     config.verify = meta.verify;
 
-    auto encoder = th::Encoder::create(config);
-    if (!encoder) {
-        report(encoder.error());
-        return exit_code_for(encoder.error().kind);
+    auto outcome = iclforge::apps::truehd_encode::encode_wav(*wav, *layout, config);
+    if (!outcome) {
+        report(outcome.error().error);
+        return exit_code_for(outcome.error().error.kind);
     }
-
-    std::vector<std::byte> stream;
-    std::uint64_t access_units = 0;
-    const auto take = [&](const std::vector<th::EncodedAccessUnit>& units) {
-        for (const th::EncodedAccessUnit& unit : units) {
-            stream.insert(stream.end(), unit.bytes.begin(), unit.bytes.end());
-            ++access_units;
-        }
-    };
-    std::vector<std::int32_t> pcm;
+    const std::vector<std::byte>& stream = outcome->stream;
+    const std::uint64_t access_units = outcome->access_units;
     const std::size_t frames = wav->frame_count();
-    for (std::size_t at = 0; at < frames; at += kChunkFrames) {
-        interleave(*wav, layout->wav_index, at, std::min(frames, at + kChunkFrames), pcm);
-        const auto units = encoder->encode(pcm);
-        if (!units) {
-            report(units.error());
-            return exit_code_for(units.error().kind);
-        }
-        take(*units);
-    }
-    const auto last = encoder->flush();
-    if (!last) {
-        report(last.error());
-        return exit_code_for(last.error().kind);
-    }
-    take(*last);
 
-    const th::EncoderStats& stats = encoder->stats();
+    const th::EncoderStats& stats = outcome->stats;
     const double pcm_bytes =
         static_cast<double>(frames) * static_cast<double>(config.channels) * 3.0;
     FILE* status = status_stream(out_path);
@@ -369,7 +218,7 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
                        frames, config.channels, config.sample_rate, access_units,
                        stats.restart_intervals, stream.size(),
                        100.0 * static_cast<double>(stream.size()) / pcm_bytes,
-                       encoder->substreams());
+                       outcome->substreams);
         if (stats.rate_violations != 0) {
             status_println(
                 status,

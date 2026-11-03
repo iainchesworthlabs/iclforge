@@ -325,6 +325,7 @@ Flickable {
                     onSelected: function(value) { CrucibleController.lowLatency = value === "low"; }
                 }
                 Note { text: qsTr("Low latency shortens the E-AC-3 frame to one block and raises the bitrate to about 1.5 Mb/s so fifteen objects' metadata still fits. The receiver's own decode delay does not change. Changing this restarts the stream.") }
+                Note { objectName: "truehdLatencyNote"; visible: CrucibleController.modeKey === "truehd"; text: qsTr("Not applicable to TrueHD 5.1, which has no short-frame form: its encoder works in intervals of about a tenth of a second and the stream leaves in 20 ms bursts, so it adds that delay before the receiver's own. It has not been measured end to end.") }
             }
 
             ColumnLayout {
@@ -371,6 +372,7 @@ Flickable {
                     }
                     Note { text: qsTr("E-AC-3 · 5.1 bed + up to 15 objects · automatic is 448 kb/s, or 1536 kb/s in low latency") }
                 }
+                Note { objectName: "truehdBitrateNote"; visible: CrucibleController.modeKey === "truehd"; text: qsTr("Not applicable to TrueHD 5.1. It is lossless from the 24-bit values the mix is rounded to, and its rate follows the music, so there is no bitrate to set.") }
                 CrucibleCheck { objectName: "splitCheck"; Layout.fillWidth: true; text: qsTr("Split stereo applications into two objects"); note: qsTr("Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application's row can override it."); checked: CrucibleController.splitStereo; onToggled: function(on) { CrucibleController.splitStereo = on; } }
             }
 

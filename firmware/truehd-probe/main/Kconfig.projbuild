@@ -1,0 +1,31 @@
+menu "TrueHD probe"
+    config TRUEHD_PROBE_TASK_STACK_BYTES
+        int "Stack of the decoding task, in bytes"
+        default 131072
+        help
+            The decoder's frame is some 33 KB on a host (planning/truehd-parity-esp32-sinks.md), and on
+            an ESP32-C6 it overran a 48 KB stack by 10 KB (a stack-protection fault, and on the
+            ESP32-S3, with no such check, a silent hang). The probe reports the stack the task
+            reached, and this is what it was given.
+
+    config TRUEHD_PROBE_START_DELAY_MS
+        int "Wait before the probe starts, in milliseconds"
+        default 6000
+        help
+            The console is USB-Serial/JTAG: a host opens its port after the chip has reset, so the
+            probe waits for it.
+
+    config TRUEHD_PROBE_BISECT
+        int "Print each step of the first unit's decode (1), or not (0)"
+        default 0
+        help
+            For finding where a decoder that does not return stops.
+
+    config TRUEHD_PROBE_TRACE
+        bool "Trace the decoder's function entries and print the last ones if it does not return"
+        default n
+        help
+            The decoder's sources are compiled with -finstrument-functions, a ring remembers the last
+            sixteen functions entered, and a task on the other core prints them when the probe has
+            been silent for 3 s. Resolve the addresses with addr2line on the .elf.
+endmenu
