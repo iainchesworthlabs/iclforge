@@ -25,7 +25,8 @@ iclforge_add_test_binary(iclforge-forge-cli-tests PROJECT forge-cli SOURCES
     test_cli_encode_paths.cpp test_cli_stream_edges.cpp
     test_cli_inspect_edges.cpp test_cli_atmos_edges.cpp test_cli_karaoke_example.cpp
     test_cli_karaoke_duet_example.cpp test_cli_project.cpp test_cli_lyrics.cpp
-    test_cli_truehd.cpp test_cli_truehd_meta.cpp test_cli_truehd_cut.cpp test_cli_truehd_probe.cpp test_cli_decode_strict.cpp
+    test_cli_truehd.cpp test_cli_truehd_meta.cpp test_cli_truehd_cut.cpp test_cli_truehd_probe.cpp
+    test_cli_truehd_objects.cpp test_cli_truehd_rate.cpp test_cli_decode_strict.cpp
     test_cli_content_signature.cpp)
 # The same device-facing commands with a device to find: software ALSA
 # devices (tests/support/alsa_null_device.hpp), so only in the ALSA configuration.
@@ -77,7 +78,8 @@ target_include_directories(iclforge-forge-cli-tests PRIVATE
 # (apps/forge/cli/CMakeLists.txt's own ICLFORGE_BUILD_ADM guard).
 if(ICLFORGE_BUILD_ADM)
     target_sources(iclforge-forge-cli-tests PRIVATE test_cli_atmos_adm.cpp test_cli_atmos_iab.cpp
-                                                    test_cli_decode_adm.cpp test_cli_atmos_adm_ac4.cpp)
+                                                    test_cli_decode_adm.cpp test_cli_atmos_adm_ac4.cpp
+                                                    test_cli_truehd_adm.cpp)
     # These four build ADM and IAB fixtures with the libraries' own headers.
     target_link_libraries(iclforge-forge-cli-tests PRIVATE iclforge::adm)
     if(TARGET iclforge::iab)
@@ -93,6 +95,7 @@ target_link_libraries(iclforge-forge-cli-tests
         iclforge::ac4
         iclforge::truehd
         iclforge::objects
+        iclforge::render
         iclforge::json)
 # test_cli_truehd.cpp decodes and probes the FFmpeg fixtures of testdata/truehd, and holds the WAV to the
 # manifest's digests.

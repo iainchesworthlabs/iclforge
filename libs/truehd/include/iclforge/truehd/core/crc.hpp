@@ -54,9 +54,15 @@ namespace iclforge::truehd {
 // the output channel's position. In a stream whose ch_assign is the identity the two are the same,
 // which is every stream FFmpeg's encoder writes; FFmpeg's decoder shifts by the matrix channel
 // (`hb_matrices.thd`, ERRATA entry 12). **Provisional, owner to confirm** (open question 6).
+//
+// The shift is the channel number modulo 8: a shift by a channel of 8 or more (a 12 to 16 channel
+// object substream) would push the top bits of the sample out of the 32 bit word, and the owner's
+// Dolby Encoding Engine streams show the check keeps them: the byte the four bytes of the word
+// fold to is the same as for a word rotated by the channel, which is the same as a shift by the
+// channel modulo 8 (ERRATA entry 69). Channels 0 to 7 are as before.
 [[nodiscard]] constexpr std::uint32_t lossless_fold_step(std::uint32_t fold, std::uint32_t sample,
                                                          unsigned matrix_channel) noexcept {
-    return matrix_channel >= 32 ? fold : fold ^ ((sample & 0xFFFFFFU) << matrix_channel);
+    return fold ^ ((sample & 0xFFFFFFU) << (matrix_channel & 7U));
 }
 
 // The 8-bit value a restart header carries for the interval whose samples folded to `fold`: the

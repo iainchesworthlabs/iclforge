@@ -1,12 +1,13 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 
+#include <algorithm>
 #include <array>
 
 #include "core/bit_io.hpp"
-#include "io/channel_meaning_fields.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "io/channel_meaning_fields.hpp"
 
 namespace iclforge::truehd {
 
@@ -265,10 +266,89 @@ std::expected<MajorSync, Error> parse_major_sync(std::span<const std::byte> data
     return major_sync;
 }
 
+std::string_view extra_channel_meaning_problem(const ExtraChannelMeaning& extra) noexcept {
+    if (extra.sixteench_dialogue_norm > 31) {
+        return "sixteench_dialogue_norm is 5 bits: 0 to 31 (TH spec §14.2)";
+    }
+    if (extra.sixteench_mix_level > 63) {
+        return "sixteench_mix_level is 6 bits: 0 to 63 (TH spec §14.2)";
+    }
+    if (extra.sixteench_channel_count > 31) {
+        return "sixteench_channel_count is 5 bits: 0 to 31 (TH spec §14.2)";
+    }
+    if (extra.dyn_object_only) {
+        return {};
+    }
+    if (extra.content_description > 15) {
+        return "sixteench_content_description is 4 bits: 0 to 15 (TH spec §14.2)";
+    }
+    if (extra.channel_assignment > 1023) {
+        return "sixteench_channel_assignment is 10 bits: 0 to 1023 (TH spec §14.2)";
+    }
+    if (extra.isf > 7) {
+        return "sixteench_isf is 3 bits: 0 to 7 (TH spec §14.2)";
+    }
+    if (extra.dynamic_object_count > 31) {
+        return "sixteench_dynamic_object_count is 5 bits: 0 to 31 (TH spec §14.2)";
+    }
+    return {};
+}
+
+namespace {
+
+// TH spec §14.2, as read_extra reads it: the 4 bit length, the fields, and zero bits up to the
+// (length + 1) 16-bit words the length names, the length counting the nibble itself. The owner's
+// discs have length 1 with the 18 bits of a dynamic-object-only programme and 10 zero bits after
+// them (planning/truehd-disc-findings.md, question 2).
+void write_extra(BitWriter& writer, const ExtraChannelMeaning& extra) {
+    BitWriter body;
+    put_field(body, extra.sixteench_dialogue_norm, 5);
+    put_field(body, extra.sixteench_mix_level, 6);
+    put_field(body, extra.sixteench_channel_count, 5);
+    put_field(body, extra.dyn_object_only ? 1U : 0U, 1);
+    if (extra.dyn_object_only) {
+        put_field(body, extra.lfe_present ? 1U : 0U, 1);
+    } else {
+        put_field(body, extra.content_description, 4);
+        if ((extra.content_description & 1U) != 0) {
+            put_field(body, extra.chan_distribute ? 1U : 0U, 1);
+            put_field(body, extra.lfe_only ? 1U : 0U, 1);
+            if (!extra.lfe_only) {
+                put_field(body, extra.channel_assignment, 10);
+            }
+        }
+        if ((extra.content_description & 2U) != 0) {
+            put_field(body, extra.isf, 3);
+        }
+        if ((extra.content_description & 4U) != 0) {
+            put_field(body, extra.dynamic_object_count, 5);
+        }
+    }
+    const std::size_t bits = 4 + body.bit_count();
+    const std::size_t words = (bits + 15) / 16;
+    put_field(writer, static_cast<unsigned>(words - 1), 4);
+    writer.append(body);
+    std::size_t fill = words * 16 - bits;
+    while (fill > 0) {
+        const std::size_t step = std::min<std::size_t>(fill, 16);
+        put_field(writer, 0, static_cast<int>(step));
+        fill -= step;
+    }
+}
+
+}  // namespace
+
 std::expected<std::vector<std::byte>, Error> write_major_sync(const MajorSync& major_sync) {
     if (major_sync.extra.has_value()) {
-        return std::unexpected(
-            Error{ErrorKind::kUnsupported, "writing a major sync with the 16-channel extension"});
+        if (major_sync.kind != StreamKind::kTrueHd || !major_sync.channel_meaning.extra_present) {
+            return std::unexpected(
+                Error{ErrorKind::kBadParameter,
+                      "the 16-channel extension needs a TrueHD major sync with extra_present"});
+        }
+        if (const std::string_view field = extra_channel_meaning_problem(*major_sync.extra);
+            !field.empty()) {
+            return std::unexpected(Error{ErrorKind::kBadParameter, field});
+        }
     }
     if (major_sync.kind == StreamKind::kTrueHd) {
         if (const std::string_view field = channel_meaning_problem(major_sync.channel_meaning);
@@ -297,6 +377,9 @@ std::expected<std::vector<std::byte>, Error> write_major_sync(const MajorSync& m
         for (const std::uint8_t byte : major_sync.channel_meaning_bytes) {
             put_field(writer, byte, 8);
         }
+    }
+    if (major_sync.extra.has_value()) {
+        write_extra(writer, *major_sync.extra);
     }
     std::vector<std::byte> bytes = writer.take();
     const std::uint16_t crc = major_sync_crc(bytes);

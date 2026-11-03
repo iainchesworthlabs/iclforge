@@ -103,4 +103,11 @@ write_access_unit_prefix(const std::optional<MajorSync>& major_sync,
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::size_t access_unit_length_bytes(
     std::span<const std::byte> data) noexcept;
 
+// The length in bytes of the AC-3 frame at the start of `data`, or 0 when none is there. A Blu-ray
+// TrueHD track carries the AC-3 core of the same programme between its access units: 48 kHz, an
+// A/52 sync word, a frame size code and a bit stream id of 8 or less. Nothing else is looked at, and
+// a frame that runs past `data` is not one.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::size_t ac3_core_frame_bytes(
+    std::span<const std::byte> data) noexcept;
+
 }  // namespace iclforge::truehd

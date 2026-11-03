@@ -1359,6 +1359,11 @@ jobs:
       # encoder is deterministic, so a change that makes any of the 13 larger fails here.
       - name: TrueHD encoder size against FFmpeg's and DEE's streams
         run: python3 tools/checks/compare_truehd_encoders.py --forge build/config-linux-llvm/bin/forge --max-ratio-ffmpeg 1.0 --max-ratio-dee 1.0
+      # forge truehd-atmos: the object channels in substream 3 against the reference decoder and the
+      # WAV they came from, and the 7.1 bed against FFmpeg's strict decode, which leaves substream 3
+      # alone (libs/truehd/ERRATA.md entries 61 to 64).
+      - name: TrueHD Atmos encoder: objects against the reference, the bed against FFmpeg
+        run: python3 tools/checks/verify_truehd_atmos_interop.py --forge build/config-linux-llvm/bin/forge --require-ffmpeg
 
       # The seeds that ever made the encoder write a stream a decoder disagreed with, replayed exactly
       # (REGRESSION_SEEDS in the script): deterministic and quick, so it gates. The unseeded search is

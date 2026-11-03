@@ -220,7 +220,7 @@ int run_words(const std::vector<std::string>& words) {
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 49> kCommands{{
+constexpr std::array<Command, 50> kCommands{{
     {"silence", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -412,6 +412,22 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStdio | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
+    {"truehd-atmos", 3, "<objects.wav|master.adm.wav> <out.thd|out.mkv|out.mp4|out.ts> [paths.txt]",
+     "2 to 16 channels of 24 bit PCM at 48 kHz, or an ADM master (BW64; needs -DICLFORGE_BUILD_ADM=ON, "
+     "its LFE first and then its beds and objects, on the paths it gives them), as the object channels "
+     "of a TrueHD Atmos stream: "
+     "substream 3 (restart sync 0x31EC), the first channel the LFE (truehd-objects-lfe=off: all "
+     "objects), beside a 7.1 bed in substreams 0 to 2 (truehd-bed=<7.1 WAV>, or the objects "
+     "placed on 7.1 by the renderer from the same metadata) and the objects' positions in the "
+     "evolution frames of the access units, one frame every 1536 samples. paths.txt is atmos-path's "
+     "scene file for the objects after the LFE; the others stand in an even fan around the room. "
+     "Decoding it with truehd-presentation=all gives the object channels back, bit for bit, and "
+     "the best presentation the bed. Nothing outside this project reads substream 3, so the stream "
+     "is provisional and unsigned, and a licensed decoder may not accept it (libs/truehd/ERRATA.md "
+     "entries 61 to 64). The other truehd-* options are truehd-encode's",
+     topic::kStdio | topic::kTruehd | topic::kObjects,
+     Needs::kNothing,
+     [](const Args& x) { return run_truehd_atmos(x.str(1), x.str(2), x.str(3), x.meta); }},
     {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path> [publisher-uuid=<uuid>]",
      "append a content signature (ECDSA P-256, Thrift-serialised, with the certificate chain) after "
      "the last sync frame of a raw AC-4 stream, making a signed copy. The key and chain are the "
@@ -443,7 +459,10 @@ constexpr std::array<Command, 49> kCommands{{
      "for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): "
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
-     "pinned to their speaker, dynamic objects positioned by their own timeline. strict: exit 2, "
+     "pinned to their speaker, dynamic objects positioned by their own timeline. For TrueHD, "
+     "truehd-presentation=all gives objects_dir each channel of substream 3 and adm_out its beds "
+     "and objects (provisional, libs/truehd/ERRATA.md entry 61), and another presentation gives "
+     "adm_out its bed alone. strict: exit 2, "
      "after writing what could be decoded, when any frame or unit was lost after the first one "
      "decoded (an AC-4 frame waiting for an I-frame, a concealed frame, a TrueHD unit a lenient "
      "decode dropped); without it such a decode exits 0 and warns",

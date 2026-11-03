@@ -129,14 +129,48 @@ struct MatrixSpec {
     std::array<bool, kMaxChannels + kNoiseChannels> present{};
     std::array<std::int32_t, kMaxChannels + kNoiseChannels> coeff{};
     std::uint8_t noise_shift = 0;  // 4 bits, sent when the restart's noise_type is set
+    // The matrices of restart sync 0x31EC (TH spec §10.2.1a) also send these three. f_shift widens
+    // the range of the coefficients: the real value is coeff / 2^(frac_bits - f_shift), -1 to 6.
+    // field_2b and field_m4 are reserved and carried as read.
+    std::int8_t f_shift = 0;
+    std::uint8_t field_2b = 0;  // 2 bits
+    std::uint8_t field_m4 = 0;  // 4 bits
+    // The extension of the object-audio matrices (ERRATA.md entry 69): a width, a scale
+    // (ext_field2) and one delta for each present coefficient. The delta is the slope of the
+    // coefficient, a change of delta / 2^ext_field2 raw places in every access unit.
+    std::uint8_t ext_width = 0;   // 4 bits
+    std::uint8_t ext_field2 = 0;  // 2 bits
+    std::array<std::int32_t, kMaxChannels> ext_value{};
     friend bool operator==(const MatrixSpec&, const MatrixSpec&) = default;
+};
+
+// What write_object_matrices sends of an object-audio section (ERRATA.md entry 69). The reader
+// does not fill it in. The default is a full section: A and B set, every header and coefficient, no
+// second precision term.
+struct ObjectSectionForm {
+    // A: the coefficients follow; clear, the set stands with its running coefficients
+    bool change = true;
+    // B (with A): the headers follow; clear, coefficients alone on the headers that stand
+    bool headers = true;
+    // A2: the extension is on; clear, every slope is cleared
+    bool extension = false;
+    // B2 (with A2): a delta for each coefficient of a matrix with a width follows; clear, the
+    // slopes stand
+    bool deltas = false;
+    // C2 (with B2): each matrix's width and scale follow
+    bool widths = false;
+    friend bool operator==(const ObjectSectionForm&, const ObjectSectionForm&) = default;
 };
 
 // The matrices a block header sends: `count` of `items` are used. A fixed array, so that reading a
 // header does not allocate.
 struct MatrixSet {
-    std::array<MatrixSpec, kMaxMatrices> items{};
+    std::array<MatrixSpec, kMaxObjectMatrices> items{};
     std::uint8_t count = 0;
+    bool extension = false;    // object-audio matrices: the section has the extension (A2)
+    bool coeffs_sent = false;  // object-audio matrices: the section sends coefficients (A)
+    bool deltas_sent = false;  // object-audio matrices: the section replaces the deltas (A2 and B2)
+    ObjectSectionForm form;    // object-audio matrices: how the writer sends the set; not read back
     friend bool operator==(const MatrixSet&, const MatrixSet&) = default;
 };
 
@@ -157,6 +191,14 @@ struct BlockContext {
     int max_chan = 0;
     int max_matrix_chan = 0;
     bool noise_type = false;
+    // Restart sync 0x31EC: the matrix section is the object-audio variant of TH spec §10.2.1a.
+    bool object_matrices = false;
+    // The object-audio matrices in force before this header: its headers are the ones a section
+    // that sends none reuses (TH spec §10.2.1a). Not owned; null when there are none.
+    const MatrixSet* object_previous = nullptr;
+    // The open grammar of the second precision term, for the owner's trials (ERRATA.md entry 69):
+    // bit 0 reads a value for every matrix channel and not for the present ones, bit 1 shares one
+    // width and one reserved field among the matrices.
     std::uint8_t presence_flags = presence::kAll;  // in effect before this header
     friend bool operator==(const BlockContext&, const BlockContext&) = default;
 };

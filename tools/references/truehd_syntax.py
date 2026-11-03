@@ -26,7 +26,8 @@ RESTART_SYNCS = (0x31EA, 0x31EB, 0x31EC)
 END_MARKER = 0xD234E  # TH spec 16.5 terminatorA, ERRATA 14
 TERMINATOR_A = (0xD234E, 0x348D3)  # TH spec 16.5.1: both are accepted
 NOISE_CHANNELS = 2
-MATRIX_SHIFT = 14
+MATRIX_SHIFT = 15  # coefficients are scaled to 2^-15 (ERRATA 60); frac_bits runs to 15
+OBJECT_SHIFT = 18  # the object matrices' coefficients are at 2^-18 (ERRATA 69)
 
 # TH spec 17.4: generator 1's noise table, indexed by the seed's bits 15 to 22.
 NOISE_TABLE = (
@@ -254,6 +255,12 @@ class Substream:
         self.index = index
         self.running = False
         self.noise_type = False
+        self.object_matrices = False
+        self.object_set = []
+        self.object_extension = False
+        self.object_ramp = []
+        self.rate_shift = 0  # 0 at 48 and 44.1 kHz, 1 at 96 and 88.2, 2 at 192 and 176.4
+        self.unit_size = 40  # samples in an access unit: 40 << rate_shift
         self.interval = None  # the fold of the output since the last restart
         self.noise_buffer = None  # generator 1's values for this access unit (TH spec 17.3)
         self.noise_size = 64  # access_unit_size_pow2: 64, 128 or 256 (ERRATA, noise generator 1)
@@ -286,7 +293,11 @@ class Substream:
             raise StreamError("restart header CRC")
         # Restart sync 0x31EB is noise_type 1: generator 1 (TH spec 17.3) and matrices with no noise
         # coefficients but a noise shift each (ERRATA 32).
-        self.noise_type = sync == 0x31EB
+        # Restart sync 0x31EC draws generator 1's noise too, its matrices' `field_m4` the noise
+        # shift (ERRATA 69).
+        self.noise_type = sync in (0x31EB, 0x31EC)
+        # Restart sync 0x31EC has the object-audio matrix section (TH spec 10.2.1a).
+        self.object_matrices = sync == 0x31EC
         if self.running and self.interval is not None:
             if fold_check(self.interval) != lossless_check:
                 raise StreamError("lossless check")
@@ -298,6 +309,9 @@ class Substream:
         self.flags = 0xFF
         self.block_size = 8
         self.matrices = []
+        self.object_set = []  # the last object matrix set, headers, widths and state (ERRATA 69)
+        self.object_extension = False
+        self.object_ramp = []
         self.output_shift = [0] * (self.max_matrix_chan + 1)
         self.quant = [0] * (self.max_chan + 1)
         self.channels = [Channel() for _ in range(self.max_chan + 1)]
@@ -334,7 +348,85 @@ class Substream:
             channel.huff_type = bits.read(2)
             channel.huff_lsbs = bits.read(5)
 
+    def read_object_matrices(self, bits):
+        """TH spec 10.2.1a (ERRATA 69). A: coefficients are sent (0: the matrices stand as they
+        are, running coefficients included); B: new headers follow (0: the last set's headers
+        stand and only coefficients are sent); with B the count less one and the header of every
+        matrix (output channel, frac_bits, f_shift + 1, 2 bits of LSB bypass, a 4 bit noise shift,
+        a presence mask), then every matrix's coefficients. Then the extension: A2, B2, C2 (each
+        inside the one before). Without A2 the extension is off and every delta is cleared; with
+        A2 and without B2 the deltas stand; with B2 every delta is replaced: C2 has a width
+        (4 bits) and ext_field2 (2 bits) for each matrix, else the last ones stand, then a signed
+        delta of width + 1 bits for each present channel of each matrix whose width is not 0 (the
+        others are 0). New headers keep the width, ext_field2 and deltas of the matrix at the
+        same place in the last set; a restart clears the set.
+
+        A matrix keeps its coefficients `c` at 2^-18 (the noise channels follow the matrix
+        channels, with coefficient 0) and its deltas `d`, which decode_block runs."""
+        channels = self.max_matrix_chan + 1
+        previous = self.object_set
+        if bits.read(1):
+            if bits.read(1):
+                count = bits.read(4) + 1
+                current = []
+                for place in range(count):
+                    matrix = {
+                        "out": bits.read(4),
+                        "frac_bits": bits.read(4),
+                        "f_shift": bits.read(3) - 1,
+                        "bypass": bits.read(
+                            2
+                        ),  # the bits a sample of the LSB bypass (ERRATA 69, provisional)
+                        "noise_shift": bits.read(4),
+                        "mask": bits.read(channels),
+                    }
+                    old = previous[place] if place < len(previous) else None
+                    matrix["width"] = old["width"] if old else 0
+                    matrix["field2"] = old["field2"] if old else 0
+                    matrix["d"] = list(old["d"]) if old else [0] * (channels + NOISE_CHANNELS)
+                    if matrix["frac_bits"] - matrix["f_shift"] > MATRIX_SHIFT:
+                        raise StreamError("matrix coefficients finer than 2^-15")
+                    current.append(matrix)
+            else:
+                if not previous:
+                    raise StreamError("object matrices reuse headers none were sent for")
+                current = [{**matrix, "d": list(matrix["d"])} for matrix in previous]
+            for matrix in current:
+                scale = OBJECT_SHIFT - matrix["frac_bits"] + matrix["f_shift"]
+                matrix["c"] = [0] * (channels + NOISE_CHANNELS)
+                for channel in range(channels):
+                    if matrix["mask"] >> channel & 1:
+                        matrix["c"][channel] = bits.signed(matrix["frac_bits"] + 2) << scale
+        else:
+            current = previous
+        self.object_extension = bool(bits.read(1))
+        if not self.object_extension:
+            for matrix in current:
+                matrix["d"] = [0] * (channels + NOISE_CHANNELS)
+        elif bits.read(1):
+            if bits.read(1):
+                for matrix in current:
+                    matrix["width"] = bits.read(4)
+                    matrix["field2"] = bits.read(2)
+            for matrix in current:
+                matrix["d"] = [0] * (channels + NOISE_CHANNELS)
+                if matrix["width"]:
+                    for channel in range(channels):
+                        if matrix["mask"] >> channel & 1:
+                            matrix["d"][channel] = bits.signed(matrix["width"] + 1)
+        self.object_set = current
+        self.object_ramp = [
+            self.object_ramp[place] if place < len(self.object_ramp) else 0
+            for place in range(len(current))
+        ]
+        return [
+            (matrix["out"], matrix["c"], matrix["bypass"], matrix["noise_shift"])
+            for matrix in current
+        ]
+
     def read_matrices(self, bits):
+        if self.object_matrices:
+            return self.read_object_matrices(bits)
         matrices = []
         for _ in range(bits.read(4)):
             out = bits.read(4)
@@ -393,7 +485,7 @@ def decode_block(sub, bits, rows, first):
                 row[column] = 0
     bypass = []
     for i in range(size):
-        bits_for_sample = [bits.read(1) if matrix[2] else 0 for matrix in sub.matrices]
+        bits_for_sample = [bits.read(matrix[2]) if matrix[2] else 0 for matrix in sub.matrices]
         bypass.append(bits_for_sample)
         for ch in range(sub.min_chan, sub.max_chan + 1):
             rows[first + i][ch] = residual(bits, sub.channels[ch], sub.quant[ch])
@@ -436,20 +528,52 @@ def decode_block(sub, bits, rows, first):
             seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
         sub.noise_seed = seed
     # The primitive matrices (ERRATA 8).
-    for index, (out, coeffs, _lsb_bypass, noise_shift) in enumerate(sub.matrices):
+    shift = OBJECT_SHIFT if sub.object_matrices else MATRIX_SHIFT
+    if sub.object_matrices and first == 0:
+        sub.object_ramp = [0] * len(sub.object_set)  # the ramps restart with the access unit
+    for index, (out, coeffs, lsb_bypass, noise_shift) in enumerate(sub.matrices):
         keep = s32((-1 << sub.quant[out]) & 0xFFFFFFFF) if out <= sub.max_chan else -1
         # Generator 1's noise (TH spec 17.3): the matrix starts the unit at the index of the
         # matrices left (this one included) and steps by twice that, plus one, a sample.
         left = len(sub.matrices) - index
+        extension = sub.object_matrices and sub.object_extension
+        if extension:
+            state = sub.object_set[index]
+            present = [c for c in range(sub.max_matrix_chan + 1) if state["mask"] >> c & 1]
+            fine_shift = state["field2"] - state["f_shift"] + state["frac_bits"]
         for i in range(size):
             row = rows[first + i]
             total = sum(row[c] * coeffs[c] for c in range(sub.max_matrix_chan + 1))
             for noise in range(NOISE_CHANNELS):  # the noise channels follow the matrix channels
                 total += row[16 + noise] * coeffs[sub.max_matrix_chan + 1 + noise]
+            if extension:
+                # The deltas' share (ERRATA 69): the sum of rows times deltas, scaled by the
+                # matrix's shift, grows by the ramp over the access unit; the coefficients take
+                # the deltas up at its end.
+                fine = sum(row[c] * state["d"][c] for c in present)
+                step = fine >> fine_shift if fine_shift >= 0 else fine << -fine_shift
+                total += s32(step) * sub.object_ramp[index]
+                sub.object_ramp[index] += (0x666 >> sub.rate_shift) * 4
             if noise_shift:
                 slot = (left + (first + i) * (2 * left + 1)) % sub.noise_size
-                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7))
-            row[out] = s32(((total >> MATRIX_SHIFT) & keep) + bypass[i][index])
+                total += sub.noise_buffer[slot] * (1 << (noise_shift + 7 + shift - 14))
+            if sub.object_matrices:
+                # An object matrix gives the sum as it is, plus the bypass bits where it has the
+                # LSB bypass; without the bypass the whole sum takes the output channel's
+                # quantiser step.
+                if lsb_bypass:
+                    row[out] = s32(s32(total >> shift) + bypass[i][index])
+                else:
+                    row[out] = s32(total >> shift) & keep
+            else:
+                row[out] = s32(((total >> shift) & keep) + bypass[i][index])
+    if sub.object_matrices and sub.object_extension and first + size == sub.unit_size:
+        for state in sub.object_set:
+            up = OBJECT_SHIFT - (state["field2"] - state["f_shift"] + state["frac_bits"])
+            for c in range(sub.max_matrix_chan + 1):
+                if state["mask"] >> c & 1:
+                    delta = state["d"][c] << up if up >= 0 else state["d"][c] >> -up
+                    state["c"][c] = s32(state["c"][c] + delta)
     # The output: the matrix channel ch_assign assigns to the output channel (ERRATA 42), then the
     # output shift of that matrix channel (TH spec 7.3, ERRATA 12): the shifts are listed by matrix
     # channel.
@@ -464,8 +588,8 @@ def decode_block(sub, bits, rows, first):
         if sub.interval is None:
             sub.interval = 0
         for ch, value in enumerate(out_row):
-            # The shift is the matrix channel the output channel takes (ERRATA 12, provisional).
-            sub.interval ^= (value & 0xFFFFFF) << sub.output_source[ch]
+            # The shift is the matrix channel the output channel takes, modulo 8 (ERRATA 12, 69).
+            sub.interval ^= (value & 0xFFFFFF) << (sub.output_source[ch] & 7)
             sub.interval &= 0xFFFFFFFF
     return output_rows
 
@@ -510,10 +634,31 @@ def decode_segment(sub, entry, segment, rows):
     return out, padding
 
 
+AC3_WORDS_48K = (64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896)
+AC3_WORDS_48K += (1024, 1152, 1280)
+
+
+def ac3_core_frame_bytes(data, offset):
+    """The length of the AC-3 frame at `offset`, or 0: a Blu-ray track carries the programme's AC-3
+    core (48 kHz, bit stream id 8 or less) between its access units."""
+    if data[offset : offset + 2] != b"\x0b\x77" or offset + 6 > len(data):
+        return 0
+    fscod, size_code = data[offset + 4] >> 6, data[offset + 4] & 0x3F
+    if fscod != 0 or size_code >= 2 * len(AC3_WORDS_48K) or data[offset + 5] >> 3 > 8:
+        return 0
+    size = AC3_WORDS_48K[size_code // 2] * 2
+    return size if offset + size <= len(data) else 0
+
+
 def access_units(data):
-    """Yield each access unit's bytes; its first two bytes give its length in words (3.3)."""
+    """Yield each access unit's bytes; its first two bytes give its length in words (3.3). AC-3
+    core frames between the units are passed over."""
     offset = 0
     while offset + 4 <= len(data):
+        core = ac3_core_frame_bytes(data, offset)
+        if core:
+            offset += core
+            continue
         length = (int.from_bytes(data[offset : offset + 2], "big") & 0xFFF) * 2
         if length < 4 or offset + length > len(data):
             return
@@ -528,6 +673,21 @@ def nibble_fold(data):
     return ((folded >> 4) ^ folded) & 0xF
 
 
+def major_sync_size(unit, offset):
+    """The major sync's length in bytes: 28, or more with the 16-channel extension of TH spec 14.2
+    (32 on the owner's discs). The extension's size is found by the CRC, which ends it, as the
+    library does (ERRATA 44): the sizes the extension's 4 bit length gives first, then every
+    even size."""
+    length_words = (unit[offset + 26] >> 4) + 1
+    for size in (28, 26 + 2 * length_words + 2, 26 + 2 * (length_words + 1) + 2, *range(28, 62, 2)):
+        if offset + size > len(unit):
+            continue
+        stored = int.from_bytes(unit[offset + size - 2 : offset + size], "big")
+        if crc16_major_sync(unit[offset : offset + size - 2]) == stored:
+            return size
+    raise StreamError("major sync CRC")
+
+
 def decode_stream(data, presentation="best"):
     """Decode a whole stream. Returns (rows of interleaved samples, sample rate, channel count)."""
     substreams = [Substream(i) for i in range(4)]
@@ -537,16 +697,16 @@ def decode_stream(data, presentation="best"):
     for unit in access_units(data):
         offset = 4
         if unit[offset : offset + 3] == SYNC_WORD:
-            stored = int.from_bytes(unit[offset + 26 : offset + 28], "big")
-            if crc16_major_sync(unit[offset : offset + 26]) != stored:
-                raise StreamError("major sync CRC")
+            size = major_sync_size(unit, offset)
             format_info = int.from_bytes(unit[offset + 4 : offset + 8], "big")
             ratebits = format_info >> 28 if unit[offset + 3] == 0xBA else (format_info >> 20) & 0xF
             rate = (48000 << ratebits) if ratebits <= 2 else (44100 << (ratebits - 8))
             for substream in substreams:
                 substream.noise_size = 64 << (ratebits & 3)
+                substream.rate_shift = ratebits & 3
+                substream.unit_size = 40 << (ratebits & 3)
             count = unit[offset + 16] >> 4
-            offset += 28
+            offset += size
         directory_start = offset
         entries = []
         for _ in range(count):

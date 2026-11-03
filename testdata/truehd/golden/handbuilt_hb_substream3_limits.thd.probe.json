@@ -4,8 +4,8 @@
   "truehd": {
     "ac3_core_frames": 0,
     "access_units": 32,
-    "average_bit_rate_bps": 18336000,
-    "bytes": 61120,
+    "average_bit_rate_bps": 18342000,
+    "bytes": 61140,
     "channel_meaning": {
       "distinct_in_stream": 1,
       "drc_start_up_gain": 0,
@@ -100,9 +100,9 @@
     "rate_model": {
       "declared_bps": 9597000,
       "latency_limit_ms": 75.0,
-      "max_unit_rate_bps": 21350400,
+      "max_unit_rate_bps": 21446400,
       "violations": 0,
-      "worst_latency_ms": 25.417
+      "worst_latency_ms": 25.438
     },
     "restart_spacing": {
       "major_syncs": 2,

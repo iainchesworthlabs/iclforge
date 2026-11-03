@@ -59,8 +59,14 @@ struct CoreStrip {
 // counts them and goes on). `loss` takes the units a lenient decode lost after the first one
 // decoded: bytes the reader skipped (the decoder is told, lost_data()), units it could not read,
 // and units that waited for a restart header (`decode strict` makes them an input fault).
+//
+// `objects_dir` and `adm_out` (TH spec v3.9 §15; provisional, libs/truehd/ERRATA.md entry 61): with
+// truehd-presentation=all, `objects_dir` takes each channel of substream 3 as a mono WAV and
+// `adm_out` an ADM master with the beds and the dynamic objects of the stream's object audio
+// metadata; with another presentation `adm_out` is that presentation's bed alone.
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta, DecodeLoss& loss);
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss,
+                      std::string_view objects_dir = {}, std::string_view adm_out = {});
 
 // Describes the stream in `in_path` and checks every access unit's header, directory, parity and
 // CRC bytes. Exit 1 when any of them fails.
@@ -205,6 +211,14 @@ int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_
 int run_truehd_synth(std::string_view out_path, std::uint32_t seconds, bool sine,
                      std::uint32_t freq_hz, std::uint32_t amplitude_pct, std::string_view layout,
                      const Options& meta);
+// `truehd-atmos`: the channels of a WAV as the objects of a TrueHD Atmos stream, in substream 3 with
+// the 7.1 bed in substreams 0 to 2 and the objects' metadata (`paths_path`, a scene file as
+// atmos-encode takes it, or a fan of static positions) in the evolution frames. The first channel is
+// the LFE unless truehd-objects-lfe=off; the bed is truehd-bed= or the objects rendered to 7.1. Bare
+// .thd, or wrapped as .mkv, .mp4 or .ts like truehd-encode. Provisional (libs/truehd/ERRATA.md
+// entries 61 to 64).
+int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
+                     std::string_view paths_path, const Options& meta);
 
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.

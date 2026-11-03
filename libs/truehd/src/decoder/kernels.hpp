@@ -10,11 +10,11 @@
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/format.hpp"
 
-// The decoder's inner loops, one function each, as the scalar reference. Decoder::decode_block calls
-// them in the order below; libs/truehd's tests and tests/performance/kernel_bench.cpp call them on
-// their own. Every one is exact integer arithmetic: the products are 32 bit by 32 bit into 64 bits
-// (the filters' coefficients are at most 16 bits wide and their history 24, the matrices'
-// coefficients are scaled to 2^-14), the sums are 64 bit, and the shifts are by amounts the stream
+// The decoder's inner loops, one function each, as the scalar reference. Decoder::decode_block
+// calls them in the order below; libs/truehd's tests and tests/performance/kernel_bench.cpp call
+// them on their own. Every one is exact integer arithmetic: the products are 32 bit by 32 bit into
+// 64 bits (the filters' coefficients are at most 16 bits wide and their history 24, the matrices'
+// coefficients are scaled to 2^-15), the sums are 64 bit, and the shifts are by amounts the stream
 // sends, so a kernel that gives other bits than these is wrong rather than approximate. A variant
 // of a kernel for a wider vector unit has to give the same samples for every input, which
 // libs/truehd/tests/decoder/test_kernels.cpp holds it to.
@@ -29,8 +29,13 @@ namespace iclforge::truehd::kernels {
 // first sample of its block (TH spec §9.3).
 inline constexpr int kHistoryPad = kMaxFirOrder;
 
-// The matrices' coefficients are scaled to 2^-14 (ERRATA.md): a sum is shifted down by this much.
-inline constexpr int kMatrixShift = 14;
+// The matrices' coefficients are scaled to 2^-15 (ERRATA.md entry 60): a sum is shifted down by
+// this much. frac_bits runs to 15 in substream 3, so 2^-14 cannot hold every coefficient; a
+// coefficient of frac_bits 14 or less, scaled to 2^-15 instead, gives the same samples (the sum is
+// twice as large and shifted one more).
+inline constexpr int kMatrixShift = 15;
+// The matrix noise of TH spec §17.3 was defined against a sum at 2^-14.
+inline constexpr int kNoiseScaleShift = 7 + (kMatrixShift - 14);
 
 // What one channel's residuals need, worked out once per block (TH spec §11.3, ERRATA.md).
 struct ResidualPlan {
@@ -47,14 +52,17 @@ struct ResidualPlan {
 // Huffman code no codebook has.
 [[nodiscard]] inline bool read_residuals(BitReader& reader, int block, int min_chan, int max_chan,
                                          const ResidualPlan* plans, int bypass_count,
-                                         const std::uint8_t* bypass_matrix, std::int32_t* rows,
-                                         std::ptrdiff_t stride, std::uint16_t* bypass) {
+                                         const std::uint8_t* bypass_matrix,
+                                         const std::uint8_t* bypass_bits, std::int32_t* rows,
+                                         std::ptrdiff_t stride, std::uint64_t* bypass) {
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
-        std::uint16_t bits = 0;
+        std::uint64_t bits = 0;
         for (int b = 0; b < bypass_count; ++b) {
-            bits = static_cast<std::uint16_t>(
-                bits | (reader.read(1) << bypass_matrix[static_cast<std::size_t>(b)]));
+            // `bypass_bits` bits a sample for the matrix (1 for the standard section, the
+            // object matrix's field_2b otherwise), kept in the matrix's nibble.
+            bits |= std::uint64_t{reader.read(bypass_bits[static_cast<std::size_t>(b)])}
+                    << (4U * bypass_matrix[static_cast<std::size_t>(b)]);
         }
         bypass[static_cast<std::size_t>(i)] = bits;
         for (int ch = min_chan; ch <= max_chan; ++ch) {
@@ -129,9 +137,9 @@ inline void generate_noise(int block, std::uint32_t& seed_state, int noise_shift
 }
 
 // TH spec §17.3: what a matrix draws from generator 1's noise buffer. The matrix with a non-zero
-// `shift` adds buffer[index] * 2^(shift + 7) to its sum, for the sample at position i of the
-// block the index (first + i * stride) & mask (the stride and the first index are those of the
-// matrix: ERRATA.md, noise generator 1). `shift` 0 draws nothing.
+// `shift` adds buffer[index] * 2^(shift + 7) to its sum at 2^-14 (twice that at 2^-15), for the
+// sample at position i of the block the index (first + i * stride) & mask (the stride and the first
+// index are those of the matrix: ERRATA.md, noise generator 1). `shift` 0 draws nothing.
 struct NoiseDraw {
     const std::int8_t* buffer = nullptr;
     int shift = 0;
@@ -141,15 +149,15 @@ struct NoiseDraw {
 };
 
 // TH spec §10: one primitive matrix over one block. Row[out] becomes the sum over the `count`
-// channels it reads of channel times coefficient (the coefficients are scaled to 2^-14), plus the
+// channels it reads of channel times coefficient (the coefficients are scaled to 2^-15), plus the
 // matrix's noise (TH spec §17.3) if it draws any, shifted down by 14, with the quantiser step's low
 // bits cleared (`keep`); with LSB bypass the bit the stream sent for this matrix (`bypass`, bit
 // `matrix_index`) is added back.
 inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                          const std::int32_t* coeff, int out, std::uint32_t keep, bool lsb_bypass,
-                         int matrix_index, const std::uint16_t* bypass, std::int32_t* rows,
+                         int matrix_index, const std::uint64_t* bypass, std::int32_t* rows,
                          std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
-    const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + 7);
+    const std::int64_t noise_scale = std::int64_t{1} << (noise.shift + kNoiseScaleShift);
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         std::int64_t sum = 0;
@@ -157,16 +165,90 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
             sum += std::int64_t{row[channel[k]]} * coeff[k];
         }
         if (noise.shift != 0) {
-            sum += std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
-                                             noise.mask]} *
-                   noise_scale;
+            sum +=
+                std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
+                                          noise.mask]} *
+                noise_scale;
         }
         std::uint32_t value = static_cast<std::uint32_t>(sum >> kMatrixShift) & keep;
         if (lsb_bypass) {
-            const std::uint32_t sent = bypass[static_cast<std::size_t>(i)];
-            value += (sent >> matrix_index) & 1U;
+            const std::uint64_t sent = bypass[static_cast<std::size_t>(i)];
+            value += static_cast<std::uint32_t>((sent >> (4 * matrix_index)) & 0xFU);
         }
         row[out] = static_cast<std::int32_t>(value);
+    }
+}
+
+// The object-audio matrices (restart sync 0x31EC; ERRATA.md entry 69). The coefficients run at
+// 2^-18 and move between sections: `slope` is the extension's delta of each coefficient, and
+// every access unit the coefficient grows by slope * 2^(18 - scale). Inside the access unit the
+// matrix adds the slope's share as a ramp, which starts at 0 with the unit and grows by `ramp_step`
+// a sample (6552 at 48 kHz); the share of the sample is (sum of channel times slope) >> `scale`
+// times the ramp, at 2^-18.
+inline constexpr int kObjectShift = 18;
+
+struct ObjectMatrixState {
+    std::array<std::int32_t, 16> coeff{};  // running, at 2^-18, by matrix channel
+    std::array<std::int32_t, 16> slope{};  // the deltas as sent
+    std::int32_t ramp = 0;
+    int scale = 0;  // ext_field2 - f_shift + frac_bits
+    bool extension = false;
+};
+
+inline void apply_object_matrix(int block, bool starts_unit, bool ends_unit, int ramp_step,
+                                int count, const std::uint8_t* channel, ObjectMatrixState& state,
+                                int out, std::uint32_t keep, bool lsb_bypass, int matrix_index,
+                                const std::uint64_t* bypass, std::int32_t* rows,
+                                std::ptrdiff_t stride, const NoiseDraw& noise = {}) {
+    if (starts_unit) {
+        state.ramp = 0;
+    }
+    const int noise_shift = noise.shift + kObjectShift - kMatrixShift + kNoiseScaleShift;
+    for (int i = 0; i < block; ++i) {
+        std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
+        std::int64_t sum = 0;
+        for (int k = 0; k < count; ++k) {
+            sum += std::int64_t{row[channel[k]]} * state.coeff[channel[k]];
+        }
+        if (state.extension) {
+            std::int64_t fine = 0;
+            for (int k = 0; k < count; ++k) {
+                fine += std::int64_t{row[channel[k]]} * state.slope[channel[k]];
+            }
+            const std::int64_t shared =
+                state.scale >= 0
+                    ? fine >> state.scale
+                    : static_cast<std::int64_t>(static_cast<std::uint64_t>(fine) << -state.scale);
+            sum += std::int64_t{static_cast<std::int32_t>(shared)} * state.ramp;
+            state.ramp += ramp_step;
+        }
+        if (noise.shift != 0) {
+            sum +=
+                std::int64_t{noise.buffer[(noise.first + noise.stride * static_cast<unsigned>(i)) &
+                                          noise.mask]} *
+                (std::int64_t{1} << noise_shift);
+        }
+        // A matrix without bypass masks the whole sum, its own term included; a matrix with bypass
+        // does not mask, and its bits are added to the unmasked value (ERRATA.md entry 69; the
+        // Dolby player decodes a stream that separates the two in this way).
+        std::uint32_t value = static_cast<std::uint32_t>(sum >> kObjectShift);
+        if (lsb_bypass) {
+            const std::uint64_t sent = bypass[static_cast<std::size_t>(i)];
+            value += static_cast<std::uint32_t>((sent >> (4 * matrix_index)) & 0xFU);
+        } else {
+            value &= keep;
+        }
+        row[out] = static_cast<std::int32_t>(value);
+    }
+    if (ends_unit && state.extension) {
+        const int up = kObjectShift - state.scale;
+        for (int k = 0; k < count; ++k) {
+            std::int32_t& c = state.coeff[channel[k]];
+            const std::int32_t slope = state.slope[channel[k]];
+            c = static_cast<std::int32_t>(static_cast<std::uint32_t>(c) +
+                                          (up >= 0 ? static_cast<std::uint32_t>(slope) << up
+                                                   : static_cast<std::uint32_t>(slope >> -up)));
+        }
     }
 }
 
@@ -176,11 +258,10 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
 
 // The output of a block: each output channel from the matrix channel `source_channel` names for it
 // (the decoder builds that from ch_assign, which assigns matrix channels to output channels:
-// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is indexed
-// by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the lossless
-// check (TH spec §7.3)
-// and, when `pcm` is not null, written as 24 bit samples, `out_channels` to a sample time. Returns
-// the new fold.
+// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is
+// indexed by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the
+// lossless check (TH spec §7.3) and, when `pcm` is not null, written as 24 bit samples,
+// `out_channels` to a sample time. Returns the new fold.
 [[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
                                                  const std::uint8_t* source_channel,
                                                  const std::int8_t* output_shift,
