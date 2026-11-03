@@ -51,7 +51,6 @@ constexpr std::size_t kBedChannels = 8;
 // Where a frame goes in the access units is libs/truehd/layout.hpp's.
 constexpr std::uint64_t kFrameSamples = th::kOamdFrameSamples;
 constexpr int kUnitSamples = 40;
-constexpr double kFullScale = 8388608.0;
 constexpr std::string_view kBedLayout = "L,R,C,LFE,Ls,Rs,Lrs,Rrs";
 
 // An even fan around the room at ear height, as atmos-encode places the channels of a file that

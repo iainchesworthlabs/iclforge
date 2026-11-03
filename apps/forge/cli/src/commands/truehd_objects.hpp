@@ -101,7 +101,6 @@ class TrueHdObjectSink {
     std::uint64_t samples_ = 0;  // per channel, before the unit being added
     std::optional<iclforge::objects::oba::Program> program_;
     ObjectPlan plan_;
-    bool plan_said_ = false;
     std::uint64_t oamd_payloads_ = 0;
     std::uint64_t oamd_unread_ = 0;
     std::uint64_t program_changes_ = 0;
