@@ -329,6 +329,12 @@ struct ControlHandlers {
     // It acts at once, with no restart.
     std::function<std::string()> speakers_style;
     std::function<bool(std::string_view style)> set_speakers_style;
+    // GET and PUT /idle-view: what the waiting screen (nothing playing, the board set up) does once the dim time has passed
+    // with nothing touched, "lit", "dim", "clock" or "dark" (iclforge/now_view.hpp, planning/p4x-now-playing.md). Empty
+    // on a board with no screen. set_idle_view is handed one of the four words; false means it could not be stored (or,
+    // for a board with no clock, that "clock" is not one it can do). It acts at once, with no restart.
+    std::function<std::string()> idle_view;
+    std::function<bool(std::string_view view)> set_idle_view;
 
     // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): GET and PUT
     // /brightness, the backlight's lit level in percent (iclforge/now_view.hpp: 10 to 100, handed to the setter
