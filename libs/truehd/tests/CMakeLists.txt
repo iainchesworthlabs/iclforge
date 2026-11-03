@@ -82,6 +82,14 @@ target_link_libraries(iclforge-truehd-object-plan-tool PRIVATE iclforge::truehd 
 target_include_directories(iclforge-truehd-object-plan-tool PRIVATE ../src)
 add_dependencies(iclforge-tests iclforge-truehd-object-plan-tool)
 
+# iclforge-truehd-render-tool - the render side's Atmos test streams from synthetic masters
+# (libs/truehd/notes/feature-truehd-atmos-encoder-render.md). The render and clustering code is
+# internal (hidden in a shared build), so the tool compiles it itself, as the tests do.
+add_executable(iclforge-truehd-render-tool tools/render_stream_tool.cpp
+    ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp)
+target_include_directories(iclforge-truehd-render-tool PRIVATE ../src)
+target_link_libraries(iclforge-truehd-render-tool PRIVATE iclforge::truehd iclforge::warnings)
+
 # iclforge-truehd-ss3-lab - the decoder under each setting of DecoderLab, for the owner to run on a
 # TrueHD Atmos stream (libs/truehd/ERRATA.md entry 69).
 add_executable(iclforge-truehd-ss3-lab tools/ss3_lab.cpp)
