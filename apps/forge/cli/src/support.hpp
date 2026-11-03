@@ -457,6 +457,9 @@ struct Options {
     // pin=<hex> (repeatable): a certificate by SHA-1 or SHA-256 fingerprint.
     std::vector<std::string> trust_anchors;
     std::vector<std::string> pins;
+    // trust-key=<path> (repeatable): a P-256 public key (PEM "PUBLIC KEY" or DER) the operator
+    // trusts to sign; a chain whose leaf carries it is anchored.
+    std::vector<std::string> trust_keys;
     // expect-publisher-uuid=<UUID> (repeatable): the publisher accounts the operator accepts. A
     // signature naming another is a finding in ac4-verify and a refusal in verify-content. CS spec
     // v2.6 §5.3: the UUID is not in the signing certificate, so without this it is only reported.

@@ -185,6 +185,7 @@ void warn_about_signer_information(const Options& meta, std::string_view option,
 struct VerifyMaterial {
     std::vector<crypto::Certificate> anchors;
     std::vector<crypto::CertificatePin> pins;
+    std::vector<crypto::P256PublicKey> keys;
     std::vector<std::string>
         expected_publishers;  // the UUIDs of the accounts expect-publisher-uuid= names
     crypto::TimeBasis basis = crypto::TimeBasis::kNow;
@@ -197,6 +198,7 @@ struct VerifyMaterial {
         crypto::VerifyPolicy p;
         p.trust_anchors = anchors;
         p.pins = pins;
+        p.trust_keys = keys;
         p.time_basis = basis;
         p.now = now_epoch();
         p.instant = instant;
@@ -217,6 +219,14 @@ std::expected<VerifyMaterial, int> load_verify_material(const Options& meta) {
             return std::unexpected(kExitInput);
         }
         m.anchors = std::move(*anchors);
+    }
+    if (!meta.trust_keys.empty()) {
+        auto keys = crypto::load_public_key_files(meta.trust_keys);
+        if (!keys.has_value()) {
+            fmt::println(stderr, "error: {}", keys.error().message);
+            return std::unexpected(kExitInput);
+        }
+        m.keys = std::move(*keys);
     }
     for (const std::string& pin : meta.pins) {
         auto bytes = hex_to_bytes(pin);
@@ -261,6 +271,10 @@ std::string_view verdict_text(crypto::Verdict verdict) {
 void print_report(FILE* out, std::string_view name, const crypto::VerifyReport& report,
                   std::string_view time_basis) {
     status_println(out, "content signature of {}: {}", name, verdict_text(report.verdict));
+    // The same verdict as one token a script can match on (the exit code is 0 or 6 whatever the
+    // reason): valid, untrusted, no-signature, unreadable, chain-rejected, signature-invalid,
+    // content-altered, metadata-altered or refused-by-policy.
+    status_println(out, "  result: {}", crypto::to_string(crypto::classify(report)));
     if (!report.signer.empty()) {
         status_println(out, "  signer      {} (serial {})", report.signer, report.signer_serial);
     }

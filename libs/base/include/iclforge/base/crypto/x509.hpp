@@ -87,6 +87,12 @@ struct Certificate {
 [[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<Certificate, X509Error> parse_certificate(
     std::span<const std::byte> der);
 
+// One DER SubjectPublicKeyInfo carrying an EC key on P-256 (RFC 5480 §2.1.1), the body of a PEM
+// "PUBLIC KEY" block. nullopt for anything else, trailing bytes included, and for a point that is
+// not on the curve.
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::optional<P256PublicKey> parse_public_key_info_der(
+    std::span<const std::byte> der);
+
 // True when `cert.signature` is a valid ecdsa-with-SHA256 signature over `cert.tbs()` by `issuer`.
 // False for any other signature algorithm too: check cert.signature_algorithm first to say why.
 [[nodiscard]] ICLFORGE_BASE_EXPORT bool certificate_signature_valid(const Certificate& cert,

@@ -803,6 +803,13 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
                    SignatureError::kBadContentSignatureDate);
         } else {
             chain_report = validate_chain(p.chain, chain_policy);
+            if (chain_report.ok() && !chain_report.anchored &&
+                std::ranges::find(policy.trust_keys, p.chain.back().public_key) !=
+                    policy.trust_keys.end()) {
+                chain_report.anchored = true;
+                chain_report.anchor_index = p.chain.size() - 1;
+                chain_report.anchor_description = "the signer's public key is a trusted key";
+            }
             record("chain", chain_report.ok(),
                    chain_report.ok()
                        ? (chain_report.anchored
@@ -934,6 +941,65 @@ VerifyReport verify_content_signature(std::span<const std::byte> blob,
     report.verdict = chain_report.anchored ? Verdict::kValid : Verdict::kChecksChainUnanchored;
     report.anchor = chain_report.anchor_description;
     return report;
+}
+
+VerifyOutcome classify(const VerifyReport& report) {
+    if (report.verdict == Verdict::kValid) {
+        return VerifyOutcome::kValid;
+    }
+    if (report.verdict == Verdict::kChecksChainUnanchored) {
+        return VerifyOutcome::kUntrusted;
+    }
+    if (report.no_signature) {
+        return VerifyOutcome::kNoSignature;
+    }
+    for (const CheckResult& check : report.checks) {
+        if (check.ok) {
+            continue;
+        }
+        if (check.name == "content digest") {
+            return VerifyOutcome::kContentAltered;
+        }
+        if (check.name == "signer-information digest") {
+            return VerifyOutcome::kMetadataAltered;
+        }
+        if (check.name == "signature") {
+            return VerifyOutcome::kSignatureInvalid;
+        }
+        if (check.name == "certificates" || check.name == "chain" || check.name == "signed date") {
+            return VerifyOutcome::kChainRejected;
+        }
+        if (check.name == "structure" || check.name == "version markers" ||
+            check.name == "scheme" || check.name == "signature method") {
+            return VerifyOutcome::kUnreadable;
+        }
+        return VerifyOutcome::kRefusedByPolicy;
+    }
+    return VerifyOutcome::kUnreadable;
+}
+
+const char* to_string(VerifyOutcome outcome) noexcept {
+    switch (outcome) {
+        case VerifyOutcome::kValid:
+            return "valid";
+        case VerifyOutcome::kUntrusted:
+            return "untrusted";
+        case VerifyOutcome::kNoSignature:
+            return "no-signature";
+        case VerifyOutcome::kUnreadable:
+            return "unreadable";
+        case VerifyOutcome::kChainRejected:
+            return "chain-rejected";
+        case VerifyOutcome::kSignatureInvalid:
+            return "signature-invalid";
+        case VerifyOutcome::kContentAltered:
+            return "content-altered";
+        case VerifyOutcome::kMetadataAltered:
+            return "metadata-altered";
+        case VerifyOutcome::kRefusedByPolicy:
+            return "refused-by-policy";
+    }
+    return "unreadable";
 }
 
 }  // namespace iclforge::base::crypto

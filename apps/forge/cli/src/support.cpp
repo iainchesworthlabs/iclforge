@@ -3500,6 +3500,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.trust_anchors.emplace_back(value);
             continue;
         }
+        if (key == "trust-key") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: trust-key= needs a public key file path");
+                return false;
+            }
+            out.trust_keys.emplace_back(value);
+            continue;
+        }
         if (key == "pin") {
             // A SHA-1 (40 hex digits) or SHA-256 (64) fingerprint; the colons a tool prints
             // between the bytes are allowed.
@@ -3682,7 +3690,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                                    signer_info_given;
         const bool checking_given = out.verify_content || out.check_content || out.unanchored_ok ||
                                     !out.trust_anchors.empty() || !out.pins.empty() ||
-                                    !out.expect_publisher_uuids.empty() ||
+                                    !out.trust_keys.empty() || !out.expect_publisher_uuids.empty() ||
                                     out.verify_time.has_value();
         if (signing_given && !signs_content) {
             fmt::println(stderr,
@@ -3694,7 +3702,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         if (checking_given && !checks_content) {
             fmt::println(stderr,
                          "error: verify-content, check-content, unanchored-ok, trust-anchor=, pin=, "
-                         "expect-publisher-uuid= and verify-time= check an AC-4 content "
+                         "trust-key=, expect-publisher-uuid= and verify-time= check an AC-4 content "
                          "signature: decode and ac4-verify take them");
             return false;
         }
@@ -3725,7 +3733,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {
             fmt::println(stderr,
-                         "error: trust-anchor=, pin=, expect-publisher-uuid=, unanchored-ok, "
+                         "error: trust-anchor=, pin=, trust-key=, expect-publisher-uuid=, unanchored-ok, "
                          "verify-time= and leaf-title= say how to check, and nothing is checked "
                          "unless verify-content or check-content asks for it");
             return false;

@@ -35,6 +35,7 @@ enum class StreamSignatureErrorKind : std::uint8_t {
     kAlreadySigned,  // there is a trailer already; strip it or sign the unsigned stream
     kTrailingData,   // bytes follow the last sync frame and are not a content signature
     kSigning,        // the signature could not be made; `fault` says why
+    kBadCredentials,  // a key, certificate, public key or date given as bytes or text did not read
 };
 
 struct StreamSignatureError {
@@ -83,6 +84,47 @@ sign_stream(std::span<const std::byte> stream, const base::crypto::SigningCreden
 // The stream without its trailer (the same bytes when there is none).
 [[nodiscard]] ICLFORGE_AC4_EXPORT std::expected<std::vector<std::byte>, StreamSignatureError>
 strip_signature(std::span<const std::byte> stream);
+
+// ---- Signing and verifying from bytes -------------------------------------------------------
+//
+// The same two operations for a caller that holds the operator's key and certificates as bytes in
+// memory (PEM or DER) and does not want to name the codec-blind types behind them: the C API, a
+// plug-in host. Nothing is read from disk; the key is wiped after use.
+
+// The reduction of a verification to one word: iclforge::base::crypto::VerifyOutcome.
+using VerifyOutcome = base::crypto::VerifyOutcome;
+
+struct KeySigningRequest {
+    std::span<const std::byte> private_key;  // P-256: PEM (PKCS#8 / SEC 1) or DER
+    std::span<const std::byte> chain;        // the certificates that vouch for it: PEM bundle / DER
+    std::string signed_date;                 // "YYYY-MM-DDTHH:MM:SS" UTC; empty: now
+    std::int64_t now_unix = 0;               // the clock for an empty `signed_date`; 0: the system's
+    std::string publisher_uuid;              // optional (CS spec v2.6 section 5.3)
+    std::string publisher_name;
+};
+
+// sign_stream with the credentials read from `request`. A key, chain or date that does not read is
+// kBadCredentials; a key that is not the chain's leaf's, or any refusal sign_stream makes, is what
+// sign_stream says.
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::expected<std::vector<std::byte>, StreamSignatureError>
+sign_stream_with_key(std::span<const std::byte> stream, const KeySigningRequest& request);
+
+struct TrustRequest {
+    std::span<const std::byte> trust_anchors;  // certificates to trust as the top of a chain; or empty
+    std::span<const std::byte> trust_key;      // a P-256 public key (PEM "PUBLIC KEY" / DER); or empty
+    std::int64_t now_unix = 0;                 // the clock certificates are judged at; 0: the system's
+    bool judge_at_signed_date = false;         // judge them at the date the signature records instead
+};
+
+struct StreamVerification {
+    VerifyOutcome outcome = VerifyOutcome::kNoSignature;
+    std::string detail;  // the first fault, as a sentence; empty for valid and untrusted
+};
+
+// verify_stream with the trust given as bytes, and the report reduced to its outcome. An anchor or
+// key that does not read is kBadCredentials, not an outcome.
+[[nodiscard]] ICLFORGE_AC4_EXPORT std::expected<StreamVerification, StreamSignatureError>
+verify_stream_with_trust(std::span<const std::byte> stream, const TrustRequest& request);
 
 // What `forge probe` shows without a key: whether a trailer is there, and what it says about
 // itself. Nothing here has been verified.
