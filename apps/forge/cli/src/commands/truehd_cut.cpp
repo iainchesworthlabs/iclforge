@@ -1,5 +1,4 @@
 #include <fmt/base.h>
-#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -16,6 +15,7 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
@@ -334,7 +334,7 @@ int run_cat_truehd(std::string_view out_path, std::span<const std::string_view> 
                 return kExitUsage;
             }
             meaning_differs =
-                meaning_differs || walk->info.major_sync.channel_meaning != *reference_meaning;
+                meaning_differs || walk->info.major_sync.channel_meaning != reference_meaning;
         }
         for (const Unit& unit : walk->units) {
             if (!sink.push(std::span<const std::byte>(bytes).subspan(unit.offset, unit.length))) {

@@ -267,6 +267,7 @@ greyed, and a default that is never a choice the board cannot make.
 |---|---|---|---|
 | Screen without lyrics: speakers, title, clock, meters, dark, off | `now-view` | `/now-playing` | the board has a screen; *clock* needs a clock, *meters* a screen of at least 240 x 240 and the Sendspin player, *dark* needs touch |
 | Dim after: 1, 5, 15, 30 minutes, 1, 2, 4 hours, never | `dim-after` | `/dim-after` | the board has a screen with touch |
+| When nothing is playing: stay lit, dim, clock, dark | `idle-view` | `/idle-view` | the board has a screen with touch (*clock* needs a clock) |
 | Speakers style: glow, pulse | `speakers-style` | `/speakers-style` | the board has a screen (it is greyed, with the reason, while the screen is set to the clock or off, which draw no speakers) |
 | Brightness: 10% to 100% in tens | `brightness` | `/brightness` | the board has a screen whose backlight it controls |
 | Clock hours: 24 or 12 | `clock-hours` | `/clock-format` | the board has a screen and keeps the time |
@@ -514,6 +515,7 @@ screen goes dark: a lyric screen and the idle screen are lit as they always were
 |---|---|---|
 | `GET` and `PUT /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark` | `speakers` |
 | `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
+| `GET` and `PUT /idle-view` | `lit`, `dim`, `clock` or `dark`: what the waiting screen does after the dim time | `dim` |
 | `GET` and `PUT /speakers-style` | `glow` or `pulse` | `glow` |
 | `GET` and `PUT /brightness` | a whole number, 10 to 100: the percent the backlight is at while the screen is lit | `80` |
 | `GET` and `PUT /clock-format` | `24`, `12`, `24 seconds` or `12 seconds` | `24` |

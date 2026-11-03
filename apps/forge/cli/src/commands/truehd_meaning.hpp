@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "iclforge/truehd/io/major_sync.hpp"
@@ -22,7 +23,7 @@ class JsonSink;
 namespace forge_cli::commands {
 
 // A presentation of the major sync's channel meaning: the 2, 6 or 8 channel one.
-enum class MeaningPresentation : int { k2ch = 0, k6ch = 1, k8ch = 2 };
+enum class MeaningPresentation : std::uint8_t { k2ch = 0, k6ch = 1, k8ch = 2 };
 
 [[nodiscard]] const char* presentation_name(MeaningPresentation presentation) noexcept;
 

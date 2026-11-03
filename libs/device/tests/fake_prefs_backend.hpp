@@ -28,6 +28,7 @@ class FakeBackend final : public Backend {
     std::string layout_ = "2.0";
     bool playing_ = false;
     nowview::SpeakersStyle style_ = nowview::kDefaultSpeakersStyle;
+    nowview::IdleView idle_view_ = nowview::kDefaultIdleView;
 
     [[nodiscard]] BoardCaps caps() const override { return board_; }
     [[nodiscard]] nowview::View now_view() const override { return view_; }
@@ -94,6 +95,15 @@ class FakeBackend final : public Backend {
         return true;
     }
     [[nodiscard]] bool playing() const override { return playing_; }
+    [[nodiscard]] nowview::IdleView idle_view() const override { return idle_view_; }
+    [[nodiscard]] bool set_idle_view(nowview::IdleView view) override {
+        ++sets;
+        if (take_refusal()) {
+            return false;
+        }
+        idle_view_ = view;
+        return true;
+    }
     [[nodiscard]] nowview::SpeakersStyle speakers_style() const override { return style_; }
     [[nodiscard]] bool set_speakers_style(nowview::SpeakersStyle style) override {
         ++sets;

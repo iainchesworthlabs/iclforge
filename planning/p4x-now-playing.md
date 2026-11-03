@@ -438,6 +438,57 @@ with 53,648 bytes free, where the zone table alone left 73,024.
 **Not built, not decided.** Days of the week. A zone typed on the screen. The idle screen under the night schedule is the
 owner's to decide. Nothing has been run on the kit.
 
+## The waiting screen
+
+The owner, 2026-11-03: *when nothing is playing and the board is waiting for a server, or for one to play, you just see the
+constant message* (the board's name, its address and "Waiting for something to play"). *It would be good if, once it times
+out, it showed the clock, or went dark, or whatever I have set it to ... tapping on the screen takes me back to the page
+that says I'm waiting, and it goes again after the dim time.* The idle screen is no longer lit for hours: this answers the
+question [Open](#open) asked about it, and the night schedule's own `night-idle` switch asked.
+
+**A setting of its own, `idle-view`** (`GET` and `PUT /idle-view`, NVS `idle_view`, `IdleView` in `now_view.hpp`, Preferences
+*When nothing is playing*, Display group, after *Dim after*). It is not the *Screen without lyrics* choice, because a person
+who watches the speakers while a song plays still wants the clock when nothing does. Never renumbered:
+
+| Word | Stored | After the dim time |
+|---|---|---|
+| `lit` | 0 | nothing: the status page stays, lit (the screen this replaced) |
+| `dim` | 1 | a black cover with the line *Waiting for something to play*, the backlight at its floor (4%). **The default** |
+| `clock` | 2 | the clock view over the whole glass, the backlight at its floor; header and footer put away. A dim until the board knows the time. Greyed where the board keeps no time |
+| `dark` | 3 | the backlight off |
+
+Speakers, title and meters are not offered: they need a stream. It needs a screen with touch (a dim or a dark that nothing
+can end is not offered), as *Dim after* does.
+
+**The rule** is one pure function, `idle_state()` in `now_view.hpp`, host-tested in `test_now_view.cpp`, and the screen
+(`lyric_screen.cpp`) asks it each frame, before it makes the rows, because the clock saver is a different set of rows:
+
+- **The dim time is *Dim after*.** The waiting screen is lit for that time from the last touch, or from when it began to show if
+  nothing has touched the glass since (a stream that ends on a panel nobody has touched for hours is not dimmed at once). *Never*
+  keeps it lit.
+- **A touch brings the status page back** and the dim time begins again. The tap lands on the cover, so it does not also press
+  the button under it (the dimmed screen's mechanism). This is the dim time, not the dark view's 30 seconds.
+- **Only a board that is set up.** A pairing code on show, or no server paired or connected (`board_set_up()`): the screen stays
+  lit and says so.
+- **No lit flash between two songs.** If the screen was dimmed or dark as the stream ended (the cover was on within the last
+  1.5 s: the board's state is read twice a second and a stream five times, so the end of a stream shows the lit "no lyrics"
+  page for a few frames first), the waiting screen begins in its saver and stays there until a touch. `carried` in the rule.
+- **The night schedule still wins.** With *Night covers idle screen* on and the night in force, the waiting screen is the dark
+  view (dark from the moment it begins, a touch lights it for 30 s), whatever `idle-view` says.
+- The developer view and Preferences keep the screen lit while open, as for every dim.
+
+**Run.** The rule: 11 test cases (the four words, the stored numbers, set-up, the dim time and the touch, never, a carried
+screen, no clock, the night schedule's switch), and `PanelFollow`, the registry entry against every known board, the settings
+table and Reset preferences. The real screen code in the preview tool, at 1024 by 600, 800 by 480, 480 by 320, 320 by 240 and
+240 by 240 (checks fail its run): lit at the start and at 4 minutes, dimmed at 6 with the backlight at 4, a touch lights it,
+dims again 6 minutes later; the clock saver is a dim until the time is known, then the clock, with none of the footer, a touch
+brings the status page back and the footer works; dark has the backlight at 0 and a touch lights it; *lit* and a dim time of
+never stay lit for ten hours; an unpaired board and one with a pairing code stay lit; a dimmed song that ends leaves the waiting
+screen dimmed until a touch. The clock saver is audited from 800 wide, as the clock view is (its digits are one size).
+
+**Not run on the kit.** The glass, a finger, the backlight levels, and the end of a real stream (is there a lit flash, and
+does the carry hold?) are for the kit window.
+
 ## Stage 5: the speakers follow the sound
 
 The owner, 2026-10-25, asked for the speakers to be "a little more dynamic ... reacting", was shown seven options
@@ -474,12 +525,9 @@ So stage 5 is that, and nothing from the seven:
 
 ## Open
 
-- **The idle screen is not dimmed.** It is on for hours too (Q7 of the panel's plan). The owner's
-  answer was about this screen; whether idle follows is a question for the owner. It matters more now
-  that there is a dark view: a listener who chose it may see the idle screen light up between two
-  songs, if the server ends one stream before it starts the next. Whether it does has not been looked
-  at on the kit. The night schedule asks the same question ([Stage 4](#stage-4-display-and-time-preferences)): it
-  is its own setting, `night-idle`, off, until the owner says.
+- **The idle screen** is the waiting screen now, and dims ([The waiting screen](#the-waiting-screen)). The kit has not
+  seen whether a stream's end lights it for a moment before the carry takes the cover back.
+  The night schedule's own switch, `night-idle`, is still there and still off by default.
 - **Does a dark screen save the scan-out?** Stopping the DSI engine while the cover is up is the
   experiment; the kit's AC-4 5.1 glitches are the reason to try it.
 - **Brightness** was not a setting (plan D6) and is one now, on the Preferences screen and `PUT /brightness`

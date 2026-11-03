@@ -2402,6 +2402,177 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         pump(6);
     }
 
+    // The waiting screen (planning/p4x-now-playing.md, "The waiting screen"): nothing playing, the board set up. Lit for the
+    // dim time, then the view chosen (a dim, the clock, or dark); a touch brings the status back and the time begins again;
+    // a board still to be set up, and one told to stay lit, are never dimmed; a screen already dimmed as the stream ends
+    // stays so, and the status is not lit between two songs.
+    {
+        constexpr std::int64_t kMinuteUs = 60'000'000;
+        const auto stats = [] { return player::panel::screen_stats(); };
+        const auto waiting_name = [&](const char* name) { return std::string(stats().name) == name; };
+        const auto be_waiting = [&] {
+            g_now_playing = false;
+            g_held = false;
+            g_board.stream = "idle";
+            g_board.server = "Music Assistant (d5369777-music-assistant)";
+            g_board.paired = 1;
+            g_board.connections = 1;
+            g_board.pairing_code.clear();
+        };
+        g_caps = iclforge::variants::p4_rev3_kit();
+        g_caps.display.width = width;
+        g_caps.display.height = height;
+        g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+        g_settings = {nv::View::kSpeakers, 5};
+        g_settings.idle_view = nv::IdleView::kDim;
+        be_waiting();
+        g_now_us += 40'000'000;
+        pump(6);
+        expect(waiting_name("idle") && !stats().dimmed, "the waiting screen is the status page, lit");
+        expect(shows_text(lv_screen_active(), "Waiting for something to play", true), "and says what it waits for");
+        g_now_us += 4 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "it is still lit 4 minutes on, with a dim time of 5");
+        g_now_us += 2 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed && stats().backlight == 4, "after the dim time it dims, the backlight at its floor");
+        expect(waiting_name("idle"), "on the status page");
+        write_bmp(out / ("waiting-dim-" + size + ".bmp"));
+        expect(shows_text(lv_screen_active(), "Waiting for something to play"), "with the one line of the dim");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed && stats().backlight == 80, "a touch lights it");
+        expect(waiting_name("idle"), "and it is the status page again");
+        g_now_us += 4 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "it stays lit for the dim time from that touch");
+        g_now_us += 2 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed, "and dims again after it");
+
+        // The clock.
+        g_settings.idle_view = nv::IdleView::kClock;
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed, "a touch lights the waiting screen when the clock is chosen");
+        g_wall = {};
+        g_now_us += 6 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed && waiting_name("idle"), "until the time is known, the clock saver is a dim of the status page");
+        g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+        pump(20);  // the screen reads the clock twice a second
+        expect(stats().dimmed && waiting_name("idle-clock"), "and the clock once it is");
+        expect(shows_text(lv_screen_active(), "21:47"), "it shows the time");
+        expect(!shows_text(lv_screen_active(), "Preferences") && !shows_text(lv_screen_active(), "Adjust"),
+               "and none of the footer");
+        write_bmp(out / ("waiting-clock-" + size + ".bmp"));
+        if (width >= 800) {
+            // The clock view's digits are one size (200 px): it is drawn as designed from 800 wide, as it is when a song plays.
+            failures += audit(lv_screen_active(), "waiting screen, clock saver " + size);
+        }
+        g_wall.local.minute = 48;
+        pump(20);
+        expect(shows_text(lv_screen_active(), "21:48"), "the time moves on");
+        tap(width / 2, height / 3);
+        pump(8);
+        expect(!stats().dimmed && waiting_name("idle"), "a touch brings the status page back");
+        expect(shows_text(lv_screen_active(), "Preferences") && shows_text(lv_screen_active(), "Adjust"),
+               "with its footer");
+        expect(tap_button("Preferences"), "and the footer works (the touch that woke it did not press a button)");
+        pump(8);
+        expect(player::panel::prefs_root() != nullptr, "Preferences opens from the waiting screen");
+        g_now_us += 10 * kMinuteUs;
+        pump(6);
+        expect(player::panel::prefs_root() == nullptr || !stats().dimmed, "and keeps the screen lit while it is open");
+        tap_button("Close");
+        pump(6);
+
+        // Dark.
+        g_settings.idle_view = nv::IdleView::kDark;
+        tap(width / 2, height / 3);
+        pump(6);
+        g_now_us += 4 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "dark: lit 4 minutes on");
+        g_now_us += 2 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed && stats().backlight == 0, "dark: the backlight is off after the dim time");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed && stats().backlight == 80, "dark: a touch lights it");
+        g_now_us += 40 * 1'000'000;
+        pump(6);
+        expect(!stats().dimmed, "and it is not dark again after the dark view's thirty seconds: the dim time governs");
+
+        // Stay lit, and a dim time of never.
+        g_settings.idle_view = nv::IdleView::kLit;
+        g_now_us += 600 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "left lit, the waiting screen is lit for hours");
+        g_settings.idle_view = nv::IdleView::kDim;
+        g_settings.dim_after_minutes = nv::kDimNever;
+        g_now_us += 600 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "with a dim time of never it is lit for hours");
+        g_settings.dim_after_minutes = 5;
+
+        // A board still to be set up keeps the screen lit and saying so.
+        g_board.paired = 0;
+        g_board.connections = 0;
+        g_board.server.clear();
+        g_now_us += 600 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "a board that is not paired is never dimmed");
+        g_board.paired = 1;
+        g_board.connections = 1;
+        g_board.server = "Music Assistant (d5369777-music-assistant)";
+        g_board.pairing_code = "123456";
+        pump(6);
+        expect(!stats().dimmed, "nor one showing a pairing code");
+        g_board.pairing_code.clear();
+        tap(width / 2, height / 3);
+        pump(6);
+
+        // The status is not lit between two songs: a dimmed screen stays dimmed as the stream ends.
+        g_settings.idle_view = nv::IdleView::kDim;
+        g_board.stream = "bursts";
+        g_board.paired = 1;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(20);  // the screen reads the board's state twice a second
+        g_now_us += 6 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed, "the speakers are dimmed after the dim time");
+        be_waiting();
+        pump(20);
+        expect(stats().dimmed && waiting_name("idle"), "the stream ends and the waiting screen stays dimmed");
+        g_now_us += 60'000'000;
+        pump(6);
+        expect(stats().dimmed, "and stays so, with nothing touched");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed && waiting_name("idle"), "until a touch");
+        g_board.stream = "bursts";
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(20);
+        g_now_us += 6 * kMinuteUs;
+        pump(6);
+        be_waiting();
+        pump(20);
+        expect(stats().dimmed && waiting_name("idle"), "and the same for a second song that dims and ends");
+        tap(width / 2, height / 3);
+        pump(6);
+
+        // A song that starts on a panel nobody has touched for hours is not dimmed at once, as before.
+        g_board.stream = "bursts";
+        g_board.server = "";
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        g_settings = {nv::View::kSpeakers, 5};
+        g_board.paired = 0;
+        g_board.connections = 0;
+        hold(lrc, 5'750);
+        pump(6);
+    }
+
     // The same sheet for a board whose screen has no touch: the dark view and the dim time are greyed with their
     // reason, never hidden, and a tap on them does nothing.
     g_caps = iclforge::variants::c3_spi_320x240_no_touch();
@@ -2529,6 +2700,11 @@ class PreviewBackend final : public iclforge::prefs::Backend {
     [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return g_settings.speakers_style; }
     [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
         g_settings.speakers_style = style;
+        return true;
+    }
+    [[nodiscard]] iclforge::nowview::IdleView idle_view() const override { return g_settings.idle_view; }
+    [[nodiscard]] bool set_idle_view(iclforge::nowview::IdleView view) override {
+        g_settings.idle_view = view;
         return true;
     }
 

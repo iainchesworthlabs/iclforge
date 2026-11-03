@@ -168,7 +168,7 @@ TEST_CASE("truehd leg: the bursts unwrap and decode to the rounded 24-bit input,
     feed(stage, clip, 0, clip.frames(), frame);
 
     CHECK(stage.status().underruns == 0);
-    CHECK(sink->submits > 100);  // 120000 samples are 125 bursts; the encoder holds one interval back
+    CHECK(sink->submits > 100);  // 120000 samples are 125 bursts; the encoder holds an interval and 75 ms back
     CHECK(sink->bytes == sink->submits * mat::kMatBurstBytes);
     REQUIRE(sink->carrier.size() == sink->bytes);
 
@@ -178,8 +178,9 @@ TEST_CASE("truehd leg: the bursts unwrap and decode to the rounded 24-bit input,
     CHECK(decoded.first_unit_started);
     const std::size_t decoded_frames = decoded.pcm.size() / kChannels;
     CHECK(decoded_frames == decoded.units * kAccessUnitSamples);
-    // Nothing but the encoder's last restart interval and the last partial burst is held back.
-    CHECK(decoded_frames + (128 + mat::kMatAccessUnitsPerFrame) * kAccessUnitSamples >= clip.frames());
+    // Nothing but the encoder's last restart interval, the 75 ms (90 units) whose arrival times wait
+    // for the units after them, and the last partial burst is held back.
+    CHECK(decoded_frames + (128 + 90 + mat::kMatAccessUnitsPerFrame) * kAccessUnitSamples >= clip.frames());
     CHECK(decoded.pcm == expected_pcm(clip, 0, decoded_frames));
 }
 

@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <initializer_list>
 #include <optional>
 #include <span>
@@ -26,6 +27,7 @@
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
@@ -305,7 +307,7 @@ int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_pat
     for (const PresentationLoudness& loudness : measured->presentations) {
         const char* name = presentation_name(loudness.presentation);
         status_println(status, "  {}  measured {:+.2f} LKFS (BS.1770-5 Annex 3 weights, {})", name,
-                       *loudness.integrated_lkfs, loudness.layout);
+                       loudness.integrated_lkfs.value_or(0.0), loudness.layout);
         status_println(status, "  {}  dialogue norm {} -> {} (ATSC A/85 section 8{})", name,
                        dialogue_norm_field(summary->before, loudness.presentation),
                        dialogue_norm_field(summary->after, loudness.presentation),
