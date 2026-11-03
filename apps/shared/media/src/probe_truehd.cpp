@@ -424,7 +424,7 @@ std::vector<TextLine> text_tail(const Report& report, std::size_t ac3_core_frame
         // decode truehd-presentation=all gives them, objects_dir= and adm_out= write them.
         lines.push_back(
             {"object substream",
-             fmt::format("present{} (decode truehd-presentation=all gives its channels as objects)",
+             fmt::format(" present{} (decode truehd-presentation=all gives its channels as objects)",
                          report.info.num_substreams == th::kMaxSubstreams
                              ? fmt::format(", {} channel(s)", report.info.channels[th::kMaxSubstreams - 1])
                              : std::string{})});

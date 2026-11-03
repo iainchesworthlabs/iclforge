@@ -744,6 +744,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                 sink.key("structure");
                 structure.write_json(sink);
             }
+            if (want_rate) {
+                sink.key("rate");
+                rate.write_json(sink);
+            }
         };
         tp::write_json(json, *report, ac3_core_frames, extras);
         json.end_object();
