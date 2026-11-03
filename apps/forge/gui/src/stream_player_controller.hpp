@@ -19,6 +19,7 @@
 #include "background_jobs.hpp"
 #include "cdg_frame_source.hpp"
 #include "cdg_frames.hpp"
+#include "truehd_pcm_source.hpp"
 
 namespace iclforge::audio {
 class MonitorSink;
@@ -77,6 +78,13 @@ struct RawResult {
     bool karaoke = false;
     bool karaoke_reproduced = false;
     QString coded_layout_label;
+    // TrueHD or MLP: the audio is not held here. `channels` stays empty and the player reads it a
+    // window at a time from this source (row U2 of planning/truehd-parity-forge.md); `locations`
+    // and the counts above are filled as for any other stream.
+    std::shared_ptr<forge_gui::TruehdPcmSource> truehd;
+    [[nodiscard]] std::size_t channel_total() const noexcept {
+        return truehd ? static_cast<std::size_t>(truehd->info().channels) : channels.size();
+    }
 };
 
 }  // namespace splayer_detail
