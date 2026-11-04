@@ -60,7 +60,7 @@ std::int64_t duration_of(const Setup& setup, std::size_t bytes) {
 
 // A unit of `bytes` whose bytes 2 and 3 (after the 12-bit length) are `timing`.
 std::vector<std::byte> unit_with(std::size_t bytes, std::uint16_t timing) {
-    std::vector<std::byte> unit(bytes, std::byte{0});
+    std::vector<std::byte> unit(std::max<std::size_t>(bytes, 4), std::byte{0});
     unit[2] = static_cast<std::byte>(timing >> 8U);
     unit[3] = static_cast<std::byte>(timing & 0xFFU);
     return unit;
