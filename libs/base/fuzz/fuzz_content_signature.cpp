@@ -29,7 +29,8 @@
 //     [0]         the entry point, modulo 7:
 //                   0  Thrift: read_struct and every interpreter on every field, followed down
 //                   1  DER: the element reader, and parse_certificate with its signature check
-//                   2  text: PEM, base64, the certificate and key loaders, the date reader
+//                   2  text: PEM, base64, the certificate and key loaders (private and public),
+//                      the date reader
 //                   3  blob: parse_content_signature, then validate_chain on what it carried
 //                   4  blob: verify_content_signature under each way of judging time, with and
 //                      without the blob's own certificates as trust anchors
@@ -98,6 +99,7 @@ void text(std::span<const std::byte> payload) {
     (void)crypto::parse_iso8601_utc(view);
     (void)crypto::parse_certificates(payload);
     (void)crypto::parse_p256_private_key(payload);
+    (void)crypto::parse_p256_public_key(payload);
 }
 
 // validate_chain under the policies a caller reaches it with, on whatever the blob carried.

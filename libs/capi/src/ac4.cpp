@@ -5,7 +5,9 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "iclforge/ac4/io/content_signature.hpp"
 #include "internal.hpp"
 #include "internal_ac4.hpp"
 
@@ -13,6 +15,21 @@ using iclforge_c::guard;
 using iclforge_c::to_cpp;
 
 namespace {
+
+std::span<const std::byte> as_bytes_or_empty(const uint8_t* data, size_t size) {
+    return data == nullptr ? std::span<const std::byte>{}
+                           : std::as_bytes(std::span<const uint8_t>(data, size));
+}
+
+void set_detail(iclforge_bytes_t** out_detail, std::string_view text) {
+    if (out_detail == nullptr) {
+        return;
+    }
+    auto owned = std::make_unique<iclforge_bytes>();
+    const auto bytes = std::as_bytes(std::span<const char>(text.data(), text.size()));
+    owned->data.assign(bytes.begin(), bytes.end());
+    *out_detail = owned.release();
+}
 
 iclforge::ac4::OutputConfig output_config_to_cpp(const iclforge_ac4_output_config_t& config) {
     return iclforge::ac4::OutputConfig{
@@ -447,6 +464,86 @@ iclforge_ac4_loudness_info_t iclforge_ac4_decoder_metadata_loudness(
     out.has_loudness_range_lu = loudness.loudness_range_lu.has_value() ? 1 : 0;
     out.loudness_range_lu = loudness.loudness_range_lu.value_or(0.0);
     return out;
+}
+
+iclforge_status_t iclforge_ac4_sign_stream(const uint8_t* stream, size_t stream_size,
+                                           const iclforge_ac4_sign_config_t* config,
+                                           iclforge_bytes_t** out_signed,
+                                           iclforge_bytes_t** out_detail) {
+    if (out_signed != nullptr) {
+        *out_signed = nullptr;
+    }
+    if (out_detail != nullptr) {
+        *out_detail = nullptr;
+    }
+    if (stream == nullptr || config == nullptr || out_signed == nullptr ||
+        config->private_key == nullptr || config->chain == nullptr) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    return guard([&]() -> iclforge_status_t {
+        iclforge::ac4::KeySigningRequest request;
+        request.private_key = as_bytes_or_empty(config->private_key, config->private_key_size);
+        request.chain = as_bytes_or_empty(config->chain, config->chain_size);
+        if (config->signed_date != nullptr) {
+            request.signed_date = config->signed_date;
+        }
+        if (config->publisher_uuid != nullptr) {
+            request.publisher_uuid = config->publisher_uuid;
+        }
+        if (config->publisher_name != nullptr) {
+            request.publisher_name = config->publisher_name;
+        }
+        auto result = iclforge::ac4::sign_stream_with_key(as_bytes_or_empty(stream, stream_size),
+                                                          request);
+        if (!result.has_value()) {
+            set_detail(out_detail, result.error().message);
+            return result.error().kind == iclforge::ac4::StreamSignatureErrorKind::kBadCredentials
+                       ? ICLFORGE_ERROR_INVALID_ARGUMENT
+                       : ICLFORGE_ERROR_AC4_SIGNING;
+        }
+        auto owned = std::make_unique<iclforge_bytes>();
+        owned->data = std::move(*result);
+        *out_signed = owned.release();
+        return ICLFORGE_OK;
+    });
+}
+
+iclforge_status_t iclforge_ac4_verify_stream(const uint8_t* stream, size_t stream_size,
+                                             const iclforge_ac4_verify_config_t* config,
+                                             iclforge_ac4_signature_outcome_t* out_outcome,
+                                             iclforge_bytes_t** out_detail) {
+    if (out_detail != nullptr) {
+        *out_detail = nullptr;
+    }
+    if (stream == nullptr || out_outcome == nullptr) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    return guard([&]() -> iclforge_status_t {
+        iclforge::ac4::TrustRequest request;
+        if (config != nullptr) {
+            if (config->trust_anchors != nullptr) {
+                request.trust_anchors =
+                    as_bytes_or_empty(config->trust_anchors, config->trust_anchors_size);
+            }
+            if (config->trust_key != nullptr) {
+                request.trust_key = as_bytes_or_empty(config->trust_key, config->trust_key_size);
+            }
+            request.now_unix = config->now_unix;
+            request.judge_at_signed_date = config->judge_at_signed_date != 0;
+        }
+        const auto result = iclforge::ac4::verify_stream_with_trust(
+            as_bytes_or_empty(stream, stream_size), request);
+        if (!result.has_value()) {
+            set_detail(out_detail, result.error().message);
+            return ICLFORGE_ERROR_INVALID_ARGUMENT;
+        }
+        // The enumerators of VerifyOutcome and the C enum are one list in one order
+        // (internal_ac4.hpp asserts it).
+        *out_outcome =
+            static_cast<iclforge_ac4_signature_outcome_t>(static_cast<int>(result->outcome));
+        set_detail(out_detail, result->detail);
+        return ICLFORGE_OK;
+    });
 }
 
 }  // extern "C"

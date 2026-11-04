@@ -358,6 +358,15 @@ const char* to_string(X509Error error) noexcept {
     return "unknown certificate error";
 }
 
+std::optional<P256PublicKey> parse_public_key_info_der(std::span<const std::byte> der_bytes) {
+    std::span<const std::byte> rest = der_bytes;
+    const auto spki = der::read(rest);
+    if (!spki || !rest.empty()) {
+        return std::nullopt;
+    }
+    return parse_public_key_info(*spki);
+}
+
 std::expected<Certificate, X509Error> parse_certificate(std::span<const std::byte> der_bytes) {
     using Unexpected = std::unexpected<X509Error>;
     std::span<const std::byte> input = der_bytes;

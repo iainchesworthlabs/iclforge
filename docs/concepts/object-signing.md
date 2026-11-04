@@ -290,6 +290,20 @@ The rest follows this page's stance:
   UUID that is missing or that is none of them. Only a raw `.ac4` stream is signed: signing an MP4 is
   out of scope (section 8.3.2) and is refused by name.
 
+- **A bring-your-own-key signature is not Dolby's.** The signature chains to the certificates *you*
+  supply, so it proves one thing: the stream is the one whose holder of your key signed it, and not a
+  byte of it, or of the signer information, has changed since. It does **not** chain to Dolby's (or
+  PACE's) trust root, and this project ships no key, certificate or fingerprint of either, so a
+  licensed Dolby decoder, player or receiver that checks a content signature against Dolby's root
+  will not treat the stream as Dolby-authentic, and a signed file does not become "certified" by
+  being signed. What a verifier can conclude depends on what it trusts: with `trust-anchor=`,
+  `pin=` or `trust-key=` naming *your* signer it can say "valid" (your key signed this), with
+  nothing named it can only say `untrusted` (the file agrees with its own signature, which anyone
+  could have made with a key of their own). The signature carries no encryption and no protection
+  against copying; anyone who strips the trailer has an unsigned stream that plays the same, and
+  `no-signature` is how a verifier tells. Guard the private key as you would a code-signing key: the
+  library wipes its copies, but a key file, a process environment or a core dump is yours to protect.
+
 See [Signing](../library/signing.md#ac-4-content-signing) for the API, and `libs/ac4/ERRATA.md` for
 what was measured on a real signature and the questions still open.
 

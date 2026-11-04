@@ -62,6 +62,15 @@ struct SigningCredentials {
 [[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<SigningCredentials, CredentialError>
 make_credentials(P256PrivateKey key, std::vector<Certificate> certificates);
 
+// A public key the operator trusts to sign: a PEM "PUBLIC KEY" block (what `openssl pkey -pubout`
+// writes), a DER SubjectPublicKeyInfo, or base64 of the DER. P-256 only.
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<P256PublicKey, CredentialError>
+parse_p256_public_key(std::span<const std::byte> contents);
+
+// The keys in the named files, one each.
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<std::vector<P256PublicKey>, CredentialError>
+load_public_key_files(std::span<const std::string> paths);
+
 // Resolution in the style of load_signing_key(): `explicit_path` if non-empty, then the file named
 // by $ICLFORGE_CONTENT_KEY_FILE, then $ICLFORGE_CONTENT_KEY inline (a path is preferred: a value
 // passed inline shows up in `ps` and shell history).

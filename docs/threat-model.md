@@ -120,7 +120,11 @@ What runs against it:
   configurations and input it takes and holds it to the decoder. Two press an AC-4 stream's
   content signature, which arrives with the file it signs: `fuzz_ac4_content_signature` (where the
   sync frames stop and what the digest covers) and `fuzz_content_signature` (the Thrift, DER,
-  X.509, PEM and credential readers, and the verifier that joins them). Four are TrueHD's and the
+  X.509, PEM and credential readers, and the verifier that joins them; a trusted-key file is read by
+  the same PEM and DER code). A signature made with the operator's own key authenticates nothing to
+  Dolby: it does not chain to Dolby's or PACE's trust root, and what a verifier here concludes is
+  only what the keys and certificates *it was given* vouch for ([Object
+  signing](concepts/object-signing.md#sibling-ac-4)). Four are TrueHD's and the
   MAT unwrapper's: the reader, the decoder and the encoder (`fuzz_truehd_parse`,
   `fuzz_truehd_decode`, `fuzz_truehd_encode`, with seeds made from the fixtures and the hand-built
   streams, a dictionary and a mutator that rewrites the stream's checks) and `fuzz_mat_unwrap`. Three more
