@@ -167,7 +167,8 @@ inline std::vector<std::byte> expected_tag(const base::crypto::SigningKey& key, 
     spec.primary.clear();
     spec.secondary.clear();
     std::vector<std::byte> message = build_unit(spec, with_major_sync);
-    message.back() = std::byte{0};
+    message.resize(message.size() - 1);  // the parity byte is zero in the message
+    message.push_back(std::byte{0});
     const auto digest = base::crypto::hmac_sha256(key.bytes(), message);
     return {digest.begin(),
             digest.begin() + static_cast<std::ptrdiff_t>(kTestProtectionBytes[spec.primary_code])};

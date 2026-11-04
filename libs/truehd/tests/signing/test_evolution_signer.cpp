@@ -337,11 +337,12 @@ TEST_CASE("the parity byte follows TH spec 16.4 with a non-zero evo_reserved nib
         std::vector<std::byte> signed_bytes = unit;
         REQUIRE(sign_evolution_unit(signed_bytes, key));
         // The nibble is in the unit the tag covers: worked out here over this unit, parity zeroed.
-        std::vector<std::byte> message = unit;
-        message.back() = std::byte{0};
+        REQUIRE_FALSE(unit.empty());
+        std::vector<std::byte> message(unit.begin(), unit.end() - 1);
+        message.push_back(std::byte{0});
         const auto digest = base::crypto::hmac_sha256(key.bytes(), message);
         FrameSpec tagged = spec;
-        tagged.primary.assign(digest.begin(), digest.begin() + 4);  // primary code 2: four bytes
+        tagged.primary = {digest[0], digest[1], digest[2], digest[3]};  // code 2: four bytes
         CHECK(signed_bytes == testing::build_unit(testing::build_region(
                                   testing::build_frame(tagged), {}, reserved)));
         const auto after = parse_access_unit(signed_bytes, 0, true);
