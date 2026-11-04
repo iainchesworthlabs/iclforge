@@ -359,3 +359,12 @@ recommendation says, provisionally.
     unanswered), the restart interval at 128 and then at 8 (question 8), and the front-panel word. *Recommendation:* the owner
     answers question 6 first; the carrier is then one backend and one reading, and every other question here waits for that
     reading.
+16. **Should the TrueHD leg keep a lead of bursts ahead of the device?** The encoder emits a restart interval at once, five
+    or six bursts every third or fourth frame, and the sink starts playing from the first burst, so nothing is held in hand when the next batch
+    arrives. The hidden case `[truehd_headroom]` plays what reaches the sink out like a device (Windows desktop, three runs):
+    a 70 to 90 ms gap at the start and one gap of up to 5 ms after the first second in each run. The Pi 4B's 36 ms worst frame
+    (`[truehd_cost]`, mean 9.2 ms, median 0.11 ms) adds to that, and the cause is the missing lead and not the CPU. Whether a
+    receiver keeps its lock through a gap that short is not known; the receiver reading will say. *Recommendation:* hold the
+    first bursts until about 150 ms of them are queued (more than the Pi's worst frame plus the rounding of batches to whole
+    frames), at the price of that much delay in the mode, and take the reading both ways. It needs a start threshold in the
+    sink or a pacing queue in the stage, which is a change to `libs/audio` as much as to Crucible.

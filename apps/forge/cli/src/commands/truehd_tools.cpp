@@ -33,6 +33,7 @@
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
 #include "truehd_meaning.hpp"
+#include "truehd_signing.hpp"
 
 namespace forge_cli::commands {
 
@@ -133,26 +134,44 @@ int report_edit_error(const th::Error& error, std::string_view in_path) {
 int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path,
                         std::string_view out_path, const Options& meta) {
     // dialnorm=, compr=, bsmod=, insert and the rest are E-AC-3's: refused by name, never dropped.
-    if (const int refused = check_options_applied(meta, kMetadataOptions); refused != kExitOk) {
+    // sign-objects (with signing-key=) is applied: it writes the per-frame evolution tag, on its
+    // own or after the edit (the tag covers the evolution payload, which an edit does not touch).
+    std::vector<std::string_view> applied(kMetadataOptions.begin(), kMetadataOptions.end());
+    applied.emplace_back("sign-objects");
+    applied.emplace_back("signing-key=");
+    if (const int refused = check_options_applied(meta, std::span<const std::string_view>(applied));
+        refused != kExitOk) {
         return refused;
     }
-    if (meta.thd_meaning.empty()) {
+    if (meta.thd_meaning.empty() && !meta.sign_objects) {
         fmt::println(
             stderr,
             "error: nothing to change - give at least one of truehd-dialnorm-2ch=, "
             "-6ch=, -8ch=, truehd-mix-level-2ch=, -6ch=, -8ch=, truehd-source-format-6ch=, "
             "-8ch=, truehd-control-2ch=, -6ch=, -8ch=, truehd-heavy-drc-start-up-gain= or "
-            "truehd-drc-start-up-gain= ('forge probe' shows the current values)");
+            "truehd-drc-start-up-gain= ('forge probe' shows the current values), or sign-objects");
         return kExitUsage;
     }
-    const auto summary = th::edit_channel_meaning(bytes, meta.thd_meaning);
-    if (!summary) {
-        return report_edit_error(summary.error(), in_path);
+    std::optional<th::StreamEditSummary> summary;
+    if (!meta.thd_meaning.empty()) {
+        auto edited = th::edit_channel_meaning(bytes, meta.thd_meaning);
+        if (!edited) {
+            return report_edit_error(edited.error(), in_path);
+        }
+        summary = std::move(*edited);
+    }
+    const auto status = status_stream(out_path);
+    if (!apply_truehd_object_signing(bytes, meta, status)) {
+        return kExitUsage;
     }
     if (!write_stream(out_path, bytes, meta.keep_partial)) {
         return kExitOutput;
     }
-    const auto status = status_stream(out_path);
+    if (!summary) {
+        status_println(status, "signed the evolution frames of {} -> {} (audio untouched)", in_path,
+                       out_path);
+        return kExitOk;
+    }
     status_println(status,
                    "rewrote the channel meaning of {} of {} major syncs ({} access units) -> {} "
                    "(audio untouched)",

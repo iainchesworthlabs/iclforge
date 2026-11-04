@@ -33,6 +33,7 @@ iclforge_add_library(truehd
         src/io/metadata_edit.cpp
         src/io/presentation_cut.cpp
         src/io/scan.cpp
+        src/signing/evolution_signer.cpp
     DEPENDS base
     PRIVATE_INCLUDES
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

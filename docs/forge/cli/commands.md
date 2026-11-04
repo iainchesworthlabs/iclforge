@@ -1126,14 +1126,25 @@ status 2 (the measurement is strict), and `normalize` takes no option but `quiet
 with no oracle until the DEE set (`libs/truehd/ERRATA.md`, question 51).
 
 **Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
-`truehd-presentation=` and `truehd-check=` and refuses every other option by name with exit status 1 and no output: the
+`truehd-presentation=`, `truehd-check=` and the object-signing options `verify-objects`, `gate-objects` and `signing-key=`
+(see below), and refuses every other option by name with exit status 1 and no output: the
 output stage (`channels=`, `downmix=`, `mix-lfe`), `drc=` and `drcmode=`, `programme=`, the object outputs (`objects_dir`,
-`adm_out`, `bed-only`) and the verification flags (`verify-content`, `check-content`, `verify-objects`, `syntax-trace=`),
+`adm_out`, `bed-only`), `sign-objects` and the verification flags (`verify-content`, `check-content`, `syntax-trace=`),
 which never succeed without checking something. `levels` and `loudness` take the same two options, `truehd-encode` its own
 and `verify` (the metadata, layout and multi-source options of the other encoders, such as `dialnorm=`, `layout=`, `src=` and
 `map=`, are refused), `probe` takes `json=` and `detail=evolution`, `structure` and `format` (`detail=frames` and `blocks` have no TrueHD form), and `mkv`, `mp4`, `ts`, `spdif` and `remux` take
 none (`mainid=`, `asvc=` and `programme=` describe a service of the AC-3 family). `quiet` and `verbose` apply everywhere. The
 transform choices `fast-mdct`, `fast-imdct` and `mode=` change nothing for a codec with no transform, and are warned about.
+
+**TrueHD object signing: `sign-objects`, `verify-objects`, `gate-objects`.** The evolution frame that carries a TrueHD stream's object
+metadata has a protection field, and `iclforge::truehd::signing` writes and checks a keyed tag in it with the operator's own key
+(`signing-key=<path>`, or `ICLFORGE_SIGNING_KEY[_FILE]`). `metadata <in> <out> sign-objects signing-key=<path>` signs every evolution
+frame (alone, or together with the channel-meaning edits; no length changes). `decode <in> <out> verify-objects signing-key=<path>`
+refuses the stream on a mismatch, and takes several `signing-key=` for a keyring. `gate-objects` is the permissive policy: a unit whose
+tag verifies is kept, any other has its object layer removed and plays as the bed, and `truehd-presentation=all` is refused when
+anything was gated. `probe` says without a key how many evolution frames carry a tag
+(`truehd.evolution.protection.tagged_frames`). This is iclforge's own scheme, not a Dolby tag: a licensed decoder holds other keys and
+will not accept these tags as Dolby-authentic. See [Object signing](../../concepts/object-signing.md#sibling-truehd-evolution).
 
 ### AC-4 content signing: `ac4-sign`, `ac4-verify`
 

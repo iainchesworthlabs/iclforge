@@ -50,6 +50,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "associated_mix.hpp"
 #include "truehd.hpp"
+#include "truehd_signing.hpp"
 #include "content_signature.hpp"
 #include "stream_playback.hpp"
 
@@ -1526,8 +1527,8 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
         // question 5); channels=as-coded is what a TrueHD decode does. No other count is taken.
         forge_cli::Options truehd_options = requested;
         std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=", "truehd-render=",
-                                              "strict",
-                                              "channels=as-coded"};
+                                              "strict", "channels=as-coded", "verify-objects",
+                                              "gate-objects", "signing-key="};
         if (std::ranges::find(requested.given, std::string{"channels=2"}) !=
             requested.given.end()) {
             if (requested.truehd_presentation != "best" && requested.truehd_presentation != "2ch" &&
@@ -1545,6 +1546,31 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
                 requested, std::span<const std::string_view>(applied));
             refused != kExitOk) {
             return refused;
+        }
+        // verify-objects and gate-objects check the per-frame evolution tag with the operator's own
+        // key (iclforge::truehd::signing); a decode without them reads no tag, as before.
+        if (!apply_truehd_object_verification(stream, requested, status_stream(out_path))) {
+            return kExitInput;
+        }
+        if (requested.gate_objects) {
+            auto gate = apply_truehd_object_gate(stream, requested, status_stream(out_path));
+            if (!gate) {
+                return kExitInput;
+            }
+            // A unit whose object layer was taken out is the bed from substreams 0 to 2; the
+            // object channels of substream 3 have no metadata left to place them.
+            if (gate->gated != 0 && (requested.truehd_presentation == "all" ||
+                                     !objects_dir.empty() || !adm_out.empty())) {
+                fmt::println(stderr,
+                             "error: gate-objects played {} unit(s) as the bed, and "
+                             "truehd-presentation=all, objects_dir= and adm_out= would still read "
+                             "their object channels: leave them out and the presentation at best, "
+                             "2ch, 6ch or 8ch",
+                             gate->gated);
+                return kExitUsage;
+            }
+            return run_decode_truehd(gate->bytes, in_path, out_path, truehd_options, loss,
+                                     objects_dir, adm_out);
         }
         return run_decode_truehd(stream, in_path, out_path, truehd_options, loss, objects_dir,
                                  adm_out);

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/mat.hpp"
 #include "iclforge/render/identify.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
@@ -539,6 +540,16 @@ private:
     // the pending ring as a burst. `start` is where it sits in what the item
     // plays (Session::SentFn).
     void send_unit(std::span<const std::byte> unit, std::uint32_t samples, std::uint64_t start);
+    // TrueHD sent as MAT to a local output: the unit goes into the burst being filled (24 to a
+    // burst), and a whole burst is queued for the link.
+    void send_unit_as_mat(std::span<const std::byte> unit, std::uint32_t samples, std::size_t record);
+    // What a unit that has been packed adds to the burst being filled, and queueing that burst once
+    // it is whole.
+    void note_packed_unit(std::uint32_t samples, std::size_t record);
+    void queue_burst(std::vector<std::byte> burst, std::size_t record);
+    // The units a MAT burst still holds when the output is not going on to another item, padded
+    // into a burst of their own so that the end of the last item is heard.
+    void flush_mat_tail();
     // A unit the session sent, for a network group: the same packer, into
     // group_payload_ instead of the pending ring, and pending_group_bursts_
     // once a burst is whole (send_unit()'s own kNetworkGroup case). Nothing
@@ -653,6 +664,8 @@ private:
     // An AC-4 item's, for a network group: one per stream, which follows its
     // frames' phase (iec61937.hpp).
     std::optional<containers::iec61937::Ac4BurstPacker> ac4_packer_;
+    // TrueHD to a local output: 24 access units to a burst.
+    std::optional<containers::iec61937::MatPacker> mat_packer_;
     std::uint64_t packed_frames_ = 0;
     std::vector<Span> packed_spans_;
     // A network group's own burst-in-progress: the raw (unwrapped)

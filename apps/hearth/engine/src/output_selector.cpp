@@ -178,6 +178,8 @@ OutputChoice OutputSelector::choose(const ItemFacts& item, const HeldOutput& hel
     // The player transcodes over its passthrough output, at a rate AC-3 has;
     // with no such output, no row takes AC-3 in the first place.
     request.transcode_available = Ac3Transcoder::carries(rate);
+    // The player packs TrueHD into MAT bursts for a passthrough output (Player::send_unit_as_mat).
+    request.mat_passthrough = bitstream_output_;
     return choose_output(request);
 }
 

@@ -161,8 +161,10 @@ metadata options (any order, after the positional arguments):
                     builds for (see docs/platforms/bare-metal/esp32-s3.md). Harmless on a
                     stream with no object layer
   sign-objects      atmos/atmos-path/atmos-encode/atmos-cbi: write a keyed EMDF object
-                    signature (needs signing-key=); see docs/concepts/object-signing.md
-  verify-objects    decode/monitor: check each frame's EMDF object signature against
+                    signature (needs signing-key=); metadata on a TrueHD stream: sign its
+                    evolution frames (iclforge's own tag, not Dolby's); see
+                    docs/concepts/object-signing.md
+  verify-objects    decode/monitor (and decode of TrueHD): check each frame's object signature against
                     signing-key= instead of just playing it - a mismatch refuses the command;
                     omitted (the default) decodes signed and unsigned streams alike, unchecked
   gate-objects      decode/monitor/spatial: the licensed policy - frames whose object
