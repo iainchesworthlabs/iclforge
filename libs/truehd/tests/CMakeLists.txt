@@ -29,6 +29,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder_atmos.cpp
     encoder/test_encoder_object_bed.cpp
     encoder/test_encoder_object_motion.cpp
+    encoder/test_bed_pan.cpp
     encoder/test_render_bed.cpp
     encoder/test_layout.cpp
     encoder/test_ratectl.cpp
@@ -101,6 +102,12 @@ add_executable(iclforge-truehd-render-tool tools/render_stream_tool.cpp
     ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp)
 target_include_directories(iclforge-truehd-render-tool PRIVATE ../src)
 target_link_libraries(iclforge-truehd-render-tool PRIVATE iclforge::truehd iclforge::warnings)
+
+# iclforge-truehd-render-dump - a stream's bed, elements and object positions laid out for the check of
+# the render rule against the owner's DEE controls (libs/truehd/notes/feature-truehd-measured-bed-render.md).
+add_executable(iclforge-truehd-render-dump tools/render_dump_tool.cpp)
+target_link_libraries(iclforge-truehd-render-dump PRIVATE iclforge::truehd iclforge::objects
+    iclforge::warnings)
 
 # iclforge-truehd-ss3-lab - the decoder under each setting of DecoderLab, for the owner to run on a
 # TrueHD Atmos stream (libs/truehd/ERRATA.md entry 69).

@@ -23,6 +23,7 @@ iclforge_add_library(truehd
         src/core/format.cpp
         src/core/syntax.cpp
         src/decoder/decoder.cpp
+        src/encoder/bed_pan.cpp
         src/encoder/cluster_elements.cpp
         src/encoder/coding.cpp
         src/encoder/encoder.cpp
