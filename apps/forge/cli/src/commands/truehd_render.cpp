@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "iclforge/base/layout.hpp"
+#include "iclforge/truehd/encoder/bed_pan.hpp"
 
 namespace forge_cli::commands {
 
@@ -56,11 +57,35 @@ std::optional<Location> location_of(oba::BedLabel label) {
     return std::nullopt;
 }
 
+// Whether the layout is the stream's 7.1 bed, slot for slot: L R C LFE Ls Rs Lrs Rrs.
+bool is_stream_bed(const iclforge::render::OutputLayout& layout) {
+    constexpr std::array<Location, 8> expected{Location::kLeft,          Location::kRight,
+                                                Location::kCentre,        Location::kLfe,
+                                                Location::kLeftSurround,  Location::kRightSurround,
+                                                Location::kLrs,           Location::kRrs};
+    if (layout.slots() != expected.size()) {
+        return false;
+    }
+    for (std::size_t slot = 0; slot < expected.size(); ++slot) {
+        const auto& speaker = layout.slot(slot);
+        const bool lfe = expected[slot] == Location::kLfe;
+        if (lfe ? speaker.kind != iclforge::render::Speaker::Kind::kLfe
+                : (!speaker.location || *speaker.location != expected[slot])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 TrueHdObjectRenderer::TrueHdObjectRenderer(const iclforge::render::OutputLayout& layout,
-                                           std::uint32_t sample_rate)
-    : layout_(layout), renderer_(layout, sample_rate), slots_(layout.slots()) {
+                                           std::uint32_t sample_rate, bool limit)
+    : layout_(layout),
+      renderer_(layout, sample_rate),
+      slots_(layout.slots()),
+      measured_(is_stream_bed(layout)),
+      limit_(limit) {
     // Only the renderer's gains are used, never its render(), so its LFE delay line is not either.
     for (std::size_t slot = 0; slot < slots_; ++slot) {
         const auto& speaker = layout_.slot(slot);
@@ -112,6 +137,19 @@ void TrueHdObjectRenderer::add_update(std::size_t channel, std::uint64_t sample,
     if (channel >= tracks_.size() || !tracks_[channel].dynamic) {
         return;
     }
+    Event event;
+    event.sample = sample;
+    event.ramp = std::max(ramp, 0);
+    if (measured_) {
+        const auto shares = iclforge::truehd::bed_pan_gains(iclforge::truehd::bed_position_code(
+            state.position.x, state.position.y, state.position.z));
+        const double level = state.active ? std::pow(10.0, state.gain_db / 20.0) : 0.0;
+        for (std::size_t slot = 0; slot < slots_ && slot < shares.size(); ++slot) {
+            event.target[slot] = level * shares[slot];
+        }
+        tracks_[channel].events.push_back(event);
+        return;
+    }
     oba::DisplayObject object;
     object.position = state.position;
     object.size = state.size;
@@ -121,9 +159,6 @@ void TrueHdObjectRenderer::add_update(std::size_t channel, std::uint64_t sample,
     object.zone = state.zone;
     object.enable_elevation = state.enable_elevation;
     renderer_.set_objects(std::span<const oba::DisplayObject>(&object, 1));
-    Event event;
-    event.sample = sample;
-    event.ramp = std::max(ramp, 0);
     for (std::size_t slot = 0; slot < slots_; ++slot) {
         event.target[slot] = static_cast<double>(renderer_.object_gain(0, slot));
     }
@@ -133,6 +168,7 @@ void TrueHdObjectRenderer::add_update(std::size_t channel, std::uint64_t sample,
 void TrueHdObjectRenderer::render(std::span<const std::int32_t> pcm, std::size_t channels,
                                   std::size_t samples, std::vector<std::int32_t>& out) {
     out.assign(samples * slots_, 0);
+    std::vector<double> mixed(samples * slots_, 0.0);
     std::vector<double> mix(slots_);
     for (std::size_t i = 0; i < samples; ++i) {
         const std::uint64_t now = position_ + i;
@@ -175,18 +211,26 @@ void TrueHdObjectRenderer::render(std::span<const std::int32_t> pcm, std::size_t
                 }
             }
         }
-        for (std::size_t slot = 0; slot < slots_; ++slot) {
-            const double scaled = std::nearbyint(mix[slot] * kFullScale);
-            double limited = scaled;
-            if (scaled > kFullScale - 1.0) {
-                limited = kFullScale - 1.0;
-                ++clipped_;
-            } else if (scaled < -kFullScale) {
-                limited = -kFullScale;
+        std::ranges::copy(mix, mixed.begin() + static_cast<std::ptrdiff_t>(i * slots_));
+    }
+    // The sum of the objects under the ceiling, one gain for all the slots, then to the 24 bit grid.
+    if (limit_) {
+        limited_ += iclforge::truehd::limit_bed_peaks(mixed, static_cast<int>(slots_));
+    }
+    for (std::size_t i = 0; i < samples * slots_; ++i) {
+        const double scaled = std::nearbyint(mixed[i] * kFullScale);
+        double limited = scaled;
+        if (scaled > kFullScale - 1.0) {
+            limited = kFullScale - 1.0;
+            // the largest 24 bit value is 1 / 2^23 under the ceiling the limiter holds: not a clip
+            if (mixed[i] > 1.0) {
                 ++clipped_;
             }
-            out[i * slots_ + slot] = static_cast<std::int32_t>(limited);
+        } else if (scaled < -kFullScale) {
+            limited = -kFullScale;
+            ++clipped_;
         }
+        out[i] = static_cast<std::int32_t>(limited);
     }
     position_ += samples;
 }

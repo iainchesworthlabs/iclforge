@@ -21,6 +21,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
+#include "iclforge/truehd/encoder/bed_pan.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
@@ -234,7 +235,6 @@ std::vector<OamdFrame> read_oamd_frames(const fs::path& file) {
 TEST_CASE("truehd-render places the objects of substream 3 on the layout by their metadata",
           "[forge-cli][truehd][atmos][render]") {
     namespace oba = iclforge::objects::oba;
-    namespace render = iclforge::render;
     const fs::path dir = scratch_dir();
     const std::string layout_text = "L,R,C,LFE,Ls,Rs,Lrs,Rrs";
     const fs::path raw_wav = dir / "render_raw.wav";
@@ -259,20 +259,16 @@ TEST_CASE("truehd-render places the objects of substream 3 on the layout by thei
     REQUIRE(oamd.size() == 2);
     REQUIRE(oamd[1].first_sample == 640);
 
-    // The gains the layout renderer gives each object at each frame's positions, asked directly.
-    const auto layout = render::OutputLayout::parse(layout_text);
-    REQUIRE(layout.has_value());
-    render::LayoutRenderer panner(*layout, 48000);
+    // The gains the measured law of the 7.1 bed (iclforge/truehd/encoder/bed_pan.hpp) gives each
+    // object at each frame's positions, asked directly. The layout is the stream's own bed, so this
+    // is the law the render and the encoder's bed share.
     const auto gains_of = [&](const oba::DynamicObject& state) {
-        oba::DisplayObject object;
-        object.position = state.position;
-        object.size = state.size;
-        object.gain_db = state.gain_db;
-        object.active = state.active;
-        panner.set_objects(std::span<const oba::DisplayObject>(&object, 1));
+        const auto shares = iclforge::truehd::bed_pan_gains(iclforge::truehd::bed_position_code(
+            state.position.x, state.position.y, state.position.z));
+        const double level = state.active ? std::pow(10.0, state.gain_db / 20.0) : 0.0;
         std::array<double, 8> gains{};
         for (std::size_t slot = 0; slot < 8; ++slot) {
-            gains[slot] = static_cast<double>(panner.object_gain(0, slot));
+            gains[slot] = level * shares[slot];
         }
         return gains;
     };
@@ -634,7 +630,7 @@ TEST_CASE("decode names and writes 14 and 16 object channels, the LFE first",
             CHECK_FALSE(fs::exists(objects / ("object_" + std::to_string(count) + ".wav")));
 
             // The plan has the LFE at channel 0 on the LFE feed (slot 3) and every other channel
-            // a dynamic object panned by libs/render from the positions of the metadata frames,
+            // a dynamic object panned by the measured law of the 7.1 bed from the positions of the metadata frames,
             // each frame's gains reached over its ramp from the sample it starts at. The
             // expectation is made here from the decoded channels and the frames, not by forge.
             const fs::path raw_wav = dir / (name + "_all.wav");
@@ -647,9 +643,6 @@ TEST_CASE("decode names and writes 14 and 16 object channels, the LFE first",
             REQUIRE(rendered.channels == 8);
             const std::size_t samples = all.samples.size() / count;
             REQUIRE(rendered.samples.size() / 8 == samples);
-            const auto layout = iclforge::render::OutputLayout::parse("L,R,C,LFE,Ls,Rs,Lrs,Rrs");
-            REQUIRE(layout.has_value());
-            iclforge::render::LayoutRenderer panner(*layout, 48000);
             const auto frames = read_oamd_frames(stream);
             REQUIRE(frames.size() >= 3);
             // The sample a frame's update takes effect at: its unit's first, the update's offset
@@ -664,16 +657,13 @@ TEST_CASE("decode names and writes 14 and 16 object channels, the LFE first",
                 REQUIRE(frames[k].program.blocks.size() == 1);
                 REQUIRE(frames[k].program.blocks[0].objects.size() == count - 1);
                 for (const auto& state : frames[k].program.blocks[0].objects) {
-                    iclforge::objects::oba::DisplayObject object;
-                    object.position = state.position;
-                    object.size = state.size;
-                    object.gain_db = state.gain_db;
-                    object.active = state.active;
-                    panner.set_objects(
-                        std::span<const iclforge::objects::oba::DisplayObject>(&object, 1));
+                    const auto shares = iclforge::truehd::bed_pan_gains(
+                        iclforge::truehd::bed_position_code(state.position.x, state.position.y,
+                                                            state.position.z));
+                    const double level = state.active ? std::pow(10.0, state.gain_db / 20.0) : 0.0;
                     std::array<double, 8> one{};
                     for (std::size_t slot = 0; slot < 8; ++slot) {
-                        one[slot] = static_cast<double>(panner.object_gain(0, slot));
+                        one[slot] = level * shares[slot];
                     }
                     gains[k].push_back(one);
                 }
