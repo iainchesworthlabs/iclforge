@@ -216,7 +216,7 @@ TEST_CASE("a changed bit anywhere the tag covers fails it, and one in the zeroed
 
     const auto flipped = [&good](std::size_t bit) {
         std::vector<std::byte> unit = good;
-        unit[bit >> 3U] ^= static_cast<std::byte>(0x80U >> (bit & 7U));
+        unit.at(bit >> 3U) ^= static_cast<std::byte>(0x80U >> (bit & 7U));
         return unit;
     };
     struct Place {
@@ -255,7 +255,7 @@ TEST_CASE("a changed bit anywhere the tag covers fails it, and one in the zeroed
     // The parity byte is not in the message: a changed one leaves the tag good (the parity is the
     // extra data's own check, which the reader reports on its own).
     std::vector<std::byte> parity = good;
-    parity.back() ^= std::byte{0x5A};
+    parity.at(parity.size() - 1) ^= std::byte{0x5A};
     CHECK(verify_evolution_unit(parity, key) == VerifyResult::kValid);
     CHECK_FALSE(read_extra_data(std::span<const std::byte>(parity).subspan(extra_at))->parity_ok);
     // The fill and the padding are not in it either; the sole-container rule is what keeps them

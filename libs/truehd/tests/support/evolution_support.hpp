@@ -138,8 +138,8 @@ inline std::vector<std::byte> build_unit(std::span<const std::byte> region,
     std::vector<std::byte> unit = stereo_unit(with_major_sync);
     unit.insert(unit.end(), region.begin(), region.end());
     const std::size_t words = unit.size() / 2;
-    unit[0] = static_cast<std::byte>((words >> 8U) & 0xFU);
-    unit[1] = static_cast<std::byte>(words & 0xFFU);
+    unit.at(0) = static_cast<std::byte>((words >> 8U) & 0xFU);
+    unit.at(1) = static_cast<std::byte>(words & 0xFFU);
     const auto fold = [](std::span<const std::byte> bytes) {
         unsigned x = 0;
         for (const std::byte b : bytes) {
