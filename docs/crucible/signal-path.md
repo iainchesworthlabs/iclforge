@@ -110,6 +110,35 @@ without a receiver: nothing has been played into one, so whether an endpoint acc
 a receiver locks on it is not known.
 Its LFE channel is empty, because Crucible's mix has no LFE source: a tap's LFE is dropped.
 
+**What the TrueHD leg costs.** The encoder holds a restart interval (128 access units, 107 ms of
+audio), and a further 90 access units (75 ms) whose arrival times wait for the units after them, and
+emits what it holds in batches, so most frames cost almost nothing and about one in three carries
+the whole encode. The hidden test case `[truehd_cost]` times it over the repository's 5.1 programme
+material, 1536-sample frames, in a Release build. On a Windows desktop the mean is 2.3 ms and the
+worst frame 10 ms. On a Raspberry Pi 4B (4 cores, 1.8 GB, Debian 13, GCC 14), at the commit before
+the encoder held the further 75 ms, the mean was 9.2 ms, which is about 29 % of one core held for as
+long as the mode runs, the median 0.11 ms, and the worst frame 36.1 ms against the 32 ms a frame
+lasts. So the Pi has the cores for the mode, and one frame in about three takes slightly longer than
+its own length. That frame is followed by two that cost almost nothing, and
+the engine paces itself on the taps, not on the encoder, so the spike delays one batch of bursts by
+a few milliseconds and does not by itself drop audio. It has not been run with live taps on the Pi.
+
+What does put the stream at risk is how far ahead of the device the bursts are. The leg hands the sink
+a batch of five or six bursts (100 or 120 ms of audio) every third or fourth frame (96 or 128 ms), and
+nothing holds any back, so the sink has about no audio in hand when the next batch arrives. The
+hidden case `[truehd_headroom]` feeds the leg at real-time pace and plays what reaches the sink out
+the way a device would, one burst in 20 ms from the first. On a Windows desktop, in three runs of
+2.5 s, it found a gap of 70 to 90 ms at the start, while the first batch is a single burst, and one
+gap of up to 5 ms in each run after the first second. On the Pi, with the encoder holding the further
+75 ms (mean 9.2 ms, worst frame 36.7 ms), three runs of 78 frames each found the same 74 ms gap at
+the start and one or two gaps after the first second, the deepest of 25 ms. A late batch is a gap in
+the stream, and what a receiver does with a gap that short is only known by playing it one. This is
+a model of the sink, not a reading of a device, and a slower machine only moves the gaps about and
+makes them longer: the cause is that no lead is kept. The way to keep one is to hold the first bursts back until about 150 ms of them are in hand,
+which is more than the Pi's worst frame plus the rounding of batches to whole frames, at the price of
+that much delay in the mode. That change is not made; it is question 16 on
+`planning/truehd-parity-crucible.md`.
+
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
 can carry; TrueHD 5.1 is left out of that order and is only ever pinned. Crucible writes E-AC-3
 and AC-3, and TrueHD when pinned. It has no AC-4 mode.
