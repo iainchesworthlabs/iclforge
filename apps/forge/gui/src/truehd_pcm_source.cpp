@@ -118,7 +118,7 @@ std::string TruehdPcmSource::scan() {
             }
             first = false;
         }
-        rate_model.add(unit->size(), first_sync);
+        rate_model.add(*unit, first_sync);
     }
     info_.rate = rate_model.report();
     return {};

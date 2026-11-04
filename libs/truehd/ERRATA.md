@@ -328,9 +328,9 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
 56. **What `forge qc` of a TrueHD stream fails (TH spec §7.3, §12.5, §18).** Built, as the parity audit recommended (question 2 of
     `planning/truehd-parity-forge.md`): an integrity gate and the existing loudness presets, exit 6 when either fails. The integrity gate fails on
     a byte the reader does not take for an access unit, a failed check (nibble, major sync CRC, restart header CRC, parity, segment CRC),
-    a restart interval whose lossless check fails, and a unit that cannot be sent within the declared peak rate and 75 ms by the encoder's own
-    model (the declared rate is `MajorSync::peak_data_rate_bps()`, the unit TH spec v3.9 §4.4 gives and question 12 records; the model is the
-    encoder's, so the gate is as provisional as the model is). Left, because each needs a decision: (a) whether a dialogue
+    a restart interval whose lossless check fails, and a unit that starts before the unit ahead of it has arrived at the declared peak rate (entry 99; the old
+    queue model, the encoder's, failed Dolby's own streams; the declared rate is `MajorSync::peak_data_rate_bps()`, the unit TH spec v3.9 §4.4 gives and question 12 records; the law is
+    per unit, so the gate is as provisional as that reading is). Left, because each needs a decision: (a) whether a dialogue
     norm that differs from the measurement by more than some tolerance fails a stream: E-AC-3's `qc` reports the difference and does not
     gate it, and for TrueHD the field is all zero in every stream FFmpeg writes with its control bit clear, so a gate would fail them all;
     (b) the rate check's tolerance (question 12 settled the scale: the field is in bits per second), and whether `input_timing` (§3.4) should be held to its three
@@ -1291,3 +1291,24 @@ channel presentations are exact over the whole 1,920,000 frames, from 5.0 s on t
 plain-51-96k24 and plain-51-48k16, byte-identical to the first round's, are accepted and exact as before. DRP's own limits are still not known. Tests: `a burst that needs more than a unit of channel time is met by the units before it` (inside a
 restart interval and across the boundary of two; fails with the old fixed lead), `a stream that never needs more than a unit of channel time keeps one
 unit of lead` and `the substream info byte follows the number of substreams`.
+
+**99. The data-rate gate reads each unit's `input_timing`, not a queue at the declared rate (TH spec §3.4, §18; entries 37 and 98; question 12; `forge qc`, `forge probe`, the Forge window's QC).**
+`RateModel` (`apps/shared/media/src/probe_truehd.cpp`) simulated a queue served at the first major sync's declared peak rate, each unit starting when the
+channel was free and carrying the backlog forward, and failed a unit that finished more than 75 ms after its slot. That is the encoder's old model
+(entry 37), and entry 98 had already found it is not what the Dolby Reference Player checks. It failed streams Dolby's own encoder wrote: the four
+streams of `D:/ac3bld/dee-single-channel` (DEE 6.5.4, 7.1 and 5.1, a tone in one channel at a time; `sc-71-p8`: field 600, 1.80 Mbit/s declared,
+average 1.22 Mbit/s, largest unit 5.22 Mbit/s, worst delivery 753 ms, 55,812 of 64,800 units late) while their parity, CRC and lossless checks
+all passed; the 0.25 s gold streams passed (they are short). A second session reading the specification found the same on a DEE Atmos stream, and
+that §18.2's law is per unit. The gate is now two checks per unit, both from the stream's own timing words (entry 98 reads the second off the owner's UHD disc and the DRP's
+messages 0x75 and 0x79): a unit takes `duration = ceil(bytes x 8 x rate / declared rate)` samples to arrive; **(1)** the next unit must not start before it
+has, `(input_timing[n] - input_timing[n-1]) mod 65536 >= duration[n-1]`; **(2)** a unit must have arrived by its decode time, `lead[n] >= duration[n]`, where the lead
+(decode time minus start) is `output_timing - input_timing` at a unit with a restart header (`output_timing` is the unit's first sample, entry 37) and moves by
+`nominal - delta` from one unit to the next. No backlog is carried: a burst sent early, as a real encoder does, is within the law. `violations` counts
+the units that fail either and `worst_overrun_ms` is the largest shortfall (the JSON keys `worst_latency_ms` and `latency_limit_ms` are gone). **Checked:**
+0 violations on the four DEE single-channel streams, the 13 DEE gold streams, the 26 FFmpeg fixtures of `testdata/truehd` and two streams `forge sine` wrote;
+6,893 on a 5.1 stream written with `truehd-peak-rate=1000 truehd-rate-check=lenient`; the 27 hand-built streams of `testdata/truehd/handbuilt`, whose timing words
+are not meant to mean anything, now show violations in their goldens. Check (1) alone passes a stream the encoder wrote past its rate with `lenient` (it serialises
+the units but lets them arrive after their decode time), which is why (2) is there. **Not checked, not known:** an upper limit on the lead (the 75 ms of the
+old model, DRP's message 0x78); that a unit starts no sooner than one slot after the previous started (§3.4); whether the DRP's own limits are the same to the
+sample. Tests: `probe json=1` of every fixture is its golden document (the `rate_model` member), `qc` of a stream written over its rate still exits 6, and the cases
+`[gui][truehd][rate]` of `apps/forge/gui/tests/test_truehd_rate_model.cpp` hold check (1) with units made to sit on it.

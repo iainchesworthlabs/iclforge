@@ -28,24 +28,26 @@
 
 namespace iclforge::apps::truehd_probe {
 
-// TH spec §18's model of the transmission of a stream: a unit starts to arrive when its slot opens,
-// when the previous unit has arrived and one unit duration after the previous started, and takes
-// bytes x 8 / rate to arrive; a unit that arrives more than 75 ms after its slot is a violation.
-// The encoder's own model, so that a stream it wrote within the rate is within it here. The declared
-// rate is MajorSync::peak_data_rate_bps() (ERRATA.md question 12).
+// The data rate of a stream against what it declares (TH spec §18, as libs/truehd/ERRATA.md entry
+// 99 records): the channel carries one unit at a time, and a unit takes duration = bytes x 8 x
+// sample rate / declared rate samples to arrive. The stream says when each unit starts
+// (input_timing) and, at a restart header, when it is decoded (output_timing). A unit is short when
+//   (input_timing[n] - input_timing[n-1]) mod 65536  <  duration[n-1]    (the one before had not arrived), or
+//   lead[n]  <  duration[n]                                               (it arrives after its decode time).
+// The law is per unit, with no queue carried forward: a stream that sends a burst early, as a real
+// encoder does, is within it. The declared rate is MajorSync::peak_data_rate_bps() (question 12).
 struct RateReport {
     std::uint64_t declared_bps = 0;
     std::uint64_t max_unit_rate_bps = 0;  // the largest unit's bytes over its own duration
-    double worst_latency_ms = 0.0;        // from a unit's slot opening to its last byte
-    double latency_limit_ms = 75.0;
-    std::uint64_t violations = 0;  // units whose latency is over the limit
+    std::uint64_t violations = 0;         // units that start before the unit before them has arrived
+    double worst_overrun_ms = 0.0;        // the most by which one did
 };
 
 class RateModel {
    public:
-    // `unit_bytes` of the next unit; `first_sync` the major sync the unit carries, if any. Units
+    // The next access unit, whole; `first_sync` the major sync the unit carries, if any. Units
     // before the first major sync are not counted.
-    void add(std::size_t unit_bytes, const std::optional<truehd::MajorSync>& first_sync);
+    void add(std::span<const std::byte> unit, const std::optional<truehd::MajorSync>& first_sync);
     [[nodiscard]] const RateReport& report() const noexcept { return report_; }
 
    private:
@@ -53,10 +55,10 @@ class RateModel {
     bool started_ = false;
     std::uint32_t rate_ = 0;
     int nominal_ = 0;
-    std::int64_t limit_ = 0;
-    std::int64_t position_ = 0;
-    std::int64_t last_start_ = 0;
-    std::int64_t last_arrival_end_ = 0;
+    std::uint16_t last_timing_ = 0;
+    std::int64_t last_duration_ = 0;  // samples the last unit takes to arrive at the declared rate
+    std::int64_t lead_ = 0;           // samples from the last unit's start to its decode time
+    bool have_lead_ = false;          // a restart header has fixed the lead
     std::uint64_t units_ = 0;
 };
 
@@ -155,7 +157,7 @@ struct JsonExtras {
 // The "truehd" member's value: an object. Keys (all additive to the first form): codec,
 // sample_rate, substreams, channels, access_units, samples_per_access_unit, duration_seconds,
 // bytes, average_bit_rate_bps, variable_rate, peak_data_rate, peak_data_rate_bps,
-// rate_model{declared_bps, max_unit_rate_bps, worst_latency_ms, latency_limit_ms, violations},
+// rate_model{declared_bps, max_unit_rate_bps, violations, worst_overrun_ms},
 // object_substream, presentations[{name, substream, channels, layout}], word_length{...},
 // channel_meaning, restart_spacing{major_syncs, min_units, max_units}, extra_data_units,
 // ac3_core_frames, major_syncs, segments_checked, segment_failures, unreadable_units,

@@ -24,7 +24,8 @@ namespace iclforge::apps::truehd_probe {
 
 namespace th = iclforge::truehd;
 
-void RateModel::add(std::size_t unit_bytes, const std::optional<th::MajorSync>& first_sync) {
+void RateModel::add(std::span<const std::byte> unit, const std::optional<th::MajorSync>& first_sync) {
+    const std::size_t unit_bytes = unit.size();
     if (!started_) {
         if (!first_sync) {
             return;
@@ -34,30 +35,49 @@ void RateModel::add(std::size_t unit_bytes, const std::optional<th::MajorSync>& 
         nominal_ = th::nominal_samples_per_access_unit(first_sync->ratebits());
         // TH spec v3.9 section 4.4 (ERRATA.md question 12): bits per second.
         report_.declared_bps = first_sync->peak_data_rate_bps();
-        limit_ = static_cast<std::int64_t>(rate_) * 75 / 1000;
     }
     if (report_.declared_bps == 0 || nominal_ <= 0) {
         return;
     }
-    const std::int64_t slot = position_ - nominal_;
-    std::int64_t start = slot;
-    if (units_ > 0) {
-        start = std::max({slot, last_arrival_end_, last_start_ + nominal_});
-    }
     const auto bits_at_rate = static_cast<std::uint64_t>(unit_bytes) * 8U * rate_;
-    const auto arrival = static_cast<std::int64_t>((bits_at_rate + report_.declared_bps - 1U) /
-                                                   report_.declared_bps);
-    const std::int64_t latency = start + arrival - slot;
-    if (latency > limit_) {
-        ++report_.violations;
+    const auto duration = static_cast<std::int64_t>((bits_at_rate + report_.declared_bps - 1U) /
+                                                    report_.declared_bps);
+    // The unit's own input_timing (bytes 2 and 3 of its prefix, TH spec section 3.4) says when it starts.
+    const auto timing = unit.size() >= 4 ? static_cast<std::uint16_t>(
+                                               (std::to_integer<unsigned>(unit[2]) << 8U) |
+                                               std::to_integer<unsigned>(unit[3]))
+                                         : std::uint16_t{0};
+    std::int64_t shortfall = 0;
+    // The unit before has to have arrived before this one starts.
+    if (units_ > 0) {
+        const std::int64_t delta = static_cast<std::uint16_t>(timing - last_timing_);
+        shortfall = std::max(shortfall, last_duration_ - delta);
+        // The lead (decode time minus start) moves by a slot less the step between starts.
+        lead_ += nominal_ - delta;
     }
-    report_.worst_latency_ms = std::max(
-        report_.worst_latency_ms, 1000.0 * static_cast<double>(latency) / static_cast<double>(rate_));
+    // A unit with a restart header says its decode time, which fixes the lead; the units after it
+    // keep it by their steps. The unit has to have arrived by its decode time.
+    if (first_sync) {
+        if (const auto parsed = th::parse_access_unit(unit, first_sync->num_substreams, true)) {
+            if (const auto header = th::first_restart_header(*parsed)) {
+                lead_ = static_cast<std::int16_t>(
+                    static_cast<std::uint16_t>(header->output_timing - timing));
+                have_lead_ = true;
+            }
+        }
+    }
+    if (have_lead_) {
+        shortfall = std::max(shortfall, duration - lead_);
+    }
+    if (shortfall > 0) {
+        ++report_.violations;
+        report_.worst_overrun_ms = std::max(
+            report_.worst_overrun_ms, 1000.0 * static_cast<double>(shortfall) / static_cast<double>(rate_));
+    }
     report_.max_unit_rate_bps = std::max<std::uint64_t>(
         report_.max_unit_rate_bps, bits_at_rate / static_cast<std::uint64_t>(nominal_));
-    last_start_ = start;
-    last_arrival_end_ = start + arrival;
-    position_ += nominal_;
+    last_timing_ = timing;
+    last_duration_ = duration;
     ++units_;
 }
 
@@ -142,7 +162,7 @@ std::expected<Report, th::Error> build_report(std::span<const std::byte> stream,
         if (options.on_unit) {
             options.on_unit(index, *parsed);
         }
-        rate.add(unit->size(), parsed->major_sync);
+        rate.add(*unit, parsed->major_sync);
         report.bytes += unit->size();
         if (parsed->extra_data) {
             ++report.extra_data_units;
@@ -275,11 +295,9 @@ void write_json(JsonSink& json, const Report& report, std::size_t ac3_core_frame
     json.begin_object();
     json.member("declared_bps", report.rate.declared_bps);
     json.member("max_unit_rate_bps", report.rate.max_unit_rate_bps);
-    json.key("worst_latency_ms");
-    json.value(report.rate.worst_latency_ms, 3);
-    json.key("latency_limit_ms");
-    json.value(report.rate.latency_limit_ms, 1);
     json.member("violations", report.rate.violations);
+    json.key("worst_overrun_ms");
+    json.value(report.rate.worst_overrun_ms, 3);
     json.end_object();
     json.member("object_substream", info.has_object_substream);
     json.key("presentations");
@@ -403,10 +421,10 @@ std::vector<TextLine> text_head(const Report& report) {
                                          major_sync.is_vbr ? "variable" : "constant",
                                          major_sync.peak_data_rate_bps(), major_sync.peak_data_rate)});
     lines.push_back(
-        {"measured", fmt::format("average {:.0f} bit/s, largest unit {} bit/s; {} unit(s) over 75 ms of "
-                                 "the declared rate (TH spec section 18, worst {:.2f} ms)",
+        {"measured", fmt::format("average {:.0f} bit/s, largest unit {} bit/s; {} unit(s) start before the unit ahead has arrived at "
+                                 "the declared rate (TH spec section 18, worst {:.2f} ms short)",
                                  report.average_bps, report.rate.max_unit_rate_bps,
-                                 report.rate.violations, report.rate.worst_latency_ms)});
+                                 report.rate.violations, report.rate.worst_overrun_ms)});
     if (report.major_syncs > 1) {
         lines.push_back({"restarts", fmt::format("{} major sync(s), {} to {} unit(s) apart",
                                                  report.major_syncs, report.restart_min_units,

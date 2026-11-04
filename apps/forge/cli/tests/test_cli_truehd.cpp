@@ -2186,8 +2186,8 @@ TEST_CASE("qc of a TrueHD stream fails, exit 6, on a damaged stream, a join, and
         CHECK(run_cli("qc " + cli_arg(late), log) == 6);
         const std::string text = read_text(log);
         CHECK(text.find("data rate            2.00 Mbit/s declared") != std::string::npos);
-        CHECK(text.find("unit(s) late  FAIL") != std::string::npos);
-        CHECK(text.find(" 0 unit(s) late") == std::string::npos);
+        CHECK(text.find("ms short)  FAIL") != std::string::npos);
+        CHECK(text.find(", 0 unit(s) start before") == std::string::npos);
         // Everything else about that stream is sound.
         CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
     }

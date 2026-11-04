@@ -148,10 +148,9 @@
     ],
     "rate_model": {
       "declared_bps": 9597000,
-      "latency_limit_ms": 75.0,
       "max_unit_rate_bps": 3014400,
-      "violations": 0,
-      "worst_latency_ms": 0.271
+      "violations": 20,
+      "worst_overrun_ms": 13.604
     },
     "restart_spacing": {
       "major_syncs": 2,
