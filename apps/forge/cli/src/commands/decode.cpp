@@ -1526,9 +1526,10 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
         // substream and not as a fold the decoder makes (planning/truehd-parity-forge.md,
         // question 5); channels=as-coded is what a TrueHD decode does. No other count is taken.
         forge_cli::Options truehd_options = requested;
-        std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=", "strict",
-                                              "channels=as-coded", "verify-objects",
-                                              "gate-objects",      "signing-key="};
+        std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=",
+                                              "truehd-reading=",      "strict",
+                                              "channels=as-coded",    "verify-objects",
+                                              "gate-objects",         "signing-key="};
         if (std::ranges::find(requested.given, std::string{"channels=2"}) !=
             requested.given.end()) {
             if (requested.truehd_presentation != "best" && requested.truehd_presentation != "2ch" &&

@@ -155,6 +155,9 @@ struct Options {
     // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
     std::string truehd_presentation;
     bool truehd_lenient = false;
+    // `decode truehd-reading=`: the other reading of a point the specification leaves open, for
+    // scoring a provisional reading (libs/truehd/ERRATA.md question 101); empty is the library's.
+    std::string truehd_reading;
     // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
     // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without
     // it such a decode exits 0 and warns where it always did.

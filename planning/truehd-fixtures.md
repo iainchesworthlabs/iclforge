@@ -6,8 +6,8 @@ fill it. "Writer" is `tools/references/truehd_writer.py`, "encoder" is `iclforge
 "FFmpeg" is the installed `ffmpeg` used as a program (its encoders write streams, its decoder reads
 them; its source is not read). "Dolby only" means a stream only Dolby's tools make (the DEE gold set
 of `tools/generators/gen_dee_gold.py`, which stays on the owner's machine until DEE's licence ends on
-2026-11-06). The streams are in `testdata/truehd/` (25 made by FFmpeg, 14 by the writer, one
-joined from two) and `tools/checks/check_truehd_coverage.py` fails when a row marked "required"
+2026-11-06). The streams are in `testdata/truehd/` (25 made by FFmpeg, 26 by the writer, one
+joined from two; the writer's manifest has 29 entries because three streams are read under two presentations) and `tools/checks/check_truehd_coverage.py` fails when a row marked "required"
 stops being carried by any of them; `--list` prints the streams behind each row.
 
 ## The bitstream
@@ -56,7 +56,7 @@ transient pre-noise stream), the FFmpeg-made stream `testdata/audio/reference_51
 
 | E-AC-3 | TrueHD today | Counterpart that is missing |
 |---|---|---|
-| Committed DEE streams with scores | none; the DEE TrueHD legs stay local | a few small DEE TrueHD streams with their sources, if the owner allows them in the tree |
+| Committed DEE streams with scores | 13 short DEE TrueHD streams with their sources and logs, `testdata/truehd-dee` (11 PASS, 2 UNEXPLAINED at 96 kHz); the rest stay local | none |
 | Encoder output hashes per platform and mode | none | one SHA-256 per quick-matrix input of `verify_truehd_encode_interop.py`; the stream should not depend on the platform, and the hash would show whether it does |
 | FATE excerpts by hash | none | FFmpeg's FATE archive has TrueHD and MLP samples; `verify_fate_interop.py` could take them (not fetched here) |
 | Local gold set | `gen_dee_gold.py` `truehd` group, scored by `score_truehd_decode.py` | the owner's discs (`verify_truehd_local_streams.py`) are a second set |
