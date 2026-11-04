@@ -134,10 +134,24 @@ gap of up to 5 ms in each run after the first second. On the Pi, with the encode
 the start and one or two gaps after the first second, the deepest of 25 ms. A late batch is a gap in
 the stream, and what a receiver does with a gap that short is only known by playing it one. This is
 a model of the sink, not a reading of a device, and a slower machine only moves the gaps about and
-makes them longer: the cause is that no lead is kept. The way to keep one is to hold the first bursts back until about 150 ms of them are in hand,
-which is more than the Pi's worst frame plus the rounding of batches to whole frames, at the price of
-that much delay in the mode. That change is not made; it is question 16 on
-`planning/truehd-parity-crucible.md`.
+makes them longer: the cause is that no lead is kept.
+
+So the leg keeps one. It holds the first bursts back until at least 150 ms of them (eight bursts,
+`OutputStageConfig::truehd_prefill_ms`) are in hand, hands the sink all it holds at once, and from then
+on hands each burst over as it is made. The device is then never waiting on the next batch: the lead is
+150 ms or more at the start and moves up and down by a batch from there. This is done in Crucible's output
+stage, above the sink, so it is the same on PipeWire, ALSA and WASAPI, and the PCM modes and the other
+bitstream modes are not touched. **What it costs is start-up delay in this mode and no other.** Sound
+reaches the receiver later than it would by the time it takes the leg to make the pre-roll, which on a Windows desktop
+was about 190 ms: the first hand-over, twelve bursts, went at 334 ms into the run where a single burst
+went at 147 ms without it. A switch into TrueHD, a restart of the engine and a change of endpoint each
+pay it once, since each starts the leg afresh. The case
+`truehd leg: the pre-roll leaves the device no gap at the pace the engine feeds it` plays the leg at the
+engine's nominal pace through the same model of a device and requires no gap and at least 60 ms of
+audio in hand throughout with the pre-roll, and the gaps without it; `[truehd_headroom]` runs the same
+thing in wall clock, on the machine the question is about, with and without the pre-roll. Set
+`truehd_prefill_ms` to 0 to hand every burst over as it comes. The reading from a receiver is still
+to come, and says whether 150 ms is more than it needs.
 
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
 can carry; TrueHD 5.1 is left out of that order and is only ever pinned. Crucible writes E-AC-3
