@@ -477,8 +477,8 @@ def residual(bits, channel, quant):
 def decode_block(sub, bits, rows, first):
     """Decode one block into rows[first:first + block_size], which the substreams share."""
     size = sub.block_size
-    start = bits.pos  # the length counts from the start of its 16 bit field (ERRATA 21)
     expected_bits = bits.read(16) if sub.data_check else None
+    start = bits.pos  # the length counts the sample data and not its own 16 bit field (TH spec 8.1)
     for row in rows[first : first + size]:
         for column in range(sub.max_matrix_chan + 1):
             if sub.index == 0:
@@ -492,7 +492,7 @@ def decode_block(sub, bits, rows, first):
     if sub.data_check:
         if bits.pos - start != expected_bits:
             raise StreamError("block data length")
-        bits.read(8)  # block_data_crc: the algorithm is not known (ERRATA open question 9)
+        bits.read(8)  # the block header CRC (TH spec 8.1): checked by the library, not here
     # The prediction filters (ERRATA 13).
     for ch in range(sub.min_chan, sub.max_chan + 1):
         channel = sub.channels[ch]

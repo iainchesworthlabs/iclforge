@@ -10,6 +10,7 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <random>
 #include <span>
 #include <string>
 #include <vector>
@@ -433,6 +434,72 @@ TEST_CASE("truehd-atmos writes a stream whose substream 3 is the WAV's channels,
                        frames[0].program.blocks[0].objects[1].position.x) < 1e-9);
     }
     CHECK(frames[0].first_sample == 0);
+}
+
+TEST_CASE("truehd-atmos signs the evolution frames when sign-objects has a key, and not otherwise",
+          "[forge-cli][truehd][atmos][truehd-atmos][signing]") {
+    const fs::path dir = scratch_dir();
+    const auto channels = twelve_object_channels();
+    const fs::path wav = dir / "sign_in.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, 48000).has_value());
+    // A key file: random bytes, the first above 0x7F so that it reads as raw bytes.
+    const fs::path key = dir / "sign.key";
+    {
+        std::mt19937 generator(7);
+        std::vector<char> bytes(32);
+        for (char& b : bytes) {
+            b = static_cast<char>(generator() & 0xFFU);
+        }
+        bytes[0] = static_cast<char>(0xFF);
+        std::ofstream out{key, std::ios::binary};
+        out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    }
+    const fs::path log = dir / "sign.log";
+    const fs::path signed_stream = dir / "sign_out.thd";
+    const fs::path plain_stream = dir / "sign_plain.thd";
+    const fs::path decoded = dir / "sign_decoded.wav";
+    const std::string signing_key = "signing-key=\"" + key.string() + "\"";
+
+    REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(signed_stream) +
+                        " sign-objects " + signing_key,
+                    log) == 0);
+    CHECK(read_text(log).find("signed 8 evolution frame(s)") != std::string::npos);
+    // The key it was signed with accepts it; the unsigned stream is refused under the same key.
+    CHECK(run_cli("decode " + quoted(signed_stream) + " " + quoted(decoded) +
+                      " verify-objects " + signing_key,
+                  log) == 0);
+    REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(plain_stream), log) == 0);
+    CHECK(read_text(log).find("signed ") == std::string::npos);
+    CHECK(run_cli("decode " + quoted(plain_stream) + " " + quoted(decoded) + " verify-objects " +
+                      signing_key,
+                  log) != 0);
+    // sign-objects without a key says so and writes nothing.
+    fs::remove(dir / "sign_nokey.thd");
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "sign_nokey.thd") +
+                      " sign-objects",
+                  log) != 0);
+}
+
+TEST_CASE("truehd-evo-frames= chooses which metadata frames get an evolution frame",
+          "[forge-cli][truehd][atmos][truehd-atmos]") {
+    const fs::path dir = scratch_dir();
+    const auto channels = twelve_object_channels();
+    const fs::path wav = dir / "evo_in.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, 48000).has_value());
+    const fs::path log = dir / "evo.log";
+    const auto frames_with = [&](const std::string& option) {
+        const fs::path stream = dir / "evo_out.thd";
+        REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(stream) + option, log) == 0);
+        return read_oamd_frames(stream).size();
+    };
+    CHECK(frames_with("") == 8);
+    CHECK(frames_with(" truehd-evo-frames=all") == 8);
+    CHECK(frames_with(" truehd-evo-frames=every:3") == 3);  // frames 0, 3 and 6
+    CHECK(frames_with(" truehd-evo-frames=first") == 1);
+    CHECK(frames_with(" truehd-evo-frames=none") == 0);
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "evo_bad.thd") +
+                      " truehd-evo-frames=every:0",
+                  log) != 0);
 }
 
 TEST_CASE(

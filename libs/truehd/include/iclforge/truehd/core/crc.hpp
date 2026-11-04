@@ -28,6 +28,16 @@ namespace iclforge::truehd {
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::uint8_t restart_header_crc(
     std::span<const std::byte> data, std::size_t first_bit, std::size_t crc_bit) noexcept;
 
+// TH spec §8.1: the block header CRC, sent after the sample data of a block when the restart
+// header says data_check_present. The register (polynomial 0x1D, initial value 0xA2) takes the bits
+// of block_header() one by one, most significant bit first: `s = (s << 1 | bit) & 0xFF`, XOR 0x1D
+// when the bit shifted out was 1, and the register at the end is the value as it stands. Neither
+// block_header_exists, restart_header_exists nor the restart header is covered; an empty span (a
+// block without a header) gives 0xA2. `data` holds the bits MSB first and the span is
+// [first_bit, end_bit).
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::uint8_t block_header_crc(
+    std::span<const std::byte> data, std::size_t first_bit, std::size_t end_bit) noexcept;
+
 // TH spec §6.2: the two bytes that end a substream segment when its directory entry says
 // crc_present. `payload` is the segment without them. The parity byte is the XOR of the payload's
 // bytes, XORed with 0xA9.

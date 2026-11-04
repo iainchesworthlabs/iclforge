@@ -157,7 +157,7 @@ TEST_CASE("a matrix of frac_bits 15 sends 17 bit coefficients and round-trips",
     context.min_chan = 0;
     context.max_chan = 0;
     context.max_matrix_chan = 1;
-    context.presence_flags = presence::kMatrix;
+    context.presence_flags = presence::kMatrix | presence::kGuards;
 
     BlockHeaderSpec header;
     MatrixSet matrices;
@@ -176,8 +176,8 @@ TEST_CASE("a matrix of frac_bits 15 sends 17 bit coefficients and round-trips",
     write_block_header(writer, context, header);
     // new_guards 0, matrixing flag 1, count 4, then per matrix out_ch 4, frac_bits 4, bypass 1 and
     // four presence bits for two matrix channels and two noise channels, two coefficients of 17
-    // bits. Only the matrix group is enabled, so the channel loop sends nothing.
-    CHECK(writer.bit_count() == 1 + 1 + 4 + 2 * (4 + 4 + 1 + 4 + 2 * 17));
+    // bits. The channel loop is not gated: one flag for channel 0.
+    CHECK(writer.bit_count() == 1 + 1 + 4 + 2 * (4 + 4 + 1 + 4 + 2 * 17) + 1);
     const std::vector<std::byte> bytes = writer.take();
     iclforge::BitReader reader(bytes);
     auto read = read_block_header(reader, context);
@@ -192,7 +192,7 @@ TEST_CASE("a matrix may write an output channel above max_matrix_chan", "[truehd
     context.min_chan = 0;
     context.max_chan = 0;
     context.max_matrix_chan = 1;
-    context.presence_flags = presence::kMatrix;
+    context.presence_flags = presence::kMatrix | presence::kGuards;
 
     BlockHeaderSpec header;
     MatrixSet matrices;
@@ -223,7 +223,7 @@ TEST_CASE("the matrices of restart sync 0x31EC send every header, then every coe
     context.max_chan = 3;
     context.max_matrix_chan = 3;
     context.object_matrices = true;
-    context.presence_flags = presence::kMatrix;
+    context.presence_flags = presence::kMatrix | presence::kGuards;
 
     iclforge::BitWriter bits;
     bits.put(0, 1);  // new_guards
@@ -251,6 +251,7 @@ TEST_CASE("the matrices of restart sync 0x31EC send every header, then every coe
     bits.put(4096, 14);
     bits.put(static_cast<std::uint32_t>(-1235) & 0x3FFFU, 14);
     bits.put(0, 1);  // no second precision term
+    bits.put(0, 2);  // params_for_this_chan for channels 2 and 3
     bits.align();
     const std::vector<std::byte> bytes = bits.take();
 
@@ -280,7 +281,7 @@ TEST_CASE("the matrices of restart sync 0x31EC send every header, then every coe
     header.matrices = set;
     iclforge::BitWriter again;
     write_block_header(again, context, header);
-    CHECK(again.bit_count() == 1 + 1 + 1 + 1 + 4 + 2 * 21 + 18 + 28 + 1);
+    CHECK(again.bit_count() == 1 + 1 + 1 + 1 + 4 + 2 * 21 + 18 + 28 + 1 + 2);  // + channels 2 and 3
 }
 
 TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry a second term",
@@ -289,7 +290,7 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     context.max_chan = 3;
     context.max_matrix_chan = 3;
     context.object_matrices = true;
-    context.presence_flags = presence::kMatrix;
+    context.presence_flags = presence::kMatrix | presence::kGuards;
 
     // The headers of one matrix: out 2, frac_bits 5, f_shift 0, channels 0 and 3.
     MatrixSet last;
@@ -317,6 +318,7 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     bits.put(0, 2);
     bits.put(2, 4);
     bits.put(static_cast<std::uint32_t>(-3) & 0xFU, 4);
+    bits.put(0, 4);  // params_for_this_chan for channels 0 to 3
     bits.align();
     const std::vector<std::byte> bytes = bits.take();
     iclforge::BitReader reader(bytes);
@@ -347,6 +349,7 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     kept.put(0, 1);  // C2
     kept.put(5, 4);
     kept.put(static_cast<std::uint32_t>(-8) & 0xFU, 4);
+    kept.put(0, 4);  // params_for_this_chan for channels 0 to 3
     kept.align();
     const std::vector<std::byte> kept_bytes = kept.take();
     iclforge::BitReader kept_reader(kept_bytes);
@@ -378,6 +381,7 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     fresh.put(0, 1);  // C2
     fresh.put(7, 4);
     fresh.put(static_cast<std::uint32_t>(-6) & 0xFU, 4);
+    fresh.put(0, 4);  // params_for_this_chan for channels 0 to 3
     fresh.align();
     const std::vector<std::byte> fresh_bytes = fresh.take();
     iclforge::BitReader fresh_reader(fresh_bytes);
@@ -401,13 +405,14 @@ TEST_CASE("the matrices of restart sync 0x31EC reuse the last headers and carry 
     none.put(1, 1);  // C2
     none.put(0, 4);  // width 0
     none.put(0, 2);
+    none.put(0, 4);  // params_for_this_chan for channels 0 to 3
     none.align();
     const std::vector<std::byte> none_bytes = none.take();
     iclforge::BitReader none_reader(none_bytes);
     const auto zero = read_block_header(none_reader, context);
     REQUIRE(zero.has_value());
     CHECK(zero->matrices->items[0].ext_value[0] == 0);
-    CHECK(none_reader.bit_position() == 27);  // nothing after the width and its field
+    CHECK(none_reader.bit_position() == 31);  // nothing after the width and its field
 
     // Without earlier headers a section that reuses them is refused.
     context.object_previous = nullptr;
@@ -423,7 +428,7 @@ TEST_CASE("the object matrix section holds 16 matrices, the largest count its fo
     context.max_chan = 15;
     context.max_matrix_chan = 15;
     context.object_matrices = true;
-    context.presence_flags = presence::kMatrix;
+    context.presence_flags = presence::kMatrix | presence::kGuards;
 
     MatrixSet set;
     set.count = 16;
@@ -472,7 +477,7 @@ TEST_CASE("presence flags gate the groups", "[truehd][syntax]") {
     BlockContext context;
     context.max_chan = 0;
     context.max_matrix_chan = 0;
-    context.presence_flags = presence::kChannels;  // only the channel loop
+    context.presence_flags = presence::kGuards;  // only the bit that replaces the flags
     iclforge::BitWriter writer;
     BlockHeaderSpec header;
     header.channels[0].present = true;
@@ -485,6 +490,33 @@ TEST_CASE("presence flags gate the groups", "[truehd][syntax]") {
     iclforge::BitReader reader(bytes);
     auto read = read_block_header(reader, context);
     REQUIRE(read.has_value());
+    CHECK(read->channels[0].huff_type == 1);
+    CHECK(read->channels[0].huff_lsbs == 5);
+}
+
+TEST_CASE("a block header reads new_guards only while bit 0 of the flags is set",
+          "[truehd][syntax]") {
+    BlockContext context;
+    context.max_chan = 0;
+    context.max_matrix_chan = 0;
+    context.presence_flags = 0xFE;  // everything but the bit that replaces the flags
+    BlockHeaderSpec header;
+    header.channels[0].present = true;
+    header.channels[0].huff_type = 1;
+    header.channels[0].huff_lsbs = 5;
+    // The flags cannot be replaced: a header that carries a new value is written without it.
+    header.presence_flags = 0x01;
+    iclforge::BitWriter writer;
+    write_block_header(writer, context, header);
+    // block size, matrixing, output shift, quantiser step: four zero bits; the channel flag, then
+    // FIR, IIR and huff_offset absent bits (three zeros), huff_type 2, huff_lsbs 5.
+    CHECK(writer.bit_count() == 4 + 1 + 3 + 2 + 5);
+    const std::vector<std::byte> bytes = writer.take();
+    iclforge::BitReader reader(bytes);
+    const auto read = read_block_header(reader, context);
+    REQUIRE(read.has_value());
+    CHECK_FALSE(read->presence_flags.has_value());
+    CHECK(read->channels[0].present);
     CHECK(read->channels[0].huff_type == 1);
     CHECK(read->channels[0].huff_lsbs == 5);
 }

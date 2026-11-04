@@ -381,9 +381,10 @@
       "features": [
         "data_check"
       ],
-      "oracle": "ffmpeg",
+      "oracle": "none",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "refused",
+        "note": "FFmpeg counts block_data_bits from the start of its own 16 bit field (the sample data and 16) and reports a mismatch for the count of TH spec 8.1, which the Dolby decoder requires (it reports 0xE4 for FFmpeg's)"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -391,7 +392,7 @@
       "channels": 2,
       "access_units": 24,
       "pcm_samples": 960,
-      "stream_sha256": "21c0fcf4eb42595da0f07382de8b2cdfac0936ad4d17af7bf02478bba6b4821c",
+      "stream_sha256": "01438a611c3644ee16cf1cd8de80b00eb1ec8fdaf8789eca4706ec412399309d",
       "pcm_sha256": "505c8a16abe33e11558f9900fbbba60b7d93e2194a550895fe9e3010ffcf41fe"
     },
     {

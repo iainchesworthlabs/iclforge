@@ -25,8 +25,10 @@ namespace iclforge::truehd {
 
 // TH spec §8.2: param_presence_flags. A block header sends a group of parameters only when its flag
 // is set; the flags are 0xFF after a restart and a block header can replace them. The bit for each
-// group is the order the syntax lists the groups in, the first group on bit 7. Streams all send
-// 0xFF; no stream here shows another value, so the assignment is provisional (ERRATA.md).
+// group is the order the syntax lists the groups in, the first group on bit 7. Bit 0 gates the
+// new_guards bit itself, the one that replaces the flags; the loop over the channels' parameters is
+// not gated. Streams all send 0xFF; the assignment was confirmed by rewriting streams and decoding
+// them.
 namespace presence {
 inline constexpr std::uint8_t kBlockSize = 0x80;
 inline constexpr std::uint8_t kMatrix = 0x40;
@@ -35,7 +37,7 @@ inline constexpr std::uint8_t kQuantStep = 0x10;
 inline constexpr std::uint8_t kFir = 0x08;
 inline constexpr std::uint8_t kIir = 0x04;
 inline constexpr std::uint8_t kHuffOffset = 0x02;
-inline constexpr std::uint8_t kChannels = 0x01;  // the loop over the channels' parameters
+inline constexpr std::uint8_t kGuards = 0x01;  // the bit that replaces the flags
 inline constexpr std::uint8_t kAll = 0xFF;
 }  // namespace presence
 

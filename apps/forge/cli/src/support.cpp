@@ -2589,6 +2589,26 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 enc.major_sync_units = static_cast<int>(units);
                 continue;
             }
+            if (name == "evo-frames") {
+                if (value == "all") {
+                    enc.evo_stride = 1;
+                } else if (value == "none") {
+                    enc.evo_stride = 0;
+                } else if (value == "first") {
+                    enc.evo_stride = -1;
+                } else if (value.starts_with("every:") && value.size() > 6 &&
+                           parse_u32_or(value.substr(6), 0) >= 1 &&
+                           parse_u32_or(value.substr(6), 0) <= 65536) {
+                    enc.evo_stride = static_cast<int>(parse_u32_or(value.substr(6), 0));
+                } else {
+                    fmt::println(stderr,
+                                 "error: truehd-evo-frames is all, every:N (N from 1 to 65536), "
+                                 "first or none (got '{}')",
+                                 token);
+                    return false;
+                }
+                continue;
+            }
             if (name == "fir-order") {
                 if (value.size() != 1 || value[0] < '0' || value[0] > '8') {
                     fmt::println(stderr, "error: truehd-fir-order is 0 to 8 (got '{}')", token);

@@ -91,6 +91,9 @@ struct MatrixPlan {
 
 struct SubstreamState {
     bool running = false;
+    // Where the last block header's bits lie in the segment: what the block header CRC covers.
+    std::size_t block_header_first_bit = 0;
+    std::size_t block_header_end_bit = 0;
     RestartHeader restart;
     BlockContext context;
     // The object-audio matrices last sent: a section that sends no headers reuses them.
@@ -217,8 +220,9 @@ struct Decoder::Impl {
     [[nodiscard]] std::expected<void, Error> apply_block_header(
         SubstreamState& state, const BlockHeaderSpec& header) const;
     [[nodiscard]] std::expected<void, Error> decode_block(int index, SubstreamState& state,
-                                                          BitReader& reader, int position,
-                                                          bool emit);
+                                                          BitReader& reader,
+                                                          std::span<const std::byte> payload,
+                                                          int position, bool emit);
 };
 
 std::expected<AccessUnit, Error> Decoder::Impl::parse_unit(std::span<const std::byte> data) {
@@ -604,7 +608,9 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
 }
 
 std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState& state,
-                                                       BitReader& reader, int position, bool emit) {
+                                                       BitReader& reader,
+                                                       std::span<const std::byte> payload,
+                                                       int position, bool emit) {
     const RestartHeader& restart = state.restart;
     const int block = state.block_size;
     const int min_chan = restart.min_chan;
@@ -617,14 +623,14 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         std::fill_n(rows_base, static_cast<std::size_t>(block) * kRowStride, 0);
     }
 
-    // TH spec §8.1: the length of the sample data, to be checked after it. ERRATA.md entry 21
-    // (provisional): the length counts from the start of its own 16 bit field, as FFmpeg's decoder
-    // counts it, so a block of n bits of samples carries n + 16.
+    // TH spec §8.1: the length of the sample data, to be checked after it. It counts the bits of
+    // sample_data() and not its own 16 (the Dolby decoder reports 0xE4 for a count that includes
+    // them), and the block header CRC that follows the data covers the block header.
     std::size_t expected_bits = 0;
     std::size_t data_start = 0;
     if (restart.data_check_present) {
         expected_bits = reader.read(16);
-        data_start = reader.bit_position() - 16;
+        data_start = reader.bit_position();
         if (expected_bits > kMaxBlockDataBits) {
             return std::unexpected(
                 make_error(ErrorKind::kBadBlockData, "block_data_bits above 16000 (TH spec §8.1)"));
@@ -686,7 +692,15 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                                "block data is not block_data_bits long (TH spec §8.1)"));
             }
         }
-        reader.skip(8);  // block_data_crc: not checked (ERRATA.md)
+        const auto sent = static_cast<std::uint8_t>(reader.read(8));
+        if (sent != block_header_crc(payload, state.block_header_first_bit,
+                                     state.block_header_end_bit)) {
+            ++counters.check_failures;
+            if (strict()) {
+                return std::unexpected(make_error(ErrorKind::kBadBlockData,
+                                                   "block header CRC does not hold (TH spec §8.1)"));
+            }
+        }
     }
 
     // The inverse prediction filters (TH spec §9.4, §9.5), channel by channel.
@@ -913,8 +927,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             }
             state.context.object_previous = state.object_have ? &state.object_last : nullptr;
             const std::size_t header_start = reader.bit_position();
+            state.block_header_first_bit = header_start;
             segment_trace += "[block starts at " + std::to_string(header_start) + "]";
             auto header = read_block_header(reader, state.context);
+            state.block_header_end_bit = reader.bit_position();
             if (!header) {
                 if (index == kObjectSubstream && counters.object_error_context.empty()) {
                     // Lab: where in the segment the object block header failed, and the state it
@@ -1012,6 +1028,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             return std::unexpected(make_error(
                 ErrorKind::kBadBlockData,
                 "the directory promises a restart header the segment lacks (TH spec §6.2)"));
+        } else {
+            // A block without a header: the data check's CRC covers no bits.
+            state.block_header_first_bit = reader.bit_position();
+            state.block_header_end_bit = state.block_header_first_bit;
         }
         first_block = false;
 
@@ -1044,7 +1064,8 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             counters.object_blocks.push_back(block);
         }
         const std::size_t block_start = reader.bit_position();
-        if (auto decoded = decode_block(index, state, reader, result.samples, emit); !decoded) {
+        if (auto decoded = decode_block(index, state, reader, payload, result.samples, emit);
+            !decoded) {
             if (index == kObjectSubstream && counters.object_error_context.empty()) {
                 int bypassing = 0;
                 for (int m = 0; m < state.matrix_count; ++m) {

@@ -68,6 +68,8 @@ struct ChannelMeaning {
 };
 
 inline constexpr int kChannelMeaningBits = 64;
+// TH spec §4.1.1: the major sync flags of an Atmos stream, and of a stream that is not.
+inline constexpr std::uint16_t kMajorSyncFlagsAtmos = 0x1000;
 
 // Names the first field of `meaning` whose value its width cannot hold (TH spec §12.3, §12.5: the
 // two start-up gains are signed, 6 and 7 bits; the dialogue norms are 6 bits for the 2 channel
@@ -94,7 +96,7 @@ struct MajorSync {
     // `kind`.
     std::uint32_t format_info = 0;
     std::uint16_t signature = kSignature;
-    std::uint16_t flags = 0;  // TH spec §4.1: 0x4000 in an MLP stream FFmpeg writes, 0 in TrueHD
+    std::uint16_t flags = 0;  // TH spec §4.1.1: 0x4000 in an MLP stream, 0x1000 in Atmos, 0 in TrueHD
     std::uint16_t reserved = 0;
     bool is_vbr = false;
     std::uint16_t peak_data_rate = 0;          // 15 bits; TH spec §4.4, see peak_data_rate_bps()
