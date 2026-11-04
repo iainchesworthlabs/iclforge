@@ -1409,10 +1409,10 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
     }
     SECTION("truehd-encode") {
         const fs::path stream = tone.dir / "refused_options.thd";
-        const fs::path other = tone.dir / "refused_other.wav";
+        const fs::path other = tone.dir / "refused_other.wav";  // programme2= names it; src= and map= are applied now (the map= cases)
         fs::copy_file(tone.wav, other, fs::copy_options::overwrite_existing);
         const std::vector<std::string> options{
-            "src=" + other.string(), "map=0:0", "offset=0:5", "layout=stereo", "dialnorm=27",
+            "layout=stereo", "dialnorm=27",
             "drc=film-standard", "bsmod=0", "programme2=" + other.string(), "lfemix=off",
             "heavy", "couple", "annexd"};
         for (const std::string& option : options) {
@@ -2624,5 +2624,162 @@ TEST_CASE("record codec=truehd takes a lossless stream, or says why the device c
         CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
         CHECK(run_cli("live 0 1 " + cli_arg(tone.dir / "live.thd") + "codec=truehd", log) == kExitUsage);
         CHECK(read_text(log).find("does not code TrueHD") != std::string::npos);
+    }
+}
+
+// ---- truehd-encode: several sources, named places (map=, src=, offset=) ---------------------------
+
+namespace {
+
+// `frames` interleaved samples of `channels` channels, each a different but fixed sequence: the value
+// says which source it is (`seed`), which channel and which frame, so that a mix-up shows.
+std::vector<std::int32_t> marked_samples(std::size_t frames, std::uint32_t channels, std::uint32_t seed) {
+    std::vector<std::int32_t> samples;
+    for (std::size_t n = 0; n < frames; ++n) {
+        for (std::uint32_t c = 0; c < channels; ++c) {
+            const std::uint32_t mixed =
+                static_cast<std::uint32_t>(n) * 2654435761U + c * 40503U + seed * 977U;
+            samples.push_back(static_cast<std::int32_t>((mixed >> 11U) & 0x7FFFFU) - 0x40000);
+        }
+    }
+    return samples;
+}
+
+std::int32_t sample_of(const std::vector<std::int32_t>& interleaved, std::uint32_t channels,
+                       std::size_t frame, std::uint32_t channel) {
+    return interleaved[frame * channels + channel];
+}
+
+std::int32_t decoded_sample(const Wav& wav, std::size_t frame, std::uint32_t channel) {
+    return static_cast<std::int32_t>(le(wav.s32le, (frame * wav.channels + channel) * 4, 4)) >> 8;
+}
+
+}  // namespace
+
+TEST_CASE("truehd-encode places the channels of several sources by name with map=",
+          "[forge-cli][truehd][truehd-encode][map]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "map.log";
+    constexpr std::size_t kFrames = 4800;
+    const std::vector<std::int32_t> a = marked_samples(kFrames, 2, 1);  // L R
+    const std::vector<std::int32_t> b = marked_samples(kFrames, 1, 2);  // C
+    const std::vector<std::int32_t> c = marked_samples(kFrames, 3, 3);  // LFE Ls Rs
+    const fs::path a_wav = dir / "map_a.wav";
+    const fs::path b_wav = dir / "map_b.wav";
+    const fs::path c_wav = dir / "map_c.wav";
+    write_wav(a_wav, 48000, 2, 0x3, a);
+    write_wav(b_wav, 48000, 1, 0x4, b);
+    write_wav(c_wav, 48000, 3, 0, c);  // no mask: map= names the places
+    const auto encode = [&](const std::string& tail, const fs::path& stream) {
+        return run_cli("truehd-encode " + cli_arg(a_wav) + cli_arg(stream) + tail, log);
+    };
+    const auto decode = [&](const fs::path& stream, const fs::path& wav) {
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        return read_wav(wav);
+    };
+
+    SECTION("channels from three sources land in the stream's order, whatever the map's") {
+        const fs::path stream = dir / "map_six.thd";
+        REQUIRE(encode("src=" + b_wav.string() + " src=" + c_wav.string() +
+                           " map=2.2:Rs,2.1:Ls,2.0:LFE,1.0:C,0.1:R,0.0:L verify",
+                       stream) == 0);
+        CHECK(read_text(log).find("placed ") != std::string::npos);
+        const Wav out = decode(stream, dir / "map_six.wav");
+        REQUIRE(out.channels == 6);
+        CHECK(read_text(log).find("(L R C LFE Ls Rs)") != std::string::npos);
+        REQUIRE(out.s32le.size() == kFrames * 6 * 4);
+        bool equal = true;
+        for (std::size_t n = 0; n < kFrames && equal; ++n) {
+            equal = decoded_sample(out, n, 0) == sample_of(a, 2, n, 0) &&
+                    decoded_sample(out, n, 1) == sample_of(a, 2, n, 1) &&
+                    decoded_sample(out, n, 2) == sample_of(b, 1, n, 0) &&
+                    decoded_sample(out, n, 3) == sample_of(c, 3, n, 0) &&
+                    decoded_sample(out, n, 4) == sample_of(c, 3, n, 1) &&
+                    decoded_sample(out, n, 5) == sample_of(c, 3, n, 2);
+        }
+        CHECK(equal);
+    }
+
+    SECTION("offset= puts silence ahead of a source, and a shorter source is padded with silence") {
+        const fs::path short_wav = dir / "map_short.wav";
+        write_wav(short_wav, 48000, 1, 0x4, marked_samples(1200, 1, 2));
+        const fs::path stream = dir / "map_offset.thd";
+        REQUIRE(encode("src=" + short_wav.string() + " map=0.0:L,0.1:R,1.0:C offset=1:0.025",
+                       stream) == 0);
+        const Wav out = decode(stream, dir / "map_offset.wav");
+        REQUIRE(out.channels == 3);
+        constexpr std::size_t kLead = 1200;  // 0.025 s at 48 kHz
+        REQUIRE(out.s32le.size() / (4 * 3) == kFrames);  // the longest: source 0
+        const std::vector<std::int32_t> shorter = marked_samples(1200, 1, 2);
+        bool equal = true;
+        for (std::size_t n = 0; n < kFrames && equal; ++n) {
+            const std::int32_t want_c =
+                n >= kLead && n < kLead + 1200 ? sample_of(shorter, 1, n - kLead, 0) : 0;
+            equal = decoded_sample(out, n, 0) == sample_of(a, 2, n, 0) &&
+                    decoded_sample(out, n, 2) == want_c;
+        }
+        CHECK(equal);
+    }
+
+    SECTION("offset= on a single file with no map= delays the whole file") {
+        const fs::path stream = dir / "map_lead.thd";
+        REQUIRE(encode("offset=0:0.025", stream) == 0);
+        const Wav out = decode(stream, dir / "map_lead.wav");
+        REQUIRE(out.channels == 2);
+        REQUIRE(out.s32le.size() / (4 * 2) == kFrames + 1200);
+        CHECK(decoded_sample(out, 0, 0) == 0);
+        CHECK(decoded_sample(out, 1199, 1) == 0);
+        CHECK(decoded_sample(out, 1200, 0) == sample_of(a, 2, 0, 0));
+        CHECK(decoded_sample(out, 1200 + 77, 1) == sample_of(a, 2, 77, 1));
+    }
+
+    SECTION("map= on one file names its places over its channel mask") {
+        const fs::path stream = dir / "map_swap.thd";
+        REQUIRE(encode("map=0.1:L,0.0:R", stream) == 0);
+        const Wav out = decode(stream, dir / "map_swap.wav");
+        REQUIRE(out.channels == 2);
+        CHECK(decoded_sample(out, 5, 0) == sample_of(a, 2, 5, 1));
+        CHECK(decoded_sample(out, 5, 1) == sample_of(a, 2, 5, 0));
+    }
+
+    SECTION("LFE2 is a place, and the case of a name does not matter") {
+        const fs::path stream = dir / "map_lfe2.thd";
+        REQUIRE(encode("src=" + b_wav.string() + " map=0.0:l,0.1:r,1.0:lfe2", stream) == 0);
+        const Wav out = decode(stream, dir / "map_lfe2.wav");
+        REQUIRE(out.channels == 3);
+        CHECK(read_text(log).find("(L R LFE2)") != std::string::npos);
+        CHECK(decoded_sample(out, 9, 2) == sample_of(b, 1, 9, 0));
+    }
+
+    SECTION("what cannot be placed is refused with a sentence, and nothing is written") {
+        const fs::path stream = dir / "map_refused.thd";
+        fs::remove(stream);
+        const auto refused = [&](const std::string& tail, const char* sentence) {
+            CHECK(encode(tail, stream) == kExitUsage);
+            CHECK(read_text(log).find(sentence) != std::string::npos);
+            CHECK_FALSE(fs::exists(stream));
+        };
+        refused("map=0.0:L,0.1:L", "map= places L twice");
+        refused("map=0.0:L,0.1:Q", "'Q' is not a TrueHD channel");
+        refused("map=0.0:L,0.5:R", "map= names channel 5 of source 0, which has 2");
+        refused("map=0.0:L,3.0:R", "map= names source 3, but there is 1");
+        refused("map=0.0:L,0.1", "needs a source, a channel and a place");
+        refused("map=x.0:L", "the source and the channel are numbers from 0");
+        refused("src=" + b_wav.string(), "src= needs map=");
+        refused("offset=2:1.5", "offset=2:1.5 names source 2, but there is 1");
+        refused("src=" + c_wav.string() + " map=0.0:L,0.1:R", "source 1 has no channel in map=");
+        // A pair needs its partner: the sentence names the sets either side.
+        refused("src=" + b_wav.string() + " src=" + c_wav.string() +
+                    " map=0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls",
+                "Ls needs Rs. The nearest sets are L R C LFE Ls Rs or L R C LFE");
+    }
+
+    SECTION("sources of two sample rates are refused") {
+        const fs::path slow = dir / "map_44k.wav";
+        write_wav(slow, 44100, 1, 0x4, marked_samples(1000, 1, 5));
+        const fs::path stream = dir / "map_rates.thd";
+        CHECK(encode("src=" + slow.string() + " map=0.0:L,0.1:R,1.0:C", stream) == kExitUsage);
+        CHECK(read_text(log).find("every source must share a sample rate") != std::string::npos);
+        CHECK_FALSE(fs::exists(stream));
     }
 }
