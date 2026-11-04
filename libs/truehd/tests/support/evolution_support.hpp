@@ -92,17 +92,16 @@ inline std::vector<std::byte> build_region(std::span<const std::byte> frame,
                                            std::span<const std::byte> padding = {}) {
     const std::size_t content = 4 + frame.size() + padding.size() + 1;
     const std::size_t words = (content + 1) / 2;
-    std::vector<std::byte> out(words * 2, std::byte{0});
     const auto length = static_cast<std::uint32_t>(words - 1);
     const auto word0 = static_cast<std::uint32_t>(
         (std::uint32_t{extra_data_check_nibble(length)} << 12U) | (length & 0xFFFU));
-    out[0] = static_cast<std::byte>(word0 >> 8U);
-    out[1] = static_cast<std::byte>(word0 & 0xFFU);
-    out[2] = static_cast<std::byte>((frame.size() >> 8U) & 0xFU);
-    out[3] = static_cast<std::byte>(frame.size() & 0xFFU);
-    std::copy(frame.begin(), frame.end(), out.begin() + 4);
-    std::copy(padding.begin(), padding.end(),
-              out.begin() + 4 + static_cast<std::ptrdiff_t>(frame.size()));
+    std::vector<std::byte> out{static_cast<std::byte>(word0 >> 8U),
+                               static_cast<std::byte>(word0 & 0xFFU),
+                               static_cast<std::byte>((frame.size() >> 8U) & 0xFU),
+                               static_cast<std::byte>(frame.size() & 0xFFU)};
+    out.insert(out.end(), frame.begin(), frame.end());
+    out.insert(out.end(), padding.begin(), padding.end());
+    out.resize(words * 2, std::byte{0});  // zero up to the word boundary, then the parity byte
     unsigned accumulator = static_cast<unsigned>(frame.size()) ^ 0xA9U;
     for (std::size_t i = 4; i + 1 < out.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(out[i]);

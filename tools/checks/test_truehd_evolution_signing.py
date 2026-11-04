@@ -1,5 +1,6 @@
 """Unit tests of tools/references/truehd_evolution_signing.py, the Python transcription of ICL
-Forge's own per-frame evolution tag (libs/truehd/include/iclforge/truehd/signing/evolution_signer.hpp).
+Forge's own per-frame evolution tag
+(libs/truehd/include/iclforge/truehd/signing/evolution_signer.hpp).
 
 The scheme is this project's own and holds no key: every key here is made by the test from a seed
 when it runs. The C++ signer is held to this file byte for byte by
@@ -11,8 +12,10 @@ should.
 
 import hashlib
 import hmac
+import json
 import random
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -27,10 +30,17 @@ def make_key(seed, size=32):
     return bytes(rng.randrange(256) for _ in range(size))
 
 
-def region_for(reading="emdf", primary=2, secondary=0, payload=b"\x11" * 16, pad_bits=16, padding=b""):
+def region_for(
+    reading="emdf", primary=2, secondary=0, payload=b"\x11" * 16, pad_bits=16, padding=b""
+):
     cfg = E.table56_config()
     evo = E.build_evo_frame(
-        reading, key_id=1, payloads=[(11, cfg, payload)], primary=primary, secondary=secondary, pad_bits=pad_bits
+        reading,
+        key_id=1,
+        payloads=[(11, cfg, payload)],
+        primary=primary,
+        secondary=secondary,
+        pad_bits=pad_bits,
     )
     return E.build_extra_data(evo, padding=padding)
 
@@ -82,7 +92,7 @@ class Tag(unittest.TestCase):
         key = make_key(5)
         signed = S.sign(region_for(payload=bytes(range(20))), key)
         ev = S.locate(signed)
-        covered = (len(ev["payload"]) * 8)
+        covered = len(ev["payload"]) * 8
         for bit in range(covered):
             flipped = bytearray(signed)
             at = 32 + bit
@@ -93,7 +103,7 @@ class Tag(unittest.TestCase):
     def test_the_secondary_field_is_zeroed_in_the_message(self):
         key = make_key(6)
         plain = S.sign(region_for(secondary=1), key)
-        zeroed, ev = zeroed_frame(secondary=1)
+        _zeroed, ev = zeroed_frame(secondary=1)
         # the same tag over a frame whose secondary byte is 0x5A still verifies
         edited = bytearray(plain)
         sec_at = 32 + ev["prim_off"] + ev["np_bits"]
@@ -125,13 +135,14 @@ class Tag(unittest.TestCase):
         for i in range(ev["np_bits"]):
             bit = base + i
             one = (t[i >> 3] >> (7 - (i & 7))) & 1
-            forged[bit >> 3] = (forged[bit >> 3] | (0x80 >> (bit & 7))) if one else (forged[bit >> 3] & ~(0x80 >> (bit & 7)) & 0xFF)
+            forged[bit >> 3] = (
+                (forged[bit >> 3] | (0x80 >> (bit & 7)))
+                if one
+                else (forged[bit >> 3] & ~(0x80 >> (bit & 7)) & 0xFF)
+            )
         self.assertEqual(S.verify(bytes(forged), key), "mismatch")
 
     def test_the_batch_command_writes_what_sign_and_verify_say(self):
-        import json
-        import tempfile
-
         key = make_key(10)
         regions = [region_for(payload=bytes([i]) * 8).hex() for i in range(3)] + ["00" * 6]
         with tempfile.TemporaryDirectory() as tmp:

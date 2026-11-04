@@ -31,7 +31,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-import truehd_evolution as E  # noqa: E402
+import truehd_evolution as E
 
 
 def _clear_bits(buf, first, count):
