@@ -12,8 +12,11 @@
 #include <fstream>
 #include <limits>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <span>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "fake_devices.hpp"
@@ -415,5 +418,89 @@ TEST_CASE("truehd leg: what a frame costs, in milliseconds against the 32 the fr
                 "worst frame is the one that carries it)\n",
                 ms.size(), kFrame, sum / static_cast<double>(ms.size()), sorted[sorted.size() / 2],
                 sorted.back(), 1000.0 * static_cast<double>(kFrame) / 48000.0);
+    CHECK(stage.status().underruns == 0);
+}
+
+// What the cost above means for a receiver: the same leg fed at the pace the engine feeds it, one
+// 1536-sample frame every 32 ms of wall clock, and the bursts that reach the sink played out the
+// way a device plays them, one in 20 ms at 48 kHz, back to back from the first. A burst that
+// arrives after the one before it has finished leaves a gap on the link, which the receiver reads
+// as a lost lock, and the device goes on from the late burst, not from where it should have been.
+// Prints how many gaps there were, how long the longest was and how much audio the sink still held
+// when each batch arrived at the least, counting from a second in, when the start-up is over.
+// Checks nothing about timing, so a loaded host cannot fail it. Hidden; run it by tag, in a Release
+// build, on the machine the question is about (docs/crucible/signal-path.md, "What the TrueHD leg
+// costs").
+TEST_CASE("truehd leg: how far ahead of the receiver the bursts arrive at real-time pace",
+          "[.truehd_headroom][crucible][output_stage][truehd]") {
+    const Clip clip = programme_clip();
+    auto devices = receiver_that_takes_truehd();
+    OutputStage stage(leg_config(devices));
+    REQUIRE(stage.reprobe(false).mode == OutputMode::kTrueHd51);
+    const auto& sink = devices->burst_sinks.at(0);
+
+    using Clock = std::chrono::steady_clock;
+    constexpr std::size_t kFrame = 1536;
+    constexpr auto kFrameTime = std::chrono::microseconds(32000);
+    constexpr auto kBurstTime = std::chrono::microseconds(20000);  // 24 access units of 40 samples
+    constexpr auto kStartUp = std::chrono::milliseconds(1000);
+    std::array<std::span<const float>, kChannels> views;
+    const auto began = Clock::now();
+    std::optional<Clock::time_point> first_arrival;
+    Clock::time_point playing_until{};
+    std::size_t counted = 0;
+    std::size_t gaps = 0;
+    std::size_t gaps_after_start_up = 0;
+    double longest_gap_ms = 0.0;
+    double least_depth_ms = std::numeric_limits<double>::infinity();
+    std::size_t frame_index = 0;
+    std::string arrivals;
+    for (std::size_t at = 0; at + kFrame <= clip.frames(); at += kFrame, ++frame_index) {
+        // The frame is complete when its last sample has been captured, so it reaches the stage
+        // no sooner than this.
+        std::this_thread::sleep_until(began + static_cast<std::chrono::microseconds::rep>(frame_index + 1) * kFrameTime);
+        for (std::size_t ch = 0; ch < kChannels; ++ch) {
+            views[ch] = std::span<const float>(clip.bed[ch]).subspan(at, kFrame);
+        }
+        stage.submit({}, RawFrame{.objects = {}, .placements = {}, .bed = views});
+        const auto arrived = Clock::now();
+        std::size_t have = 0;
+        {
+            const std::lock_guard lock(sink->mutex);
+            have = sink->carrier.size() / mat::kMatBurstBytes;
+        }
+        if (have > counted) {
+            arrivals += " " + std::to_string(frame_index) + "@" +
+                        std::to_string(static_cast<long>(
+                            std::chrono::duration<double, std::milli>(arrived - began).count())) +
+                        "ms:+" + std::to_string(have - counted);
+        }
+        for (; counted < have; ++counted) {
+            if (!first_arrival) {
+                first_arrival = arrived;
+                playing_until = arrived + kBurstTime;
+                continue;
+            }
+            const double depth_ms = std::chrono::duration<double, std::milli>(playing_until - arrived).count();
+            const bool settled = arrived - *first_arrival >= kStartUp;
+            if (settled) {
+                least_depth_ms = std::min(least_depth_ms, depth_ms);
+            }
+            if (depth_ms < 0.0) {
+                ++gaps;
+                gaps_after_start_up += settled ? 1 : 0;
+                longest_gap_ms = std::max(longest_gap_ms, -depth_ms);
+                playing_until = arrived + kBurstTime;
+            } else {
+                playing_until += kBurstTime;
+            }
+        }
+    }
+    REQUIRE(counted > 0);
+    std::printf("truehd leg at real-time pace, %zu frames, %zu bursts: %zu gaps (%zu after the first "
+                "second), longest %.2f ms; the sink held at least %.2f ms of audio when a burst "
+                "arrived after the first second (negative is a gap)\n",
+                frame_index, counted, gaps, gaps_after_start_up, longest_gap_ms, least_depth_ms);
+    std::printf("arrivals (frame@time:bursts that frame brought):%s\n", arrivals.c_str());
     CHECK(stage.status().underruns == 0);
 }

@@ -178,7 +178,9 @@ TEST_CASE("engine start: the same engine restarted answers for this run, not the
     // wait for the new worker rather than hand back the verdict the last
     // one left behind.
     devices->devices = {realtek_default(), null_sink(), hdmi_avr()};
-    REQUIRE(engine.start().has_value());
+    const auto started = engine.start();
+    INFO("second start() said: " << (started ? std::string("started") : started.error()));
+    REQUIRE(started.has_value());
     CHECK(frames_flow(engine, std::chrono::milliseconds(2000)));
     engine.stop();
 
@@ -188,5 +190,57 @@ TEST_CASE("engine start: the same engine restarted answers for this run, not the
     const auto after = engine.start();
     REQUIRE_FALSE(after.has_value());
     CHECK(after.error().find("no render endpoint can carry any mode") != std::string::npos);
+    engine.stop();
+}
+
+TEST_CASE("engine start: a probe the last run left unapplied is not applied to this one",
+          "[crucible][engine]") {
+    auto devices = std::make_shared<FakeDevices>();
+    Engine engine(config_over(devices));
+
+    // Refused, and the frame loop keeps running after a refusal: it is still
+    // watching the machine for an endpoint to appear.
+    REQUIRE_FALSE(engine.start().has_value());
+
+    // A second enumeration, caught in flight. It has read the list - empty -
+    // and is parked, so whatever happens next, what it will report is a
+    // machine with nothing on it. On a host with a device watcher this is
+    // just what a stop() racing a hot-plug event meets.
+    const auto parked_before = devices->enumerations_parked();
+    devices->hold_enumerations();
+    engine.reprobe();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
+    while (devices->enumerations_parked() == parked_before && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (devices->enumerations_parked() == parked_before) {
+        // A gate left shut would hang the engine's destructor on the join.
+        devices->release_enumerations();
+    }
+    REQUIRE(devices->enumerations_parked() > parked_before);
+
+    // Stop with that enumeration still parked. stop() asks the frame loop to
+    // leave and the loop's last act is to join the probe, so the probe can
+    // only land after the loop has made its final pass over the results.
+    // The pause is for the loop to reach the join: the gate opening any
+    // sooner could let a frame apply the answer, and the case would pass
+    // against the bug it is here for. One-block frames are 5 ms.
+    std::thread stopper([&engine] { engine.stop(); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    {
+        const std::lock_guard lock(devices->mutex);
+        devices->devices = {realtek_default(), null_sink(), hdmi_avr()};
+    }
+    devices->release_enumerations();
+    stopper.join();
+
+    // The machine has an endpoint now, and the engine is started again. What
+    // the parked enumeration left behind describes the machine as it was in
+    // the last run; this run asks for its own first probe, and its answer is
+    // that one's.
+    const auto started = engine.start();
+    INFO("start() said: " << (started ? std::string("started") : started.error()));
+    REQUIRE(started.has_value());
+    CHECK(mode_resolved(engine, std::chrono::milliseconds(2000)));
     engine.stop();
 }
