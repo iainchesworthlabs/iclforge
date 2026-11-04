@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -13,14 +12,17 @@
 
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
+#include "byte_source.hpp"
 #include "probe_truehd.hpp"
+#include "truehd_stream.hpp"
 
 // The decoded audio of a TrueHD or MLP file, a window at a time, for the Forge window's player and
 // QC (planning/truehd-parity-forge.md, row U2 and question 12). A two-hour film at 48 kHz and eight
 // channels is about 11 GB decoded, and the stream itself is larger than a machine may hold, so
-// nothing here keeps more than one access unit's samples ahead of the caller: the file is read in
-// blocks, an index of the units that carry a major sync (where a decode can begin) is built by one
-// pass over the unit lengths, and a seek decodes from the restart before the time asked.
+// nothing here keeps more than one access unit's samples ahead of the caller: the file is read a
+// window at a time by the TruehdCursor Hearth plays from (apps/shared/media/src/truehd_stream.hpp),
+// its index says where a decode can begin and how many samples the stream holds, and a seek decodes
+// from the restart before the time asked.
 //
 // Qt-free, so the Catch2 cases of iclforge-forge-gui-tests hold it. One caller at a time: the
 // calls are serialised by a mutex, which is not a promise that two readers get sensible positions.
@@ -71,11 +73,6 @@ class TruehdPcmSource {
    private:
     TruehdPcmSource() = default;
 
-    struct Restart {
-        std::uint64_t unit = 0;
-        std::uint64_t offset = 0;
-    };
-
     [[nodiscard]] std::string scan();
     void seek_to(std::uint64_t frame);
     // Decodes the next unit into pending_. False at the end of the file.
@@ -83,20 +80,17 @@ class TruehdPcmSource {
 
     std::filesystem::path path_;
     iclforge::truehd::Presentation presentation_ = iclforge::truehd::Presentation::kBest;
-    std::ifstream file_;
-    std::uint64_t file_size_ = 0;
-    std::uint64_t first_offset_ = 0;
+    std::unique_ptr<iclforge::apps::ByteSource> bytes_;
+    std::unique_ptr<iclforge::apps::TruehdCursor> cursor_;
+    iclforge::apps::TruehdIndex index_;
     TruehdPcmInfo info_;
-    std::vector<Restart> restarts_;
 
     std::unique_ptr<iclforge::truehd::Decoder> decoder_;
-    std::uint64_t next_offset_ = 0;   // of the next unit to read
-    std::uint64_t next_unit_ = 0;
+    bool ended_ = false;  // the cursor is out of units, or the stream changed shape
     std::vector<std::vector<float>> pending_;  // decoded, from pending_start_
     std::uint64_t pending_start_ = 0;          // sample index of pending_[*][0]
     std::uint64_t decoded_end_ = 0;            // sample index after the last decoded sample
     std::uint64_t decode_errors_ = 0;
-    std::vector<std::byte> unit_buffer_;
     std::mutex mutex_;
 };
 

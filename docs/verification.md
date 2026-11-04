@@ -518,7 +518,10 @@ Two tiers, both gated in CI:
   legacy-core delivery (below). Fetched at run time and never committed — they are film
   excerpts, and pinning by hash is what keeps an upstream change from quietly moving the
   numbers. Runs nightly in the `Interop` workflow, and on a pull request that changes the decode
-  path or the harness.
+  path or the harness. The archive is volunteer-run and can be down for days, so a download is
+  retried and cached, and when it is still unreachable a pull request checks what it holds and
+  warns about the rest, while the nightly run on main fails: an outage is seen there, not on
+  every pull request that happens to touch the decode path.
 
 A third set is neither committed nor gated. `tools/generators/gen_dee_gold.py` keeps 1,086 of
 DEE's own streams on a local disk, made before DEE's licence ends on 2026-11-06, each rebuildable

@@ -57,6 +57,7 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
     {"content-key=", "the operator's private key for the AC-4 content signature (PEM or DER, P-256)"},
     {"content-chain=", "the certificates that vouch for content-key=: a bundle, or repeat it"},
     {"trust-anchor=", "a certificate to trust as the top of a content-signature chain; repeat for more"},
+    {"trust-key=", "a P-256 public key (PEM or DER) to trust to sign content: a chain whose signing certificate carries it is anchored; repeat for more"},
     {"pin=", "a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted wherever it appears in the chain"},
     {"leaf-title=", "the title the signing certificate must carry (default Code/Content Signer), or any"},
     {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now, which is what CS spec 5.3 asks for; another date is warned about)"},
@@ -1169,6 +1170,8 @@ void print_option_blocks(std::uint32_t mask) {
                      "for more (or ICLFORGE_CONTENT_CHAIN_FILE)");
         fmt::println("  trust-anchor=<path>   a certificate to trust as the top of the chain; repeat "
                      "for more");
+        fmt::println("  trust-key=<path>      a P-256 public key (PEM or DER) to trust to sign; a chain "
+                     "whose signing certificate carries it is anchored; repeat for more");
         fmt::println("  pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) "
                      "fingerprint, trusted wherever it appears in the chain");
         fmt::println("  leaf-title=<text|any>  the title the signing certificate must carry (default "

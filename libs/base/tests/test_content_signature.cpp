@@ -19,6 +19,7 @@
 #include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/credentials.hpp"
 #include "iclforge/base/crypto/ecdsa_p256.hpp"
+#include "iclforge/base/crypto/pem.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
 #include "iclforge/base/crypto/thrift_binary.hpp"
 #include "iclforge/base/crypto/x509.hpp"
@@ -1336,4 +1337,60 @@ TEST_CASE("the owner's sample parses and verifies the way the measurements say",
         }());
     CHECK(has_check(wrong, "content digest", false));
     CHECK(has_check(wrong, "signature", true));
+}
+
+// A public key the operator trusts, in the forms OpenSSL writes (`openssl pkey -pubout`).
+TEST_CASE("a P-256 public key reads from PEM, DER and base64, and nothing else",
+          "[crypto][credentials][public-key]") {
+    const pki::TestChain chain = pki::make_chain();
+    const auto key = crypto::p256_public_key(chain.leaf_key);
+    REQUIRE(key.has_value());
+    // SubjectPublicKeyInfo: id-ecPublicKey, prime256v1, then the uncompressed point.
+    std::vector<std::byte> der = {
+        std::byte{0x30}, std::byte{0x59}, std::byte{0x30}, std::byte{0x13}, std::byte{0x06},
+        std::byte{0x07}, std::byte{0x2A}, std::byte{0x86}, std::byte{0x48}, std::byte{0xCE},
+        std::byte{0x3D}, std::byte{0x02}, std::byte{0x01}, std::byte{0x06}, std::byte{0x08},
+        std::byte{0x2A}, std::byte{0x86}, std::byte{0x48}, std::byte{0xCE}, std::byte{0x3D},
+        std::byte{0x03}, std::byte{0x01}, std::byte{0x07}, std::byte{0x03}, std::byte{0x42},
+        std::byte{0x00}};
+    const auto point = crypto::p256_public_key_uncompressed(*key);
+    der.insert(der.end(), point.begin(), point.end());
+
+    const auto as_text = [](const std::string& s) {
+        std::vector<std::byte> out;
+        for (const char c : s) {
+            out.push_back(static_cast<std::byte>(c));
+        }
+        return out;
+    };
+    const std::string pem = crypto::pem_encode("PUBLIC KEY", der);
+
+    const auto from_pem = crypto::parse_p256_public_key(as_text(pem));
+    REQUIRE(from_pem.has_value());
+    CHECK(*from_pem == *key);
+    const auto from_der = crypto::parse_p256_public_key(der);
+    REQUIRE(from_der.has_value());
+    CHECK(*from_der == *key);
+    const auto from_base64 = crypto::parse_p256_public_key(as_text(crypto::base64_encode(der)));
+    REQUIRE(from_base64.has_value());
+    CHECK(*from_base64 == *key);
+
+    SECTION("refused") {
+        CHECK_FALSE(crypto::parse_p256_public_key({}).has_value());
+        CHECK_FALSE(crypto::parse_p256_public_key(as_text("not a key")).has_value());
+        // The wrong kind of PEM block.
+        CHECK_FALSE(crypto::parse_p256_public_key(as_text(crypto::pem_encode("CERTIFICATE", der)))
+                        .has_value());
+        // A point that is not on the curve.
+        std::vector<std::byte> off_curve = der;
+        off_curve.back() ^= std::byte{0x01};
+        CHECK_FALSE(crypto::parse_p256_public_key(off_curve).has_value());
+        // Trailing bytes after the structure.
+        std::vector<std::byte> longer = der;
+        longer.push_back(std::byte{0});
+        CHECK_FALSE(crypto::parse_p256_public_key(longer).has_value());
+        // The private key is not a public key.
+        CHECK_FALSE(
+            crypto::parse_p256_public_key(chain.leaf_key.scalar()).has_value());
+    }
 }

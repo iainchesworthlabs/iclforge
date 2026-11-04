@@ -10,16 +10,15 @@
 #include <fstream>
 #include <ios>
 #include <memory>
-#include <optional>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
-#include "iclforge/truehd/io/access_unit.hpp"
-#include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
 namespace forge_gui {
@@ -28,14 +27,41 @@ namespace th = iclforge::truehd;
 
 namespace {
 
-// An access unit is at most 4095 16-bit words (TH spec §3.3: the length is 12 bits).
-constexpr std::size_t kMaxUnitBytes = 8192;
-// How much of the file the index pass reads at a time.
-constexpr std::size_t kScanBlockBytes = std::size_t{4} << 20U;
-// What find_stream_start and probe_stream read of the head of the file.
-constexpr std::size_t kHeadBytes = th::kMaxLeadingBytes + (std::size_t{256} << 10U);
 // A 24-bit sample, sign-extended in an int32, to +-1.0.
 constexpr float kFullScale = 8388608.0F;
+
+// A file read by offset, as Hearth's loader reads one (apps/hearth/ui/src/item_loader.cpp): the
+// cursor asks for a window at a time, so a film's lossless track is not held in memory.
+class FileByteSource final : public iclforge::apps::ByteSource {
+   public:
+    explicit FileByteSource(const std::filesystem::path& path) : file_(path, std::ios::binary) {
+        if (file_) {
+            file_.seekg(0, std::ios::end);
+            const std::streamoff end = file_.tellg();
+            ok_ = end >= 0;
+            size_ = ok_ ? static_cast<std::uint64_t>(end) : 0;
+        }
+    }
+
+    [[nodiscard]] bool ok() const { return ok_; }
+
+    [[nodiscard]] std::uint64_t size() const override { return size_; }
+
+    [[nodiscard]] std::size_t read(std::uint64_t offset, std::span<std::byte> out) override {
+        if (offset >= size_ || out.empty()) {
+            return 0;
+        }
+        file_.clear();
+        file_.seekg(static_cast<std::streamoff>(offset));
+        file_.read(reinterpret_cast<char*>(out.data()), static_cast<std::streamsize>(out.size()));
+        return static_cast<std::size_t>(std::max<std::streamsize>(file_.gcount(), 0));
+    }
+
+   private:
+    std::ifstream file_;
+    std::uint64_t size_ = 0;
+    bool ok_ = false;
+};
 
 }  // namespace
 
@@ -44,10 +70,11 @@ std::expected<std::unique_ptr<TruehdPcmSource>, std::string> TruehdPcmSource::op
     std::unique_ptr<TruehdPcmSource> source{new TruehdPcmSource()};
     source->path_ = path;
     source->presentation_ = presentation;
-    source->file_.open(path, std::ios::binary);
-    if (!source->file_) {
+    auto bytes = std::make_unique<FileByteSource>(path);
+    if (!bytes->ok()) {
         return std::unexpected("Could not open " + path.string() + ".");
     }
+    source->bytes_ = std::move(bytes);
     if (const std::string problem = source->scan(); !problem.empty()) {
         return std::unexpected(problem);
     }
@@ -61,93 +88,50 @@ std::expected<std::unique_ptr<TruehdPcmSource>, std::string> TruehdPcmSource::op
 }
 
 std::string TruehdPcmSource::scan() {
-    file_.seekg(0, std::ios::end);
-    file_size_ = static_cast<std::uint64_t>(file_.tellg());
-    if (file_size_ < 8) {
-        return path_.string() + " is too short to hold a TrueHD or MLP access unit.";
+    // The index is one pass over the stream (the units that open with a major sync, thinned, and
+    // the padding at the end), made by the code Hearth plays from.
+    auto index = iclforge::apps::index_truehd(*bytes_);
+    if (!index) {
+        return path_.string() + " is not a TrueHD or MLP stream (" + index.error() + ").";
     }
-    std::vector<std::byte> head(static_cast<std::size_t>(std::min<std::uint64_t>(file_size_, kHeadBytes)));
-    file_.seekg(0);
-    file_.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
-    head.resize(static_cast<std::size_t>(std::max<std::streamsize>(file_.gcount(), 0)));
-    file_.clear();
-    const auto start = th::find_stream_start(head);
-    if (!start) {
-        return path_.string() +
-               " is not a TrueHD or MLP stream: it has no access unit with a major sync.";
-    }
-    first_offset_ = *start;
-    const auto probed = th::probe_stream(head);
-    if (!probed) {
-        return path_.string() + ": " + std::string{th::to_string(probed.error().kind)};
-    }
-    info_.mlp = probed->major_sync.kind == th::StreamKind::kMlp;
-    info_.sample_rate = probed->sample_rate;
-    info_.samples_per_unit = probed->samples_per_access_unit;
-    if (info_.sample_rate == 0 || info_.samples_per_unit <= 0) {
-        return path_.string() + " has a sample rate this build does not read.";
-    }
+    index_ = std::move(*index);
+    cursor_ = std::make_unique<iclforge::apps::TruehdCursor>(*bytes_);
+    info_.mlp = index_.kind == th::StreamKind::kMlp;
+    info_.sample_rate = index_.sample_rate;
+    info_.samples_per_unit = static_cast<int>(index_.samples_per_unit);
+    info_.units = index_.units;
+    info_.restarts = index_.major_syncs;
+    info_.frames = index_.samples();
 
-    // The index: every unit's length is in its first two bytes, so the file is walked without
-    // decoding it, and the units that open with a major sync are the places a decode can begin.
-    std::vector<std::byte> block;
-    std::uint64_t block_start = 0;
-    std::uint64_t pos = first_offset_;
-    std::uint64_t units = 0;
-    iclforge::apps::truehd_probe::RateModel rate_model;
-    while (pos + 8 <= file_size_) {
-        if (pos < block_start || pos + 8 > block_start + block.size()) {
-            block.resize(kScanBlockBytes);
-            file_.seekg(static_cast<std::streamoff>(pos));
-            file_.read(reinterpret_cast<char*>(block.data()), static_cast<std::streamsize>(block.size()));
-            block.resize(static_cast<std::size_t>(std::max<std::streamsize>(file_.gcount(), 0)));
-            file_.clear();
-            block_start = pos;
-            if (block.size() < 8) {
-                break;
-            }
-        }
-        const auto here = std::span<const std::byte>(block).subspan(static_cast<std::size_t>(pos - block_start));
-        const std::size_t length = th::access_unit_length_bytes(here);
-        if (length < 8 || length > kMaxUnitBytes || pos + length > file_size_) {
-            break;  // the end of the stream, or bytes that are not an access unit
-        }
-        const bool major_sync = th::starts_with_major_sync(here.subspan(4));
-        if (major_sync) {
-            restarts_.push_back(Restart{.unit = units, .offset = pos});
-        }
-        // The rate model needs the declared rate, which the first unit's major sync gives.
-        std::optional<th::MajorSync> first_sync;
-        if (units == 0 && major_sync) {
-            if (const auto parsed = th::parse_major_sync(here.subspan(4), false)) {
-                first_sync = *parsed;
-            }
-        }
-        rate_model.add(length, first_sync);
-        pos += length;
-        ++units;
-    }
-    if (restarts_.empty() || restarts_.front().unit != 0) {
+    // TH spec section 18 over the unit lengths: a second walk of the stream, since the index keeps
+    // no lengths. The model needs the declared rate, which the first unit's major sync gives.
+    if (!cursor_->rewind()) {
         return path_.string() + " does not open with an access unit that carries a major sync.";
     }
-    info_.units = units;
+    iclforge::apps::truehd_probe::RateModel rate_model;
+    bool first = true;
+    while (const auto unit = cursor_->next()) {
+        std::optional<th::MajorSync> first_sync;
+        if (first) {
+            if (const auto parsed = th::parse_major_sync(unit->subspan(4), false)) {
+                first_sync = *parsed;
+            }
+            first = false;
+        }
+        rate_model.add(unit->size(), first_sync);
+    }
     info_.rate = rate_model.report();
-    info_.restarts = restarts_.size();
-    info_.frames = units * static_cast<std::uint64_t>(info_.samples_per_unit);
     return {};
 }
 
 void TruehdPcmSource::seek_to(std::uint64_t frame) {
-    const std::uint64_t unit = frame / static_cast<std::uint64_t>(info_.samples_per_unit);
-    auto it = std::ranges::upper_bound(restarts_, unit, {}, &Restart::unit);
-    if (it != restarts_.begin()) {
-        --it;
-    }
+    const std::uint64_t samples_per_unit = static_cast<std::uint64_t>(info_.samples_per_unit);
+    const iclforge::apps::TruehdRestart& restart = index_.restart_at_or_before(frame / samples_per_unit);
     decoder_ = std::make_unique<th::Decoder>(
         th::DecoderConfig{.presentation = presentation_, .strictness = th::Strictness::kLenient});
-    next_offset_ = it->offset;
-    next_unit_ = it->unit;
-    pending_start_ = it->unit * static_cast<std::uint64_t>(info_.samples_per_unit);
+    cursor_->seek(restart);
+    ended_ = false;
+    pending_start_ = restart.unit * samples_per_unit;
     decoded_end_ = pending_start_;
     for (auto& channel : pending_) {
         channel.clear();
@@ -155,23 +139,15 @@ void TruehdPcmSource::seek_to(std::uint64_t frame) {
 }
 
 bool TruehdPcmSource::decode_next_unit() {
-    if (next_unit_ >= info_.units) {
+    if (ended_) {
         return false;
     }
-    unit_buffer_.resize(kMaxUnitBytes);
-    file_.seekg(static_cast<std::streamoff>(next_offset_));
-    file_.read(reinterpret_cast<char*>(unit_buffer_.data()), static_cast<std::streamsize>(unit_buffer_.size()));
-    const auto got = static_cast<std::size_t>(std::max<std::streamsize>(file_.gcount(), 0));
-    file_.clear();
-    const std::size_t length = th::access_unit_length_bytes(std::span<const std::byte>(unit_buffer_).first(got));
-    if (length < 8 || length > got) {
-        next_unit_ = info_.units;
+    const auto unit = cursor_->next();
+    if (!unit) {
+        ended_ = true;
         return false;
     }
-    const auto unit = std::span<const std::byte>(unit_buffer_).first(length);
-    next_offset_ += length;
-    ++next_unit_;
-    const auto result = decoder_->decode(unit);
+    const auto result = decoder_->decode(*unit);
     if (!result) {
         ++decode_errors_;
         return true;
@@ -188,7 +164,7 @@ bool TruehdPcmSource::decode_next_unit() {
     }
     if (decoded.channels != info_.channels) {
         ++decode_errors_;  // a stream that changes its channel count is not played past the change
-        next_unit_ = info_.units;
+        ended_ = true;
         return false;
     }
     if (pending_.size() != channels) {

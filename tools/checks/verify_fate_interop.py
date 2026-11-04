@@ -37,23 +37,57 @@ Usage:
                       temporary directory removed on exit)
     --cli PATH        forge, overriding $ICLFORGE_CLI
     --list            print the pinned corpus and exit, downloading nothing
+    --tolerate-unreachable
+                      (or FATE_TOLERATE_UNREACHABLE=1) when the archive cannot be
+                      reached after the retries below, check the samples already in
+                      the cache and skip the rest with a warning, instead of failing
 
-Exits non-zero on the first sample that fails.
+The archive is volunteer-run and has been unreachable for days at a time, which
+failed every pull request that reached this gate for a reason none of them
+caused. So a download is retried with a back-off, a file lands in the cache only
+once it is complete, and the first sample that cannot be reached marks the whole
+archive as down (the rest are not each given their own retries). Whether that
+is a failure is the caller's to say: the nightly run on main stays strict so an
+outage is seen; a pull request may tolerate it, because the same decoders are
+held against the committed external-baseline streams on every build. A sample
+that IS fetched is held to its pin and to FFmpeg exactly as before: only a
+missing file is tolerated, never a wrong one.
+
+Exits non-zero on the first sample that fails, or when the archive is
+unreachable and that was not tolerated.
 """
 
 import argparse
 import hashlib
+import http.client
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
 COMPARE = REPO / "tools" / "checks" / "compare_wav.py"
 BASE_URL = "https://fate-suite.ffmpeg.org/"
+
+# Four tries a sample, 5 s then 15 s then 45 s apart, 30 s a socket operation:
+# long enough to ride out a restart or a busy minute, short enough that an
+# archive which is simply down costs the job about two minutes, not the
+# eight times that three-minute-a-try timeouts would.
+DOWNLOAD_ATTEMPTS = 4
+DOWNLOAD_BACKOFF_SECONDS = 5
+DOWNLOAD_TIMEOUT_SECONDS = 30
+
+# Failures that mean "could not get the bytes", as opposed to a bad hash.
+NETWORK_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError)
+
+
+class ArchiveUnreachable(Exception):
+    """The archive could not be reached, or did not finish sending a file."""
 
 # Every sample below was measured by hand against FFmpeg 8.0.1 on x86-64
 # Windows and Linux while this file was written; the measured worst channel is
@@ -194,6 +228,35 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
+def download(url: str, local: Path) -> None:
+    """Fetch url into local, retrying; raise ArchiveUnreachable if it never works.
+
+    The bytes are written beside the destination and renamed into place, so a
+    connection that drops part-way leaves no half file for the next run (or a
+    cache save) to find."""
+    partial = local.with_name(local.name + ".part")
+    last_error = None
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+                body = response.read()
+                expected = response.headers.get("Content-Length")
+            if expected is not None and len(body) != int(expected):
+                raise http.client.IncompleteRead(body, int(expected) - len(body))
+            partial.write_bytes(body)
+            partial.replace(local)
+            return
+        except NETWORK_ERRORS as error:
+            last_error = error
+            partial.unlink(missing_ok=True)
+            if attempt < DOWNLOAD_ATTEMPTS:
+                wait = DOWNLOAD_BACKOFF_SECONDS * 3 ** (attempt - 1)
+                print(f"    ::warning::{url}: {error!r}; try {attempt} of "
+                      f"{DOWNLOAD_ATTEMPTS}, again in {wait} s")
+                time.sleep(wait)
+    raise ArchiveUnreachable(f"{url}: {last_error!r} after {DOWNLOAD_ATTEMPTS} tries")
+
+
 def fetch(sample: dict, cache_dir: Path) -> Path:
     """Download (or reuse) one sample and check it against its pinned hash.
 
@@ -207,8 +270,7 @@ def fetch(sample: dict, cache_dir: Path) -> Path:
         if not local.exists():
             url = BASE_URL + sample["path"]
             print(f"    fetching {url}")
-            with urllib.request.urlopen(url, timeout=120) as response:
-                local.write_bytes(response.read())
+            download(url, local)
         actual = sha256_of(local)
         if actual == sample["sha256"]:
             return local
@@ -245,6 +307,10 @@ def main() -> int:
     parser.add_argument("--cli", default=os.environ.get("ICLFORGE_CLI", ""))
     parser.add_argument("--list", action="store_true",
                          help="Print the pinned corpus and exit, downloading nothing.")
+    parser.add_argument("--tolerate-unreachable", action="store_true",
+                         default=os.environ.get("FATE_TOLERATE_UNREACHABLE") == "1",
+                         help="If the archive cannot be reached, check what the cache holds "
+                              "and skip the rest with a warning rather than failing.")
     args = parser.parse_args()
 
     if args.list:
@@ -271,11 +337,23 @@ def main() -> int:
     work = Path(tempfile.mkdtemp(prefix="iclforge-fate-work-"))
 
     failures = []
+    skipped = []
+    archive_down = False
     try:
         for index, sample in enumerate(SAMPLES, start=1):
             name = sample["path"].split("/")[-1]
             print(f"[{index}/{len(SAMPLES)}] {name}: {sample['note']}")
-            source = fetch(sample, cache_dir)
+            if archive_down and not (cache_dir / name).exists():
+                skipped.append(name)
+                print("    skipped: the archive is unreachable and this sample is not cached")
+                continue
+            try:
+                source = fetch(sample, cache_dir)
+            except ArchiveUnreachable as error:
+                archive_down = True
+                skipped.append(name)
+                print(f"    ::warning::archive unreachable: {error}")
+                continue
 
             if "complete_bytes" in sample:
                 trimmed = work / name
@@ -327,6 +405,17 @@ def main() -> int:
         for failure in failures:
             print(f"::error::{failure}")
         return 1
+    if skipped:
+        checked = len(SAMPLES) - len(skipped)
+        message = (f"FATE interop: the archive was unreachable; {len(skipped)} of "
+                   f"{len(SAMPLES)} samples were NOT checked ({', '.join(skipped)}), "
+                   f"{checked} were")
+        if not args.tolerate_unreachable:
+            print(f"::error::{message}")
+            return 1
+        print(f"::warning::{message}. Tolerated for this run; the nightly run on main "
+              f"is the strict one.")
+        return 0
     print(f"FATE interop: {len(SAMPLES)} pinned third-party samples decoded and checked")
     return 0
 

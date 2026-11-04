@@ -529,6 +529,17 @@ and `iclforge_ac4_encoder_delay_samples` and `iclforge_ac4_encoder_decoder_delay
 silence the encoder puts before the input and the delay a decoder adds on top, both at the input's
 rate.
 
+`iclforge_ac4_sign_stream` and `iclforge_ac4_verify_stream` sign and check a raw `.ac4` stream's
+content signature with the caller's own key: the private key, the certificate bundle, the trust
+anchors and the trust public key are all passed as in-memory PEM or DER buffers, nothing is read from
+disk and no key ships. Verifying returns `ICLFORGE_OK` when the check *ran* and writes an
+`iclforge_ac4_signature_outcome_t` (`_VALID`, `_UNTRUSTED`, `_NONE`, `_UNREADABLE`, `_CHAIN_REJECTED`,
+`_INVALID`, `_CONTENT_ALTERED`, `_METADATA_ALTERED`, `_REFUSED_BY_POLICY`; only `_VALID` is
+acceptance), with the first fault as text in `out_detail`; signing failures are
+`ICLFORGE_ERROR_AC4_SIGNING` (not a raw AC-4 stream, already signed, key not the chain's) or
+`ICLFORGE_ERROR_INVALID_ARGUMENT` (a key, chain or date that does not read). A signature made with
+your own key does not chain to Dolby's or PACE's trust root; see [Signing](signing.md#in-the-c-api).
+
 `iclforge_ac4_encoder_config_t` also carries `iframes` and `fragment_starts` (a pointer and a count
 each: frames, counted from 0, that must be I-frames, and where an MP4's fragments start in samples
 of the decoded output) and `experimental`, the flags of `iclforge::ac4::EncoderConfig::Experimental` that

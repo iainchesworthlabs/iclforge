@@ -22,6 +22,28 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 
+#include "iclforge/ac4/io/content_signature.hpp"
+
+// The C outcome enum is iclforge::ac4::VerifyOutcome, one for one, in its order.
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kValid) ==
+              ICLFORGE_AC4_SIGNATURE_VALID);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kUntrusted) ==
+              ICLFORGE_AC4_SIGNATURE_UNTRUSTED);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kNoSignature) ==
+              ICLFORGE_AC4_SIGNATURE_NONE);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kUnreadable) ==
+              ICLFORGE_AC4_SIGNATURE_UNREADABLE);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kChainRejected) ==
+              ICLFORGE_AC4_SIGNATURE_CHAIN_REJECTED);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kSignatureInvalid) ==
+              ICLFORGE_AC4_SIGNATURE_INVALID);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kContentAltered) ==
+              ICLFORGE_AC4_SIGNATURE_CONTENT_ALTERED);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kMetadataAltered) ==
+              ICLFORGE_AC4_SIGNATURE_METADATA_ALTERED);
+static_assert(static_cast<int>(iclforge::ac4::VerifyOutcome::kRefusedByPolicy) ==
+              ICLFORGE_AC4_SIGNATURE_REFUSED_BY_POLICY);
+
 // --- enum-ordinal contract (global scope, matching internal.hpp's own
 // non-AC-4 static_asserts above the point its namespace iclforge_c opens) ---
 
