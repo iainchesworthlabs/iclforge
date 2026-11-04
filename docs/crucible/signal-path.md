@@ -150,8 +150,15 @@ pay it once, since each starts the leg afresh. The case
 engine's nominal pace through the same model of a device and requires no gap and at least 60 ms of
 audio in hand throughout with the pre-roll, and the gaps without it; `[truehd_headroom]` runs the same
 thing in wall clock, on the machine the question is about, with and without the pre-roll. Set
-`truehd_prefill_ms` to 0 to hand every burst over as it comes. The reading from a receiver is still
-to come, and says whether 150 ms is more than it needs.
+`truehd_prefill_ms` to 0 to hand every burst over as it comes.
+
+On the Raspberry Pi 4B (the build above, no receiver), three runs of `[truehd_headroom]` with the
+pre-roll found no gap in any, and the sink held at least 73, 107 and 107 ms of audio when a batch
+arrived after the first second. The first hand-over was twelve bursts at 352 ms into the run. With no
+pre-roll the same runs had five or six gaps each, the longest 75 to 76 ms, one to three of them after
+the first second, and the sink fell as far as 11 ms short. The cost is unchanged: mean 9.2 ms, median
+0.11 ms, worst frame 36.5 ms against the 32 ms a frame lasts. The reading from a receiver is still to
+come, and says whether 150 ms is more than it needs.
 
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
 can carry; TrueHD 5.1 is left out of that order and is only ever pinned. Crucible writes E-AC-3
