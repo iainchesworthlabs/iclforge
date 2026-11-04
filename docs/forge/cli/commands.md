@@ -966,7 +966,7 @@ the major sync that follows its first access unit's header. `decode` writes a 24
 mask when that order is the WAV's own (5.1's is; a 7.1's is not, and the status line names the channels). A failed check
 (check nibble, CRC, parity, lossless check) or a byte the reader skipped stops the decode with exit status 2;
 `truehd-check=lenient` counts them (the status lines say how many) and goes on. `truehd-presentation=` picks the substreams read:
-`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `probe` describes the stream (`json=1` adds a `truehd`
+`best` (the default, substreams 0 to 2), `2ch`, `6ch`, `8ch` or `all`; `decode`, `levels` and `loudness` take both options. `decode` alone takes `truehd-reading=` for scoring a provisional reading (`seed-shr7-32`, `zero-histories`, `shift-by-position` or `fold-by-position`: the other reading of a point the specification leaves open, `libs/truehd/ERRATA.md` question 101); given, the decode is expected to differ from the source or to fail its lossless check wherever the stream depends on the reading. `probe` describes the stream (`json=1` adds a `truehd`
 member) and exits 1 if a unit's header, directory, parity or CRC fails. [TrueHD and MLP](../../library/truehd.md).
 
 `probe` also shows the stream's channel meaning (TH spec section 14.1), of a TrueHD stream (an MLP stream's bytes at that place are not
@@ -1114,8 +1114,9 @@ and, for an AC-3 or E-AC-3 stream, any `truehd-` option. The same provisional ma
 for two, 8 for three), measures its integrated loudness with the BS.1770-5 Annex 3 weights `loudness` uses (from the speakers the major sync
 names), maps it to a dialogue norm as E-AC-3's `normalize` maps it (ATSC A/85 section 8: the loudness negated and rounded, from 1 to 31, the
 range the 5 bit fields hold, so a quiet programme is 31 and no field is written as 0), and writes it into that presentation's field of every
-major sync, as `metadata` does. **No gain is applied to the audio: the stream is lossless, so only the field changes**, and the mix level,
-source format, control-enabled bits and DRC start-up gains are left as they were (E-AC-3's `normalize` leaves its mixing metadata alone
+major sync, as `metadata` does, except that the 2 channel field gets the norm plus 6 and its control-enabled bit is set, as DEE writes
+them (ERRATA question 51 and 54). **No gain is applied to the audio: the stream is lossless, so only the fields change**, and the mix level,
+source format, the 6 and 8 channel control-enabled bits and DRC start-up gains are left as they were (E-AC-3's `normalize` leaves its mixing metadata alone
 too). The status lines give each presentation's loudness and its dialogue norm before and after, and say for each whose control-enabled bit
 is off that a decoder may not apply the field (`metadata ... truehd-control-6ch=on` sets it; whether any decoder reads the bit that way is
 open). A stream with nothing above the -70 LKFS gate in some presentation is exit status 5 and writes nothing, a damaged stream is exit
@@ -1123,8 +1124,8 @@ status 2 (the measurement is strict), and `normalize` takes no option but `quiet
 with no oracle until the DEE set (`libs/truehd/ERRATA.md`, question 51).
 
 **Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
-`truehd-presentation=`, `truehd-check=` and the object-signing options `verify-objects`, `gate-objects` and `signing-key=`
-(see below), and refuses every other option by name with exit status 1 and no output: the
+`truehd-presentation=`, `truehd-check=`, `truehd-reading=` and the object-signing options `verify-objects`, `gate-objects` and
+`signing-key=` (see below), and refuses every other option by name with exit status 1 and no output: the
 output stage (`channels=`, `downmix=`, `mix-lfe`), `drc=` and `drcmode=`, `programme=`, the object outputs (`objects_dir`,
 `adm_out`, `bed-only`), `sign-objects` and the verification flags (`verify-content`, `check-content`, `syntax-trace=`),
 which never succeed without checking something. `levels` and `loudness` take the same two options, `truehd-encode` its own

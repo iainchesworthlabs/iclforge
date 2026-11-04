@@ -1302,7 +1302,8 @@ properties its trace shows, and the scorers pin the scores. The encoder's stream
 only as cases for syntax that no DEE stream reaches (`testdata/ac4/constructed`,
 `presentations` and `objects`, with the Python parser's digests), which the tests rebuild byte for
 byte; CI makes the rest, and no hashes of them are pinned. The full census, the gold set (G0, G1)
-and librempeg's outputs stay local on `D:`, and so do the third-party streams: none is committed.
+and librempeg's outputs stay local on `D:`, and so do the third-party streams: none is committed. The TrueHD gold set is the one exception: 13 short DEE
+TrueHD streams are committed with their sources, in `testdata/truehd-dee/` (`planning/truehd-fixtures.md`).
 
 ## Phases
 

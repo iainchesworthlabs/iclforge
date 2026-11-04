@@ -158,6 +158,9 @@ struct Options {
     // the channels of substream 3 (an iclforge::render::OutputLayout name or list); empty: none.
     std::string truehd_render;
     bool truehd_lenient = false;
+    // `decode truehd-reading=`: the other reading of a point the specification leaves open, for
+    // scoring a provisional reading (libs/truehd/ERRATA.md question 101); empty is the library's.
+    std::string truehd_reading;
     // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
     // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without
     // it such a decode exits 0 and warns where it always did.

@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 164> kOptionTokens{{
+constexpr std::array<OptionToken, 165> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -116,6 +116,7 @@ constexpr std::array<OptionToken, 164> kOptionTokens{{
     {"truehd-bed=", "truehd-atmos: the 7.1 bed as a WAV (L R C LFE Ls Rs Lrs Rrs, the objects' length and rate); without it the bed is the objects placed on 7.1 by the renderer"},
     {"truehd-objects-lfe=", "truehd-atmos: on (the default) takes the first channel of the objects WAV as the LFE, off makes every channel an object"},
     {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
+    {"truehd-reading=", "decode of TrueHD or MLP, for scoring a provisional reading: the other reading of a point the specification leaves open, seed-shr7-32, zero-histories, shift-by-position or fold-by-position (ERRATA.md question 101); not given, the library's reading"},
     {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
     {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
     {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
