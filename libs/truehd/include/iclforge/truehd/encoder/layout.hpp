@@ -112,6 +112,15 @@ using OamdFrameSource = std::function<std::vector<std::byte>(std::uint64_t frame
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT ExtraDataSource
 oamd_extra_data(OamdFrameSource source, int unit_samples, int frame_samples = kOamdFrameSamples);
 
+// TH spec §15.4.1: the evolution frame (EMDF container body, without the sync word and length of
+// E-AC-3) of one payload as the TrueHD streams carry it: no sample offset, duration or group id,
+// codec data 0x08, frame aligned, the payload list closed by id 0, one protection byte (zero here:
+// the tag is Dolby's to compute, so the stream is unsigned) and no secondary protection, padded
+// with zero bits to the byte. For payload id 11 (OAMD) and fewer than 256 bytes the result is
+// payload + 8 bytes.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::vector<std::byte> layout_evolution_frame(
+    int payload_id, std::span<const std::byte> payload);
+
 // TH spec §16.1 and §16.4: the extra data region of `payload`: check nibble and length (in 16-bit
 // words, less one), evo_reserved and the payload length, the payload, zero padding to a whole word
 // and the parity byte.

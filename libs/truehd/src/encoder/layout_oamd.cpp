@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 
+#include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/encoder/layout.hpp"
 
@@ -40,6 +42,33 @@ ExtraDataSource oamd_extra_data(OamdFrameSource source, int unit_samples, int fr
         }
         return source(at->frame, at->offset);
     };
+}
+
+std::vector<std::byte> layout_evolution_frame(int payload_id, std::span<const std::byte> payload) {
+    iclforge::BitWriter w;
+    w.put(0, 2);  // evo_version
+    w.put(0, 3);  // key_id
+    w.put(static_cast<std::uint32_t>(payload_id), 5);
+    w.put(0, 1);     // smploffste
+    w.put(0, 1);     // duratione
+    w.put(0, 1);     // groupide
+    w.put(1, 1);     // codecdatae
+    w.put(0x08, 8);  // codec data
+    w.put(0, 1);     // discard_unknown_payload
+    w.put(1, 1);     // payload_frame_aligned
+    w.put(0, 1);     // create_duplicate
+    w.put(0, 1);     // remove_duplicate
+    w.put(0, 5);     // priority
+    w.put(0, 2);     // proc_allowed
+    w.write_variable_bits(8, static_cast<std::uint32_t>(payload.size()));
+    for (const std::byte byte : payload) {
+        w.put(std::to_integer<std::uint32_t>(byte), 8);
+    }
+    w.put(0, 5);  // the payload list ends: id 0
+    w.put(1, 2);  // protection_length_primary: one byte
+    w.put(0, 2);  // protection_length_secondary: none
+    w.put(0, 8);  // the protection byte (the tag, unsigned)
+    return w.take();
 }
 
 std::vector<std::byte> layout_frame_extra_data(std::span<const std::byte> payload) {

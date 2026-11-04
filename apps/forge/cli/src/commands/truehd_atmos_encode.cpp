@@ -162,11 +162,7 @@ bool is_adm_master(std::string_view path) {
 }
 
 std::vector<std::byte> evolution_frame_of(std::span<const std::byte> oamd) {
-    const iclforge::objects::emdf::Payload payload{.id = iclforge::objects::emdf::kPayloadIdOamd,
-                                                   .bytes = oamd};
-    std::vector<std::byte> container = iclforge::objects::emdf::build_container({&payload, 1});
-    container.erase(container.begin(), container.begin() + 4);
-    return container;
+    return th::layout_evolution_frame(iclforge::objects::emdf::kPayloadIdOamd, oamd);
 }
 
 }  // namespace

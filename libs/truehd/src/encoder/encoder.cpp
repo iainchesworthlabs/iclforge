@@ -955,6 +955,9 @@ MajorSync Encoder::Impl::make_major_sync() const {
     sync.substream_info = stages.size() == 1 ? 0x14 : stages.size() == 2 ? 0x3C : 0x7C;
     sync.channel_meaning = config.channel_meaning;
     if (config.object_channels > 0) {
+        // TH spec §4.1.1: an Atmos stream carries exactly 0x1000; the Dolby decoder offers the
+        // 16-channel presentation for no other value.
+        sync.flags = kMajorSyncFlagsAtmos;
         // The fourth substream (ERRATA.md entry 63). The owner's discs have 0xFC in substream_info
         // for four substreams (entry 17) and 3 in extended_substream_info, which §4.5 lists as 0, 1
         // and 2 (question 46); the extension is the 16-channel fields of §14.2.

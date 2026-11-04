@@ -7,10 +7,14 @@
 #include <vector>
 
 #include "encoder/encoder_support.hpp"
+#include "encoder/ratectl_support.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/encoder/layout.hpp"
+#include "iclforge/truehd/io/evolution.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 
 // The restart header's bounds (TH spec §7.1.1, §19.3): the Dolby decoder rejects a stream whose
@@ -111,6 +115,57 @@ TEST_CASE("max_lsbs and max_shift never fall below what the interval uses",
         CHECK(interval.header.max_shift <= 7);
         CHECK(interval.header.max_lsbs > 0);
     }
+}
+
+TEST_CASE("the evolution frame of an OAMD payload is the fixed configuration of TH spec 15.4.1",
+          "[truehd][encoder][evolution]") {
+    for (const std::size_t size : {std::size_t{50}, std::size_t{66}, std::size_t{200}}) {
+        std::vector<std::byte> oamd(size);
+        for (std::size_t i = 0; i < size; ++i) {
+            oamd[i] = static_cast<std::byte>(i * 7 + 1);
+        }
+        const std::vector<std::byte> frame = layout_evolution_frame(kEvolutionPayloadOamd, oamd);
+        // 42 header bits with the 9 bit size, the payload, 22 closing bits: payload + 8 bytes.
+        CHECK(frame.size() == size + 8);
+        const auto parsed = parse_evolution_frame(frame, EvolutionReading::kEmdf);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->payloads.size() == 1);
+        const EvolutionPayload& payload = parsed->payloads[0];
+        CHECK(payload.id == kEvolutionPayloadOamd);
+        CHECK(payload.bytes == oamd);
+        CHECK_FALSE(payload.config.sample_offset.has_value());
+        CHECK_FALSE(payload.config.duration.has_value());
+        CHECK_FALSE(payload.config.group_id.has_value());
+        REQUIRE(payload.config.codec_data.has_value());
+        CHECK(*payload.config.codec_data == 0x08);
+        CHECK_FALSE(payload.config.discard_unknown);
+        CHECK(payload.config.frame_aligned);
+        CHECK_FALSE(payload.config.create_duplicate);
+        CHECK_FALSE(payload.config.remove_duplicate);
+        CHECK(parsed->protection.primary_code == 1);
+        CHECK(parsed->protection.secondary_code == 0);
+        CHECK(parsed->protection.primary.size() == 1);
+        CHECK(parsed->protection.secondary.empty());
+        CHECK(parsed->trailing_zero);
+    }
+}
+
+TEST_CASE("an Atmos stream carries exactly 0x1000 in the major sync flags",
+          "[truehd][encoder][config]") {
+    EncoderConfig atmos = atmos_config(12);
+    atmos.allow_rate_violations = true;
+    const Encoded with_objects = encode_all(atmos, std::vector<std::int32_t>(20 * 40 * 20, 0));
+    REQUIRE_FALSE(with_objects.units.empty());
+    auto parsed = parse_access_unit(with_objects.units[0].bytes, 4, true);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->major_sync.has_value());
+    CHECK(parsed->major_sync->flags == 0x1000);
+
+    const Encoded plain = encode_all(stereo(), make_pcm(2, 40 * 8, 24, 3));
+    auto plain_parsed = parse_access_unit(plain.units[0].bytes, 1, true);
+    REQUIRE(plain_parsed.has_value());
+    REQUIRE(plain_parsed->major_sync.has_value());
+    CHECK(plain_parsed->major_sync->flags == 0);
 }
 
 }  // namespace
