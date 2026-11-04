@@ -490,15 +490,45 @@ TEST_CASE("project command: TrueHD is truehd-encode with its own two options, an
         folder.touch("b.wav");
         CHECK(fails(R"({"sources": [{"path": "a.wav"}], "encode": {"codec": "truehd",
                          "container": "fmp4"}})") == "truehd-no-fmp4");
-        CHECK(fails(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav"}],
-                         "encode": {"codec": "truehd"}})") == "truehd-one-source");
         CHECK(fails(R"({"sources": [{"path": "a.wav"}], "atmos": true,
                          "encode": {"codec": "truehd"}})") == "truehd-no-atmos");
         CHECK(fails(R"({"sources": [{"path": "a.wav"}],
-                         "assignments": [{"source": 0, "channel": 0, "to": "L"}],
-                         "encode": {"codec": "truehd"}})") == "truehd-no-assignments");
-        CHECK(fails(R"({"sources": [{"path": "a.wav"}],
                          "encode": {"codec": "truehd", "options": {"dialnorm": 27}}})") ==
               "truehd-no-options");
+        // Two sources with no rows to place them: a channel nobody placed is a mistake.
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav"}],
+                         "encode": {"codec": "truehd"}})") == "no-assignments");
+        // A row that names a source the project does not have.
+        CHECK(fails(R"({"sources": [{"path": "a.wav"}],
+                         "assignments": [{"source": 1, "channel": 0, "to": "L"}],
+                         "encode": {"codec": "truehd"}})") == "bad-assignment");
+    }
+    SECTION("the other sources, the rows and the offsets are the command's src=, map= and offset=") {
+        folder.touch("b.wav");
+        const auto plan = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav", "offsetSeconds": 0.5}],
+                            "assignments": [{"source": 0, "channel": 0, "to": "L"},
+                                            {"source": 0, "channel": 1, "to": "R"},
+                                            {"source": 1, "channel": 0, "to": "C"}],
+                            "encode": {"codec": "truehd", "truehd": {"verify": true}}})"),
+            request(folder));
+        REQUIRE(plan.has_value());
+        CHECK(plan->steps[0].argv ==
+              std::vector<std::string>{"truehd-encode", g(folder.path() / "a.wav"),
+                                       g(folder.path() / "song.thd"),
+                                       "src=" + g(folder.path() / "b.wav"),
+                                       "map=0.0:L,0.1:R,1.0:C", "offset=1:0.5", "verify"});
+    }
+    SECTION("one source and rows: the rows name the places, with no src=") {
+        const auto plan = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}],
+                            "assignments": [{"source": 0, "channel": 1, "to": "R"},
+                                            {"source": 0, "channel": 0, "to": "L"}],
+                            "encode": {"codec": "truehd"}})"),
+            request(folder));
+        REQUIRE(plan.has_value());
+        CHECK(plan->steps[0].argv ==
+              std::vector<std::string>{"truehd-encode", g(folder.path() / "a.wav"),
+                                       g(folder.path() / "song.thd"), "map=0.1:R,0.0:L"});
     }
 }

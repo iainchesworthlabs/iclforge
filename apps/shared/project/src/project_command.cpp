@@ -68,6 +68,33 @@ std::optional<std::string> option_token(const std::string& key, const Json& valu
     return std::nullopt;
 }
 
+// The project's `assignments` as the text of a map= option, `<source>.<channel>:<place>` for each,
+// comma separated; empty when there are none. A row that does not say a source, a channel and a
+// place, or names a source the project does not have, is a bad-assignment (counted from 1).
+std::expected<std::string, Message> map_text_of(const Json* assignments, std::size_t source_count) {
+    std::string map;
+    if (assignments == nullptr || !assignments->is_array()) {
+        return map;
+    }
+    for (std::size_t i = 0; i < assignments->size(); ++i) {
+        const Json& entry = (*assignments)[i];
+        const auto source =
+            member(entry, "source") ? int_of(*member(entry, "source")) : std::nullopt;
+        const auto channel =
+            member(entry, "channel") ? int_of(*member(entry, "channel")) : std::nullopt;
+        const std::string to = string_of(entry, "to");
+        if (!source || !channel || to.empty() || *source < 0 || *channel < 0 ||
+            static_cast<std::size_t>(*source) >= source_count) {
+            return std::unexpected(Message{"bad-assignment", {std::to_string(i + 1)}});
+        }
+        if (!map.empty()) {
+            map += ",";
+        }
+        map += std::to_string(*source) + "." + std::to_string(*channel) + ":" + to;
+    }
+    return map;
+}
+
 const char* container_suffix(std::string_view container) {
     if (container == "matroska") {
         return ".mkv";
@@ -168,11 +195,14 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
         out.scratch_files.push_back(stream);
     }
 
-    // ---- TrueHD: one source, one command ---------------------------------------------------------
-    // `forge truehd-encode <source> <stream>` [truehd-downmix=standard] [verify], and then the
-    // container command like any other stream's. A lossless encode has no bit rate, tools, layout
-    // or metadata of the AC-3 family, so a project that names them for it is refused, not run with
-    // them dropped; the bit rate the window always writes is the one thing left out.
+    // ---- TrueHD: one command --------------------------------------------------------------------
+    // `forge truehd-encode <source> <stream>` [src=...] [map=...] [offset=...]
+    // [truehd-downmix=standard] [verify], and then the container command like any other stream's.
+    // The other sources, the assignment rows (`<source>.<channel>:<place>`, the places TrueHD's
+    // channel names) and the offsets are the command line's own. A lossless encode has no bit rate,
+    // tools, layout or metadata of the AC-3 family, so a project that names them for it is
+    // refused, not run with them dropped; the bit rate the window always writes is the one thing
+    // left out.
     if (codec == "truehd") {
         if (atmos) {
             return std::unexpected(Message{"truehd-no-atmos", {}});
@@ -180,19 +210,32 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
         if (container == "fmp4") {
             return std::unexpected(Message{"truehd-no-fmp4", {}});
         }
-        if (sources.size() != 1) {
-            return std::unexpected(Message{"truehd-one-source", {std::to_string(sources.size())}});
-        }
-        if (const Json* given = member(project, "assignments");
-            given != nullptr && given->is_array() && !given->empty()) {
-            return std::unexpected(Message{"truehd-no-assignments", {}});
-        }
         if (const Json* given = member(encode, "options");
             given != nullptr && given->is_object() && !given->empty()) {
             return std::unexpected(Message{"truehd-no-options", {}});
         }
+        auto thd_map = map_text_of(member(project, "assignments"), sources.size());
+        if (!thd_map) {
+            return std::unexpected(thd_map.error());
+        }
+        // Several sources are routed by name or not at all, as for the other codecs.
+        if (sources.size() > 1 && thd_map->empty()) {
+            return std::unexpected(Message{"no-assignments", {std::to_string(sources.size())}});
+        }
         Step first;
         first.argv = {"truehd-encode", sources.front(), utf8(stream)};
+        for (std::size_t i = 1; i < sources.size(); ++i) {
+            first.argv.push_back("src=" + sources[i]);
+        }
+        if (!thd_map->empty()) {
+            first.argv.push_back("map=" + *thd_map);
+        }
+        for (std::size_t i = 0; i < offsets.size(); ++i) {
+            if (offsets[i] > 0.0) {
+                first.argv.push_back("offset=" + std::to_string(i) + ":" +
+                                     number_text(Json(offsets[i])));
+            }
+        }
         if (const Json* thd = member(encode, "truehd"); thd != nullptr && thd->is_object()) {
             if (string_of(*thd, "downmix", "none") == "standard") {
                 first.argv.emplace_back("truehd-downmix=standard");
@@ -336,22 +379,11 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
         trailing.push_back("src=" + sources[i]);
     }
     if (has_assignments) {
-        for (std::size_t i = 0; i < assignments->size(); ++i) {
-            const Json& entry = (*assignments)[i];
-            const auto source = member(entry, "source") ? int_of(*member(entry, "source"))
-                                                       : std::nullopt;
-            const auto channel = member(entry, "channel") ? int_of(*member(entry, "channel"))
-                                                         : std::nullopt;
-            const std::string to = string_of(entry, "to");
-            if (!source || !channel || to.empty() || *source < 0 || *channel < 0 ||
-                static_cast<std::size_t>(*source) >= sources.size()) {
-                return std::unexpected(Message{"bad-assignment", {std::to_string(i + 1)}});
-            }
-            if (!map.empty()) {
-                map += ",";
-            }
-            map += std::to_string(*source) + "." + std::to_string(*channel) + ":" + to;
+        auto text = map_text_of(assignments, sources.size());
+        if (!text) {
+            return std::unexpected(text.error());
         }
+        map = std::move(*text);
     }
     if (!map.empty()) {
         trailing.push_back("map=" + map);

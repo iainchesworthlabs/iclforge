@@ -17,9 +17,11 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "../exit_codes.hpp"
+#include "../multi_source.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
@@ -128,7 +130,7 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
              "truehd-mix-level-2ch=", "truehd-mix-level-6ch=", "truehd-mix-level-8ch=",
              "truehd-source-format-6ch=", "truehd-source-format-8ch=", "truehd-control-2ch=",
              "truehd-control-6ch=", "truehd-control-8ch=", "truehd-heavy-drc-start-up-gain=",
-             "truehd-drc-start-up-gain=", "verify"});
+             "truehd-drc-start-up-gain=", "verify", "src=", "map=", "offset="});
         refused != kExitOk) {
         return refused;
     }
@@ -144,19 +146,82 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         return kExitUsage;
     }
 
-    auto wav = read_wav_arg(in_path);
-    if (!wav) {
-        fmt::println(stderr, "error: {}: {}", in_path, iclforge::ac3::io::describe(wav.error()));
+    // src= and offset= are about where each channel of each source goes, and a channel nobody
+    // placed is a mistake, not a default (the other encoders say the same): src= needs map=.
+    if (!meta.sources.empty() && !meta.map_spec) {
+        fmt::println(stderr,
+                     "error: truehd-encode: src= needs map= to say where each channel of each source "
+                     "goes, as in map=0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs");
+        return kExitUsage;
+    }
+    for (const auto& [index, seconds] : meta.offsets) {
+        if (index > meta.sources.size()) {
+            fmt::println(stderr,
+                         "error: truehd-encode: offset={}:{} names source {}, but there {} {} (the "
+                         "positional input is source 0, each src= the next)",
+                         index, seconds, index, meta.sources.size() + 1 == 1 ? "is" : "are",
+                         meta.sources.size() + 1);
+            return kExitUsage;
+        }
+    }
+
+    auto primary = read_wav_arg(in_path);
+    if (!primary) {
+        fmt::println(stderr, "error: {}: {}", in_path, iclforge::ac3::io::describe(primary.error()));
         return kExitInput;
+    }
+    std::optional<iclforge::ac3::io::WavData> wav;
+    std::optional<iclforge::apps::truehd_encode::Layout> layout;
+    std::string placed;  // map=: where each channel of the stream came from
+    if (meta.map_spec) {
+        // The places are TrueHD's channel names; the channels of every source go into one WAV in
+        // the order of the assignment they make (truehd_encode_core.hpp).
+        const auto placements = iclforge::apps::truehd_encode::parse_map(*meta.map_spec);
+        if (!placements) {
+            fmt::println(stderr, "error: truehd-encode: {}", placements.error());
+            return kExitUsage;
+        }
+        std::vector<iclforge::ac3::io::WavData> sources;
+        sources.push_back(std::move(*primary));
+        for (const std::string& path : meta.sources) {
+            auto more = iclforge::ac3::io::read_wav(path);
+            if (!more) {
+                fmt::println(stderr, "error: {}: {}", path, iclforge::ac3::io::describe(more.error()));
+                return kExitInput;
+            }
+            sources.push_back(std::move(*more));
+        }
+        std::vector<std::size_t> offset_samples(sources.size());
+        for (std::size_t i = 0; i < sources.size(); ++i) {
+            offset_samples[i] = offset_samples_for(meta.offsets, i, sources.front().sample_rate);
+        }
+        auto joined =
+            iclforge::apps::truehd_encode::assemble(sources, offset_samples, *placements);
+        if (!joined) {
+            fmt::println(stderr, "error: truehd-encode: {}", joined.error());
+            return kExitUsage;
+        }
+        for (const iclforge::apps::truehd_encode::Placement& p : *placements) {
+            placed += fmt::format("{}{} <- {}.{}", placed.empty() ? "" : ", ",
+                                  th::channel_name(p.place), p.source, p.channel);
+        }
+        wav = std::move(joined->wav);
+        layout = std::move(joined->layout);
+    } else {
+        wav = std::move(*primary);
+        if (const std::size_t lead = offset_samples_for(meta.offsets, 0, wav->sample_rate);
+            lead != 0) {
+            iclforge::apps::truehd_encode::pad_leading(*wav, lead);
+        }
+        const auto named = iclforge::apps::truehd_encode::layout_of(*wav);
+        if (!named) {
+            fmt::println(stderr, "error: {}", named.error());
+            return kExitInput;
+        }
+        layout = *named;
     }
     if (wav->frame_count() == 0) {
         fmt::println(stderr, "error: {}: no samples to encode", in_path);
-        return kExitInput;
-    }
-
-    const auto layout = iclforge::apps::truehd_encode::layout_of(*wav);
-    if (!layout) {
-        fmt::println(stderr, "error: {}", layout.error());
         return kExitInput;
     }
     for (const std::string& warning : layout->warnings) {
@@ -217,6 +282,9 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
                        stats.restart_intervals, stream.size(),
                        100.0 * static_cast<double>(stream.size()) / pcm_bytes,
                        outcome->substreams);
+        if (!placed.empty()) {
+            status_println(status, "placed {} (from {} source(s))", placed, meta.sources.size() + 1);
+        }
         if (stats.rate_violations != 0) {
             status_println(
                 status,

@@ -182,13 +182,13 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
                                 "name=, dialnorm=, gains=, emdf= and the rest (see 'help "
                                 "ac4-encode')"},
     {"conceal=","decode/monitor: repeat or mute, §7.10 error concealment for a bad frame"},
-    {"src=", "an additional input source; repeat for more than one"},
+    {"src=", "an additional input source; repeat for more than one (truehd-encode too, with map=)"},
     {"lyrics=", "encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, .ass, .kar) to write beside "
                 "the stream as its own UTF-8 .lrc"},
     {"lyrics-encoding=", "encode/eac3-encode/ac4-encode/lyrics-to-lrc: the code page a lyrics file is in "
                          "when it is not UTF-8 or UTF-16 (windows-1252, shift-jis, gbk, big5, ...)"},
     {"overwrite=", "lyrics-to-lrc: 1 replaces the output file where there is one"},
-    {"map=", "where each source channel goes"},
+    {"map=", "where each source channel goes (truehd-encode: TrueHD channel names, e.g. 0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs)"},
     {"offset=", "<sourceIndex>:<seconds> leading silence for that source"},
     {"capture2=", "live: a second capture device, clock-conformed to the first"},
     {"container=", "record/live: raw, mkv, ts, spdif or fmp4"},
@@ -553,7 +553,9 @@ void print_truehd_topic() {
     fmt::println("       truehd-rate-check=strict|lenient, truehd-fir-order=0..8,");
     fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
     fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
-    fmt::println("       the input.");
+    fmt::println("       the input. src=, map= and offset= place the channels of several WAVs by");
+    fmt::println("       TrueHD channel name (map=0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs); the");
+    fmt::println("       places must make one channel assignment, and no place is named twice.");
     fmt::println("       truehd-encode also writes the stream's channel meaning (TH spec 14) into");
     fmt::println("       every major sync, per presentation: truehd-dialnorm-2ch|6ch|8ch=,");
     fmt::println("       truehd-mix-level-2ch|6ch|8ch=, truehd-source-format-6ch|8ch=,");
@@ -1041,7 +1043,7 @@ void print_option_blocks(std::uint32_t mask) {
     }
     if ((mask & topic::kMulti) != 0) {
         fmt::println("");
-        fmt::println("source options (encode/eac3-encode/atmos-encode/live; any order, after "
+        fmt::println("source options (encode/eac3-encode/atmos-encode/truehd-encode/live; any order, after "
                      "the positional arguments):");
         fmt::println("  src=<path>        an additional input source; repeat for more than one");
         fmt::println("  map=<spec>        {}", plan::kAssignmentSyntax);
