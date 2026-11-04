@@ -1,11 +1,10 @@
 # TrueHD and DD+ parity: the ESP32 sinks
 
-!!! note "Status as of 2026-11-01: the decoder is measured on the C6 and the P4; the S3 is owed; no sink plays TrueHD"
-    A probe of the library's decoder (`firmware/truehd-probe`) ran on an ESP32-C6 and an ESP32-P4: all eight
+!!! note "Status as of 2026-11-01: the decoder is measured on the C6, the S3 and the P4; no sink plays TrueHD"
+    A probe of the library's decoder (`firmware/truehd-probe`) ran on an ESP32-C6, an ESP32-S3 and an ESP32-P4: all eight
     fixtures decode bit-exact to FFmpeg's PCM and the figures are in
-    [Measured on the C6 and the P4](#measured-on-the-c6-and-the-p4-2026-11-01). The S3 was not measured
-    (its USB port stopped answering after a debug session; see the section). The host-ratio estimates
-    below it stand for the S3 only. No ESP-IDF component, `hearth_sink` or `libs/device` source names
+    [Measured on the C6 and the P4](#measured-on-the-c6-and-the-p4-2026-11-01), with the S3 under it
+    (measured 2026-11-04): 5.1 does not decode in real time on the S3. No ESP-IDF component, `hearth_sink` or `libs/device` source names
     TrueHD yet; the sender side (Sendspin carriage, the sink library, Hearth) is built and tested on the
     host ([truehd-parity-hearth-player.md](truehd-parity-hearth-player.md)).
 
@@ -240,12 +239,33 @@ mean.
   go to PSRAM on the S3 and the P4 and cost more (the S3 page records 20 ms becoming 28 ms for a burst), the
   P4's rev v1.x silicon opens only two output channels, and no Wi-Fi or Sendspin traffic ran. The P4 therefore
   has CPU to spare for every stream tested, and the sink's overhead is still to be measured (Phase 3).
-- **The S3 is not measured.** With a 48 KB stack the decoder hung at the first unit and the interrupt watchdog
-  reset the board without a message (no stack-overflow check is on by default there; the C6's fault names the
-  cause, and a stack of 60 KB on both chips says the S3 did the same, but that is inferred, not seen). A GDB
-  session on its USB-Serial-JTAG port then left the port refusing writes, which only a replug of the cable
-  clears. The image to run with the 128 KB stack is built; the board is owed (question 21 of the
-  Hearth page's list asks for it).
+- **The S3, measured 2026-11-04 after the board was reset into download mode.** All eight fixtures decode bit-exact,
+  with the same 158,020 B of heap and 60,944 B of stack as the other chips (276,820 B of internal RAM free at the
+  start, largest block 208,896). At 240 MHz, with the same 128 KB task stack:
+
+  | Fixture | mean us/unit | real-time factor | slowest unit |
+  |---|---:|---:|---:|
+  | 1.0, 48 kHz, 24-bit | 331 | 0.397 | 1,380 us |
+  | 2.0, 48 kHz, 16-bit | 437 | 0.524 | 1,766 us |
+  | 2.0, 48 kHz, 24-bit | 463 | 0.556 | 1,775 us |
+  | 2.0, 44.1 kHz, 24-bit | 472 | 0.521 | 1,827 us |
+  | 2.0, 96 kHz, 24-bit | 788 | 0.945 | 2,135 us |
+  | 2.0, 192 kHz, 24-bit | 1,421 | **1.705** | 2,786 us |
+  | 5.1, 48 kHz, 16-bit | 861 | **1.033** | 2,849 us |
+  | 5.1, 48 kHz, 24-bit | 944 | **1.132** | 2,763 us |
+
+  The S3 is slower than the C6 despite its 240 MHz clock (2.0 at 48 kHz, 24-bit: 0.556 against 0.342 at 160 MHz), so
+  the S3 is **not** a 5.1 TrueHD decoder, and 2.0 at 96 kHz leaves it 5 % of the core before Wi-Fi, the network stack
+  and the I2S path. It decodes mono and 2.0 at 44.1 and 48 kHz (0.40 to 0.56). Its cycles per unit are 2.4 to 3.0 times
+  the C6's and 2.8 times the P4's (111,108 against 45,603 and 39,941 for 2.0 at 48 kHz, 24-bit): the probe runs the
+  decoder from flash through the S3's cache, and the likely cause is cache misses on a 158 KB working set. That is
+  inferred, not measured (a run with the decoder's hot code in IRAM, or with the cache size raised, would show it).
+
+- **The S3 board was put back.** A GDB session on its USB-Serial-JTAG port
+  left it refusing writes; pressing RST did not clear it, holding BOOT while tapping RST did (download mode),
+  and `esptool --after watchdog-reset` is the only exit from download mode that starts the app on this board (the
+  RTS hard reset returns to download mode). `ota_0` and `otadata` were written back from the backup and read back
+  byte-identical, and the board answers `/status` as `hearth-47b39c`.
 
 ## Translating the host figures to the tiers
 

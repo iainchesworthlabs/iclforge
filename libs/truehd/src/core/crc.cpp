@@ -1,6 +1,9 @@
 #include "iclforge/truehd/core/crc.hpp"
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
 
 namespace iclforge::truehd {
 

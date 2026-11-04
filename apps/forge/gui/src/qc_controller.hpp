@@ -61,6 +61,11 @@ struct RawResult {
     bool ac4 = false;
     QStringList presentations = {};
     std::size_t presentation = 0;
+    // TrueHD and MLP: the integrity gate of `forge qc` (the lossless check of every restart
+    // interval, the other checks, TH spec section 18's data rate), as a verdict and a sentence.
+    bool integrity_checked = false;
+    bool integrity_ok = true;
+    QString integrity_text = QString();
 };
 
 }  // namespace qc_detail
@@ -105,6 +110,11 @@ class QcController : public QObject {
     // "AC-3 · 5.1 · 48000 Hz · 500 frame(s) · 16.00 s" - run_qc's own opening
     // line, restated for the report header.
     Q_PROPERTY(QString summaryLine READ summaryLine NOTIFY resultChanged)
+    // TrueHD and MLP only: whether the integrity gate ran, whether the stream passed it, and the
+    // sentence that says what it counted. Empty and false for every other stream.
+    Q_PROPERTY(bool hasIntegrity READ hasIntegrity NOTIFY resultChanged)
+    Q_PROPERTY(bool integrityOk READ integrityOk NOTIFY resultChanged)
+    Q_PROPERTY(QString integrityText READ integrityText NOTIFY resultChanged)
     // One entry per programme measured - one for every layout except 1+1
     // dual mono, which is two (Ch1, Ch2), the same split QcProgrammeResult
     // draws in the CLI and for the same reason (§E1.3: two unrelated
@@ -145,6 +155,9 @@ class QcController : public QObject {
     [[nodiscard]] bool hasResult() const { return result_.has_value(); }
     [[nodiscard]] QString error() const { return error_; }
     [[nodiscard]] QString summaryLine() const;
+    [[nodiscard]] bool hasIntegrity() const { return result_ && result_->integrity_checked; }
+    [[nodiscard]] bool integrityOk() const { return !result_ || result_->integrity_ok; }
+    [[nodiscard]] QString integrityText() const { return result_ ? result_->integrity_text : QString(); }
     [[nodiscard]] QVariantList programmes() const;
     [[nodiscard]] QStringList presetNames() const;
     [[nodiscard]] int presetIndex() const { return preset_index_; }

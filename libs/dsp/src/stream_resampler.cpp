@@ -1,10 +1,14 @@
 #include "iclforge/dsp/stream_resampler.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <numeric>
-#include <utility>
+#include <span>
+#include <vector>
 
+#include "iclforge/dsp/tiered/real.hpp"
 #include "tiered/resampler.hpp"
 
 namespace iclforge::dsp {

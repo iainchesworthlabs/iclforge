@@ -986,3 +986,73 @@ TEST_CASE("the listing carries late night in the Sound group with its route and 
     REQUIRE(contains(json, "\"id\":\"late-night\",\"group\":\"Sound\",\"label\":\"Late night\",\"kind\":\"choice\""));
     REQUIRE(contains(json, "\"apply\":\"next-play\",\"route\":\"/dynamic-range\",\"value\":\"late-night\",\"available\":true"));
 }
+
+TEST_CASE("the waiting screen's entry: four words, Dim by default, on a board with a screen and a touch", "[preferences]") {
+    const prefs::Pref& idle = *prefs::find("idle-view");
+    REQUIRE(idle.group == prefs::Group::kDisplay);
+    REQUIRE(std::string(idle.route) == "/idle-view");
+    REQUIRE(std::string(idle.default_word) == nv::idle_view_name(nv::kDefaultIdleView));
+    REQUIRE(idle.choices.size() == 4);
+    // The choices are the words the route takes, in the order the screen shows them.
+    REQUIRE(std::string(idle.choices[0].id) == nv::idle_view_name(nv::IdleView::kLit));
+    REQUIRE(std::string(idle.choices[1].id) == nv::idle_view_name(nv::IdleView::kDim));
+    REQUIRE(std::string(idle.choices[2].id) == nv::idle_view_name(nv::IdleView::kClock));
+    REQUIRE(std::string(idle.choices[3].id) == nv::idle_view_name(nv::IdleView::kDark));
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        const prefs::Entry entry = prefs::resolve(idle, backend, variant.caps);
+        // A touch ends a dim or a dark, so a screen with none is not offered it; the rest follows the screen's.
+        REQUIRE(entry.availability.available == prefs::detail::needs_screen_with_touch(variant.caps).available);
+        if (entry.availability.available) {
+            REQUIRE(entry.value == "dim");
+            REQUIRE(prefs::set_value(backend, idle, "dark").ok);
+            REQUIRE(backend.idle_view_ == nv::IdleView::kDark);
+            REQUIRE(prefs::resolve(idle, backend, variant.caps).value == "dark");
+            REQUIRE_FALSE(prefs::set_value(backend, idle, "Dark").ok);
+            REQUIRE_FALSE(prefs::set_value(backend, idle, "speakers").ok);
+            backend.refuse_next = true;
+            REQUIRE_FALSE(prefs::set_value(backend, idle, "lit").ok);
+            REQUIRE(backend.idle_view_ == nv::IdleView::kDark);
+        }
+    }
+}
+
+TEST_CASE("the waiting screen's clock choice needs a clock, and says so", "[preferences]") {
+    const prefs::Pref& idle = *prefs::find("idle-view");
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        const prefs::Availability clock = idle.choices[2].availability(variant.caps);
+        REQUIRE(clock.available == prefs::detail::needs_clock(variant.caps).available);
+        if (!clock.available) {
+            REQUIRE_FALSE(clock.reason.empty());
+        }
+    }
+}
+
+TEST_CASE("Reset preferences puts the waiting screen back to Dim, on a board that offers it only", "[preferences]") {
+    REQUIRE(prefs::find("idle-view")->on_reset == prefs::OnReset::kReset);
+    for (const auto& variant : iclforge::known_variants()) {
+        INFO(variant.name);
+        FakeBackend backend(variant.caps);
+        backend.idle_view_ = nv::IdleView::kClock;
+        const prefs::ResetReport report = prefs::reset_preferences(backend);
+        const bool listed = std::find(report.reset.begin(), report.reset.end(), "idle-view") != report.reset.end();
+        const bool reachable = prefs::detail::needs_screen_with_touch(variant.caps).available;
+        REQUIRE(listed == reachable);
+        REQUIRE(backend.idle_view_ == (reachable ? nv::IdleView::kDim : nv::IdleView::kClock));
+    }
+}
+
+TEST_CASE("the dim time says it still serves the waiting screen while the Dark view is chosen", "[preferences]") {
+    FakeBackend backend(iclforge::variants::p4_rev3_kit());
+    backend.view_ = nv::View::kDark;
+    backend.idle_view_ = nv::IdleView::kDim;
+    const prefs::Entry both = prefs::resolve(*prefs::find("dim-after"), backend, backend.caps());
+    REQUIRE(contains(both.inert, "waiting screen"));
+    // With the waiting screen left lit, nothing else uses the dim time.
+    backend.idle_view_ = nv::IdleView::kLit;
+    const prefs::Entry only = prefs::resolve(*prefs::find("dim-after"), backend, backend.caps());
+    REQUIRE_FALSE(contains(only.inert, "waiting screen"));
+    REQUIRE(contains(only.inert, "Dark view"));
+}

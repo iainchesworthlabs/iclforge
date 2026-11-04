@@ -1,8 +1,15 @@
 #include "iclforge/truehd/io/presentation_cut.hpp"
 
-#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <optional>
+#include <span>
+#include <utility>
+#include <vector>
 
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 

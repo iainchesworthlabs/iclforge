@@ -2,10 +2,19 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <vector>
 
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 #include "io/channel_meaning_fields.hpp"
 
 namespace iclforge::truehd {

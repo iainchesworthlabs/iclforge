@@ -156,8 +156,18 @@ jobs:
       # matches. It is refetched, individually, and every sample that did not
       # change is reused - so changing one pin costs one download rather than
       # eight, which is the whole point of caching a volunteer-run archive.
-      - name: Cache the pinned FATE corpus
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      #
+      # Restored and saved as two steps (the same action's /restore and /save,
+      # at the same pinned commit) because the one-step form saves only when
+      # the whole job succeeds. An archive outage fails the job, so nothing
+      # fetched before it was ever kept, and the nightly run on main - the only
+      # run whose cache every pull request can read - never seeded one. Saving
+      # under `if: always()` keeps whatever did arrive. A cache is readable
+      # from the default branch and from the branch that made it, not between
+      # pull requests, so it is main's nightly run that does the seeding.
+      - name: Restore the pinned FATE corpus
+        id: fate-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/fate-samples
           key: fate-corpus-${{ hashFiles('tools/checks/verify_fate_interop.py') }}
@@ -171,7 +181,21 @@ jobs:
         env:
           ICLFORGE_CLI: build/config-linux-llvm/bin/forge
           FATE_CACHE_DIR: ${{ runner.temp }}/fate-samples
+          # The archive is volunteer-run and has been down for days, failing
+          # every pull request for something none of them changed. A pull
+          # request checks what it can fetch or has cached and says what it
+          # could not, as a warning; the nightly and manual runs stay strict,
+          # so an outage is still seen, once a day, where it can be acted on.
+          FATE_TOLERATE_UNREACHABLE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
         run: python3 tools/checks/verify_fate_interop.py
+
+      - name: Save the pinned FATE corpus
+        if: always() && steps.fate-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fate-samples
+          key: fate-corpus-${{ hashFiles('tools/checks/verify_fate_interop.py') }}
 
       # The DASH half of the same question. forge fmp4's manifests used to be
       # read back through FFmpeg's dash demuxer and nothing else, and that

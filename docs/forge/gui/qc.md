@@ -14,9 +14,9 @@ popover use.
 **QC a stream…**, top right, next to Settings and the Guided/Advanced/Expert control. It opens
 regardless of what (if anything) is loaded in the main workbench — QC-ing a finished file has
 nothing to do with whatever source is currently being configured for a new encode, and the two
-never interact. QC does not read TrueHD or MLP either; `forge levels` and `forge loudness` measure them.
+never interact. A TrueHD or MLP file is read a window at a time and gets one card for each presentation it has (2, 6 and 8 channels, the speakers named), with the dialogue norm its major sync stores beside the measurement (provisional: [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md), questions 51 to 55), and an **Integrity** line, `forge qc`'s gate: the lossless check of every restart interval, the other checks of the decode, and TH spec section 18's data rate against the peak the stream declares. Two streams joined end to end fail it, as they fail `forge qc` (exit 6). The file has to be a bare `.thd` or `.mlp` stream: a TrueHD track in a container is taken out with `forge demux` first.
 
-**Choose file…** opens a standard file picker with four filters — `*.ac3`/`*.ec3`, `*.ac4`,
+**Choose file…** opens a standard file picker with five filters — `*.ac3`/`*.ec3`, `*.ac4`, `*.thd`/`*.mlp`,
 **Containers** (`*.mkv *.webm *.mp4 *.m4a *.mov *.ts *.m2ts`) and **All files**. The filters are a
 convenience for the picker only: `QcController` sniffs the actual bytes rather than trusting the
 extension, so a container works whatever the name says.

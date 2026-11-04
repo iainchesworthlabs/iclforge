@@ -329,6 +329,10 @@ jobs:
       # The coverage job's packages, plus what Qt's prebuilt kit loads at run time (the offscreen
       # platform plugin still wants fontconfig, EGL, GL and xkbcommon), the PipeWire headers
       # Crucible's Linux audio arm builds against, and a font for the layout suites to measure with.
+      # sudo, python3 and python-is-python3 are install-qt-action's: it installs its own packages
+      # with `sudo apt-get` and its guard step wants a plain `python` (the AppImage leg in
+      # _build.yml found both; the first run of this job stopped on "Unable to locate executable
+      # file: sudo").
       - name: Bootstrap container
         run: |
           set -eu
@@ -336,7 +340,7 @@ jobs:
           attempt=1
           until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
             build-essential ca-certificates cmake curl git gnupg libasound2-dev lsb-release \
-            ninja-build pkg-config python3-pip python3-venv software-properties-common tar unzip wget zip \
+            ninja-build pkg-config python3 python3-pip python3-venv python-is-python3 software-properties-common sudo tar unzip wget zip \
             libegl1 libgl1 libgl-dev libegl-dev libxkbcommon0 libxkbcommon-dev libfontconfig1 \
             libdbus-1-3 libglib2.0-0 libpipewire-0.3-dev libspa-0.2-dev fonts-dejavu-core
           do
@@ -345,6 +349,7 @@ jobs:
             attempt=$((attempt + 1))
             sleep 30
           done
+          echo "/usr/bin" >> "$GITHUB_PATH"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -367,7 +372,7 @@ jobs:
       # pip; the container is thrown away at the end of the job. The action exports QT_ROOT_DIR,
       # which cmake/FindQt6.cmake reads, and the library path the offscreen tests load Qt from.
       - name: Install Qt (prebuilt)
-        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         env:
           PIP_BREAK_SYSTEM_PACKAGES: "1"
         with:

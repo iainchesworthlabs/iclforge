@@ -1,12 +1,9 @@
 #include <fmt/base.h>
-#include <fmt/format.h>
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
 #include <span>
-#include <string>
 #include <string_view>
 #include <vector>
 

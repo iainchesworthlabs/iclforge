@@ -1114,6 +1114,38 @@ test('the stand-in lists late night with the value its route holds, and greyed w
     }
 });
 
+test('the stand-in answers /idle-view as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        let reply = await fetch(`${stub.url}idle-view`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        reply = await fetch(`${stub.url}idle-view`, { method: 'PUT', body: 'clock' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.noScreen);
+        // One with a screen takes lit, dim, clock or dark, in lower case, and dims out of the box.
+        stub.device.screen = screenBoard();
+        reply = await fetch(`${stub.url}idle-view`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('dim\n');
+        for (const bad of ['Clock', 'clock now', 'speakers', '1', '']) {
+            reply = await fetch(`${stub.url}idle-view`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.idleViewBad);
+        }
+        reply = await fetch(`${stub.url}idle-view`, { method: 'PUT', body: 'clock\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingOk);
+        expect(await (await fetch(`${stub.url}idle-view`)).text()).toBe('clock\n');
+        // The route is in the list GET /api says, in the words the firmware says it in.
+        const api = await (await fetch(`${stub.url}api`)).text();
+        expect(api).toContain('GET  /idle-view     lit, dim, clock or dark on a board with a screen: what the waiting screen does after the dim time; PUT one');
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in lists the preferences, greyed with the reason where the board has no screen', async () => {
     const stub = await startStub();
     try {
@@ -1122,6 +1154,7 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         expect(listing.preferences.map((p) => p.id)).toEqual([
             'now-view',
             'dim-after',
+            'idle-view',
             'speakers-style',
             'brightness',
             'clock-hours',
@@ -1151,7 +1184,8 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         expect(listing.display).toBe('dsi');
         expect(listing.preferences[0]).toMatchObject({ id: 'now-view', value: 'speakers', available: true, reason: '' });
         expect(listing.preferences[1]).toMatchObject({ id: 'dim-after', value: '5', available: true, reason: '' });
-        expect(listing.preferences.slice(2, 8).map((p) => [p.id, p.value, p.available])).toEqual([
+        expect(listing.preferences.slice(2, 9).map((p) => [p.id, p.value, p.available])).toEqual([
+            ['idle-view', 'dim', true],
             ['speakers-style', 'glow', true],
             ['brightness', '80', true],
             ['clock-hours', '24', true],
@@ -1176,12 +1210,12 @@ test('the stand-in lists the preferences, greyed with the reason where the board
         // A glass whose backlight cannot be dimmed greys the brightness with its reason, and only that.
         stub.device.screen.dimmable = false;
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
-        expect(listing.preferences[3]).toMatchObject({
+        expect(listing.preferences[4]).toMatchObject({
             id: 'brightness',
             available: false,
             reason: "This screen's backlight is not under the board's control.",
         });
-        expect(listing.preferences[4].available).toBe(true);
+        expect(listing.preferences[5].available).toBe(true);
         // The night schedule says why it is moot where the screen without lyrics is dark already, or off.
         stub.device.screen.view = 'dark';
         listing = JSON.parse(await (await fetch(`${stub.url}preferences`)).text());
@@ -1273,6 +1307,7 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
             view: 'clock',
             dimAfter: '30',
             speakersStyle: 'pulse',
+            idleView: 'dark',
             brightness: 40,
             clockFormat: '12 seconds',
             night: { enabled: true, from: '23:00', to: '06:00', idle: true },
@@ -1287,6 +1322,7 @@ test('the stand-in answers /reset-preferences as the firmware does', async () =>
         expect(stub.device.screen.view).toBe('speakers');
         expect(stub.device.screen.dimAfter).toBe('5');
         expect(stub.device.screen.speakersStyle).toBe('glow');
+        expect(stub.device.screen.idleView).toBe('dim');
         expect(stub.device.screen.brightness).toBe(80);
         expect(stub.device.screen.clockFormat).toBe('24');
         expect(stub.device.screen.night).toEqual({ enabled: false, from: '22:00', to: '07:00', idle: false });

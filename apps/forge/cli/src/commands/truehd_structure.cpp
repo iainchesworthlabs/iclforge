@@ -14,6 +14,7 @@
 
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"

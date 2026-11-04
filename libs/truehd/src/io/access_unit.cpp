@@ -1,9 +1,20 @@
 #include "iclforge/truehd/io/access_unit.hpp"
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <optional>
+#include <span>
+#include <vector>
 
 #include "core/bit_io.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {
 

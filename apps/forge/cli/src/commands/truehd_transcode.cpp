@@ -1,14 +1,13 @@
 #include <fmt/base.h>
 #include <fmt/format.h>
-#include <atomic>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <span>
-#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -16,6 +15,7 @@
 #include "../support.hpp"
 #include "encode.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "truehd.hpp"

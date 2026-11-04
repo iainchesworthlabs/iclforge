@@ -11,7 +11,7 @@
 # maintainers' answer is Zensical (github.com/zensical/zensical), not MkDocs 2.0, which is why
 # it's pinned below as a canary rather than the mkdocs>=1.6,<2.0 line being revisited.
 mkdocs>=1.6,<2.0
-mkdocs-material>=9.5,<10.0
+mkdocs-material>=9.8.0,<10.0
 # Non-blocking build canary (see .github/workflows/docs.yml) tracking Zensical as the eventual
 # replacement for the line above once it proves itself on this site over real PRs. No version cap:
 # it's pre-1.0 and the thing being evaluated, not a dependency to defend against.
