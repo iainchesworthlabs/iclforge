@@ -256,13 +256,18 @@ been compiled but never run on a device.
 
 ### TrueHD (MAT)
 
-!!! warning "Written, not built, not run"
-    The Hearth for Android bridge (`apps/hearth/android`) has two new optional methods, `isLinkSupported(carrierRateHz, channels)` and
+!!! success "Run once on a Shield: TrueHD named by the receiver, within limits"
+    The Hearth for Android bridge (`apps/hearth/android`) has two optional methods, `isLinkSupported(carrierRateHz, channels)` and
     `openLink(carrierRateHz, channels)`, that open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND` at 192 kHz (176.4 kHz for the
     44.1 kHz family), for the backend's TrueHD (MAT). The native side looks them up as it looks up `pause()` and the rest, and refuses MAT
-    with `kUnsupportedFormat` for a bridge that lacks them, as this demo's does. It has not been compiled (the session that wrote it had
-    no NDK), has not run on a Shield, and has not been tried with the Onkyo TX-RZ740. Whether the Shield's HDMI policy takes it is a question for a run:
-    the findings list TrueHD and IEC 61937 at 7.1 masks, and only stereo IEC 61937 at 48 and 192 kHz has been tried.
+    with `kUnsupportedFormat` for a bridge that lacks them, as this demo's does. The Hearth app now uses them: a server that lists `truehd`
+    in its support object is sent TrueHD's access units, 24 to a chunk, `libs/sink` packs each chunk into a MAT burst, and the app offers
+    `truehd` only when `isLinkSupported` says the route takes the track. On 2026-11-04 an NVIDIA Shield Pro running the debug APK was sent
+    TrueHD stereo at 48 kHz by `hearth-testserver` for 40 s: `openLink` opened the track (192 kHz, 8 channels) and an Onkyo TX-RZ740 reported "Dolby TrueHD SUR, 48 kHz, 2.0 ch"
+    from 1.4 s in until it ended, with no underrun. Not shown: the owner's front-panel reading, lock across the Shield's 20.5 s HDMI flap, lock in the gap between two
+    items, 7.1 content, or any other rate (planning entry 139). A command-line `AudioTrack` probe of the Shield, reported by the Shield test session, answered
+    `isDirectPlaybackSupported` true for IEC 61937 at 192 kHz on the 7.1 mask, and a MAT stream written as `ENCODING_DOLBY_TRUEHD` played with the
+    receiver staying on PCM; why is not known here.
 
 ### Diagnostic file replay
 

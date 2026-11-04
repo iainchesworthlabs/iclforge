@@ -546,8 +546,8 @@ std::optional<RawResult> measure_truehd(const QString& path, QString& error) {
     result.integrity_text =
         QStringLiteral("lossless check: %1 restart interval(s) ok, %2 failed · other checks (access "
                        "unit, CRC, parity) failed: %3 · %4 unit(s) could not be decoded · data "
-                       "rate: declared peak %5 Mbit/s, largest unit %6 Mbit/s, %7 unit(s) later "
-                       "than %8 ms (TH spec section 18)")
+                       "rate: declared peak %5 Mbit/s, largest unit %6 Mbit/s, %7 unit(s) start "
+                       "before the unit ahead has arrived (TH spec section 18, worst %8 ms short)")
             .arg(counters.lossless_checks_ok)
             .arg(counters.lossless_check_failures)
             .arg(counters.check_failures)
@@ -555,7 +555,7 @@ std::optional<RawResult> measure_truehd(const QString& path, QString& error) {
             .arg(static_cast<double>(rate.declared_bps) / 1e6, 0, 'f', 2)
             .arg(static_cast<double>(rate.max_unit_rate_bps) / 1e6, 0, 'f', 2)
             .arg(rate.violations)
-            .arg(rate.latency_limit_ms, 0, 'f', 0);
+            .arg(rate.worst_overrun_ms, 0, 'f', 2);
     if (result.programmes.empty()) {
         error = QStringLiteral("%1 has no presentation to measure.").arg(path);
         return std::nullopt;

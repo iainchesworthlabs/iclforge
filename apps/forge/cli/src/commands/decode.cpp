@@ -1519,16 +1519,16 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
     // before its major sync (0xF8726FBA, 0xF8726FBB).
     if (is_truehd_stream(stream)) {
         // What decode does not apply to it is refused by name (check_options_applied): the output
-        // stage, the DRC options, the programme choice, the object outputs and every verification
-        // flag, none of which a TrueHD decode reads. verify-content passing here would pass
+        // stage, the DRC options, the programme choice and every verification flag, none of which
+        // a TrueHD decode reads. objects_dir= and adm_out= are applied (run_decode_truehd). verify-content passing here would pass
         // without verifying anything.
         // channels=2 is the stream's own 2 channel presentation, which the stream carries as a
         // substream and not as a fold the decoder makes (planning/truehd-parity-forge.md,
         // question 5); channels=as-coded is what a TrueHD decode does. No other count is taken.
         forge_cli::Options truehd_options = requested;
-        std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=", "strict",
-                                              "channels=as-coded", "verify-objects",
-                                              "gate-objects",      "signing-key="};
+        std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=", "truehd-render=",
+                                              "truehd-reading=", "strict", "channels=as-coded",
+                                              "verify-objects", "gate-objects", "signing-key="};
         if (std::ranges::find(requested.given, std::string{"channels=2"}) !=
             requested.given.end()) {
             if (requested.truehd_presentation != "best" && requested.truehd_presentation != "2ch" &&
@@ -1547,13 +1547,6 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
             refused != kExitOk) {
             return refused;
         }
-        if (!objects_dir.empty() || !adm_out.empty()) {
-            fmt::println(stderr,
-                         "error: {} is TrueHD or MLP, whose object layer this build does not "
-                         "decode, so decode writes no objects: leave out '{}'",
-                         in_path, !objects_dir.empty() ? objects_dir : adm_out);
-            return kExitUsage;
-        }
         // verify-objects and gate-objects check the per-frame evolution tag with the operator's own
         // key (iclforge::truehd::signing); a decode without them reads no tag, as before.
         if (!apply_truehd_object_verification(stream, requested, status_stream(out_path))) {
@@ -1566,17 +1559,21 @@ int run_decode_counting(std::string_view in_path, std::string_view out_path,
             }
             // A unit whose object layer was taken out is the bed from substreams 0 to 2; the
             // object channels of substream 3 have no metadata left to place them.
-            if (gate->gated != 0 && requested.truehd_presentation == "all") {
+            if (gate->gated != 0 && (requested.truehd_presentation == "all" ||
+                                     !objects_dir.empty() || !adm_out.empty())) {
                 fmt::println(stderr,
                              "error: gate-objects played {} unit(s) as the bed, and "
-                             "truehd-presentation=all would still read their object channels: "
-                             "leave it at best, 2ch, 6ch or 8ch",
+                             "truehd-presentation=all, objects_dir= and adm_out= would still read "
+                             "their object channels: leave them out and the presentation at best, "
+                             "2ch, 6ch or 8ch",
                              gate->gated);
                 return kExitUsage;
             }
-            return run_decode_truehd(gate->bytes, in_path, out_path, truehd_options, loss);
+            return run_decode_truehd(gate->bytes, in_path, out_path, truehd_options, loss,
+                                     objects_dir, adm_out);
         }
-        return run_decode_truehd(stream, in_path, out_path, truehd_options, loss);
+        return run_decode_truehd(stream, in_path, out_path, truehd_options, loss, objects_dir,
+                                 adm_out);
     }
     warn_truehd_options_unused(requested, in_path);
     // AC-4's sync words are 0xAC40 and 0xAC41 (TS 103 190-2 Annex G), where

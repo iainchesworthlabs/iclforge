@@ -359,8 +359,9 @@ def check_nibble(length):
 
 
 def parity(reserved, frame_length, tail):
-    """16.4: seed 0xA9, the reserved field, the length, then the payload and padding bytes."""
-    acc = reserved ^ frame_length ^ 0xA9
+    """16.4: seed 0xA9 and the 16-bit word of the reserved nibble and the length, then the payload
+    and padding bytes."""
+    acc = (((reserved & 0xF) << 12) | (frame_length & 0xFFF)) ^ 0xA9
     for byte in tail:
         acc ^= byte
     return ((acc >> 8) ^ acc) & 0xFF

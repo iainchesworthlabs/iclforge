@@ -154,6 +154,12 @@ struct OutputStage::Impl {
     std::optional<iclforge::truehd::Encoder> truehd_encoder;
     std::unique_ptr<iclforge::containers::iec61937::MatPacker> mat_packer;
     std::vector<std::int32_t> truehd_pcm;  // the frame being encoded, interleaved
+    // The pre-roll (OutputStageConfig::truehd_prefill_ms): whole bursts held back, back to back,
+    // until `truehd_prefill_bursts` are in hand, and `truehd_primed` once they have been handed
+    // over, after which every burst goes straight to the sink.
+    std::vector<std::byte> truehd_held;
+    std::size_t truehd_prefill_bursts = 0;
+    bool truehd_primed = true;
     std::unique_ptr<iclforge::ac3::Eac3Decoder> decoder;                // the decoded modes
 
     std::vector<float> interleaved;
@@ -206,6 +212,9 @@ struct OutputStage::Impl {
         truehd_encoder.reset();
         mat_packer.reset();
         truehd_pcm.clear();
+        truehd_held.clear();
+        truehd_prefill_bursts = 0;
+        truehd_primed = true;
         decoder.reset();
         lfe_delay.reset();
     }
@@ -343,6 +352,12 @@ const OutputStatus& OutputStage::apply(std::vector<EndpointFacts> facts, bool si
             }
             impl_->truehd_encoder.emplace(std::move(*encoder));
             impl_->mat_packer = std::make_unique<iclforge::containers::iec61937::MatPacker>();
+            // A MAT burst always lasts 20 ms (24 access units, 960 samples at 48 kHz).
+            constexpr int kBurstMs = 20;
+            impl_->truehd_prefill_bursts =
+                static_cast<std::size_t>(std::max(0, config_.truehd_prefill_ms + kBurstMs - 1) / kBurstMs);
+            impl_->truehd_held.clear();
+            impl_->truehd_primed = impl_->truehd_prefill_bursts == 0;
             break;
         }
         case OutputMode::kPcmSurround: {
@@ -512,10 +527,26 @@ void OutputStage::submit_truehd(const RawFrame& raw) {
                  std::string(iclforge::containers::iec61937::describe(burst.error())));
             return;
         }
-        if (*burst) {
-            submit_with_patience(*impl.passthrough, status_.underruns,
-                                 std::span<const std::byte>(**burst));
+        if (!*burst) {
+            continue;
         }
+        const std::span<const std::byte> bytes(**burst);
+        if (impl.truehd_primed) {
+            submit_with_patience(*impl.passthrough, status_.underruns, bytes);
+            continue;
+        }
+        // Still gathering the pre-roll: the device is not given the first burst until it can be
+        // given this many, so it never waits on the next batch for the burst after.
+        impl.truehd_held.insert(impl.truehd_held.end(), bytes.begin(), bytes.end());
+        if (impl.truehd_held.size() < impl.truehd_prefill_bursts * bytes.size()) {
+            continue;
+        }
+        for (std::size_t at = 0; at + bytes.size() <= impl.truehd_held.size(); at += bytes.size()) {
+            submit_with_patience(*impl.passthrough, status_.underruns,
+                                 std::span<const std::byte>(impl.truehd_held).subspan(at, bytes.size()));
+        }
+        impl.truehd_held.clear();
+        impl.truehd_primed = true;
     }
 }
 

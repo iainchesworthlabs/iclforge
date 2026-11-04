@@ -8,6 +8,8 @@
 #include <span>
 #include <vector>
 
+#include <array>
+
 #include "core/bit_io.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
@@ -67,7 +69,10 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
     extra.evolution_payload = bytes.subspan(kFramingBytes, extra.evo_frame_byte_length);
     // TH spec §16.4: the payload and the padding are the bytes between the framing and the parity
     // byte.
-    unsigned accumulator = extra.evo_reserved ^ extra.evo_frame_byte_length ^ kExtraDataSeed;
+    // The word of evo_reserved (4 bits) and evo_frame_byte_length (12) is the accumulator's start.
+    unsigned accumulator =
+        (((unsigned{extra.evo_reserved} & 0xFU) << 12U) | (extra.evo_frame_byte_length & 0xFFFU)) ^
+        kExtraDataSeed;
     for (std::size_t i = kFramingBytes; i + 1 < bytes.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(bytes[i]);
     }
@@ -86,6 +91,29 @@ std::optional<ExtraData> read_extra_data(std::span<const std::byte> bytes) {
 
 std::size_t access_unit_length_bytes(std::span<const std::byte> data) noexcept {
     return data.size() < 2 ? 0 : std::size_t{be16(data, 0) & 0xFFFU} * 2U;
+}
+
+std::size_t ac3_core_frame_bytes(std::span<const std::byte> data) noexcept {
+    // A/52 table 4.13 at 48 kHz: frame size in 16 bit words for each pair of frame size codes.
+    constexpr std::array<std::uint16_t, 19> kWords{64,  80,  96,  112, 128, 160, 192,
+                                                   224, 256, 320, 384, 448, 512, 640,
+                                                   768, 896, 1024, 1152, 1280};
+    constexpr unsigned kSyncHigh = 0x0B;
+    constexpr unsigned kSyncLow = 0x77;
+    constexpr unsigned kMaxBsid = 8;
+    if (data.size() < 6 || std::to_integer<unsigned>(data[0]) != kSyncHigh ||
+        std::to_integer<unsigned>(data[1]) != kSyncLow) {
+        return 0;
+    }
+    const unsigned fscod_and_size = std::to_integer<unsigned>(data[4]);
+    const unsigned fscod = fscod_and_size >> 6U;
+    const unsigned size_code = fscod_and_size & 0x3FU;
+    const unsigned bsid = std::to_integer<unsigned>(data[5]) >> 3U;
+    if (fscod != 0 || size_code >= 2 * kWords.size() || bsid > kMaxBsid) {
+        return 0;
+    }
+    const std::size_t bytes = std::size_t{kWords[size_code / 2]} * 2U;
+    return bytes <= data.size() ? bytes : 0;
 }
 
 std::expected<AccessUnit, Error> parse_access_unit(std::span<const std::byte> data,
@@ -231,6 +259,27 @@ std::expected<std::vector<std::byte>, Error> write_access_unit_prefix(
     }
     prefix.insert(prefix.end(), directory_bytes.begin(), directory_bytes.end());
     return prefix;
+}
+
+std::optional<RestartHeader> first_restart_header(const AccessUnit& unit) {
+    for (int i = 0; i < unit.num_substreams; ++i) {
+        const auto index = static_cast<std::size_t>(i);
+        if (unit.entries[index].restart_nonexistent) {
+            continue;
+        }
+        std::span<const std::byte> payload = unit.segments[index];
+        if (unit.entries[index].crc_present && payload.size() >= 3) {
+            payload = payload.first(payload.size() - 2);
+        }
+        BitReader reader(payload);
+        if (reader.read(1) == 0 || reader.read(1) == 0) {
+            continue;
+        }
+        if (auto header = read_restart_header(reader, payload, true)) {
+            return *header;
+        }
+    }
+    return std::nullopt;
 }
 
 }  // namespace iclforge::truehd

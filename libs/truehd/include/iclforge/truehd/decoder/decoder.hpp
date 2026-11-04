@@ -1,12 +1,14 @@
 #pragma once
 
 #include <array>
+#include <vector>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 
 #include "iclforge/truehd/core/error.hpp"
@@ -64,9 +66,41 @@ enum class Strictness : std::uint8_t {
                // restart interval of a stream, which no restart header follows
 };
 
+// Settings for the lab tool (iclforge-truehd-ss3-lab); the decoder does not use them otherwise.
+struct DecoderLab {
+    // The output sample from which the lab keeps the first 51,200 samples of the object substream
+    // (DecoderCounters::object_first_out); 0 keeps the first ones.
+    std::uint64_t record_from = 0;
+    friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
+};
+
+// The other reading of a point the specification leaves open or contradicts, one for each reading
+// that is marked provisional until a stream scores it (ERRATA.md questions 5, 6 and 18; entries 43
+// and 45). They exist so that a stream can be decoded both ways and the readings told apart by
+// whether the decode is the source: a stream that decodes to its source with the library's reading
+// and to something else with the alternative is evidence for the reading, with a count of the
+// values that differ. They are for scoring and are never the default; `forge decode` takes them
+// only by name (`truehd-reading=`).
+struct AlternativeReadings {
+    // §17.2: `seed_shr7` is the 32 bits of the seed from bit 7 up, as the text shows, and not the
+    // 16 bits FFmpeg's decoder takes (question 5).
+    bool seed_shr7_32_bit = false;
+    // §7.1: a restart resets the filter histories, as the text says, and does not keep them
+    // (question 18).
+    bool zero_histories_at_restart = false;
+    // §8.2: `output_shift` is indexed by the output position, and not by the matrix channel the
+    // output takes (question 6; entry 43).
+    bool output_shift_by_position = false;
+    // §7.3: the lossless check's fold shifts a sample by the output position, and not by the matrix
+    // channel (question 6; entries 12 and 43).
+    bool fold_by_position = false;
+};
+
 struct DecoderConfig {
     Presentation presentation = Presentation::kBest;
     Strictness strictness = Strictness::kStrict;
+    DecoderLab lab = {};
+    AlternativeReadings readings{};
 };
 
 // One decoded access unit. The views point into the decoder and stay valid until its next decode()
@@ -112,6 +146,92 @@ struct DecoderCounters {
     std::uint64_t restarts = 0;
     std::uint64_t lossless_checks_ok = 0;
     std::uint64_t lossless_check_failures = 0;
+    // The same, by substream.
+    std::array<std::uint64_t, kMaxSubstreams> lossless_ok_by_substream{};
+    std::array<std::uint64_t, kMaxSubstreams> lossless_failed_by_substream{};
+    // The first checks of the object substream: the byte the restart header stored and the one the
+    // decoder folded (ERRATA.md entry 69; for the trials of DecoderLab).
+    static constexpr std::size_t kObjectChecksKept = 12;
+    std::array<std::uint8_t, kObjectChecksKept> object_check_stored{};
+    std::array<std::uint8_t, kObjectChecksKept> object_check_folded{};
+    std::size_t object_checks_kept = 0;
+    // The first 256 checks of the object substream, in order: bit 0 set when the check passed,
+    // the upper bits the number of matrix sections the interval's blocks carried (at most 127).
+    static constexpr std::size_t kObjectIntervalsKept = 256;
+    std::vector<std::uint8_t> object_interval_log;
+    // For the same intervals: the matrices of the last section, the largest noise shift among
+    // them, and the bits the largest coded sample of channels 8 and up, of channels below 8
+    // (before the matrices) and of every output row took (no sample value).
+    struct ObjectIntervalFacts {
+        std::uint8_t matrices = 0;
+        std::uint8_t max_noise_shift = 0;
+        std::uint8_t coded_bits = 0;
+        std::uint8_t bed_bits = 0;
+        std::uint8_t out_bits = 0;
+        std::uint32_t samples_so_far = 0;  // output samples kept when the interval ended
+    };
+    std::vector<ObjectIntervalFacts> object_interval_facts;
+    std::string object_error_context;  // the first object block header that failed (lab)
+    // The quantiser steps and output shifts, by matrix channel, at the first interval's check.
+    std::array<std::uint8_t, kMaxChannels> object_quant_step{};
+    std::array<std::int8_t, kMaxChannels> object_output_shift{};
+    // For the same intervals, the fold of each matrix channel's own samples (the check byte of the
+    // fold of that channel alone): columns 0 to 11 after the matrices, 12 to 23 before them.
+    static constexpr std::size_t kObjectColumns = 24;
+    // The headers of the first matrix set the object substream sent (no coefficient).
+    struct ObjectMatrixHeader {
+        std::uint8_t out = 0;
+        std::uint8_t frac_bits = 0;
+        std::int8_t f_shift = 0;
+        std::uint8_t field_2b = 0;
+        std::uint8_t field_m4 = 0;
+        std::uint16_t mask = 0;
+        std::array<std::int32_t, kMaxChannels> coeff{};  // as sent (raw)
+        std::uint8_t ext_width = 0;
+        std::array<std::int32_t, kMaxChannels> ext_value{};  // the extension's deltas as sent
+    };
+    std::vector<ObjectMatrixHeader> object_first_matrices;
+    // Every matrix section of the object substream sent in the first ten intervals: the output
+    // sample it was sent at and its matrices (for the lab; no audio).
+    struct ObjectSection {
+        std::uint32_t sample = 0;
+        bool extension = false;
+        std::vector<ObjectMatrixHeader> items;
+    };
+    std::vector<ObjectSection> object_sections;
+    // Every block of the object substream in the first ten intervals: the output sample it starts
+    // at, its size, whether its header carries matrices (and how many) and whether it has the
+    // extension (for the lab).
+    struct ObjectBlock {
+        std::uint32_t sample = 0;
+        std::uint16_t size = 0;
+        std::uint8_t matrices = 0;
+        bool header = false;  // the block has a header at all
+        bool carries = false;
+        bool extension = false;
+    };
+    std::vector<ObjectBlock> object_blocks;
+    // Output samples of the object substream decoded so far (for the lab's positions).
+    std::uint64_t object_samples_total = 0;
+    std::array<std::array<std::uint8_t, kObjectColumns>, kObjectChecksKept> object_column_bytes{};
+    // The first three intervals of the object substream, by matrix channel: the smallest and the
+    // largest value and the number of samples that differ from the one before, in the rows as
+    // decoded (before the matrices) and in the rows as output (after them). Counts and ranges only.
+    struct ObjectStats {
+        std::array<std::int32_t, kMaxChannels> coded_min{};
+        std::array<std::int32_t, kMaxChannels> coded_max{};
+        std::array<std::uint32_t, kMaxChannels> coded_changes{};
+        std::array<std::int32_t, kMaxChannels> out_min{};
+        std::array<std::int32_t, kMaxChannels> out_max{};
+        std::array<std::uint32_t, kMaxChannels> out_changes{};
+        std::array<std::int32_t, kMaxChannels> coded_last{};
+        std::array<std::int32_t, kMaxChannels> out_last{};
+        std::uint64_t samples = 0;
+    } object_stats;
+    // The output rows (after the matrices, before the output shift) of the same first intervals,
+    // 12 values a sample, for the lab to find the samples that differ in a stream whose objects
+    // are constant.
+    std::vector<std::int32_t> object_first_out;
     std::uint64_t check_failures =
         0;  // nibble, major sync CRC, restart CRC, parity and segment CRC together
     // Block headers that send matrices, and the matrices among them with lsb_bypass set (TH spec
@@ -152,8 +272,10 @@ class ICLFORGE_TRUEHD_EXPORT Decoder {
 
     [[nodiscard]] const DecoderCounters& counters() const noexcept;
 
-    // Forgets the stream: the next unit has to carry a major sync.
-    void reset();
+    // Forgets the stream: the next unit has to carry a major sync. The decoder's buffers are kept
+    // and cleared where they are, so this allocates nothing and cannot fail; a device restarts a
+    // stream at a seek or a format change without holding the decoder's memory twice.
+    void reset() noexcept;
 
    private:
     struct Impl;

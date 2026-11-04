@@ -31,6 +31,7 @@
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
+#include "iclforge/truehd/signing/evolution_signer.hpp"
 #include "truehd.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_signing.hpp"
@@ -135,7 +136,8 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
                         std::string_view out_path, const Options& meta) {
     // dialnorm=, compr=, bsmod=, insert and the rest are E-AC-3's: refused by name, never dropped.
     // sign-objects (with signing-key=) is applied: it writes the per-frame evolution tag, on its
-    // own or after the edit (the tag covers the evolution payload, which an edit does not touch).
+    // own or after the edit (the tag covers the whole access unit, the major sync included, so the
+    // edit comes first and the signing after it).
     std::vector<std::string_view> applied(kMetadataOptions.begin(), kMetadataOptions.end());
     applied.emplace_back("sign-objects");
     applied.emplace_back("signing-key=");
@@ -153,6 +155,7 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
         return kExitUsage;
     }
     std::optional<th::StreamEditSummary> summary;
+    const int tags_before = th::signing::count_evolution_tags(bytes);
     if (!meta.thd_meaning.empty()) {
         auto edited = th::edit_channel_meaning(bytes, meta.thd_meaning);
         if (!edited) {
@@ -161,6 +164,16 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
         summary = std::move(*edited);
     }
     const auto status = status_stream(out_path);
+    if (tags_before > 0 && summary && summary->changed > 0 && !meta.sign_objects) {
+        // The tag covers the whole access unit, the major sync with it: this edit has just broken
+        // the ones that were there. Said, not refused: the edit is what was asked for.
+        fmt::println(stderr,
+                     "warning: {} evolution frame(s) of {} carry a tag, and the major sync you "
+                     "changed is part of what the tag covers: they no longer verify (a licensed "
+                     "decoder and verify-objects read them as failing). Give sign-objects "
+                     "signing-key=<path> to sign them again",
+                     tags_before, in_path);
+    }
     if (!apply_truehd_object_signing(bytes, meta, status)) {
         return kExitUsage;
     }
@@ -234,6 +247,15 @@ bool control_of(const th::ChannelMeaning& meaning, MeaningPresentation presentat
     return meaning.eightch_control_enabled;
 }
 
+// What the 2 channel field holds above the programme's dialogue norm: DEE writes N + 6 there and
+// N in the 6 and 8 channel fields, in every leg of a known N (ERRATA.md question 51), and the six
+// disc streams agree.
+constexpr int kTwochDialogueNormOffset = 6;
+
+int dialogue_norm_offset(MeaningPresentation presentation) {
+    return presentation == MeaningPresentation::k2ch ? kTwochDialogueNormOffset : 0;
+}
+
 int dialogue_norm_field(const th::ChannelMeaning& meaning, MeaningPresentation presentation) {
     switch (presentation) {
         case MeaningPresentation::k2ch:
@@ -295,9 +317,14 @@ int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_pat
         // ATSC A/85 section 8, as E-AC-3's normalize takes it: dialnorm states where dialogue
         // sits relative to full scale, and the anchor for a programme with no separate dialogue
         // measurement is its own integrated loudness. The same mapping, clamped to 1..31, which
-        // the 5 bit fields hold and the 6 bit one never needs (ERRATA.md question 51).
+        // the 5 bit fields hold. The 2 channel field is 6 above it (6 bits, so at most 37), and its
+        // control bit is set, as DEE writes both (ERRATA.md questions 51 and 54).
         dialogue_norm_of(edit, loudness.presentation) =
-            iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs);
+            iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs) +
+            dialogue_norm_offset(loudness.presentation);
+        if (loudness.presentation == MeaningPresentation::k2ch) {
+            edit.twoch_control_enabled = true;
+        }
     }
     const auto summary = th::edit_channel_meaning(bytes, edit);
     if (!summary) {
@@ -313,16 +340,21 @@ int run_normalize_truehd(std::vector<std::byte>&& bytes, std::string_view in_pat
         const char* name = presentation_name(loudness.presentation);
         status_println(status, "  {}  measured {:+.2f} LKFS (BS.1770-5 Annex 3 weights, {})", name,
                        loudness.integrated_lkfs.value_or(0.0), loudness.layout);
-        status_println(status, "  {}  dialogue norm {} -> {} (ATSC A/85 section 8)", name,
+        status_println(status, "  {}  dialogue norm {} -> {} (ATSC A/85 section 8{})", name,
                        dialogue_norm_field(summary->before, loudness.presentation),
-                       dialogue_norm_field(summary->after, loudness.presentation));
+                       dialogue_norm_field(summary->after, loudness.presentation),
+                       loudness.presentation == MeaningPresentation::k2ch
+                           ? fmt::format(", plus {} in the 2 channel field, control bit on, as DEE "
+                                         "writes it",
+                                         kTwochDialogueNormOffset)
+                           : std::string{});
     }
     // What the changes in the major sync are, field by field, is above; what is left alone is said
     // once.
     status_println(status,
                    "  no gain is applied (the stream is lossless): only the dialogue norm fields "
-                   "change; the mix level, source format, control bits and DRC start-up gains are "
-                   "as they were");
+                   "and the 2 channel control bit change; the mix level, source format, the 6 and "
+                   "8 channel control bits and DRC start-up gains are as they were");
     for (const PresentationLoudness& loudness : measured->presentations) {
         if (!control_of(summary->after, loudness.presentation)) {
             status_println(
@@ -439,11 +471,11 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
     if (rate_report.declared_bps != 0) {
         fmt::println(
             "  data rate            {:.2f} Mbit/s declared (field {}, TH spec v3.9 section 4.4), "
-            "largest unit {:.2f} Mbit/s, slowest delivery {:.1f} ms of {:.0f} ms, {} unit(s) "
-            "late  {}",
+            "largest unit {:.2f} Mbit/s, {} unit(s) start before the unit ahead has arrived "
+            "(worst {:.2f} ms short)  {}",
             static_cast<double>(rate_report.declared_bps) / 1e6, sync.peak_data_rate,
-            static_cast<double>(rate_report.max_unit_rate_bps) / 1e6, rate_report.worst_latency_ms,
-            rate_report.latency_limit_ms, rate_report.violations, rate_ok ? "PASS" : "FAIL");
+            static_cast<double>(rate_report.max_unit_rate_bps) / 1e6, rate_report.violations,
+            rate_report.worst_overrun_ms, rate_ok ? "PASS" : "FAIL");
     } else {
         fmt::println(
             "  data rate            the peak data rate field is 0: nothing to hold the stream to  "
@@ -482,7 +514,9 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
         // The stream's own claim, as the major sync has it. Provisional: the unit is the
         // specification's for the 6 and 8 channel fields and assumed for the 2 channel one, and
         // whether a decoder applies the field at all depends on the control bit (ERRATA.md 51, 54).
-        const int claimed = dialogue_norm_field(meaning, loudness.presentation);
+        const int claimed =
+            dialogue_norm_field(meaning, loudness.presentation) -
+            dialogue_norm_offset(loudness.presentation);
         const bool has_meaning = sync.kind == th::StreamKind::kTrueHd;
         if (has_meaning) {
             fmt::println(
@@ -496,8 +530,13 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
             const double claimed_lkfs = 0.0 - static_cast<double>(claimed);
             const int implied = iclforge::ac3::meta::dialnorm_from_lkfs(*loudness.integrated_lkfs);
             fmt::println("  dialnorm check:");
-            fmt::println("    claimed              {:>+8.2f} LKFS  (from dialogue norm {}{})",
+            fmt::println("    claimed              {:>+8.2f} LKFS  (from dialogue norm {}{}{})",
                          claimed_lkfs, claimed,
+                         dialogue_norm_offset(loudness.presentation) != 0
+                             ? fmt::format(", the field's {} less {}",
+                                           dialogue_norm_field(meaning, loudness.presentation),
+                                           dialogue_norm_offset(loudness.presentation))
+                             : std::string{},
                          control_of(meaning, loudness.presentation)
                              ? ""
                              : "; the control-enabled bit is off, so a decoder may not apply it");

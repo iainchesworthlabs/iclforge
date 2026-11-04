@@ -305,6 +305,46 @@ TEST_CASE("a damaged stream fails a strict decode and is counted by a lenient on
     CHECK(read_wav(out).channels == 2);
 }
 
+TEST_CASE("decode takes truehd-reading= by name and the other reading changes what depends on it",
+          "[forge-cli][truehd]") {
+    // ERRATA.md question 101. hb_filters filters from the first sample after each restart, so
+    // decoding it with the histories zeroed at a restart gives other samples; a stream that does not
+    // depend on the reading decodes to the same WAV.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "reading.log";
+    const fs::path filters = fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_filters.thd";
+    const fs::path base = dir / "reading_base.wav";
+    const fs::path zeroed = dir / "reading_zeroed.wav";
+    REQUIRE(run_cli("decode \"" + filters.string() + "\" \"" + base.string() + "\"", log) == 0);
+    REQUIRE(run_cli("decode \"" + filters.string() + "\" \"" + zeroed.string() +
+                        "\" truehd-reading=zero-histories truehd-check=lenient",
+                    log) == 0);
+    CHECK(read_bytes(base) != read_bytes(zeroed));
+    // Strict, the zeroed decode stops at the lossless check that the unzeroed histories satisfy.
+    CHECK(run_cli("decode \"" + filters.string() + "\" \"" + zeroed.string() +
+                      "\" truehd-reading=zero-histories",
+                  log) == kExitInput);
+
+    const fs::path plain = fixture("truehd_st48_s24.thd");
+    const fs::path plain_base = dir / "reading_plain_base.wav";
+    const fs::path plain_alt = dir / "reading_plain_alt.wav";
+    REQUIRE(run_cli("decode \"" + plain.string() + "\" \"" + plain_base.string() + "\"", log) == 0);
+    for (const char* reading : {"seed-shr7-32", "zero-histories"}) {
+        CAPTURE(reading);
+        REQUIRE(run_cli("decode \"" + plain.string() + "\" \"" + plain_alt.string() +
+                            "\" truehd-reading=" + reading,
+                        log) == 0);
+        CHECK(read_bytes(plain_base) == read_bytes(plain_alt));
+    }
+
+    CHECK(run_cli("decode \"" + plain.string() + "\" \"" + plain_alt.string() +
+                      "\" truehd-reading=elsewhere",
+                  log) == kExitUsage);
+    // Only decode takes it.
+    CHECK(run_cli("levels \"" + plain.string() + "\" truehd-reading=zero-histories", log) ==
+          kExitUsage);
+}
+
 TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][truehd]") {
     const fs::path dir = scratch_dir();
     const fs::path log = dir / "probe.log";
@@ -795,7 +835,7 @@ TEST_CASE("forge probe detail=format is both, and the TrueHD details are refused
     CHECK(run_cli("probe \"" + ec3.string() + "\" detail=evolution", log) == 1);
     CHECK(read_text(log).find("describes TrueHD and MLP streams") != std::string::npos);
     CHECK(run_cli("probe \"" + stream.string() + "\" detail=everything", log) == 1);
-    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format or checks") !=
+    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format, checks or rate") !=
           std::string::npos);
 }
 
@@ -1349,10 +1389,12 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
             CHECK(text.find("drc=0.5, mix-lfe") != std::string::npos);
             CHECK(text.find("truehd-check=lenient, ") == std::string::npos);
         }
-        SECTION("the objects directory and the ADM path are not dropped either") {
+        SECTION("the objects directory is not dropped either") {
             const fs::path objects = tone.dir / "objects_dir";
+            // Objects are the channels of substream 3, which truehd-presentation=all decodes.
             CHECK(run_cli("decode " + in + out + cli_arg(objects), log) == kExitUsage);
-            CHECK(read_text(log).find("writes no objects") != std::string::npos);
+            CHECK(read_text(log).find("only truehd-presentation=all decodes") !=
+                  std::string::npos);
             CHECK_FALSE(fs::exists(out_wav));
         }
         SECTION("the options it does apply, and a transform choice it warns about") {
@@ -1845,19 +1887,24 @@ TEST_CASE("normalize measures each presentation of a TrueHD stream and writes it
     CHECK(text.find("audio untouched") != std::string::npos);
     CHECK(text.find(fmt::format("2ch  measured {:+.2f} LKFS", lkfs_2ch)) != std::string::npos);
     CHECK(text.find(fmt::format("6ch  measured {:+.2f} LKFS", lkfs_6ch)) != std::string::npos);
-    CHECK(text.find(fmt::format("2ch  dialogue norm 0 -> {} (ATSC A/85 section 8)",
-                                dialnorm_of(lkfs_2ch))) != std::string::npos);
+    // The 2 channel field is 6 above the norm the measurement gives, and its control bit is on, as
+    // DEE writes them (ERRATA.md questions 51 and 54).
+    CHECK(text.find(fmt::format("2ch  dialogue norm 0 -> {} (ATSC A/85 section 8, plus 6 in the 2 "
+                                "channel field, control bit on, as DEE writes it)",
+                                dialnorm_of(lkfs_2ch) + 6)) != std::string::npos);
     CHECK(text.find(fmt::format("6ch  dialogue norm 0 -> {} (ATSC A/85 section 8)",
                                 dialnorm_of(lkfs_6ch))) != std::string::npos);
     CHECK(text.find("no gain is applied") != std::string::npos);
     CHECK(text.find("control-enabled bit is off") != std::string::npos);
     CHECK(text.find("provisional, no oracle until the DEE set") != std::string::npos);
 
-    // Every major sync carries the two dialogue norms, with a good CRC, and nothing else is set.
+    // Every major sync carries the two dialogue norms, with a good CRC, the 2 channel control bit,
+    // and nothing else is set.
     const auto meanings = channel_meanings(out);
     REQUIRE_FALSE(meanings.empty());
     iclforge::truehd::ChannelMeaning expected;
-    expected.twoch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_2ch));
+    expected.twoch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_2ch) + 6);
+    expected.twoch_control_enabled = true;
     expected.sixch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_6ch));
     for (const auto& meaning : meanings) {
         CHECK(meaning == expected);  // no 8 channel presentation: its field is left alone
@@ -1872,7 +1919,9 @@ TEST_CASE("normalize measures each presentation of a TrueHD stream and writes it
     REQUIRE(run_cli("probe " + cli_arg(out) + "json=1", log) == 0);
     const auto presentations =
         nlohmann::json::parse(read_text(log))["truehd"]["channel_meaning"]["presentations"];
-    CHECK(presentations["2ch"]["dialogue_norm"] == dialnorm_of(lkfs_2ch));
+    CHECK(presentations["2ch"]["dialogue_norm"] == dialnorm_of(lkfs_2ch) + 6);
+    CHECK(presentations["2ch"]["control_enabled"] == true);
+    CHECK(presentations["6ch"]["control_enabled"] == false);
     CHECK(presentations["6ch"]["dialogue_norm"] == dialnorm_of(lkfs_6ch));
     const fs::path again = tone.dir / "normalized_again.thd";
     REQUIRE(run_cli("normalize " + cli_arg(out) + cli_arg(again), log) == 0);
@@ -1925,7 +1974,7 @@ TEST_CASE(
         REQUIRE(run_cli("normalize " + cli_arg(thd) + cli_arg(out), log) == 0);
         for (const auto& meaning : channel_meanings(out)) {
             CHECK(meaning.sixch_dialogue_norm == 31);
-            CHECK(meaning.twoch_dialogue_norm == 31);
+            CHECK(meaning.twoch_dialogue_norm == 37);  // 31 and the 2 channel field's 6
         }
 
         const fs::path silent_wav = tone.dir / "normalize_silent.wav";
@@ -2072,7 +2121,18 @@ TEST_CASE(
                 0);
         REQUIRE(run_cli("qc " + cli_arg(on), log) == 0);
         const std::string after = read_text(log);
-        CHECK(after.find("(matches)") != std::string::npos);
+        // Both presentations match: the 2 channel field holds the norm plus 6 and qc takes the 6
+        // off before it compares (ERRATA.md question 51).
+        const auto matches = [&after]() {
+            std::size_t count = 0;
+            for (auto at = after.find("(matches)"); at != std::string::npos;
+                 at = after.find("(matches)", at + 1)) {
+                ++count;
+            }
+            return count;
+        };
+        CHECK(matches() == 2);
+        CHECK(after.find(", the field's ") != std::string::npos);
         CHECK(after.find("control on, dialogue norm " + std::to_string(dialnorm_of(lkfs_6ch))) !=
               std::string::npos);
         CHECK(after.find("claimed              " +
@@ -2186,8 +2246,8 @@ TEST_CASE("qc of a TrueHD stream fails, exit 6, on a damaged stream, a join, and
         CHECK(run_cli("qc " + cli_arg(late), log) == 6);
         const std::string text = read_text(log);
         CHECK(text.find("data rate            2.00 Mbit/s declared") != std::string::npos);
-        CHECK(text.find("unit(s) late  FAIL") != std::string::npos);
-        CHECK(text.find(" 0 unit(s) late") == std::string::npos);
+        CHECK(text.find("ms short)  FAIL") != std::string::npos);
+        CHECK(text.find(", 0 unit(s) start before") == std::string::npos);
         // Everything else about that stream is sound.
         CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
     }

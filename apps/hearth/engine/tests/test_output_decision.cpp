@@ -470,9 +470,11 @@ TEST_CASE("output decision: only the platforms a receiver has named TrueHD throu
         const MatPlatformStatus status = iclforge::hearth::mat_status(backend);
         // This is the table the owner's rule is kept in: a platform becomes "run" in the same
         // commit as the page that records a run that passed on a receiver, and this test changes
-        // with it. Run on 2026-11-01, Raspberry Pi 4B into an Onkyo TX-RZ740: ALSA and PipeWire.
+        // with it. Run on 2026-11-01, Raspberry Pi 4B into an Onkyo TX-RZ740: ALSA and PipeWire;
+        // on 2026-11-04, an NVIDIA Shield Pro through Hearth for Android into it: Android.
         const bool run = backend == PassthroughBackend::kAlsa ||
-                         backend == PassthroughBackend::kPipeWire;
+                         backend == PassthroughBackend::kPipeWire ||
+                         backend == PassthroughBackend::kAndroid;
         CHECK(status.run == (run ? MatRun::kRun : MatRun::kNotRun));
         CHECK(status.backend == backend);
         CHECK_FALSE(status.basis.empty());

@@ -136,9 +136,24 @@ TEST_CASE("the lossless fold shifts a sample by the matrix channel its output ch
     by_position = lossless_fold_step(by_position, 0x000200, 1);
     CHECK(by_position == 0x000401U);
     CHECK(lossless_check_of(by_assign) != lossless_check_of(by_position));
-    // Only the low 24 bits of a sample count, and a shift of 32 or more contributes nothing.
+    // Only the low 24 bits of a sample count.
     CHECK(lossless_fold_step(0, 0xFF000001U, 0) == 0x000001U);
-    CHECK(lossless_fold_step(7, 0x000001, 32) == 7U);
     // The four bytes of the fold are XORed into one.
     CHECK(lossless_check_of(0x01020408U) == (0x01 ^ 0x02 ^ 0x04 ^ 0x08));
+}
+
+TEST_CASE("the lossless fold of a matrix channel of 8 or more keeps the sample's top bits",
+          "[truehd][checks]") {
+    // ERRATA entry 69: an object substream has 12 to 16 matrix channels. A shift by the channel
+    // would push the top bits of a 24 bit sample out of the word; the check counts the channel
+    // modulo 8, so that the byte it folds to is the one a rotation of the word by the channel gives.
+    const std::uint32_t sample = 0xF0F0F0U;  // a negative sample: its top bits are set
+    for (unsigned channel = 0; channel < 16; ++channel) {
+        const std::uint32_t rotated =
+            channel % 32 == 0 ? sample : (sample << channel) | (sample >> (32 - channel));
+        CHECK(lossless_check_of(lossless_fold_step(0, sample, channel)) ==
+              lossless_check_of(rotated));
+    }
+    CHECK(lossless_fold_step(0, 0x000001, 9) == lossless_fold_step(0, 0x000001, 1));
+    CHECK(lossless_fold_step(7, 0x000001, 32) == (7U ^ 1U));
 }

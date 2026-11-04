@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 157> kOptionTokens{{
+constexpr std::array<OptionToken, 165> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -102,7 +102,7 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
     {"numblkscod=", "atmos* encode: 0-3 (default 3), §E2.3.1.4 short syncframes of 1/2/3/6 blocks"},
     {"search=", "AC-3 encode, and eac3-encode under CBR: bit-allocation search, off (default)"},
     {"fgaincod=", "encode: auto (default) or 0..7, §7.2.2.4 fast gain pinned for the whole encode"},
-    {"verify", "eac3-encode and truehd-encode: decode every access unit as it's encoded and diff against it"},
+    {"verify", "eac3-encode, truehd-encode and truehd-atmos: decode every access unit as it's encoded and diff against it"},
     {"channels=", "decode/monitor: 2 or 1 apply the §7.8 output stage; as-coded (default) is a no-op; "
                   "decode of AC-4: 5.1 folds a 7.X stream to 5.X"},
     {"ltrt-phase=", "decode/monitor: off skips §7.8.2's real 90° surround phase shift"},
@@ -112,12 +112,20 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
     {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all; qc: the presentation the preset gates judge, best, 2ch, 6ch or 8ch"},
+    {"truehd-render=", "decode of a TrueHD Atmos stream with truehd-presentation=all: place the objects on this speaker layout (a name such as 7.1 or 7.1.4, or a list such as L,R,C,LFE,Ls,Rs,Lrs,Rrs) and write the speaker feeds as the output WAV instead of the channels of substream 3 (provisional)"},
+    {"truehd-bed=", "truehd-atmos: the 7.1 bed as a WAV (L R C LFE Ls Rs Lrs Rrs, the objects' length and rate); without it the bed is the objects placed on 7.1 by the renderer"},
+    {"truehd-objects-lfe=", "truehd-atmos: on (the default) takes the first channel of the objects WAV as the LFE, off makes every channel an object"},
     {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
+    {"truehd-reading=", "decode of TrueHD or MLP, for scoring a provisional reading: the other reading of a point the specification leaves open, seed-shr7-32, zero-histories, shift-by-position or fold-by-position (ERRATA.md question 101); not given, the library's reading"},
     {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
     {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
     {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
     {"truehd-peak-rate=", "truehd-encode: the rate the stream is declared not to exceed, kbit/s (default 18000)"},
     {"truehd-rate-check=", "truehd-encode: strict (the default) refuses a stream that cannot be sent within the peak rate; lenient writes it and counts"},
+    {"truehd-rate-mode=", "truehd-atmos: strict (the default) refuses a stream that does not fit; shape lets the object channels of substream 3 give up low bits, one at a time, in the restart intervals that do not fit (the 7.1 bed is never touched; provisional, lossy for the objects)"},
+    {"truehd-shape-bits=", "truehd-atmos with truehd-rate-mode=shape: the most low bits an interval's objects give up, 0 to 16 (default 8)"},
+    {"truehd-bitrate=", "truehd-encode, truehd-atmos: hold the stream to this bitrate over any 75 ms, kbit/s, 1000 to 100000 (default the declared peak rate); probe detail=rate: run the arrival model at it"},
+    {"truehd-major-sync=", "truehd-encode, truehd-atmos: access units between major syncs, 0 (one at every restart header, the default) or a multiple of truehd-restart="},
     {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
     {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
     {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
@@ -210,7 +218,7 @@ constexpr std::array<OptionToken, 157> kOptionTokens{{
                "transcoding to AC-3 or falling back to decoded PCM"},
     {"preset=", "qc: gate the measurement against a named delivery spec"},
     {"json=", "probe: emit the JSON document instead of the human table"},
-    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure or format"},
+    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure, format or rate"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
     {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
                "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
@@ -550,7 +558,8 @@ void print_truehd_topic() {
     fmt::println("       truehd-downmix=none|standard,");
     fmt::println("       truehd-downmix-gains=<C,Ls/Rs,LFE,Lrs/Rrs in dB>,");
     fmt::println("       truehd-restart=<access units>, truehd-peak-rate=<kbit/s>,");
-    fmt::println("       truehd-rate-check=strict|lenient, truehd-fir-order=0..8,");
+    fmt::println("       truehd-rate-check=strict|lenient, truehd-bitrate=<kbit/s>,");
+    fmt::println("       truehd-major-sync=<access units>, truehd-fir-order=0..8,");
     fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
     fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
     fmt::println("       the input. src=, map= and offset= place the channels of several WAVs by");
@@ -1152,6 +1161,9 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=format     both; metadata only, no content");
         fmt::println("  detail=checks     TrueHD and MLP: decode the stream for the lossless check of every");
         fmt::println("                    restart interval (the cost of a decode); exit 1 when one fails");
+        fmt::println("  detail=rate       TrueHD: per restart interval the bitrate, the largest unit's rate and");
+        fmt::println("                    the least headroom of the 75 ms arrival model (truehd-bitrate=");
+        fmt::println("                    sets the rate it runs at)");
     }
     if ((mask & topic::kContentSignature) != 0) {
         fmt::println("");

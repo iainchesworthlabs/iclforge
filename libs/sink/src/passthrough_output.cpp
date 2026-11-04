@@ -17,6 +17,7 @@
 
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/mat.hpp"
 
 namespace iclforge::sink {
 
@@ -36,13 +37,52 @@ namespace ac = sendspin::player;
         case ac::DataType::kEac3:
             return std::uint16_t{0x0015};
         case ac::DataType::kAc4:
-        case ac::DataType::kTruehd:  // access units, not IEC 61937 bursts: this output does not take them
+        case ac::DataType::kTruehd:  // access units, not bursts: mat_format_of() packs them
             break;
     }
     return std::nullopt;
 }
 
+// TrueHD arrives as access units, up to 24 to a chunk (sendspin::kTruehdUnitsPerChunk), and the
+// link takes them as MAT bursts of 61,440 bytes on an eight-channel carrier at 192 kHz for the 48
+// kHz family and 176.4 kHz for the 44.1 kHz family, the carrier the owner chose on 2026-10-29 and
+// a receiver has been seen to name TrueHD on (planning/truehd-parity-hearth-player.md, entry 120).
+// A burst lasts 24 units, which is 24 * 40 samples at 48 and 44.1 kHz and twice and four times
+// that at their doubles, so the carrier runs at 4, 2 or 1 times the content rate. The same table
+// as audio::link_rate(), which this library does not depend on.
+[[nodiscard]] std::optional<LinkFormat> mat_format_of(const ac::StreamStart& stream) {
+    const auto rate = static_cast<std::uint32_t>(stream.sample_rate);
+    std::uint32_t link = 0;
+    std::uint32_t base = 0;
+    switch (rate) {
+        case 48000U:
+        case 96000U:
+        case 192000U:
+            link = 192000U;
+            base = 48000U;
+            break;
+        case 44100U:
+        case 88200U:
+        case 176400U:
+            link = 176400U;
+            base = 44100U;
+            break;
+        default:
+            return std::nullopt;
+    }
+    const std::uint32_t unit_samples = 40U * (rate / base);
+    return LinkFormat{.data_type = stream.data_type,
+                      .sample_rate = rate,
+                      .carrier_ratio = link / rate,
+                      .burst_bytes = iec::kMatBurstBytes,
+                      .frames_per_burst = static_cast<std::uint32_t>(iec::kMatAccessUnitsPerFrame) * unit_samples,
+                      .pc = iec::kMatPc};
+}
+
 [[nodiscard]] std::optional<LinkFormat> format_of(const ac::StreamStart& stream) {
+    if (stream.data_type == ac::DataType::kTruehd) {
+        return mat_format_of(stream);
+    }
     const std::optional<std::uint16_t> pc = pc_of(stream.data_type);
     if (!pc) {
         return std::nullopt;
@@ -182,6 +222,10 @@ void PassthroughOutput::write(const sendspin::BurstChunk& chunk, std::int64_t lo
                       std::to_string((now_us_() - started_at_us_) / 1000) + " ms ago)");
     }
     offset_us_ = offset;
+    if (format_->data_type == ac::DataType::kTruehd) {
+        write_truehd_locked(chunk, local_time);
+        return;
+    }
     if (!decoder_) {
         // What the first syncframe says, as a decoder would report it, without decoding it: the
         // receiver decodes. Objects and substreams are not read here (the receiver places them).
@@ -201,6 +245,47 @@ void PassthroughOutput::write(const sendspin::BurstChunk& chunk, std::int64_t lo
         iec::burst_from_parts(chunk.pc, chunk.pd, std::as_bytes(payload));
     if (!burst || burst->size() != format_->burst_bytes) {
         // A burst of another length than the stream's cannot go in the slot a link was opened for.
+        ++counts_.dropped;
+        return;
+    }
+    pending_.push_back({.burst = std::move(*burst), .due_us = local_time});
+}
+
+void PassthroughOutput::write_truehd_locked(const sendspin::BurstChunk& chunk, std::int64_t local_time) {
+    const std::optional<std::size_t> units = sendspin::count_truehd_units(chunk.chunk.data);
+    if (!units || *units > iec::kMatAccessUnitsPerFrame) {
+        // parse_burst_chunk() refuses these, so this is a caller that did not ask it.
+        ++counts_.dropped;
+        return;
+    }
+    if (!decoder_) {
+        // The receiver decodes, and what the stream's channels are is in its major sync, which this
+        // output does not read: the report names the data type and nothing more.
+        decoder_ = ac::DecoderReport{.data_type = ac::DataType::kTruehd, .substreams = 1};
+    }
+    // One chunk is one burst: its units go into a MAT frame, and a chunk of fewer than 24 (the end
+    // of an item, where a sink joins at a chunk) leaves the rest of the frame's slots empty.
+    const std::span<const std::byte> payload = std::as_bytes(chunk.chunk.data);
+    iec::MatPacker packer;
+    std::optional<std::vector<std::byte>> burst;
+    std::size_t at = 0;
+    for (std::size_t unit = 0; unit < *units; ++unit) {
+        const std::size_t words = (static_cast<std::size_t>(std::to_integer<unsigned>(payload[at]) & 0x0FU) << 8U) |
+                                  std::to_integer<unsigned>(payload[at + 1]);
+        auto packed = packer.push(payload.subspan(at, words * 2));
+        if (!packed) {
+            ++counts_.dropped;
+            return;
+        }
+        if (packed->has_value()) {
+            burst = std::move(**packed);
+        }
+        at += words * 2;
+    }
+    if (!burst) {
+        burst = packer.flush();
+    }
+    if (!burst || burst->size() != format_->burst_bytes) {
         ++counts_.dropped;
         return;
     }

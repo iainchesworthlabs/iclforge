@@ -195,7 +195,9 @@ committed, except that the `truehd-fixtures` legs (0.25 s streams of 7.1, three
 substreams, 96 kHz and 16 and 20 bits) and four short length legs are, with their
 sources and DEE's logs, under `testdata/truehd-dee/`; `--fixtures-out DIR` writes that
 copy from a set, laid out so that `tools/checks/score_truehd_decode.py --set` reads it.
-The `truehd-long` group (300 s programmes) is made in a second set directory.
+The `truehd-long` group (300 s programmes) is made in a second set directory. The `truehd-last` group is the legs
+asked for in the last days of the licence (`planning/truehd-validation.md`): impulses and band-limited tones at 96 kHz, a
+stepped tone with and without `--optimize-data-rate`, dialnorm and DRC profiles on a stream of three presentations.
 `gen_ac4_baseline.py --gold-set` does the same for AC-4; without `--gold-set` it
 writes the short streams under `testdata/external-baseline/` that CI reads.
 

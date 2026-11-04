@@ -108,8 +108,8 @@ TEST_CASE("every hand-built stream decodes to the signal it was built from",
             // The manifest names what FFmpeg's strict decode of the stream does; the python leg
             // holds FFmpeg to it. Here the library is held to the signal.
             const std::string outcome = fixture["ffmpeg"]["outcome"];
-            CHECK((outcome == "equal" || outcome == "short" || outcome == "refused" ||
-                   outcome == "differs"));
+            CHECK((outcome == "equal" || outcome == "short" || outcome == "bed" ||
+                   outcome == "refused" || outcome == "differs"));
             const std::vector<std::byte> stream =
                 read_file(dir() + "/" + std::string(fixture["file"]));
             CHECK(hex(iclforge::base::crypto::sha256(stream)) ==
@@ -478,4 +478,128 @@ TEST_CASE("the 16-channel stream has an object substream and four directory entr
     CHECK(info->channels[1] == 6);
     CHECK(info->channels[2] == 8);
     CHECK(info->channels[3] == 16);
+}
+
+TEST_CASE("the object matrices' extension runs the coefficients as slopes, sample for sample",
+          "[truehd][handbuilt][no-external-oracle]") {
+    // ERRATA entry 69, "The extension". hb_substream3_object_extension is four object matrices over
+    // sixteen access units of 40 samples in two restart intervals (restarts at samples 0 and 320),
+    // with twelve matrix sections:
+    //   sample   0  new headers, deltas with widths 3, 5, 2, 0 and scales 1, 0, 3, 2 (the matrix of width 0
+    //               sends none)
+    //   sample   8  A clear, new deltas, widths and scales stand (the restart unit's second block)
+    //   sample  80  new headers, no new deltas: the deltas, widths and scales stand across the headers
+    //   sample 160  A clear: the running coefficients and the deltas stand
+    //   sample 200  extension off: the deltas are cleared and the coefficients rebuilt from raw
+    //   sample 240  extension on with new deltas on the inherited widths and scales
+    //   sample 320  a restart: no deltas, widths or scales are left
+    //   sample 360  extension on, widths 0, so no deltas
+    //   sample 400  A clear, new widths 5, 4, 6, 2 and scales 3, 2, 1, 0 with deltas
+    //   sample 480  the deltas of sample 400 stand
+    //   sample 520  extension off: the coefficients keep what they accumulated
+    //   sample 560  extension on again, deltas 0
+    // The expected signal is the one the Python writer built the stream from (the coded channels
+    // follow from it by the rule), and the Python decode (tools/references/truehd_syntax.py)
+    // agrees with this one. Breaking any part of the rule changes the samples: the ramp's step,
+    // its reset at the start of the unit, the move of the coefficients at the end of the unit, the
+    // clearing of the deltas when the extension is off, the scale, and the truncation of the fine
+    // sum. The rule was measured on the owner's controlled encodes; no decoder outside this
+    // repository was run on this stream.
+    std::ifstream manifest_file(dir() + "/manifest.json");
+    REQUIRE(manifest_file.good());
+    const nlohmann::json manifest = nlohmann::json::parse(manifest_file);
+    std::string expected;
+    for (const nlohmann::json& fixture : manifest["fixtures"]) {
+        if (fixture["name"] == "hb_substream3_object_extension_all") {
+            expected = fixture["pcm_sha256"].get<std::string>();
+            CHECK(fixture["channels"].get<int>() == 12);
+        }
+    }
+    REQUIRE_FALSE(expected.empty());
+
+    const std::vector<std::byte> stream = read_file(dir() + "/hb_substream3_object_extension.thd");
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    std::vector<std::byte> pcm;
+    while (const auto unit = reader.next()) {
+        auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        for (const std::int32_t sample : (*decoded)->pcm) {
+            const auto word = static_cast<std::uint32_t>(sample) << 8U;
+            for (unsigned shift = 0; shift < 32; shift += 8) {
+                pcm.push_back(static_cast<std::byte>((word >> shift) & 0xFFU));
+            }
+        }
+    }
+    CHECK(pcm.size() == 640U * 12U * 4U);
+    CHECK(hex(iclforge::base::crypto::sha256(pcm)) == expected);
+    // Twelve blocks send a matrix section, and the lossless checks of the first interval, which
+    // fold the output after the matrices, hold in all four substreams.
+    CHECK(decoder.counters().matrix_headers == 12);
+    CHECK(decoder.counters().lossless_checks_ok == 4);
+    CHECK(decoder.counters().lossless_check_failures == 0);
+    CHECK(decoder.counters().check_failures == 0);
+}
+
+TEST_CASE("an object matrix with the LSB bypass is not masked, one without it masks its whole sum",
+          "[truehd][handbuilt][no-external-oracle]") {
+    // ss3_mask_regress.thd is a 40 access unit object stream built from the specification, in
+    // which the quantiser step is 2 on matrix rows 0 to 7, two of them rows of a matrix with the
+    // LSB bypass (field_2b 1 and 2). The coded rows are not multiples of 4 in three quarters of
+    // their samples, so the three places a mask can go (before the bits, after them, none) give
+    // different samples; the Dolby player decodes it as the .wav holds, and the three lossless
+    // checks (at access units 10, 20 and 30) pass only under that reading. The .wav holds the
+    // intended decoded channels: 12 channels, 48 kHz, 24-bit, 1,600 frames.
+    const std::vector<std::byte> wav = read_file(dir() + "/ss3_mask_regress.wav");
+    REQUIRE(wav.size() > 44);
+    const auto le32 = [&](std::size_t at) {
+        return static_cast<std::uint32_t>(wav[at]) | static_cast<std::uint32_t>(wav[at + 1]) << 8U |
+               static_cast<std::uint32_t>(wav[at + 2]) << 16U |
+               static_cast<std::uint32_t>(wav[at + 3]) << 24U;
+    };
+    std::size_t data_at = 0;
+    std::size_t data_size = 0;
+    for (std::size_t at = 12; at + 8 <= wav.size();) {
+        const std::string id{reinterpret_cast<const char*>(wav.data() + at), 4};
+        const std::size_t size = le32(at + 4);
+        if (id == "data") {
+            data_at = at + 8;
+            data_size = size;
+            break;
+        }
+        at += 8 + size + (size & 1U);
+    }
+    REQUIRE(data_at != 0);
+    REQUIRE(data_size == 1600U * 12U * 3U);
+
+    const std::vector<std::byte> stream = read_file(dir() + "/ss3_mask_regress.thd");
+    DecoderConfig config;
+    config.presentation = Presentation::kAll;
+    Decoder decoder(config);
+    ElementaryReader reader(stream);
+    std::vector<std::int32_t> decoded_pcm;
+    while (const auto unit = reader.next()) {
+        auto decoded = decoder.decode(*unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        REQUIRE((*decoded)->channels == 12);
+        decoded_pcm.insert(decoded_pcm.end(), (*decoded)->pcm.begin(), (*decoded)->pcm.end());
+    }
+    REQUIRE(decoded_pcm.size() == 1600U * 12U);
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < decoded_pcm.size(); ++i) {
+        const std::size_t at = data_at + i * 3U;
+        const auto word = static_cast<std::uint32_t>(wav[at]) |
+                          static_cast<std::uint32_t>(wav[at + 1]) << 8U |
+                          static_cast<std::uint32_t>(wav[at + 2]) << 16U;
+        const auto expected = static_cast<std::int32_t>(word << 8U) >> 8;
+        differing += decoded_pcm[i] != expected ? 1U : 0U;
+    }
+    CHECK(differing == 0);
+    CHECK(decoder.counters().lossless_ok_by_substream[3] == 3);
+    CHECK(decoder.counters().lossless_failed_by_substream[3] == 0);
+    CHECK(decoder.counters().lossless_check_failures == 0);
 }

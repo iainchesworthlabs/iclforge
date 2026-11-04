@@ -10,6 +10,12 @@
 # platform code, and no third-party code. Built and installed as a static and a shared library by
 # iclforge_add_library() (cmake/IclforgeLibrary.cmake).
 # ---------------------------------------------------------------------------
+# The minimum-footprint profile's archive (ICLFORGE_MINIMAL_TRUEHD): what a decode reads, no encoder.
+if(ICLFORGE_MINIMAL_DECODER)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/minimal.cmake")
+    return()
+endif()
+
 iclforge_add_library(truehd
     NO_C4251_SUPPRESSION
     SOURCES
@@ -17,8 +23,15 @@ iclforge_add_library(truehd
         src/core/format.cpp
         src/core/syntax.cpp
         src/decoder/decoder.cpp
+        src/encoder/cluster_elements.cpp
         src/encoder/coding.cpp
         src/encoder/encoder.cpp
+        src/encoder/layout_cadence.cpp
+        src/encoder/layout_oamd.cpp
+        src/encoder/object_bed.cpp
+        src/encoder/render_bed.cpp
+        src/encoder/ratectl_model.cpp
+        src/encoder/ratectl_shape.cpp
         src/io/access_unit.cpp
         src/io/elementary.cpp
         src/io/evolution.cpp

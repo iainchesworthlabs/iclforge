@@ -2432,6 +2432,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.truehd_presentation = std::string{value};
             continue;
         }
+        if (command == "decode" && key == "truehd-render") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: truehd-render needs a speaker layout, such as 7.1 (got '{}')", token);
+                return false;
+            }
+            out.truehd_render = std::string{value};
+            continue;
+        }
         if (reads_truehd && key == "truehd-check") {
             if (value != "strict" && value != "lenient") {
                 fmt::println(stderr, "error: truehd-check is strict or lenient (got '{}')", token);
@@ -2440,9 +2448,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.truehd_lenient = value == "lenient";
             continue;
         }
+        if (command == "decode" && key == "truehd-reading") {
+            if (value != "seed-shr7-32" && value != "zero-histories" &&
+                value != "shift-by-position" && value != "fold-by-position") {
+                fmt::println(stderr,
+                             "error: truehd-reading is seed-shr7-32, zero-histories, "
+                             "shift-by-position or fold-by-position (got '{}')",
+                             token);
+                return false;
+            }
+            out.truehd_reading = std::string{value};
+            continue;
+        }
         // The channel meaning of TH spec §14.1, which 'truehd-encode' writes and 'metadata' sets in a
         // finished TrueHD stream.
-        if ((command == "truehd-encode" || command == "metadata") && key.starts_with("truehd-")) {
+        if ((command == "truehd-encode" || command == "truehd-atmos" || command == "metadata") &&
+            key.starts_with("truehd-")) {
             switch (parse_truehd_meaning_option(key.substr(7), value, token, out.thd_meaning)) {
                 case MetadataOptionResult::kOk:
                     continue;
@@ -2452,8 +2473,29 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     break;
             }
         }
-        // TrueHD encoding, which 'truehd-encode' alone reads (iclforge::truehd::EncoderConfig).
-        if (command == "truehd-encode" && key.starts_with("truehd-")) {
+        // TrueHD Atmos encoding: the bed and the LFE of the objects.
+        if (command == "truehd-atmos" && key == "truehd-bed") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: truehd-bed needs the path of a 7.1 WAV");
+                return false;
+            }
+            out.thd_bed_path = std::string{value};
+            continue;
+        }
+        if (command == "truehd-atmos" && key == "truehd-objects-lfe") {
+            if (value != "on" && value != "off") {
+                fmt::println(stderr, "error: truehd-objects-lfe is on or off (got '{}')", token);
+                return false;
+            }
+            out.thd_objects_lfe = value == "on";
+            continue;
+        }
+        // TrueHD encoding, which 'truehd-encode' and 'truehd-atmos' read
+        // (iclforge::truehd::EncoderConfig).
+        // ('probe' reads truehd-bitrate= alone: the rate detail=rate runs the arrival model at.)
+        if (((command == "truehd-encode" || command == "truehd-atmos") &&
+             key.starts_with("truehd-")) ||
+            (command == "probe" && key == "truehd-bitrate")) {
             Options::TruehdEncode& enc = out.thdenc;
             const std::string_view name = key.substr(7);
             if (name == "downmix") {
@@ -2497,6 +2539,54 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     return false;
                 }
                 enc.rate_lenient = value == "lenient";
+                continue;
+            }
+            if (name == "bitrate") {
+                const auto kbps = parse_u32_or(value, 0);
+                if (kbps < 1000 || kbps > 100000) {
+                    fmt::println(
+                        stderr, "error: truehd-bitrate is a rate in kbit/s, 1000 to 100000 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.bitrate_kbps = kbps;
+                continue;
+            }
+            if (name == "rate-mode") {
+                if (value != "strict" && value != "shape") {
+                    fmt::println(stderr, "error: truehd-rate-mode is strict or shape (got '{}')",
+                                 token);
+                    return false;
+                }
+                if (value == "shape" && command != "truehd-atmos") {
+                    fmt::println(stderr,
+                                 "error: truehd-rate-mode=shape gives up low bits of the object "
+                                 "channels, which only truehd-atmos has");
+                    return false;
+                }
+                enc.shape = value == "shape";
+                continue;
+            }
+            if (name == "shape-bits") {
+                const auto bits = parse_u32_or(value, 99);
+                if (bits > 16) {
+                    fmt::println(stderr, "error: truehd-shape-bits is 0 to 16 (got '{}')", token);
+                    return false;
+                }
+                enc.shape_bits = static_cast<int>(bits);
+                continue;
+            }
+            if (name == "major-sync") {
+                const auto units = parse_u32_or(value, 70000);
+                if (units > 65536) {
+                    fmt::println(stderr,
+                                 "error: truehd-major-sync is the access units between major "
+                                 "syncs, 0 (one at every restart header) or a multiple of "
+                                 "truehd-restart= up to 65536 (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.major_sync_units = static_cast<int>(units);
                 continue;
             }
             if (name == "fir-order") {
@@ -3459,9 +3549,9 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (key == "detail") {
             if (value != "frames" && value != "blocks" && value != "evolution" && value != "checks" &&
-                value != "structure" && value != "format") {
+                value != "structure" && value != "format" && value != "rate") {
                 fmt::println(stderr,
-                             "error: detail must be frames, blocks, evolution, structure, format or checks "
+                             "error: detail must be frames, blocks, evolution, structure, format, checks or rate "
                              "(got '{}')",
                              token);
                 return false;

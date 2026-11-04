@@ -20,12 +20,15 @@
 #include <string_view>
 #include <vector>
 
+#include "../adm/atmos_adm.hpp"
 #include "../exit_codes.hpp"
 #include "../json.hpp"
 #include "../platform/stdio_binary.hpp"
 #include "../support.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/version.hpp"
+#include "iclforge/render/layout.hpp"
+#include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
@@ -35,6 +38,8 @@
 #include "probe_truehd.hpp"
 #include "truehd_evolution.hpp"
 #include "truehd_meaning.hpp"
+#include "truehd_objects.hpp"
+#include "truehd_rate.hpp"
 #include "truehd_structure.hpp"
 
 namespace forge_cli::commands {
@@ -45,6 +50,7 @@ namespace th = iclforge::truehd;
 namespace tp = iclforge::apps::truehd_probe;
 
 constexpr int kBitsPerSample = 24;
+constexpr int kObjectSubstream = 3;
 constexpr std::size_t kWavHeaderBytes = 68;
 
 std::optional<th::Presentation> parse_presentation(std::string_view text) {
@@ -266,8 +272,8 @@ std::string_view key_of_spelling(std::string_view spelling) {
     return spelling.ends_with('=') ? spelling.substr(0, spelling.size() - 1) : spelling;
 }
 
-// Whether the spelling names one value of an option ("detail=evolution"), which applies that value and
-// no other, and not the option ("json=").
+// Whether the spelling names one value of an option ("detail=evolution"), which applies that value
+// and no other, and not the option ("json=").
 bool spells_a_value(std::string_view spelling) {
     const auto equals = spelling.find('=');
     return equals != std::string_view::npos && equals + 1 < spelling.size();
@@ -280,8 +286,8 @@ constexpr std::array<std::string_view, 3> kTransformChoices{"fast-mdct", "fast-i
 // Options that assert something about a stream (or record what was read of it). One that is not
 // applied would let the run pass without having checked anything.
 constexpr std::array<std::string_view, 9> kVerifications{
-    "verify-content", "check-content", "unanchored-ok", "trust-anchor", "pin",
-    "verify-time",    "verify-objects", "gate-objects", "syntax-trace"};
+    "verify-content", "check-content",  "unanchored-ok", "trust-anchor", "pin",
+    "verify-time",    "verify-objects", "gate-objects",  "syntax-trace"};
 
 // The tokens, `separator` between them.
 std::string join(std::span<const std::string_view> tokens, std::string_view separator) {
@@ -422,22 +428,65 @@ bool starts_with_ac3_core_then_truehd(std::span<const std::byte> stream) {
 }
 
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta, DecodeLoss& loss) {
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss,
+                      std::string_view objects_dir, std::string_view adm_out) {
     const auto presentation = parse_presentation(meta.truehd_presentation);
     if (!presentation) {
         fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')",
                      meta.truehd_presentation);
         return kExitUsage;
     }
+    // The objects are the channels of substream 3, which only truehd-presentation=all decodes. An
+    // ADM master without it is the presentation's bed alone (TH spec §15.20).
+    const bool objects = *presentation == th::Presentation::kAll;
+    if (!objects_dir.empty() && !objects) {
+        fmt::println(stderr,
+                     "error: objects_dir= writes the channels of substream 3, which only "
+                     "truehd-presentation=all decodes");
+        return kExitUsage;
+    }
+    if (!adm_out.empty() && !forge_cli::adm_capability().available) {
+        fmt::println(stderr, "error: {}", forge_cli::adm_capability().reason);
+        return kExitInput;
+    }
+    std::optional<iclforge::render::OutputLayout> render_layout;
+    if (!meta.truehd_render.empty()) {
+        if (!objects) {
+            fmt::println(stderr,
+                         "error: truehd-render= places the objects of substream 3, which only "
+                         "truehd-presentation=all decodes");
+            return kExitUsage;
+        }
+        render_layout = iclforge::render::OutputLayout::parse(meta.truehd_render);
+        if (!render_layout) {
+            fmt::println(stderr,
+                         "error: truehd-render is a speaker layout such as 7.1, 5.1.4 or "
+                         "L,R,C,LFE,Ls,Rs,Lrs,Rrs (got '{}')",
+                         meta.truehd_render);
+            return kExitUsage;
+        }
+    }
+    std::optional<TrueHdObjectSink> object_sink;
+    std::optional<TrueHdBedSink> bed_sink;
+    if (objects && (!objects_dir.empty() || !adm_out.empty() || render_layout)) {
+        object_sink.emplace(objects_dir, adm_out, render_layout);
+    } else if (!adm_out.empty()) {
+        bed_sink.emplace(adm_out);
+    }
     const auto status = status_stream(out_path);
     th::DecoderConfig config;
     config.presentation = *presentation;
     config.strictness = meta.truehd_lenient ? th::Strictness::kLenient : th::Strictness::kStrict;
+    config.readings.seed_shr7_32_bit = meta.truehd_reading == "seed-shr7-32";
+    config.readings.zero_histories_at_restart = meta.truehd_reading == "zero-histories";
+    config.readings.output_shift_by_position = meta.truehd_reading == "shift-by-position";
+    config.readings.fold_by_position = meta.truehd_reading == "fold-by-position";
     th::Decoder decoder(config);
     th::ElementaryReader reader(stream);
     Pcm24Wav wav;
 
     int channels = 0;
+    int written_channels = 0;  // the WAV's: the layout's speakers with truehd-render=
     std::uint32_t rate = 0;
     int substream = 0;
     std::uint64_t samples = 0;
@@ -480,6 +529,13 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
             fmt::println(stderr, "error: {}: access unit {}: {}", in_path, index,
                          error_text(result.error()));
             if (!meta.truehd_lenient) {
+                if (result.error().kind == th::ErrorKind::kBadLosslessCheck && objects) {
+                    // The object substream's lossless check fails on real streams while its
+                    // reconstruction is incomplete (ERRATA.md entry 69): say what goes on past it.
+                    fmt::println(stderr,
+                                 "note: truehd-check=lenient decodes on past a failed lossless "
+                                 "check and counts the failed intervals");
+                }
                 failed = true;
                 break;
             }
@@ -495,16 +551,37 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
             }
         } else if (*result) {
             const th::DecodedAccessUnit& decoded = **result;
+            if (object_sink) {
+                if (decoded.substream != kObjectSubstream) {
+                    fmt::println(stderr, "error: {}: the stream has no substream 3, so no objects",
+                                 in_path);
+                    object_sink->abort();
+                    return kExitInput;
+                }
+                if (!object_sink->add(decoded)) {
+                    object_sink->abort();
+                    return kExitOutput;
+                }
+            } else if (bed_sink && !bed_sink->add(decoded)) {
+                return kExitUsage;
+            }
+            // truehd-render=: the speaker feeds of the objects are the output, not the channels.
+            const bool rendered = object_sink && object_sink->rendering();
+            const int out_channels =
+                rendered ? static_cast<int>(object_sink->rendered_slots()) : decoded.channels;
             if (channels == 0) {
-                const std::uint32_t mask = channel_mask(decoded.layout, decoded.channels);
-                if (!wav.open(out_path, decoded.channels, decoded.sample_rate, mask)) {
+                const std::uint32_t mask =
+                    rendered ? 0U : channel_mask(decoded.layout, decoded.channels);
+                if (!wav.open(out_path, out_channels, decoded.sample_rate, mask)) {
                     fmt::println(stderr, "error: cannot write {}", out_path);
                     return kExitOutput;
                 }
                 channels = decoded.channels;
                 rate = decoded.sample_rate;
                 substream = decoded.substream;
-                layout_text = channel_names(decoded.layout);
+                layout_text =
+                    rendered ? object_sink->rendered_names() : channel_names(decoded.layout);
+                written_channels = out_channels;
             } else if (decoded.channels != channels || decoded.sample_rate != rate) {
                 fmt::println(
                     stderr,
@@ -513,7 +590,7 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
                 failed = true;
                 break;
             }
-            if (!wav.write(decoded.pcm)) {
+            if (!wav.write(rendered ? object_sink->rendered() : decoded.pcm)) {
                 fmt::println(stderr, "error: cannot write {}", out_path);
                 return kExitOutput;
             }
@@ -534,7 +611,7 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     const auto& counters = decoder.counters();
     const auto& major_sync = decoder.major_sync();
     status_println(status, "{} {} Hz, {} channel(s){}, substream {}",
-                   major_sync ? codec_name(*major_sync) : "TrueHD", rate, channels,
+                   major_sync ? codec_name(*major_sync) : "TrueHD", rate, written_channels,
                    layout_text.empty() ? "" : fmt::format(" ({})", layout_text), substream);
     status_println(status, "  {} access unit(s) read, {} decoded, {} sample(s) a channel{}", index,
                    counters.units_decoded, samples,
@@ -542,13 +619,41 @@ int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_pat
     status_println(status, "  {} restart header(s); lossless check: {} interval(s) ok, {} failed",
                    counters.restarts, counters.lossless_checks_ok,
                    counters.lossless_check_failures);
+    if (substream == kObjectSubstream) {
+        // The object substream's own count. A lenient decode goes on past a failed interval, so
+        // the object audio of that interval can be wrong. The intervals counted are the ones a
+        // restart header follows: the last interval of a stream is not checked.
+        const auto ok = counters.lossless_ok_by_substream[kObjectSubstream];
+        const auto bad = counters.lossless_failed_by_substream[kObjectSubstream];
+        status_println(status,
+                       "  substream {} (objects): lossless check: {} interval(s) ok, {} failed",
+                       kObjectSubstream, ok, bad);
+        if (bad != 0) {
+            status_println(status,
+                           "  warning: the lossless check of substream {} failed in {} of {} "
+                           "interval(s); the object audio of those intervals can be wrong",
+                           kObjectSubstream, bad, ok + bad);
+        }
+    }
     status_println(status, "  other checks (access unit, CRC, parity) failed: {}",
                    counters.check_failures);
+    if (meta.truehd_lenient && errors != 0) {
+        status_println(status, "  {} unit(s) could not be decoded and were left out", errors);
+    }
     if (counters.units_waiting != 0) {
         status_println(status, "  {} unit(s) waited for a restart header", counters.units_waiting);
     }
     if (failed || (!meta.truehd_lenient && errors != 0)) {
+        if (object_sink) {
+            object_sink->abort();
+        }
         return kExitInput;
+    }
+    if (object_sink) {
+        return object_sink->finish(status);
+    }
+    if (bed_sink) {
+        return bed_sink->finish(status);
     }
     return kExitOk;
 }
@@ -568,11 +673,11 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                             const std::function<void()>& container_text,
                             std::size_t ac3_core_frames) {
     // detail=frames and detail=blocks ask for per-unit lines this report does not have, and are
-    // refused; detail=evolution, structure, format and checks are its own.
+    // refused; detail=evolution, structure, format, checks and rate are its own.
     if (const int refused = check_options_applied(
             meta,
             {"json=", "detail=frames", "detail=evolution", "detail=structure", "detail=format",
-             "detail=checks"});
+             "detail=checks", "detail=rate", "truehd-bitrate="});
         refused != kExitOk) {
         return refused;
     }
@@ -586,6 +691,14 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         meta.detail.has_value() && (*meta.detail == "structure" || *meta.detail == "format");
     const bool want_lossless = meta.detail.has_value() && *meta.detail == "checks";
     const bool want_frames = meta.detail.has_value() && *meta.detail == "frames";
+    // detail=rate: the arrival model over the stream, at the declared peak rate or at
+    // truehd-bitrate= (libs/truehd/ratectl.hpp).
+    const bool want_rate = meta.detail.has_value() && *meta.detail == "rate";
+    if (!want_rate && meta.thdenc.bitrate_kbps) {
+        fmt::println(stderr, "error: truehd-bitrate= is read by probe with detail=rate only");
+        return kExitUsage;
+    }
+    RateSurvey rate(want_rate, meta.thdenc.bitrate_kbps ? *meta.thdenc.bitrate_kbps * 1000ULL : 0ULL);
     EvolutionSurvey evolution(want_evolution);
     StructureSurvey structure;
     tp::ReportOptions options;
@@ -606,6 +719,7 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         structure.decode(stream);
     }
     const th::MajorSync& major_sync = report->info.major_sync;
+    rate.run(stream);
 
     if (meta.json) {
         iclforge::cli::platform::set_stdio_binary();
@@ -614,7 +728,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         json.member("schema", "iclforge.probe/1");
         json.member("generator", iclforge::ac3::version_full);
         json.member("file", in_path);
-        // container_json writes the member's key and value, as write_container does for AC-3 and AC-4.
+        // container_json writes the member's key and value, as write_container does for AC-3 and
+        // AC-4.
         if (container_json) {
             container_json(json);
         } else {
@@ -633,6 +748,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             if (want_structure) {
                 sink.key("structure");
                 structure.write_json(sink);
+            }
+            if (want_rate) {
+                sink.key("rate");
+                rate.write_json(sink);
             }
         };
         tp::write_json(json, *report, ac3_core_frames, extras);
@@ -667,6 +786,7 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         if (want_structure) {
             structure.print_text();
         }
+        rate.print_text();
     }
     return report->damaged() ? 1 : 0;
 }

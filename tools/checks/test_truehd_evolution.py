@@ -91,7 +91,9 @@ class ExtraData(unittest.TestCase):
         self.assertEqual(E.parity(0, 2, b"\xab\xcd"), 0xAB ^ 0xAB ^ 0xCD)
         # a 12-bit length folds its high nibble in
         self.assertEqual(E.parity(0, 0x123, b""), ((0x123 ^ 0xA9) >> 8 ^ (0x123 ^ 0xA9)) & 0xFF)
-        self.assertEqual(E.parity(5, 0, b""), (5 ^ 0xA9))
+        # the reserved nibble is the top of the 16-bit word (section 16.4): 0x5000 ^ 0xA9 = 0x50A9,
+        # folded to 0x50 ^ 0xA9
+        self.assertEqual(E.parity(5, 0, b""), 0x50 ^ 0xA9)
 
     def test_a_built_region_reads_back_clean(self):
         for reading in E.READINGS:

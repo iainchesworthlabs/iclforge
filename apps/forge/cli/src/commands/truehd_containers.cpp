@@ -673,7 +673,7 @@ std::optional<TruehdMeasurement> measure_truehd(std::span<const std::byte> strea
                 out.substreams = parsed->num_substreams;
             }
         }
-        rate.add(unit->size(), sync);
+        rate.add(*unit, sync);
         bool errored = false;
         for (const auto& track : tracks) {
             const auto result = track->decoder.decode(*unit);

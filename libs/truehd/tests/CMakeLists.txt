@@ -16,20 +16,32 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     decoder/test_decoder_checks.cpp
     decoder/test_ffmpeg_fixtures.cpp
     decoder/test_fixture_features.cpp
+    decoder/test_alternative_readings.cpp
     decoder/test_handbuilt.cpp
     decoder/test_kernels.cpp
+    decoder/test_object_robustness.cpp
     encoder/test_coded_bits_simd.cpp
     decoder/test_substream3.cpp
+    encoder/test_cluster_elements.cpp
     encoder/test_coding.cpp
     encoder/test_downmix.cpp
     encoder/test_encoder.cpp
+    encoder/test_encoder_atmos.cpp
+    encoder/test_encoder_object_bed.cpp
+    encoder/test_encoder_object_motion.cpp
+    encoder/test_render_bed.cpp
+    encoder/test_layout.cpp
+    encoder/test_ratectl.cpp
+    encoder/test_ratectl_motion.cpp
     encoder/test_signals.cpp
     fuzz/test_truehd_mutator.cpp)
 
-# iclforge::objects only for test_evolution.cpp, which holds this library's reading of the evolution
-# frame to the EMDF container reader E-AC-3 streams go through (libs/truehd itself links base alone).
+# iclforge::objects for test_evolution.cpp, which holds this library's reading of the evolution
+# frame to the EMDF container reader E-AC-3 streams go through, and iclforge::render for
+# test_render_bed.cpp, which holds the bed panner to libs/render's (libs/truehd itself links base
+# alone).
 target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::base_headers iclforge::json
-    iclforge::objects)
+    iclforge::objects iclforge::render)
 # fuzz/test_truehd_mutator.cpp includes libs/truehd/fuzz/truehd_mutator.hpp, the repair half of the
 # libFuzzer custom mutator. The mutator itself builds only under Clang with -fsanitize=fuzzer, but
 # the header's restamp_truehd_checks is portable C++ over the library's own check routines, and
@@ -42,8 +54,11 @@ target_compile_definitions(iclforge-truehd-tests PRIVATE
     ICLFORGE_TRUEHD_SIGNING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
     ICLFORGE_TRUEHD_REFERENCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tools/references")
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
-# build), so the tests that exercise them compile coding.cpp themselves and see src/.
-target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)
+# build), so the tests that exercise them compile coding.cpp themselves and see src/. The same goes
+# for the object substream's matrix planner (object_bed.cpp) and the render and clustering code.
+target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp
+    ../src/encoder/object_bed.cpp ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp
+    ../src/encoder/ratectl_shape.cpp)
 target_include_directories(iclforge-truehd-tests PRIVATE ../src)
 
 # The AVX2 kernel of src/internal/avx2, compiled a second time into this binary for the reason
@@ -69,3 +84,33 @@ endif()
 add_executable(iclforge-truehd-encode-tool tools/encode_tool.cpp)
 target_link_libraries(iclforge-truehd-encode-tool PRIVATE iclforge::truehd iclforge::warnings)
 add_dependencies(iclforge-tests iclforge-truehd-encode-tool)
+
+# iclforge-truehd-object-plan-tool - what the encoder's planner of moving objects makes of a request,
+# for tools/checks/verify_truehd_object_bed.py to hold to the Python reference writer's. It compiles
+# object_bed.cpp itself, which the library keeps to itself.
+add_executable(iclforge-truehd-object-plan-tool tools/object_plan_tool.cpp ../src/encoder/object_bed.cpp)
+target_link_libraries(iclforge-truehd-object-plan-tool PRIVATE iclforge::truehd iclforge::base_headers
+    iclforge::warnings)
+target_include_directories(iclforge-truehd-object-plan-tool PRIVATE ../src)
+add_dependencies(iclforge-tests iclforge-truehd-object-plan-tool)
+
+# iclforge-truehd-render-tool - the render side's Atmos test streams from synthetic masters
+# (libs/truehd/notes/feature-truehd-atmos-encoder-render.md). The render and clustering code is
+# internal (hidden in a shared build), so the tool compiles it itself, as the tests do.
+add_executable(iclforge-truehd-render-tool tools/render_stream_tool.cpp
+    ../src/encoder/render_bed.cpp ../src/encoder/cluster_elements.cpp)
+target_include_directories(iclforge-truehd-render-tool PRIVATE ../src)
+target_link_libraries(iclforge-truehd-render-tool PRIVATE iclforge::truehd iclforge::warnings)
+
+# iclforge-truehd-ss3-lab - the decoder under each setting of DecoderLab, for the owner to run on a
+# TrueHD Atmos stream (libs/truehd/ERRATA.md entry 69).
+add_executable(iclforge-truehd-ss3-lab tools/ss3_lab.cpp)
+target_link_libraries(iclforge-truehd-ss3-lab PRIVATE iclforge::truehd iclforge::warnings)
+add_dependencies(iclforge-tests iclforge-truehd-ss3-lab)
+
+# decoder/test_object_robustness.cpp reads std::getenv (ICLFORGE_TRUEHD_MUTATIONS, for a longer
+# run of the mutation tests); MSVC's C4996 on it is an error under the warnings target - same
+# reasoning as libs/ac3/tests/core/test_simd_kernels.cpp.
+if(MSVC)
+    set_source_files_properties(decoder/test_object_robustness.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()

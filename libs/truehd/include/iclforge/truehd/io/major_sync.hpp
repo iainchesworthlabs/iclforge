@@ -83,6 +83,11 @@ inline constexpr int kChannelMeaningBits = 64;
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::array<std::uint8_t, 8> pack_channel_meaning(
     const ChannelMeaning& meaning);
 
+// Names the first field of `extra` whose value its width cannot hold (TH spec §14.2); an empty view
+// when every field fits. The writer and the encoder's configuration check use it.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::string_view extra_channel_meaning_problem(
+    const ExtraChannelMeaning& extra) noexcept;
+
 struct MajorSync {
     StreamKind kind = StreamKind::kTrueHd;
     // TH spec §5.1 / §5.2: the 32 bits after the sync word; the accessors below split them by
@@ -151,9 +156,11 @@ struct MajorSync {
     std::span<const std::byte> data, bool verify_crc = true);
 
 // Writes the major sync with its CRC. A TrueHD stream's channel meaning is written from
-// `channel_meaning`, an MLP stream's from `channel_meaning_bytes`. The writer does not write an
-// extension (`extra` must be empty): kUnsupported otherwise. A channel meaning with a field wider
-// than its width is kBadParameter, the detail naming the field (channel_meaning_problem()).
+// `channel_meaning`, an MLP stream's from `channel_meaning_bytes`. With `extra` set (a TrueHD
+// stream whose channel meaning has extra_present) the 16-channel extension of TH spec §14.2
+// follows: its length is the words the fields take, so a dynamic-object-only programme is the 4
+// bytes the owner's discs have; it is kBadParameter without extra_present. A channel meaning or an
+// extension with a field wider than its width is kBadParameter, the detail naming the field.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<std::vector<std::byte>, Error> write_major_sync(
     const MajorSync& major_sync);
 
