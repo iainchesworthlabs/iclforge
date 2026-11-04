@@ -152,8 +152,10 @@ class ICLFORGE_TRUEHD_EXPORT Decoder {
 
     [[nodiscard]] const DecoderCounters& counters() const noexcept;
 
-    // Forgets the stream: the next unit has to carry a major sync.
-    void reset();
+    // Forgets the stream: the next unit has to carry a major sync. The decoder's buffers are kept
+    // and cleared where they are, so this allocates nothing and cannot fail; a device restarts a
+    // stream at a seek or a format change without holding the decoder's memory twice.
+    void reset() noexcept;
 
    private:
     struct Impl;

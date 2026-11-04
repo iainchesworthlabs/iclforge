@@ -184,6 +184,10 @@ struct Decoder::Impl {
 
     [[nodiscard]] bool strict() const noexcept { return config.strictness == Strictness::kStrict; }
 
+    // What a new decoder holds, kept in the memory this one already has: no allocation, so it
+    // cannot fail and a device that has no second copy of the buffers to spare can restart a stream.
+    void clear() noexcept;
+
     [[nodiscard]] std::expected<AccessUnit, Error> parse_unit(std::span<const std::byte> data);
     void accept_major_sync(const MajorSync& incoming);
     [[nodiscard]] int substreams_wanted(int available) const noexcept;
@@ -888,9 +892,25 @@ void Decoder::lost_data() noexcept {
     }
 }
 
-void Decoder::reset() {
-    const DecoderConfig config = impl_->config;
-    impl_ = std::make_unique<Impl>(config);
+void Decoder::Impl::clear() noexcept {
+    counters = DecoderCounters{};
+    major_sync.reset();
+    // Rebuilt where they stand: a substream's state is several kilobytes, and a temporary of it
+    // on the stack is what a small task stack cannot take.
+    for (SubstreamState& substream : substreams) {
+        std::destroy_at(&substream);
+        std::construct_at(&substream);
+    }
+    std::ranges::fill(rows, 0);
+    std::ranges::fill(matrixed, 0);
+    std::ranges::fill(pcm, 0);
+    extra_data.clear();
+    layout_eight.clear();
+    layout_six.clear();
+}
+
+void Decoder::reset() noexcept {
+    impl_->clear();
 }
 
 }  // namespace iclforge::truehd

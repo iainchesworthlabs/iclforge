@@ -1,0 +1,18 @@
+# TrueHD in the Hearth sink (planning/truehd-parity-esp32-sinks.md): the component's TrueHD decoder on,
+# so that a Sendspin stream of the `truehd` data type (one to 24 whole access units a chunk) is
+# decoded and played as an AC-3, E-AC-3 or AC-4 stream is.
+#
+#   $d = python tools/hearth/sink_profile.py defaults p4-rev1 --overlay truehd
+#   idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=$d" build
+#
+# It is an overlay (profiles.json), given after a profile's own fragments.
+#
+# A part with PSRAM or without, the board lists `truehd` only where CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD
+# says (the P4 by default, 6 channels); an S3 or a C6 turns it on by hand once a play has been measured
+# there. The decoder holds 158 KB and the task that runs it needs the stack below.
+CONFIG_ICLFORGE_TRUEHD=y
+
+# The decode task's stack: the decoder reached 60,944 bytes on the ESP32-C6, -S3 and -P4
+# (firmware/truehd-probe, results/), the owner's decision (question 22) is at least 64 KiB, and the
+# player's own frames above the decoder come on top of it.
+CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES=73728

@@ -261,6 +261,20 @@ if(ICLFORGE_MINIMAL_AC4 AND NOT ICLFORGE_MINIMAL_DECODER)
         "and needs ICLFORGE_MINIMAL_DECODER=ON (a full build has ICLFORGE_BUILD_AC4).")
 endif()
 
+# The TrueHD decoder, in the same profile and for the same reason: libs/truehd/minimal.cmake builds
+# what a decode reads (the core, the major sync, the access unit and the decoder) and no encoder, with
+# the profile's compile options. An option of its own, since ICLFORGE_BUILD_TRUEHD also builds the
+# encoder and what the CLI links. Off by default; firmware/esp-idf/iclforge/CMakeLists.txt sets it
+# from CONFIG_ICLFORGE_TRUEHD.
+option(ICLFORGE_MINIMAL_TRUEHD
+    "Minimum-footprint decoder profile only: also build the TrueHD core, bitstream layer and decoder (no encoder)"
+    OFF)
+if(ICLFORGE_MINIMAL_TRUEHD AND NOT ICLFORGE_MINIMAL_DECODER)
+    message(FATAL_ERROR
+        "ICLFORGE_MINIMAL_TRUEHD adds the TrueHD decoder to the minimum-footprint decoder profile, "
+        "and needs ICLFORGE_MINIMAL_DECODER=ON (a full build has ICLFORGE_BUILD_TRUEHD).")
+endif()
+
 # Where a frame's time goes, on a target that cannot run Tracy. Routes the
 # library's ICLFORGE_ZONE_SCOPED_N() markers - the same ones ICLFORGE_ENABLE_TRACY
 # turns into Tracy zones - to two functions the APPLICATION supplies (see
@@ -576,7 +590,7 @@ endif()
 # The TrueHD and MLP codec, a peer of iclforge::ac3 and iclforge::ac4 that links only iclforge::base:
 # the bitstream layer and the decoder (libs/truehd). Gated by ICLFORGE_BUILD_TRUEHD (default ON, see
 # the option() above).
-if(ICLFORGE_BUILD_TRUEHD)
+if(ICLFORGE_BUILD_TRUEHD OR ICLFORGE_MINIMAL_TRUEHD)
     add_subdirectory(libs/truehd)
 endif()
 

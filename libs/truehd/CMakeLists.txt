@@ -10,6 +10,12 @@
 # platform code, and no third-party code. Built and installed as a static and a shared library by
 # iclforge_add_library() (cmake/IclforgeLibrary.cmake).
 # ---------------------------------------------------------------------------
+# The minimum-footprint profile's archive (ICLFORGE_MINIMAL_TRUEHD): what a decode reads, no encoder.
+if(ICLFORGE_MINIMAL_DECODER)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/minimal.cmake")
+    return()
+endif()
+
 iclforge_add_library(truehd
     NO_C4251_SUPPRESSION
     SOURCES
