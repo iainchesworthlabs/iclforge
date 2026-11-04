@@ -86,7 +86,10 @@ owner decides; none of them blocks the rest.
    finds and carries on, judges at the date the signature records, and the report line says so
    (`validity judged at 2025-06-01T00:00:00 (signed, the default of check-content)`).
    `verify-time=now|signed|ignore|<instant>` overrides either. The library's default is still
-   `TimeBasis::kNow`; the choice is the front end's. Which commands are "strict" and which are
+   `TimeBasis::kNow`; the choice is the front end's. A later independent audit (2026-11-04) read the same chain and the same
+   result (`chain-rejected`, the second CA expired 2025-11-13, `signedDate` 2026-04-13); it changes nothing
+   here. The sample's signature and signer-information digest verify; only the time check fails, and
+   whether Dolby's verifier makes that check on intermediates is not known. Which commands are "strict" and which are
    "own-QC" is my reading: confirm it, or name the commands.
 2. **How is a signature carried in an MP4?** *Answered by v2.5 §8.3.2: it is not; signing an MP4 is
    out of scope and a signer refuses it (see above).* If a convention is defined later, §8.3.2 says

@@ -686,3 +686,26 @@ one; `follow=off`, or no output that can take PCM, refuses. It is carried in `Ou
      `kMat`, the support object listing `truehd` only when `isLinkSupported` says yes (the real feature, and a Hearth server then plays to the Shield); or (b) a
      diagnostic only: a debug intent in the app that opens `openLink` and plays a bundled MAT stream. (a) is the one to build; it is a PR of its own.
 135. **MLP is not sent.** The decision never sends MLP as MAT (no carriage); an MLP item is decoded here whatever is chosen. Unchanged.
+
+## Hearth for Android plays TrueHD (2026-11-04)
+
+Entries 136 to 139 are this block's, and they answer entry 134 (the Android app could not play TrueHD).
+
+136. **`libs/sink`'s `PassthroughOutput` packs TrueHD into MAT.** A server sends TrueHD as access units, up to 24 to a chunk. The output opens its link for
+     `kTruehd` at 192 kHz (176.4 kHz for the 44.1 kHz family; 4, 2 or 1 times the content rate, 960, 1,920 or 3,840 content frames to a burst), packs each chunk with
+     `MatPacker` (no second packer) into one 61,440-byte burst, and places it in the slot it is due in as it places an AC-3 burst. A chunk of fewer than 24 units
+     (the end of an item) is a burst with empty slots. A chunk that is not whole units, or is over 24, is dropped and counted. Rates TrueHD has no link at are refused.
+     Tests: `libs/sink/tests/test_passthrough_truehd.cpp` (a model link; the real bursts the link was handed unwrap to the units sent, in order; the carrier per rate;
+     the refusals). Mutation checks on the unit limit, the carrier ratio, the frames per burst and the padded tail fail them.
+137. **The Android app offers `truehd` only on a route that takes it.** `audio_link.cpp` maps `DataType::kTruehd` to `kMat`, so `PassthroughSink` opens the eight-channel
+     track through the bridge's `openLink()`, and `SharedAudio::routes()` lists `truehd` when the backend's `supports_mat_passthrough` (the bridge's `isLinkSupported`)
+     is true. A server that does not see `truehd` listed sends the member PCM or Opus under the fallback chain (the sink's stated form, then stereo PCM, then refusal), and
+     nothing is transcoded; but this app accepts PCM only to drop it (README, "What it does not do yet"), so a Shield whose route does not take TrueHD is not played
+     to by the group for a TrueHD item. *Recommend:* the group editor says so, as it does for any member that cannot take a stream (the form's reason); no change here.
+138. **Between TrueHD bursts the link carries IEC 61937 null bursts of the MAT period** (`iec::null_burst(61440)`), the keep-alive the AC-3 and E-AC-3 paths use. That a
+     receiver keeps a TrueHD lock on them is an assumption: on one receiver zeros lost the AC-3 lock in half a second and null bursts did not
+     (`planning/hearth-android-findings.md`, F12), and nothing has shown it for MAT. An empty MAT frame is the other candidate. *Recommend:* the Shield run notes whether
+     the receiver drops lock in the gaps between items, and if it does the output sends empty MAT frames instead; the Pi session can try both on the Onkyo first.
+139. **Not run.** Nothing here has run on a Shield or against a receiver. Not covered by a host test: `audio_link.cpp`'s mapping and `routes()` (Android-only code, built by the
+     Android lane), and the loopback end-to-end harness (`libs/sink/src/loopback_harness.cpp`, AC-3 and E-AC-3 only) was not extended to TrueHD. *Recommend:* the debug APK (below, in the
+     Shield note) is run once on the Shield into the Onkyo with the desktop player as the server, and the lock, the first seconds and the gap between items are read.
