@@ -182,7 +182,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     `mp4`, `ts`, `spdif` and `remux` none; `quiet` and `verbose` always). `decode` also refuses an objects directory and an ADM
     path, which would never be written. The only options warned about are the choices between ways of computing a transform
     (`fast-mdct`, `fast-imdct`, `mode=`), which cannot change the output or any verdict of a codec that has no transform, and
-    the two `truehd-` options on a stream that is not TrueHD, as before. Not covered: `demux`, `unspdif` and the positional
+    the two `truehd-` options on a stream that is not TrueHD, as before. **Update:** `decode` now also applies `verify-objects`, `gate-objects` and `signing-key=`, and `metadata` applies `sign-objects` and `signing-key=` (the per-frame evolution tag of `iclforge::truehd::signing`, docs/concepts/object-signing.md); `sign-objects` on any other TrueHD command and `verify-objects` on `probe` stay refused by name. Not covered: `demux`, `unspdif` and the positional
     arguments a command does not read, which `forge` ignores for every codec. Refuse, warn, or refuse only some? Recommendation:
     refuse, and warn only where the option cannot change the output or any verdict, so that a verification flag or a second
     source is never dropped. **Provisional, owner to confirm.**

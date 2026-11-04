@@ -1325,7 +1325,7 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
         // Each of these was accepted, exit 0, and left the output as it would have been.
         for (const std::string option :
              {"downmix=loro", "drc=0.5", "drcmode=rf", "karaoke", "conceal=mute",
-              "mix-lfe", "programme=3", "bed-only", "verify-objects", "gate-objects",
+              "mix-lfe", "programme=3", "bed-only", "sign-objects",
               "dialnorm=27", "syntax-trace=trace.txt", "verify-content", "check-content",
               "heavy"}) {
             DYNAMIC_SECTION(option) {

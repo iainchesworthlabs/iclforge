@@ -259,8 +259,10 @@ or check, without the command that signs or checks, is refused, and so is `sign-
 The core in `iclforge::base::crypto` is codec-neutral on purpose. The TrueHD specification supplied for this project describes its
 Evolution frame payload as the same `ContentSignature` container under the same scheme, and lists the container's field IDs and the
 digest scope as unconfirmed. If real streams agree, a TrueHD front end needs only its own carriage (where the blob sits, which bytes
-the digest covers), the way `iclforge::ac4` has. **Nothing for TrueHD is built:** `forge` has no TrueHD signing or verifying command,
-and the TrueHD decoder reads none of the evolution frame. See
+the digest covers), the way `iclforge::ac4` has. **The nested content signature for TrueHD is not built.** What is built is a separate, per-frame
+keyed tag in the evolution frame's protection field (`iclforge::truehd::signing`, iclforge's own scheme with the operator's own key;
+`forge metadata ... sign-objects`, `decode ... verify-objects` and `gate-objects`), which the
+TrueHD decoder does not read unless asked. See
 [Object signing](../concepts/object-signing.md#sibling-truehd-evolution) and, for the open question,
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
 
