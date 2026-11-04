@@ -183,6 +183,38 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
 // check (TH spec §7.3)
 // and, when `pcm` is not null, written as 24 bit samples, `out_channels` to a sample time. Returns
 // the new fold.
+//
+// ShiftByPosition and FoldByPosition are the alternative readings of AlternativeReadings, for
+// scoring only: they index the shift and the fold by the output channel instead of the matrix
+// channel. They are template parameters so the loop for the readings as specified is exactly the
+// loop without them. Tested per sample instead, they doubled this kernel's time
+// (truehd_output_assign, truehd_lossless_fold).
+template <bool ShiftByPosition, bool FoldByPosition>
+[[nodiscard]] inline std::uint32_t assign_output_as(int block, int out_channels,
+                                                    const std::uint8_t* source_channel,
+                                                    const std::int8_t* output_shift,
+                                                    const std::int32_t* rows, std::ptrdiff_t stride,
+                                                    std::int32_t* pcm, std::uint32_t fold) {
+    for (int i = 0; i < block; ++i) {
+        const std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
+        for (int ch = 0; ch < out_channels; ++ch) {
+            const std::int32_t source = row[source_channel[ch]];
+            const int shift_index = ShiftByPosition ? ch : source_channel[ch];
+            const int shift = output_shift[shift_index];
+            const std::int32_t output =
+                shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
+                           : source >> -shift;
+            const auto fold_channel =
+                static_cast<std::uint32_t>(FoldByPosition ? ch : source_channel[ch]);
+            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output), fold_channel);
+            if (pcm != nullptr) {
+                pcm[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
+            }
+        }
+    }
+    return fold;
+}
+
 [[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
                                                  const std::uint8_t* source_channel,
                                                  const std::int8_t* output_shift,
@@ -190,25 +222,18 @@ inline void apply_matrix(int block, int count, const std::uint8_t* channel,
                                                  std::int32_t* pcm, std::uint32_t fold,
                                                  bool shift_by_position = false,
                                                  bool fold_by_position = false) {
-    // shift_by_position and fold_by_position are the alternative readings of AlternativeReadings,
-    // for scoring only.
-    for (int i = 0; i < block; ++i) {
-        const std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
-        for (int ch = 0; ch < out_channels; ++ch) {
-            const std::int32_t source = row[source_channel[ch]];
-            const int shift = output_shift[shift_by_position ? ch : source_channel[ch]];
-            const std::int32_t output =
-                shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
-                           : source >> -shift;
-            const int fold_channel = fold_by_position ? ch : source_channel[ch];
-            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output),
-                                      static_cast<std::uint32_t>(fold_channel));
-            if (pcm != nullptr) {
-                pcm[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
-            }
-        }
+    if (shift_by_position) {
+        return fold_by_position
+                   ? assign_output_as<true, true>(block, out_channels, source_channel, output_shift,
+                                                  rows, stride, pcm, fold)
+                   : assign_output_as<true, false>(block, out_channels, source_channel,
+                                                   output_shift, rows, stride, pcm, fold);
     }
-    return fold;
+    return fold_by_position
+               ? assign_output_as<false, true>(block, out_channels, source_channel, output_shift,
+                                               rows, stride, pcm, fold)
+               : assign_output_as<false, false>(block, out_channels, source_channel, output_shift,
+                                                rows, stride, pcm, fold);
 }
 
 }  // namespace iclforge::truehd::kernels
