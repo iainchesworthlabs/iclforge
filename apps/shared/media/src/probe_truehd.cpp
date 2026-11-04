@@ -25,7 +25,26 @@ namespace iclforge::apps::truehd_probe {
 namespace th = iclforge::truehd;
 
 void RateModel::add(std::span<const std::byte> unit, const std::optional<th::MajorSync>& first_sync) {
-    const std::size_t unit_bytes = unit.size();
+    // The unit's own input_timing (bytes 2 and 3 of its prefix, TH spec section 3.4) says when it starts.
+    const auto timing = unit.size() >= 4 ? static_cast<std::uint16_t>(
+                                               (std::to_integer<unsigned>(unit[2]) << 8U) |
+                                               std::to_integer<unsigned>(unit[3]))
+                                         : std::uint16_t{0};
+    // A unit with a restart header says its decode time.
+    std::optional<std::uint16_t> output_timing;
+    if (first_sync) {
+        if (const auto parsed = th::parse_access_unit(unit, first_sync->num_substreams, true)) {
+            if (const auto header = th::first_restart_header(*parsed)) {
+                output_timing = header->output_timing;
+            }
+        }
+    }
+    add_unit(unit.size(), timing, output_timing, first_sync);
+}
+
+void RateModel::add_unit(std::size_t unit_bytes, std::uint16_t input_timing,
+                         std::optional<std::uint16_t> output_timing,
+                         const std::optional<th::MajorSync>& first_sync) {
     if (!started_) {
         if (!first_sync) {
             return;
@@ -42,32 +61,25 @@ void RateModel::add(std::span<const std::byte> unit, const std::optional<th::Maj
     const auto bits_at_rate = static_cast<std::uint64_t>(unit_bytes) * 8U * rate_;
     const auto duration = static_cast<std::int64_t>((bits_at_rate + report_.declared_bps - 1U) /
                                                     report_.declared_bps);
-    // The unit's own input_timing (bytes 2 and 3 of its prefix, TH spec section 3.4) says when it starts.
-    const auto timing = unit.size() >= 4 ? static_cast<std::uint16_t>(
-                                               (std::to_integer<unsigned>(unit[2]) << 8U) |
-                                               std::to_integer<unsigned>(unit[3]))
-                                         : std::uint16_t{0};
     std::int64_t shortfall = 0;
-    // The unit before has to have arrived before this one starts.
     if (units_ > 0) {
-        const std::int64_t delta = static_cast<std::uint16_t>(timing - last_timing_);
-        shortfall = std::max(shortfall, last_duration_ - delta);
+        const std::int64_t delta = static_cast<std::uint16_t>(input_timing - last_timing_);
+        // The unit before has to have arrived before this one starts, and a start can follow the
+        // last by little, but not by less than a quarter of a slot.
+        shortfall = std::max({shortfall, last_duration_ - delta, nominal_ / 4 - delta});
         // The lead (decode time minus start) moves by a slot less the step between starts.
         lead_ += nominal_ - delta;
     }
-    // A unit with a restart header says its decode time, which fixes the lead; the units after it
-    // keep it by their steps. The unit has to have arrived by its decode time.
-    if (first_sync) {
-        if (const auto parsed = th::parse_access_unit(unit, first_sync->num_substreams, true)) {
-            if (const auto header = th::first_restart_header(*parsed)) {
-                lead_ = static_cast<std::int16_t>(
-                    static_cast<std::uint16_t>(header->output_timing - timing));
-                have_lead_ = true;
-            }
-        }
+    // A restart header fixes the lead; the units after it keep it by their steps.
+    if (output_timing) {
+        lead_ = static_cast<std::int16_t>(static_cast<std::uint16_t>(*output_timing - input_timing));
+        have_lead_ = true;
     }
     if (have_lead_) {
-        shortfall = std::max(shortfall, duration - lead_);
+        // The unit has to have arrived by its decode time and lead it by a unit at least, and no
+        // unit may lead by more than 75 ms.
+        const std::int64_t ceiling = static_cast<std::int64_t>(rate_) * 75 / 1000;
+        shortfall = std::max({shortfall, std::max<std::int64_t>(duration, nominal_) - lead_, lead_ - ceiling});
     }
     if (shortfall > 0) {
         ++report_.violations;
@@ -76,7 +88,7 @@ void RateModel::add(std::span<const std::byte> unit, const std::optional<th::Maj
     }
     report_.max_unit_rate_bps = std::max<std::uint64_t>(
         report_.max_unit_rate_bps, bits_at_rate / static_cast<std::uint64_t>(nominal_));
-    last_timing_ = timing;
+    last_timing_ = input_timing;
     last_duration_ = duration;
     ++units_;
 }

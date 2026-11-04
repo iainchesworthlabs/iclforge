@@ -31,16 +31,22 @@ namespace iclforge::apps::truehd_probe {
 // The data rate of a stream against what it declares (TH spec §18, as libs/truehd/ERRATA.md entry
 // 99 records): the channel carries one unit at a time, and a unit takes duration = bytes x 8 x
 // sample rate / declared rate samples to arrive. The stream says when each unit starts
-// (input_timing) and, at a restart header, when it is decoded (output_timing). A unit is short when
-//   (input_timing[n] - input_timing[n-1]) mod 65536  <  duration[n-1]    (the one before had not arrived), or
-//   lead[n]  <  duration[n]                                               (it arrives after its decode time).
-// The law is per unit, with no queue carried forward: a stream that sends a burst early, as a real
-// encoder does, is within it. The declared rate is MajorSync::peak_data_rate_bps() (question 12).
+// (input_timing) and, at a restart header, when it is decoded (output_timing); the lead is the
+// samples from the one to the other. A unit is out of the law when
+//   delta[n] = (input_timing[n] - input_timing[n-1]) mod 65536  <  duration[n-1]   (the one before had not arrived), or
+//   delta[n]  <  nominal / 4                                                       (a start too soon after the last), or
+//   lead[n]  <  max(duration[n], nominal)                                          (it arrives after its decode time,
+//                                                                                    or leads by under a unit), or
+//   lead[n]  >  75 ms.
+// The last three bounds are what the streams the project holds show (ERRATA.md entry 99), not a
+// reading of the specification's text. The law is per unit, with no queue carried forward: a stream
+// that sends a burst early, as a real encoder does, is within it. The declared rate is
+// MajorSync::peak_data_rate_bps() (question 12).
 struct RateReport {
     std::uint64_t declared_bps = 0;
     std::uint64_t max_unit_rate_bps = 0;  // the largest unit's bytes over its own duration
-    std::uint64_t violations = 0;         // units that start before the unit before them has arrived
-    double worst_overrun_ms = 0.0;        // the most by which one did
+    std::uint64_t violations = 0;         // units out of the law
+    double worst_overrun_ms = 0.0;        // the most by which one was (a bound missed, in ms)
 };
 
 class RateModel {
@@ -48,6 +54,11 @@ class RateModel {
     // The next access unit, whole; `first_sync` the major sync the unit carries, if any. Units
     // before the first major sync are not counted.
     void add(std::span<const std::byte> unit, const std::optional<truehd::MajorSync>& first_sync);
+    // The same from the numbers: the unit's size, its input_timing, the output_timing of its
+    // restart header if it has one that read, and the major sync it carries, if any.
+    void add_unit(std::size_t unit_bytes, std::uint16_t input_timing,
+                  std::optional<std::uint16_t> output_timing,
+                  const std::optional<truehd::MajorSync>& first_sync);
     [[nodiscard]] const RateReport& report() const noexcept { return report_; }
 
    private:

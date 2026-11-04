@@ -71,7 +71,7 @@
       "declared_bps": 9597000,
       "max_unit_rate_bps": 3897600,
       "violations": 40,
-      "worst_overrun_ms": 27.021
+      "worst_overrun_ms": 27.5
     },
     "restart_spacing": {
       "major_syncs": 3,

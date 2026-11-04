@@ -119,3 +119,64 @@ TEST_CASE("input_timing wraps at 65536 without a violation", "[gui][truehd][rate
     const RateModel model = run(setup, 2000, 65500);
     CHECK(model.report().violations == 0);
 }
+
+namespace {
+
+// `count` small units (duration well under a slot) a slot apart, the first with a restart header
+// that puts the lead at `lead`; the lead then stays there, since each step is a slot.
+RateModel run_led(const Setup& setup, std::size_t count, std::int64_t lead,
+                  std::uint16_t first_timing = 1000, std::int64_t step = 40) {
+    RateModel model;
+    std::uint16_t timing = first_timing;
+    for (std::size_t n = 0; n < count; ++n) {
+        const std::optional<std::uint16_t> out =
+            n == 0 ? std::optional<std::uint16_t>(static_cast<std::uint16_t>(timing + lead))
+                   : std::nullopt;
+        model.add_unit(8, timing, out, n == 0 ? std::optional<th::MajorSync>{setup.sync} : std::nullopt);
+        timing = static_cast<std::uint16_t>(timing + step);
+    }
+    return model;
+}
+
+}  // namespace
+
+TEST_CASE("a start less than a quarter of a slot after the last is out of the law", "[gui][truehd][rate]") {
+    const Setup setup = setup_from_fixture();
+    // 8-byte units take 1 sample to arrive; the floor is 40 / 4 = 10 samples between starts.
+    CHECK(run_led(setup, 100, 40, 1000, 10).report().violations == 0);
+    const RateModel nine = run_led(setup, 100, 40, 1000, 9);
+    // Each step also moves the lead by a slot less the step, so the lead grows by 31 per unit: only
+    // the step itself is under test, so count the violations of a stream that keeps its lead.
+    CHECK(nine.report().violations > 0);
+    RateModel exact;
+    RateModel one_short;
+    std::uint16_t timing = 0;
+    for (std::size_t n = 0; n < 50; ++n) {
+        exact.add_unit(8, timing, n == 0 ? std::optional<std::uint16_t>(40) : std::nullopt,
+                       n == 0 ? std::optional<th::MajorSync>{setup.sync} : std::nullopt);
+        timing = static_cast<std::uint16_t>(timing + (n % 2 == 0 ? 10 : 70));  // steps of 10 and 70
+    }
+    CHECK(exact.report().violations == 0);
+    timing = 0;
+    for (std::size_t n = 0; n < 50; ++n) {
+        one_short.add_unit(8, timing, n == 0 ? std::optional<std::uint16_t>(40) : std::nullopt,
+                           n == 0 ? std::optional<th::MajorSync>{setup.sync} : std::nullopt);
+        timing = static_cast<std::uint16_t>(timing + (n % 2 == 0 ? 9 : 71));  // steps of 9 and 71
+    }
+    CHECK(one_short.report().violations == 25);
+}
+
+TEST_CASE("the lead is held between a slot and 75 ms", "[gui][truehd][rate]") {
+    const Setup setup = setup_from_fixture();
+    const std::int64_t ceiling = static_cast<std::int64_t>(setup.rate) * 75 / 1000;  // 3600 at 48 kHz
+    CHECK(run_led(setup, 20, 40).report().violations == 0);
+    CHECK(run_led(setup, 20, ceiling).report().violations == 0);
+    CHECK(run_led(setup, 20, 39).report().violations == 20);
+    CHECK(run_led(setup, 20, ceiling + 1).report().violations == 20);
+    // A lead is the difference of two 16 bit words: input 65530, output 10 is 16 samples.
+    CHECK(run_led(setup, 20, 16, 65530).report().violations == 20);
+    CHECK(run_led(setup, 20, 100, 65530).report().violations == 0);
+    // The overrun is the miss in milliseconds.
+    CHECK(run_led(setup, 1, ceiling + 48).report().worst_overrun_ms > 0.99);
+    CHECK(run_led(setup, 1, ceiling + 48).report().worst_overrun_ms < 1.01);
+}

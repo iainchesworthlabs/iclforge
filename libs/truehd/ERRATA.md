@@ -1299,16 +1299,25 @@ channel was free and carrying the backlog forward, and failed a unit that finish
 streams of `D:/ac3bld/dee-single-channel` (DEE 6.5.4, 7.1 and 5.1, a tone in one channel at a time; `sc-71-p8`: field 600, 1.80 Mbit/s declared,
 average 1.22 Mbit/s, largest unit 5.22 Mbit/s, worst delivery 753 ms, 55,812 of 64,800 units late) while their parity, CRC and lossless checks
 all passed; the 0.25 s gold streams passed (they are short). A second session reading the specification found the same on a DEE Atmos stream, and
-that §18.2's law is per unit. The gate is now two checks per unit, both from the stream's own timing words (entry 98 reads the second off the owner's UHD disc and the DRP's
-messages 0x75 and 0x79): a unit takes `duration = ceil(bytes x 8 x rate / declared rate)` samples to arrive; **(1)** the next unit must not start before it
-has, `(input_timing[n] - input_timing[n-1]) mod 65536 >= duration[n-1]`; **(2)** a unit must have arrived by its decode time, `lead[n] >= duration[n]`, where the lead
-(decode time minus start) is `output_timing - input_timing` at a unit with a restart header (`output_timing` is the unit's first sample, entry 37) and moves by
-`nominal - delta` from one unit to the next. No backlog is carried: a burst sent early, as a real encoder does, is within the law. `violations` counts
-the units that fail either and `worst_overrun_ms` is the largest shortfall (the JSON keys `worst_latency_ms` and `latency_limit_ms` are gone). **Checked:**
-0 violations on the four DEE single-channel streams, the 13 DEE gold streams, the 26 FFmpeg fixtures of `testdata/truehd` and two streams `forge sine` wrote;
-6,893 on a 5.1 stream written with `truehd-peak-rate=1000 truehd-rate-check=lenient`; the 27 hand-built streams of `testdata/truehd/handbuilt`, whose timing words
-are not meant to mean anything, now show violations in their goldens. Check (1) alone passes a stream the encoder wrote past its rate with `lenient` (it serialises
-the units but lets them arrive after their decode time), which is why (2) is there. **Not checked, not known:** an upper limit on the lead (the 75 ms of the
-old model, DRP's message 0x78); that a unit starts no sooner than one slot after the previous started (§3.4); whether the DRP's own limits are the same to the
-sample. Tests: `probe json=1` of every fixture is its golden document (the `rate_model` member), `qc` of a stream written over its rate still exits 6, and the cases
-`[gui][truehd][rate]` of `apps/forge/gui/tests/test_truehd_rate_model.cpp` hold check (1) with units made to sit on it.
+that §18.2's law is per unit. **The law as built**, per unit, from the stream's own timing words: a unit takes `duration = ceil(bytes x 8 x rate / declared rate)`
+samples to arrive; `delta[n] = (input_timing[n] - input_timing[n-1]) mod 65536`; the lead is the decode time less the start, `output_timing - input_timing` at a unit with a
+restart header (`output_timing` is the unit's first sample, entry 37) and moved by `nominal - delta` from one unit to the next. A unit is out of the law when **(1)**
+`delta[n] < duration[n-1]` (the unit before had not arrived), **(2)** `delta[n] < nominal / 4` (10 samples at 48 kHz), **(3)** `lead[n] < max(duration[n], nominal)`
+(it arrives after its decode time, or leads by less than a slot), or **(4)** `lead[n] > 75 ms` (3,600 samples at 48 kHz). No backlog is carried: a burst sent early, as a real
+encoder does, is within the law. `violations` counts the units out of it and `worst_overrun_ms` is the largest miss (the JSON keys `worst_latency_ms` and
+`latency_limit_ms` are gone).
+**What carries each bound.** (1) and the arrival half of (3) are the per-unit law above and entry 98's DRP findings (0x75) and the owner's UHD disc. (2), the slot floor of (3)
+and (4) were proposed by a session that quoted a document of the analysis project (dee-analysis's own `TRUEHD_REFERENCE_SPECIFICATION.md`, not the licensed specification,
+whose provenance the owner has not cleared), and **no number was taken from it**: each was tested here as a hypothesis against the streams the project holds. The four Dolby
+single-channel streams, the 13 DEE gold streams and the 26 FFmpeg fixtures show a lead never under one slot (40 at 48 kHz, 80 at 96 kHz, 160 at 192 kHz; the single-channel
+streams reach exactly 40), never over the 75 ms (largest 3,586 of 3,600 at 48 kHz and 7,190 of 7,200 at 96 kHz), and a step between starts never under 11 samples at 48 kHz
+(`sc-71`; the floor is 10). A stream written at 1 Mbit/s with `truehd-rate-check=lenient` leads from -37,872 to +32,495 samples and has 11,411 units out of the law.
+Check (1) alone passes a stream the encoder wrote past its rate with `lenient` (it serialises the units but lets them arrive after their decode time), which is why (3) is there.
+**Also found:** entry 37 reads §3.4 as "a unit starts no sooner than one unit duration after the previous started". The Dolby streams contradict it (steps of 11, 17 and 36 samples at
+48 kHz where a slot is 40), so it is not a check.
+**Checked:** 0 violations on the four DEE single-channel streams, the 13 DEE gold streams, the 26 FFmpeg fixtures of `testdata/truehd` and two streams `forge sine` wrote; the 27 hand-built
+streams of `testdata/truehd/handbuilt`, whose timing words are not meant to mean anything, report violations in their goldens. **Not known:** that the floors and the ceiling sit
+exactly where the Reference Player puts them (only that every stream seen is inside and the Dolby ones come within 14 samples of the ceiling and 0 of the floor), whether the
+declared rate is the smallest that satisfies (1) (an authoring question, not a gate), and what a stream does to a player whose lead is out of the law. Tests:
+`probe json=1` of every fixture is its golden document (the `rate_model` member), `qc` of a stream written over its rate exits 6, and the cases `[gui][truehd][rate]` of
+`apps/forge/gui/tests/test_truehd_rate_model.cpp` hold each of the four, with a mutation for each.
