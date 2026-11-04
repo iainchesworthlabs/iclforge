@@ -223,6 +223,7 @@ controllers and the dialogs. Nothing is pressed in these rows: the tests call th
 |---|---|---|---|
 | The windows of a TrueHD or MLP file add up to FFmpeg's decode (4 fixtures, 3 window sizes) | new | logic | iclforge-forge-gui-tests [gui][truehd]: the TrueHD player's windows add up to FFmpeg's decode |
 | A seek lands on the sample asked for (forward over restarts, back, mid-unit, at and past the end) | new | logic | [gui][truehd]: a seek in a TrueHD stream lands on the sample asked for; a seek past the last restart of a stream with few of them |
+| The length stops where the stream does: the last unit's padding is not delivered (44.1 kHz fixture, 15 samples) | new | logic | [gui][truehd]: the padding of the last unit is not part of the stream the player delivers |
 | A file that is not a stream, or is missing, is refused with a sentence | new | logic | [gui][truehd]: a file that is not a TrueHD stream is refused with a sentence |
 | The exported WAV is the 24-bit WAV `forge decode` writes (header, mask 0x60F, samples) | new | logic | [gui][truehd]: the exported WAV is the 24-bit WAV forge decode writes |
 | Open stream: the summary line, the speakers, the length; MLP says so | new | logic | TrueHd::test_openingATrueHdStreamReportsItsFormatAndSpeakers, test_anMlpStreamSaysSo |

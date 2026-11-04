@@ -336,6 +336,11 @@ std::string Player::join_blocked(const OutputChoice& next, std::string_view titl
     if (mode_ != OutputMode::kBitstream || packed_frames_ == 0 || !prepared_) {
         return {};
     }
+    if (transport_.open_format().stream == audio::BitstreamFormat::kMat) {
+        // TrueHD units are of any length and the next item's first is a major sync, so its units
+        // go on into the burst the item before left open.
+        return {};
+    }
     // The packer holds part of a burst. It is made whole only by units that
     // add up to the six blocks a burst period is, and an E-AC-3 stream's
     // units are all the same length, so the next item's first says whether
@@ -368,6 +373,7 @@ std::string_view Player::settings_note() const {
 void Player::reset_packer() {
     packer_.reset();
     ac4_packer_.reset();
+    mat_packer_.reset();
     packed_frames_ = 0;
     packed_spans_.clear();
     group_payload_.clear();
@@ -386,6 +392,10 @@ void Player::send_unit(std::span<const std::byte> unit, std::uint32_t samples,
         return;
     }
     const std::size_t record = history_.size() - 1;
+    if (transport_.open_format().stream == audio::BitstreamFormat::kMat) {
+        send_unit_as_mat(unit, samples, record);
+        return;
+    }
 
     // AC-3 is a burst a frame. E-AC-3's units are packed until they make six
     // blocks, which for a stream of shorter frames spans several units - and
@@ -419,23 +429,66 @@ void Player::send_unit(std::span<const std::byte> unit, std::uint32_t samples,
                                     describe(packed.error())));
         return;
     }
+    note_packed_unit(samples, record);
+    if (!packed->has_value()) {
+        return;
+    }
+    queue_burst(std::move(**packed), record);
+}
+
+void Player::note_packed_unit(std::uint32_t samples, std::size_t record) {
     packed_frames_ += samples;
     if (packed_spans_.empty() || packed_spans_.back().record != record) {
         packed_spans_.push_back(Span{.record = record, .frames = 0});
     }
     packed_spans_.back().frames += samples;
-    if (!packed->has_value()) {
-        return;
-    }
+}
+
+void Player::queue_burst(std::vector<std::byte> burst, std::size_t record) {
     Pending& block = push_block();
     block.samples.clear();
-    block.burst = std::move(**packed);
+    block.burst = std::move(burst);
     block.spans.assign(packed_spans_.begin(), packed_spans_.end());
     block.frames = static_cast<std::size_t>(packed_frames_);
     block.record = record;
     pending_frames_ += block.frames;
     packed_frames_ = 0;
     packed_spans_.clear();
+}
+
+void Player::send_unit_as_mat(std::span<const std::byte> unit, std::uint32_t samples,
+                              std::size_t record) {
+    if (!mat_packer_) {
+        mat_packer_.emplace();
+    }
+    auto packed = mat_packer_->push(unit);
+    if (!packed) {
+        // Not sent. A packer that refused a unit has kept what it held, but the burst it would
+        // have joined can no longer be made whole in place, so what it held goes with it and the
+        // next unit starts a burst; a receiver that loses units waits for the next restart, as
+        // the library's own decoder does.
+        segments_.back().unsent += samples + packed_frames_;
+        packed_frames_ = 0;
+        packed_spans_.clear();
+        mat_packer_.emplace();
+        note_unit_error(fmt::format("a unit could not be sent over IEC 61937 as MAT, as {}",
+                                    describe(packed.error())));
+        return;
+    }
+    note_packed_unit(samples, record);
+    if (!packed->has_value()) {
+        return;
+    }
+    queue_burst(std::move(**packed), record);
+}
+
+void Player::flush_mat_tail() {
+    if (!mat_packer_ || mat_packer_->pending() == 0 || history_.empty()) {
+        return;
+    }
+    if (std::optional<std::vector<std::byte>> tail = mat_packer_->flush()) {
+        queue_burst(std::move(*tail), history_.size() - 1);
+    }
 }
 
 void Player::send_unit_to_group(std::span<const std::byte> unit, std::uint32_t samples,
@@ -1535,6 +1588,12 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     };
     const ItemFacts facts = session_->facts();
     const std::uint32_t rate = facts.sample_rate;
+    // What the item is sent as over IEC 61937: its own stream, or MAT for TrueHD, which has none of
+    // its own (the output decision names it).
+    const std::optional<audio::BitstreamFormat> item_stream =
+        facts.codec == ItemCodec::kTruehd && choice_.stream && audio::is_mat(*choice_.stream)
+            ? choice_.stream
+            : facts.stream;
     switch (choice_.mode) {
         case OutputMode::kLocalPcm:
             if (!sink_) {
@@ -1548,7 +1607,7 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                 return refuse(OpenFailure::kOutput, "This player has no passthrough output.",
                               "could not start");
             }
-            if (!facts.stream) {
+            if (!item_stream) {
                 return refuse(OpenFailure::kItem, "It carries nothing IEC 61937 can wrap.",
                               "cannot be played");
             }
@@ -1597,7 +1656,7 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     }
     // What the link carries: the item's own stream, or the transcode's AC-3.
     const std::optional<audio::BitstreamFormat> link =
-        transcode ? std::optional{audio::BitstreamFormat::kAc3} : facts.stream;
+        transcode ? std::optional{audio::BitstreamFormat::kAc3} : item_stream;
     std::expected<OpenOutputFormat, std::string> opened;
     if (bitstream) {
         opened = bitstream_->open(BitstreamSink::Format{
@@ -1643,11 +1702,11 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     attach_variants();
     if (transcode) {
         note(fmt::format("output opened: {} ({} transcoded), {} Hz (open {})",
-                         describe(format.mode), stream_name(*facts.stream), format.sample_rate,
+                         describe(format.mode), stream_name(*item_stream), format.sample_rate,
                          opens_));
     } else if (bitstream) {
         note(fmt::format("output opened: {} ({}), {} Hz (open {})", describe(format.mode),
-                         stream_name(*facts.stream), format.sample_rate, opens_));
+                         stream_name(*item_stream), format.sample_rate, opens_));
     } else {
         note(fmt::format("output opened: {}, {} Hz, {} channels (open {})", describe(format.mode),
                          format.sample_rate, format.channels, opens_));
@@ -2224,6 +2283,11 @@ void Player::item_ended(PumpReport& report, bool heard) {
     }
     if (!outcome.note.empty()) {
         report.note = outcome.note;
+    }
+    if (outcome.action != TransportAction::kJoinItem) {
+        // Nothing follows on this link: the burst being filled goes out padded, so the last
+        // units of the item are heard.
+        flush_mat_tail();
     }
     switch (outcome.action) {
         case TransportAction::kJoinItem: {

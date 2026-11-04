@@ -20,6 +20,7 @@ iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/karaoke_authoring.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/truehd_pcm_source.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/probe_truehd.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/truehd_stream.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_encode_core.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_objects_core.cpp"
     # The table of a karaoke stream's parts, which karaoke_authoring.cpp and `forge project` share
