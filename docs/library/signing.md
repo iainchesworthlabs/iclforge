@@ -231,8 +231,13 @@ reported as changed content), and `crypto::to_string(outcome)` gives the token a
 `policy.now`; `kSignedDate` judges them at the date the signature records, which is only as
 trustworthy as its signer; `kInstant` at a time the caller gives; `kIgnore` not at all. The report
 says which. A path is validated from its anchor down, so an expired certificate *above* an anchor does
-not matter. The sample the owner supplied has a CA certificate that expired before its signature was
-dated, which `kNow` correctly refuses; see `libs/ac4/ERRATA.md`.
+not matter, but the anchor itself is judged. The sample the owner supplied has a CA certificate that expired before its signature was
+dated, which `kNow` correctly refuses; see `libs/ac4/ERRATA.md`. A chain like that is accepted three ways, each
+a decision for the caller: `kIgnore` (`verify-time=ignore`), a `kInstant` before the expiry, or an anchor or pin
+placed *below* the expired certificate. `trust_keys` is not one of them: a trusted key anchors the signer
+only after the whole chain has passed, so every certificate is still judged, and an expired intermediate
+rejects a signer whose key you trust. `classify` reports a signed date that is not a date, is in the future or lies outside the
+signer certificate's validity as `chain-rejected`, with the sentence in `detail`.
 
 **High-s signatures are accepted.** ECDSA allows both `s` and `n - s` for the same message, and the
 specification asks for neither; so one valid signature can be rewritten as another valid one. The
