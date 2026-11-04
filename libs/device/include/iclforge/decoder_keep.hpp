@@ -25,12 +25,14 @@ enum class DecoderNeed {
     kAc3Family,  // AC-3 and E-AC-3
     kOpus,
     kAc4,
+    kTruehd,
 };
 
 struct DecodersKept {
     bool ac3_family = false;  // the AC-3 decoder and the E-AC-3 decoder
     bool opus = false;
     bool ac4 = false;
+    bool truehd = false;
 };
 
 // The decoders a stream that needs `need` takes over; every other one is let go.
@@ -42,6 +44,8 @@ struct DecodersKept {
             return {.opus = true};
         case DecoderNeed::kAc4:
             return {.ac4 = true};
+        case DecoderNeed::kTruehd:
+            return {.truehd = true};
         case DecoderNeed::kNone:
             return {.ac3_family = !has_psram};
     }

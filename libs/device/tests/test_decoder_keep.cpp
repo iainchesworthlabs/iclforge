@@ -28,6 +28,13 @@ TEST_CASE("a coded stream keeps only the decoder family it needs", "[decoder_kee
         CHECK_FALSE(ac4.ac3_family);
         CHECK_FALSE(ac4.opus);
         CHECK(ac4.ac4);
+        CHECK_FALSE(ac4.truehd);
+
+        const auto truehd = decoders_kept(DecoderNeed::kTruehd, psram);
+        CHECK_FALSE(truehd.ac3_family);
+        CHECK_FALSE(truehd.opus);
+        CHECK_FALSE(truehd.ac4);
+        CHECK(truehd.truehd);
     }
 }
 
@@ -46,12 +53,12 @@ TEST_CASE("a PCM stream on a part without PSRAM keeps the AC-3 decoders it has",
 }
 
 TEST_CASE("no stream keeps the decoders of more than one family", "[decoder_keep]") {
-    for (const DecoderNeed need :
-         {DecoderNeed::kNone, DecoderNeed::kAc3Family, DecoderNeed::kOpus, DecoderNeed::kAc4}) {
+    for (const DecoderNeed need : {DecoderNeed::kNone, DecoderNeed::kAc3Family, DecoderNeed::kOpus,
+                                   DecoderNeed::kAc4, DecoderNeed::kTruehd}) {
         for (const bool psram : {false, true}) {
             const auto kept = decoders_kept(need, psram);
             const int families = static_cast<int>(kept.ac3_family) + static_cast<int>(kept.opus) +
-                                 static_cast<int>(kept.ac4);
+                                 static_cast<int>(kept.ac4) + static_cast<int>(kept.truehd);
             CHECK(families <= 1);
         }
     }
@@ -106,6 +113,16 @@ TEST_CASE("a part without PSRAM keeps the AC-3 decoder through a PCM stream", "[
     held = begin_stream(held, DecoderNeed::kAc3Family, false);
     held = begin_stream(held, DecoderNeed::kNone, false);
     CHECK(held.ac3_family);
+}
+
+TEST_CASE("a TrueHD decoder never outlives its stream into PCM or another codec", "[decoder_keep]") {
+    for (const bool psram : {false, true}) {
+        for (const DecoderNeed next : {DecoderNeed::kNone, DecoderNeed::kAc3Family,
+                                       DecoderNeed::kOpus, DecoderNeed::kAc4}) {
+            CHECK_FALSE(decoders_kept(next, psram).truehd);
+        }
+        CHECK(decoders_kept(DecoderNeed::kTruehd, psram).truehd);
+    }
 }
 
 TEST_CASE("an Opus or AC-4 decoder never outlives its stream into PCM", "[decoder_keep]") {
