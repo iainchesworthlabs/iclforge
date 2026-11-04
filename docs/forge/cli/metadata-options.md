@@ -191,6 +191,8 @@ metadata options (any order, after the positional arguments):
   content-chain=<path>  the certificates for that key, a bundle; repeat for more (or
                     ICLFORGE_CONTENT_CHAIN_FILE)
   trust-anchor=<path>  a certificate to trust as the top of the chain; repeat for more
+  trust-key=<path>  a P-256 public key (PEM "PUBLIC KEY" or DER) to trust to sign; a chain whose
+                    signing certificate carries it is anchored; repeat for more
   pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted
                     wherever it appears in the chain; repeat for more
   leaf-title=<text|any>  the title the signing certificate must carry (default

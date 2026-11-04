@@ -104,6 +104,9 @@ typedef enum iclforge_status {
     /* iclforge::ac4::EncodeError - iclforge::ac4::Encoder::create()/encode()/flush() */
     ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG = 80,
     ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT = 81,
+    /* iclforge_ac4_sign_stream(): the stream could not be signed - not a raw AC-4 stream, already
+     * signed, or the key does not match its chain. iclforge_bytes_t detail names which. */
+    ICLFORGE_ERROR_AC4_SIGNING = 82,
 
     /* iclforge_lyrics_parse(): the bytes are not lyrics - empty, in an encoding that is not read,
      * or with no lyrics in them. iclforge_lyrics_error_message() says which. */
@@ -2368,6 +2371,67 @@ ICLFORGE_C_EXPORT int iclforge_ac4_samples_per_frame(const iclforge_ac4_toc_t* t
 ICLFORGE_C_EXPORT iclforge_status_t iclforge_ac4_sync_frame(const uint8_t* raw_frame,
                                                            size_t raw_frame_size, int crc,
                                                            iclforge_bytes_t** out_bytes);
+
+/* --- AC-4 content signatures, with the operator's own key -------------------------- *
+ *
+ * One ECDSA P-256 signature over a raw .ac4 stream, appended after its last sync frame
+ * (iclforge::ac4::sign_stream / verify_stream; docs/library/signing.md). The key and the
+ * certificates are the CALLER'S: PEM (PKCS#8 or SEC 1 key, certificate bundle) or DER bytes,
+ * held in memory; nothing is read from disk and no key or certificate ships in the library.
+ * The signature chains to whatever certificate the caller supplied, NOT to Dolby's trust
+ * root, so a licensed Dolby decoder will not treat it as Dolby-authentic. */
+typedef enum iclforge_ac4_signature_outcome {
+    ICLFORGE_AC4_SIGNATURE_VALID = 0,          /* checks pass and a trust anchor or key vouches */
+    ICLFORGE_AC4_SIGNATURE_UNTRUSTED = 1,      /* checks pass; nothing the caller trusts vouches */
+    ICLFORGE_AC4_SIGNATURE_NONE = 2,           /* the stream carries no signature */
+    ICLFORGE_AC4_SIGNATURE_UNREADABLE = 3,     /* a signature is there and is not read here */
+    ICLFORGE_AC4_SIGNATURE_CHAIN_REJECTED = 4, /* certificates do not hold together / not valid */
+    ICLFORGE_AC4_SIGNATURE_INVALID = 5,        /* the ECDSA signature does not verify */
+    ICLFORGE_AC4_SIGNATURE_CONTENT_ALTERED = 6,  /* the stream is not what was signed */
+    ICLFORGE_AC4_SIGNATURE_METADATA_ALTERED = 7, /* the signer information is not what was signed */
+    ICLFORGE_AC4_SIGNATURE_REFUSED_BY_POLICY = 8
+} iclforge_ac4_signature_outcome_t;
+
+/* A stable lower-case token ("valid", "untrusted", "no-signature", ...), static storage. */
+ICLFORGE_C_EXPORT const char* iclforge_ac4_signature_outcome_name(
+    iclforge_ac4_signature_outcome_t outcome);
+
+typedef struct iclforge_ac4_sign_config {
+    const uint8_t* private_key; /* the signing key, P-256, PEM or DER (required) */
+    size_t private_key_size;
+    const uint8_t* chain; /* the certificates that vouch for it, PEM bundle or DER (required) */
+    size_t chain_size;
+    const char* signed_date;     /* "YYYY-MM-DDTHH:MM:SS" UTC; NULL: now */
+    const char* publisher_uuid;  /* optional, CS spec 5.3; NULL or "" for none */
+    const char* publisher_name;  /* optional */
+} iclforge_ac4_sign_config_t;
+
+/* `stream` with a content signature appended. A stream that already has one, is not a raw
+ * AC-4 stream, or whose key does not belong to its chain is ICLFORGE_ERROR_AC4_SIGNING (with
+ * `out_detail`, when non-NULL, set to a UTF-8 sentence saying why; destroy it with
+ * iclforge_bytes_destroy()); a key or chain that is not readable is
+ * ICLFORGE_ERROR_INVALID_ARGUMENT. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_ac4_sign_stream(
+    const uint8_t* stream, size_t stream_size, const iclforge_ac4_sign_config_t* config,
+    iclforge_bytes_t** out_signed, iclforge_bytes_t** out_detail);
+
+typedef struct iclforge_ac4_verify_config {
+    const uint8_t* trust_anchors; /* certificates to trust as the top of a chain (PEM / DER), or NULL */
+    size_t trust_anchors_size;
+    const uint8_t* trust_key; /* a P-256 public key to trust to sign (PEM "PUBLIC KEY" / DER), or NULL */
+    size_t trust_key_size;
+    int64_t now_unix;        /* the clock the certificates are judged at; 0: the system clock */
+    int judge_at_signed_date; /* non-zero: judge them at the date the signature records instead */
+} iclforge_ac4_verify_config_t;
+
+/* Verifies the stream's content signature. ICLFORGE_OK means the verification RAN: read
+ * `out_outcome` for its result (only ICLFORGE_AC4_SIGNATURE_VALID is acceptance). `out_detail`,
+ * when non-NULL, is set to UTF-8 text: the first fault, or "" when valid or untrusted. A trust
+ * anchor or key that is not readable is ICLFORGE_ERROR_INVALID_ARGUMENT. `config` may be NULL
+ * (nothing trusted: a good signature is UNTRUSTED). */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_ac4_verify_stream(
+    const uint8_t* stream, size_t stream_size, const iclforge_ac4_verify_config_t* config,
+    iclforge_ac4_signature_outcome_t* out_outcome, iclforge_bytes_t** out_detail);
 
 /* --------------------------------------------------------------------- *
  * Lyrics (iclforge::lyrics, planning/karaoke-phase2.md, W13)

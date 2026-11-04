@@ -1,0 +1,1 @@
+**The plan for the TrueHD forms the ESP32-S3 is offered.** The S3 cannot decode 5.1 TrueHD in real time (1.03 to 1.13 of the core), so its hello will state a 2-channel TrueHD limit of its own and the sender cuts a stream with downmix substreams to the 2-channel presentation; `planning/truehd-parity-esp32-sinks.md` has the steps. Planning only, no code.

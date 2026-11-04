@@ -616,3 +616,89 @@ TEST_CASE("a real AC-4 stream signs, plays as it did, and verifies", "[ac4][sign
     CHECK(summary.application == "ICL Forge");
     CHECK_FALSE(iclforge::ac4::summarise_signature(stream).present);
 }
+
+// What each way of breaking a signed stream comes to, as the one word forge prints and a C caller
+// reads (VerifyOutcome). The signature is checked before the digests it holds, so a changed
+// signature is never reported as changed content.
+TEST_CASE("each way a signed stream is wrong has its own outcome", "[ac4][signing][outcome]") {
+    const Fixture f;
+    const std::vector<std::byte> stream = synthetic_stream();
+    const auto signed_stream = iclforge::ac4::sign_stream(stream, f.credentials, f.options());
+    REQUIRE(signed_stream.has_value());
+    const auto outcome = [&](const std::vector<std::byte>& bytes, const crypto::VerifyPolicy& p) {
+        return crypto::classify(iclforge::ac4::verify_stream(bytes, p));
+    };
+    const std::vector<crypto::Certificate> anchors = {f.certs[0]};
+    crypto::VerifyPolicy anchored = f.policy();
+    anchored.trust_anchors = anchors;
+
+    SECTION("a good signature is valid only when something the caller trusts vouches for it") {
+        CHECK(outcome(*signed_stream, f.policy()) == crypto::VerifyOutcome::kUntrusted);
+        CHECK(outcome(*signed_stream, anchored) == crypto::VerifyOutcome::kValid);
+    }
+    SECTION("a trusted public key anchors the chain, and another key does not") {
+        const std::vector<crypto::P256PublicKey> right = {*crypto::p256_public_key(f.chain.leaf_key)};
+        const std::vector<crypto::P256PublicKey> wrong = {*crypto::p256_public_key(f.chain.root_key)};
+        crypto::VerifyPolicy by_key = f.policy();
+        by_key.trust_keys = right;
+        const auto report = iclforge::ac4::verify_stream(*signed_stream, by_key);
+        CHECK(report.verdict == crypto::Verdict::kValid);
+        CHECK(report.anchor.find("trusted key") != std::string::npos);
+        by_key.trust_keys = wrong;
+        CHECK(outcome(*signed_stream, by_key) == crypto::VerifyOutcome::kUntrusted);
+        // A key does not rescue a signature that is broken.
+        std::vector<std::byte> bad_audio = *signed_stream;
+        bad_audio[400] ^= std::byte{0x04};
+        by_key.trust_keys = right;
+        CHECK(outcome(bad_audio, by_key) == crypto::VerifyOutcome::kContentAltered);
+    }
+    SECTION("an unsigned stream, and a stream with a foreign trailer, carry no signature") {
+        CHECK(outcome(stream, anchored) == crypto::VerifyOutcome::kNoSignature);
+        CHECK(outcome({}, anchored) == crypto::VerifyOutcome::kNoSignature);
+    }
+    SECTION("changed audio is content altered") {
+        std::vector<std::byte> bytes = *signed_stream;
+        bytes[400] ^= std::byte{0x04};
+        CHECK(outcome(bytes, anchored) == crypto::VerifyOutcome::kContentAltered);
+    }
+    SECTION("a changed signature is signature invalid, not altered content") {
+        const auto located = iclforge::ac4::locate_signature_trailer(*signed_stream);
+        REQUIRE(located.has_value());
+        const auto parsed = crypto::parse_content_signature(located->blob);
+        REQUIRE(parsed.has_value());
+        const auto at = std::search(signed_stream->begin(), signed_stream->end(),
+                                    parsed->signature.r.begin(), parsed->signature.r.end());
+        REQUIRE(at != signed_stream->end());
+        std::vector<std::byte> bytes = *signed_stream;
+        bytes[static_cast<std::size_t>(at - signed_stream->begin()) + 5] ^= std::byte{0x01};
+        CHECK(outcome(bytes, anchored) == crypto::VerifyOutcome::kSignatureInvalid);
+        // The stream cut short inside the signature is an unreadable signature, not a valid one.
+        const std::vector<std::byte> cut(signed_stream->begin(), signed_stream->end() - 3);
+        CHECK(outcome(cut, anchored) != crypto::VerifyOutcome::kValid);
+    }
+    SECTION("changed signer information is metadata altered") {
+        const std::string publisher = "ICL Forge";  // the default application name, in the blob
+        const auto at = std::search(signed_stream->begin(), signed_stream->end(),
+                                    reinterpret_cast<const std::byte*>(publisher.data()),
+                                    reinterpret_cast<const std::byte*>(publisher.data()) + publisher.size());
+        REQUIRE(at != signed_stream->end());
+        std::vector<std::byte> bytes = *signed_stream;
+        bytes[static_cast<std::size_t>(at - signed_stream->begin())] = std::byte{'X'};
+        CHECK(outcome(bytes, anchored) == crypto::VerifyOutcome::kMetadataAltered);
+    }
+    SECTION("a chain that is not valid at the time asked is chain rejected") {
+        crypto::VerifyPolicy late = anchored;
+        late.instant = pki::epoch("2030-01-01T00:00:00");
+        CHECK(outcome(*signed_stream, late) == crypto::VerifyOutcome::kChainRejected);
+    }
+    SECTION("every outcome has a distinct stable token") {
+        std::vector<std::string> tokens;
+        for (int i = 0; i <= static_cast<int>(crypto::VerifyOutcome::kRefusedByPolicy); ++i) {
+            tokens.emplace_back(crypto::to_string(static_cast<crypto::VerifyOutcome>(i)));
+        }
+        std::ranges::sort(tokens);
+        CHECK(std::ranges::adjacent_find(tokens) == tokens.end());
+        CHECK(std::string(crypto::to_string(crypto::VerifyOutcome::kContentAltered)) ==
+              "content-altered");
+    }
+}

@@ -1164,7 +1164,11 @@ MP4: signing an MP4 is out of scope in CS spec v2.6 (§8.3.2), which names no bo
 signature, so `ac4-sign` and `sign-content` exit 1 saying so and ask for the raw `.ac4` stream
 instead. `verify-content` on `decode` stops (exit 2) unless the signature, the chain and an anchor
 all check, before anything is decoded; `check-content` prints the checks and plays on. The exit code
-of `ac4-verify` is 0 for valid and anchored, 6 for anything else.
+of `ac4-verify` is 0 for valid and anchored, 6 for anything else; the reason is the `result:` line
+it prints under the verdict: `valid`, `untrusted` (it checks out, nothing you trust vouches for the
+signer), `no-signature`, `unreadable`, `chain-rejected`, `signature-invalid`, `content-altered`,
+`metadata-altered` or `refused-by-policy`. A signature made with your own key does not chain to
+Dolby's or PACE's trust root; see [Object signing](../../concepts/object-signing.md#sibling-ac-4).
 
 **Who signed.** A signature names its publisher, product and platform (CS spec v2.6 §5.3). `ac4-sign`
 and `sign-content` take them as `publisher-uuid=` (the UUID of your PACE publisher account),
@@ -1190,7 +1194,9 @@ and `check-content`, which reports and carries on, judges at the signed date. Th
 time it used and why. The leaf must carry the title
 `Code/Content Signer` unless `leaf-title=` says otherwise (`any` checks none). `pin=` takes a
 certificate's SHA-1 (40 hex digits) or SHA-256 (64) fingerprint and trusts that certificate wherever it
-appears in the chain; `trust-anchor=` takes a certificate file. Both repeat. The options are listed in
+appears in the chain; `trust-anchor=` takes a certificate file; `trust-key=` takes the signer's P-256
+public key (a PEM "PUBLIC KEY" block or DER, which `openssl pkey -in signer.key -pubout` writes) and
+trusts a chain whose signing certificate carries it. All three repeat. The options are listed in
 [options and grammars](metadata-options.md); an option that says how to
 sign or check, without the command that signs or checks, is refused rather than dropped.
 

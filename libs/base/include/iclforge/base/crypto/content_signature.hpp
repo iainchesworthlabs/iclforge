@@ -237,6 +237,10 @@ enum class OperatorMetadata : std::uint8_t {
 struct VerifyPolicy {
     std::span<const Certificate> trust_anchors;
     std::span<const CertificatePin> pins;
+    // Public keys the caller trusts to sign: a chain whose leaf carries one of these is anchored,
+    // however its certificates are issued. This is "I know this signer's key", as a pin is "I know
+    // this signer's certificate"; the chain must still be well formed and valid at the time asked.
+    std::span<const P256PublicKey> trust_keys;
     TimeBasis time_basis = TimeBasis::kNow;
     std::int64_t now = 0;      // seconds since the epoch; the caller supplies the clock
     std::int64_t instant = 0;  // for kInstant
@@ -284,7 +288,32 @@ struct VerifyReport {
     std::string application;       // the signing application, its version and build, when given
     std::int64_t verified_at = 0;  // the instant the chain was judged at; 0 when not checked
     std::string anchor;            // what anchored it, when it is anchored
+    // Set by the codec layer that looked for the blob and found none (iclforge::ac4::verify_stream):
+    // the stream is not signed, as against a signature that is there and damaged.
+    bool no_signature = false;
 };
+
+// What a report comes to, in the one word a script or a C caller acts on. Taken from the first
+// check that failed, in the order the checks run, so a stream with a bad signature and a changed
+// content digest is kSignatureInvalid (the digests carry weight only under a verified signature).
+enum class VerifyOutcome : std::uint8_t {
+    kValid,             // every check passed and a trust anchor, pin or key vouches for the signer
+    kUntrusted,         // every check passed; nothing the caller trusts vouches for the signer
+    kNoSignature,       // the stream carries no signature (or is not a stream that can)
+    kUnreadable,        // a signature is there and is not the structure, version or method read here
+    kChainRejected,     // the certificates do not hold together, are not valid then, or the leaf
+                        // may not sign content
+    kSignatureInvalid,  // the ECDSA signature does not verify under the signer certificate's key
+    kContentAltered,    // the signature verifies; the content is not what it covers
+    kMetadataAltered,   // the signature verifies; the signer information is not what it covers
+    kRefusedByPolicy,   // a check the policy made decisive failed (operator metadata)
+};
+
+[[nodiscard]] ICLFORGE_BASE_EXPORT VerifyOutcome classify(const VerifyReport& report);
+// A stable lower-case token ("valid", "untrusted", "no-signature", "unreadable",
+// "chain-rejected", "signature-invalid", "content-altered", "metadata-altered",
+// "refused-by-policy"), the one a script matches on.
+[[nodiscard]] ICLFORGE_BASE_EXPORT const char* to_string(VerifyOutcome outcome) noexcept;
 
 // Verifies `blob` against `content_digest`, the SHA-256 of the content as it is now. The checks run
 // in the order of CS spec v2.6 §6.1, all of them reported: structure, versions and methods, curve,
