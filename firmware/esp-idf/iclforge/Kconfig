@@ -81,6 +81,30 @@ config ICLFORGE_AC4
         it on a board; the ESP32-C6 builds it and refuses a play it has no
         heap for (planning/ac4.md, D14c and D14d).
 
+# THE TRUEHD DECODER - libs/truehd, and the player's reading of TrueHD chunks
+# (src/truehd_stream.hpp; planning/truehd-parity-esp32-sinks.md). Off by default:
+# a firmware that plays AC-3, E-AC-3 and AC-4 carries none of it.
+config ICLFORGE_TRUEHD
+    bool "TrueHD decoder"
+    default n
+    help
+        Builds the TrueHD core, bitstream layer and decoder (libs/truehd,
+        without its encoder) into the component and lets the player decode
+        the Sendspin extension's TrueHD data type: one to 24 whole access
+        units a chunk.
+
+        Measured by firmware/truehd-probe, bit-exact against FFmpeg's PCM
+        on all three chips: 158,020 bytes of heap and 60,944 bytes of stack
+        for a decoder, and, as a share of one core, 0.13 (ESP32-P4, 360 MHz)
+        and 0.56 (ESP32-S3, 240 MHz) for 2.0 at 48 kHz, and 0.32 (P4) and
+        1.13 (S3, so not real time) for 5.1. The ESP32-C6 does 2.0 at
+        48 kHz at 0.34 and 5.1 at 0.80, with 25 to 56 KB free in a play,
+        so it does not fit beside Wi-Fi.
+
+        The task that decodes needs at least 64 KiB of stack. A board
+        states the channels it takes in the hello (max_coded_channels for
+        "truehd"), so a server cuts a stream with downmix substreams to them.
+
 # Where an AC-4 play's allocations go (planning/ac4.md, D14c). An int rather
 # than a choice, so it reaches C++ as a plain constant.
 config ICLFORGE_AC4_INTERNAL_BELOW

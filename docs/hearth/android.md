@@ -9,7 +9,7 @@ with a lyrics file, it shows the words in time on the TV.
     The app pairs, passes AC-3 and E-AC-3 to a receiver and draws the lyric screen. It does not
     decode anything itself yet, so a stream that reaches it as PCM, FLAC or Opus is accepted and
     not heard, and it does not list AC-4. It lists TrueHD, on a route that takes the
-    eight-channel track, and sends its access units to the receiver packed as MAT: built, and not run on a Shield. CI builds a debug APK and runs its tests on an emulator;
+    eight-channel track, and sends its access units to the receiver packed as MAT: run once on a Shield (2026-11-04, stereo 48 kHz, an Onkyo TX-RZ740 reported TrueHD). CI builds a debug APK and runs its tests on an emulator;
     no release publishes one, and it is not in an app store. The plan and what is left are in
     [`planning/hearth-android.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md).
 

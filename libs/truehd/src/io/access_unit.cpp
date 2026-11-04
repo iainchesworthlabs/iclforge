@@ -258,4 +258,25 @@ std::expected<std::vector<std::byte>, Error> write_access_unit_prefix(
     return prefix;
 }
 
+std::optional<RestartHeader> first_restart_header(const AccessUnit& unit) {
+    for (int i = 0; i < unit.num_substreams; ++i) {
+        const auto index = static_cast<std::size_t>(i);
+        if (unit.entries[index].restart_nonexistent) {
+            continue;
+        }
+        std::span<const std::byte> payload = unit.segments[index];
+        if (unit.entries[index].crc_present && payload.size() >= 3) {
+            payload = payload.first(payload.size() - 2);
+        }
+        BitReader reader(payload);
+        if (reader.read(1) == 0 || reader.read(1) == 0) {
+            continue;
+        }
+        if (auto header = read_restart_header(reader, payload, true)) {
+            return *header;
+        }
+    }
+    return std::nullopt;
+}
+
 }  // namespace iclforge::truehd

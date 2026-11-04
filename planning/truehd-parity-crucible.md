@@ -368,3 +368,7 @@ recommendation says, provisionally.
     first bursts until about 150 ms of them are queued (more than the Pi's worst frame plus the rounding of batches to whole
     frames), at the price of that much delay in the mode, and take the reading both ways. It needs a start threshold in the
     sink or a pacing queue in the stage, which is a change to `libs/audio` as much as to Crucible.
+    **Decided 2026-11-04 by the owner: build it.** It is built in the stage and not in `libs/audio`: the leg holds the
+    first bursts until `OutputStageConfig::truehd_prefill_ms` (150) of them are in hand and hands them over together, which
+    is the same on every backend and changes no library interface. `docs/crucible/signal-path.md` has the delay it adds.
+    Still open: the receiver reading, with the pre-roll and (by setting it to 0) without.

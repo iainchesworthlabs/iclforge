@@ -556,6 +556,34 @@ yet lists TrueHD in a sink's hello, so no sink is wrong today.
 
 Nothing here changes the extension document: `max_coded_channels` and `max_data_rate` are already per type.
 
+## TrueHD in the P4 sink, played and measured (2026-11-05)
+
+The decoder is in the Hearth sink behind `CONFIG_ICLFORGE_TRUEHD` (`sdkconfig.truehd`, the `truehd` overlay of
+`profiles.json`): `libs/truehd/minimal.cmake` for the decode-only archive, `TruehdStream` beside `Ac4Stream` for the
+chunk-to-block adaptor, the burst player's TrueHD path, and a hello that lists `truehd` with the board's own channel
+limit (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD*`: the P4 lists it and states 6, the S3 and the C6 do not list it).
+`Decoder::reset()` clears in place (the second half of question 22) and the decode task has 72 KiB of stack.
+
+**Played on the P4b** (ESP32-P4 v1.3, 2 output slots, 360 MHz; the image built from this branch, written to `ota_0` over
+USB, the board put back byte-identical afterwards). The repository's `hearth-testserver` paired it and sent
+`truehd_st48_s24.thd` and `truehd_m51_s24.thd` as `truehd` chunks, each looped for 20 s over Wi-Fi:
+
+| Fixture | Chunks played | Late, dropped, invalid, underruns | Decode and render a chunk (20 ms) | Heap free at the end |
+|---|---:|---|---:|---:|
+| 2.0, 48 kHz, 24-bit | 1040 of 1040 | 0, 0, 0, 0 | 3.67 ms (0.18 of a core) | 200,547 B |
+| 5.1, 48 kHz, 24-bit (on 2 outputs) | 1040 of 1040 | 0, 0, 0, 0 | 8.03 ms (0.40 of a core) | 180,079 B |
+
+The decode task reached 56,848 B of its 73,728 B (`decode_stack_free` 16,880 B after both plays). The probe's 0.13 and
+0.32 became 0.18 and 0.40 with the render and the sink's own work added. The levels the board's meters read for the
+stereo fixture are 0.970 of the host decode's on both channels (27,275 and 34,192 millionths against 28,120 and 35,200),
+so the channels are not swapped; that is a level comparison, not a bit-exact one. Two earlier plays of the stereo file,
+the first after the board had been paired by code, lost their first 25 and 76 chunks as late (an AC-3 play paired the same
+way lost 13), and the two plays above, with the record held, lost none: the start-up is not TrueHD's.
+
+**Not shown.** No receiver or speaker was listened to; the P4b's output was not captured, so the samples are not compared
+bit for bit (the decoder is, in the probe, on the same silicon). The 7.1 decode has not been measured on the P4 (the board
+states 6). The S3 and the C6 have not played TrueHD in a sink. The Hearth now-view has no name for TrueHD yet.
+
 ## Open questions
 
 1. **Which tiers are in scope for TrueHD?** The P4 and S3 only, or the C6 too? Recommendation: P4 and S3. The

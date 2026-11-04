@@ -105,3 +105,14 @@ does not depend on the matrix chain: shaping rounds the object planes before the
 stream's counters, so the matrices session's two counters are not counted twice.
 Merging the matrices branch with atmos-bed directly is not this session's: the replayed branch is
 `feature/truehd-atmos-encoder-stream-on-matrices`.
+
+## After main's per-unit rate law (#1748)
+
+`probe`'s `rate_model` and `forge qc` now hold each unit to its own `input_timing` (TH spec 18.2: a unit may start only after the unit ahead
+of it has arrived at the declared rate), with no cumulative queue. The library `RateModel` (the encoder's rate control and `probe
+detail=rate`) is a different thing and stays: it is the arrival model at the declared peak rate and at the *chosen* bitrate (`truehd-bitrate=`),
+which is what the budget and the shaping need, and it lets a backlog drain. Where they differ: the probe law says nothing about the 75 ms
+latency window except through `input_timing`, the library model measures every unit against its slot at the chosen bitrate. On encoder
+output both agree that nothing is late (the 12 object forge stream: 0 violations in the probe, 0 late units in `detail=rate`). The hand-built
+substream-3 fixtures were written with one unit of input timing per unit whatever its size, so the probe's law reports violations for them
+(their goldens record it); they are not rate-tuned streams.
