@@ -439,11 +439,11 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
     if (rate_report.declared_bps != 0) {
         fmt::println(
             "  data rate            {:.2f} Mbit/s declared (field {}, TH spec v3.9 section 4.4), "
-            "largest unit {:.2f} Mbit/s, slowest delivery {:.1f} ms of {:.0f} ms, {} unit(s) "
-            "late  {}",
+            "largest unit {:.2f} Mbit/s, {} unit(s) start before the unit ahead has arrived "
+            "(worst {:.2f} ms short)  {}",
             static_cast<double>(rate_report.declared_bps) / 1e6, sync.peak_data_rate,
-            static_cast<double>(rate_report.max_unit_rate_bps) / 1e6, rate_report.worst_latency_ms,
-            rate_report.latency_limit_ms, rate_report.violations, rate_ok ? "PASS" : "FAIL");
+            static_cast<double>(rate_report.max_unit_rate_bps) / 1e6, rate_report.violations,
+            rate_report.worst_overrun_ms, rate_ok ? "PASS" : "FAIL");
     } else {
         fmt::println(
             "  data rate            the peak data rate field is 0: nothing to hold the stream to  "

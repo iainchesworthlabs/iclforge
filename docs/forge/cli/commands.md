@@ -988,8 +988,8 @@ provisional: no stream the project holds carries an evolution frame (`libs/trueh
 this report is the check to run on a real Atmos track.
 
 `probe` of a TrueHD or MLP stream also reports, from the headers alone: the duration; the average bit rate and the largest unit's rate
-against the peak rate the major sync declares, with the count of units that would arrive more than 75 ms after their slot (TH spec
-section 18, the encoder's own model; `rate_model` under `truehd`); the presentations, with the speakers of each named (`presentations`);
+against the peak rate the major sync declares, with the count of units that start before the unit ahead of them has arrived at that rate, by their own `input_timing` (TH spec
+section 18; `libs/truehd/ERRATA.md` entry 99; `rate_model` under `truehd`); the presentations, with the speakers of each named (`presentations`);
 the word length (MLP sends two; a TrueHD decode delivers 24-bit words and the stream does not say the source's depth); and the
 restart spacing, the distance in units between one major sync and the next (`restart_spacing`). `detail=checks` decodes the stream,
 the samples discarded, for the lossless check of every restart interval (`lossless` under `truehd`; null otherwise) and exits 1
@@ -1597,7 +1597,7 @@ integrity (TH spec 6.2 parity and CRC, 7.3 lossless check, 18 data rate):
   access units         2400 read, 0 byte(s) skipped, 0 unreadable  PASS
   checks               0 failed (check nibble, major sync, restart header, parity, segment CRC)  PASS
   lossless check       36 interval(s) ok, 0 failed  PASS
-  data rate            18.00 Mbit/s declared (field 6000, ...), largest unit 3.30 Mbit/s, slowest delivery 0.2 ms of 75 ms, 0 unit(s) late  PASS
+  data rate            18.00 Mbit/s declared (field 6000, ...), largest unit 3.30 Mbit/s, 0 unit(s) start before the unit ahead has arrived (worst 0.00 ms short)  PASS
   integrity verdict: PASS
 ```
 
