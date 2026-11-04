@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 163> kOptionTokens{{
+constexpr std::array<OptionToken, 164> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -124,6 +124,7 @@ constexpr std::array<OptionToken, 163> kOptionTokens{{
     {"truehd-shape-bits=", "truehd-atmos with truehd-rate-mode=shape: the most low bits an interval's objects give up, 0 to 16 (default 8)"},
     {"truehd-bitrate=", "truehd-encode, truehd-atmos: hold the stream to this bitrate over any 75 ms, kbit/s, 1000 to 100000 (default the declared peak rate); probe detail=rate: run the arrival model at it"},
     {"truehd-major-sync=", "truehd-encode, truehd-atmos: access units between major syncs, 0 (one at every restart header, the default) or a multiple of truehd-restart="},
+    {"truehd-evo-frames=", "truehd-atmos: which metadata frames (one every 1536 samples) get an evolution frame: all (the default), every:N, first or none. A stream is unsigned, and a licensed decoder that reads two evolution frames in a row with a wrong tag reports an error"},
     {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
     {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
     {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
@@ -558,6 +559,7 @@ void print_truehd_topic() {
     fmt::println("       truehd-restart=<access units>, truehd-peak-rate=<kbit/s>,");
     fmt::println("       truehd-rate-check=strict|lenient, truehd-bitrate=<kbit/s>,");
     fmt::println("       truehd-major-sync=<access units>, truehd-fir-order=0..8,");
+    fmt::println("       truehd-evo-frames=all|every:N|first|none (truehd-atmos),");
     fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
     fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
     fmt::println("       the input.");

@@ -175,6 +175,9 @@ struct Options {
         bool shape = false;                   // truehd-rate-mode=shape (truehd-atmos only)
         std::optional<int> shape_bits;        // truehd-shape-bits=
         std::optional<int> major_sync_units;  // truehd-major-sync=
+        // truehd-evo-frames= (truehd-atmos only): which of the metadata frames get an evolution
+        // frame. N > 0: every N-th (1 is all, the default), 0: none, -1: the first only.
+        int evo_stride = 1;
         std::optional<int> fir_order;                 // truehd-fir-order=
         bool matrix = true;                           // truehd-matrix=
         unsigned stereo_mode = 0;  // truehd-stereo-mode=: stereo, ltrt, headphone

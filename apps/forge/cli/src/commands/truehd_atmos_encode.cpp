@@ -178,6 +178,7 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
                                                          "truehd-shape-bits=",
                                                          "truehd-bitrate=",
                                                          "truehd-major-sync=",
+                                                         "truehd-evo-frames=",
                                                          "truehd-fir-order=",
                                                          "truehd-matrix=",
                                                          "truehd-stereo-mode=",
@@ -397,8 +398,21 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
     }
     config.verify = meta.verify;
     // The evolution frame of the access unit that holds the start of a metadata frame.
+    // truehd-evo-frames= leaves some of the frames out; the metadata is the same.
+    const auto evolution_wanted = [stride = opts.evo_stride](std::uint64_t frame) {
+        if (stride == 0) {
+            return false;
+        }
+        if (stride < 0) {
+            return frame == 0;
+        }
+        return frame % static_cast<std::uint64_t>(stride) == 0;
+    };
     config.extra_data = th::oamd_extra_data(
         [&](std::uint64_t frame, int offset) {
+            if (!evolution_wanted(frame)) {
+                return std::vector<std::byte>{};
+            }
             return evolution_frame_of(payload_of_frame(frame, offset));
         },
         kUnitSamples, static_cast<int>(kFrameSamples));

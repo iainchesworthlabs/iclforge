@@ -439,6 +439,28 @@ TEST_CASE("truehd-atmos writes a stream whose substream 3 is the WAV's channels,
     CHECK(frames[0].first_sample == 0);
 }
 
+TEST_CASE("truehd-evo-frames= chooses which metadata frames get an evolution frame",
+          "[forge-cli][truehd][atmos][truehd-atmos]") {
+    const fs::path dir = scratch_dir();
+    const auto channels = twelve_object_channels();
+    const fs::path wav = dir / "evo_in.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, 48000).has_value());
+    const fs::path log = dir / "evo.log";
+    const auto frames_with = [&](const std::string& option) {
+        const fs::path stream = dir / "evo_out.thd";
+        REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(stream) + option, log) == 0);
+        return read_oamd_frames(stream).size();
+    };
+    CHECK(frames_with("") == 8);
+    CHECK(frames_with(" truehd-evo-frames=all") == 8);
+    CHECK(frames_with(" truehd-evo-frames=every:3") == 3);  // frames 0, 3 and 6
+    CHECK(frames_with(" truehd-evo-frames=first") == 1);
+    CHECK(frames_with(" truehd-evo-frames=none") == 0);
+    CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "evo_bad.thd") +
+                      " truehd-evo-frames=every:0",
+                  log) != 0);
+}
+
 TEST_CASE(
     "the bed of a truehd-atmos stream is the objects the renderer places, as the decode renders",
     "[forge-cli][truehd][atmos][truehd-atmos][render]") {
