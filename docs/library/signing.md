@@ -203,6 +203,30 @@ nonce and the UUID. `VerifyPolicy::operator_metadata` chooses what they do: `kRe
 leaves the verdict alone; `kRequire` makes a nonce that is not 128 bytes, a UUID that is missing or
 malformed, or (when expected accounts are given) one that is none of them, an invalid report.
 
+**Trusting a key.** `VerifyPolicy::trust_keys` (and `forge`'s `trust-key=<public key file>`, a PEM
+"PUBLIC KEY" block as `openssl pkey -pubout` writes it, or DER) trusts a signer by its P-256 public
+key, for a signer whose certificate is not at hand to pin: a chain whose signing certificate carries
+that key is anchored (`kValid`, with `anchor` saying "the signer's public key is a trusted key"). The
+chain must still be well formed and valid at the time asked, and every other check still runs, so a
+trusted key does not rescue a changed stream. `crypto::parse_p256_public_key` and
+`crypto::load_public_key_files` read the files.
+
+**One word for the outcome.** `crypto::classify(report)` reduces a report to a `VerifyOutcome`, taken
+from the first check that failed (the checks run in the order above, so a changed signature is never
+reported as changed content), and `crypto::to_string(outcome)` gives the token a script matches on:
+
+| Token | Meaning |
+|---|---|
+| `valid` | every check passed and a trust anchor, pin or key vouches for the signer |
+| `untrusted` | every check passed; nothing you trust vouches for the signer |
+| `no-signature` | the stream carries no signature (or is not a raw AC-4 stream) |
+| `unreadable` | a signature is there and is not the structure, version or method read here |
+| `chain-rejected` | the certificates do not hold together, are not valid at the time asked, or the signer may not sign content |
+| `signature-invalid` | the ECDSA signature does not verify under the signer certificate's key |
+| `content-altered` | the signature verifies; the stream is not what it covers |
+| `metadata-altered` | the signature verifies; the signer information is not what it covers |
+| `refused-by-policy` | a check the policy made decisive (`OperatorMetadata::kRequire`) failed |
+
 **Time.** `TimeBasis::kNow` (the default, and CS spec §6.1 steps 3 and 4) judges every certificate valid at
 `policy.now`; `kSignedDate` judges them at the date the signature records, which is only as
 trustworthy as its signer; `kInstant` at a time the caller gives; `kIgnore` not at all. The report
@@ -253,6 +277,38 @@ it) for the publisher accounts to accept. `forge probe` shows the trailer withou
 (`stream.content_signature` in the JSON, `verified` always false). An option that says how to sign
 or check, without the command that signs or checks, is refused, and so is `sign-content` for an MP4
 (out of scope in CS spec v2.6 §8.3.2; sign the raw `.ac4` stream) or for E-AC-3 output.
+
+`ac4-verify` and `decode`'s `check-content` print the token as a `result: <token>` line under the
+verdict (`result: content-altered`), because the exit code is one value, 6, for every way a signature
+can fail (`ac4-verify`) or 2 (`decode verify-content`), and a script that needs the reason matches the
+line:
+
+```bash
+forge ac4-verify signed.ac4 trust-key=signer.pub.pem verify-time=signed | grep -q '^  result: valid$'
+```
+
+`trust-key=` takes the signer's public key (repeatable) in place of `trust-anchor=` or `pin=`;
+`openssl pkey -in signer.key -pubout -out signer.pub.pem` makes the file from the private key.
+
+### In the C API
+
+`iclforge_ac4_sign_stream` and `iclforge_ac4_verify_stream` (`iclforge_c/iclforge.h`) are the same
+two calls on in-memory bytes: the key (PEM or DER), the certificate bundle, the trust anchors and the
+trust key are all passed as buffers, nothing is read from disk, and no key ships in the library.
+`iclforge_ac4_verify_stream` returns `ICLFORGE_OK` when the verification *ran*, and the result is the
+`iclforge_ac4_signature_outcome_t` it writes (the tokens above, as `ICLFORGE_AC4_SIGNATURE_VALID`,
+`..._UNTRUSTED`, `..._NONE`, `..._CONTENT_ALTERED` and so on; `iclforge_ac4_signature_outcome_name`
+gives the token), so only `ICLFORGE_AC4_SIGNATURE_VALID` is acceptance. A library built without AC-4
+answers `ICLFORGE_ERROR_UNSUPPORTED`. The C++ side of both is `iclforge::ac4::sign_stream_with_key` and
+`verify_stream_with_trust` (keys and certificates as bytes in a `KeySigningRequest` / `TrustRequest`).
+
+### What a bring-your-own-key signature is, and is not
+
+It is the operator's signature, under the operator's key, in the `pace-ccjf1` container this page
+describes. It does **not** chain to Dolby's or PACE's trust root: a licensed Dolby decoder that checks
+for a Dolby-issued signature will not take it as one, and nothing here obtains, imitates or replays
+such a signature. See [Object signing](../concepts/object-signing.md#sibling-ac-4) for the threat
+model.
 
 ### The seam for other codecs
 

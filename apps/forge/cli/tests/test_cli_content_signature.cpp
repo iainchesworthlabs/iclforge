@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -26,6 +27,8 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/io/content_signature.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/base/crypto/content_signature.hpp"
+#include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/pem.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
 #include "iclforge/base/crypto/x509.hpp"
@@ -894,4 +897,162 @@ TEST_CASE("probe describes a content signature without checking it",
     CHECK(contains(read_log(log), "\"content_signature\": null"));
     REQUIRE(run_cli("probe " + quoted(plain), log) == 0);
     CHECK_FALSE(contains(read_log(log), "content sig"));
+}
+
+namespace {
+
+// `openssl pkey -pubout`'s file for a key: SubjectPublicKeyInfo (id-ecPublicKey, prime256v1, the
+// uncompressed point) in a PEM "PUBLIC KEY" block.
+void write_public_key_pem(const fs::path& path,
+                          const iclforge::base::crypto::P256PrivateKey& private_key) {
+    namespace crypto = iclforge::base::crypto;
+    const auto point = crypto::p256_public_key_uncompressed(*crypto::p256_public_key(private_key));
+    constexpr std::array<std::uint8_t, 26> kPrefix = {
+        0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01,
+        0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00};
+    std::vector<std::byte> der;
+    for (const std::uint8_t b : kPrefix) {
+        der.push_back(static_cast<std::byte>(b));
+    }
+    der.insert(der.end(), point.begin(), point.end());
+    write_text(path, crypto::pem_encode("PUBLIC KEY", der));
+}
+
+}  // namespace
+
+// ac4-verify prints the outcome as one token (`result: <token>`) and exits 0 only on valid. The
+// exit code is the same 6 for every failure; the token is what a script matches on.
+TEST_CASE("ac4-verify names what is wrong with a stream in a result line",
+          "[cli][ac4][content-signature][outcome]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "outcome.log";
+    const Files files = write_credentials();
+    const fs::path plain = plain_stream("outcome_plain");
+    const fs::path signed_file = dir / "outcome_signed.ac4";
+    REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(signed_file) +
+                        key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                    log) == 0);
+    const std::string verify = " trust-anchor=" + quoted(files.anchor) + " verify-time=signed";
+
+    SECTION("valid") {
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + verify, log) == 0);
+        CHECK(contains(read_log(log), "result: valid"));
+    }
+    SECTION("untrusted: it checks out and nothing vouches for the signer") {
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + " verify-time=signed", log) == kQcGate);
+        CHECK(contains(read_log(log), "result: untrusted"));
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + " verify-time=signed trust-anchor=" +
+                          quoted(files.other_anchor),
+                      log) == kQcGate);
+        CHECK(contains(read_log(log), "result: untrusted"));
+    }
+    SECTION("no-signature") {
+        CHECK(run_cli("ac4-verify " + quoted(plain) + verify, log) == kQcGate);
+        CHECK(contains(read_log(log), "result: no-signature"));
+    }
+    SECTION("content-altered") {
+        std::vector<std::byte> bytes = read_bytes(signed_file);
+        bytes[bytes.size() / 3] ^= std::byte{0x01};
+        const fs::path damaged = dir / "outcome_audio.ac4";
+        write_bytes(damaged, bytes);
+        CHECK(run_cli("ac4-verify " + quoted(damaged) + verify, log) == kQcGate);
+        CHECK(contains(read_log(log), "result: content-altered"));
+    }
+    SECTION("signature-invalid") {
+        std::vector<std::byte> bytes = read_bytes(signed_file);
+        const auto located = iclforge::ac4::locate_signature_trailer(bytes);
+        REQUIRE(located.has_value());
+        const auto parsed = iclforge::base::crypto::parse_content_signature(located->blob);
+        REQUIRE(parsed.has_value());
+        const auto at = std::search(bytes.begin(), bytes.end(), parsed->signature.s.begin(),
+                                    parsed->signature.s.end());
+        REQUIRE(at != bytes.end());
+        bytes[static_cast<std::size_t>(at - bytes.begin()) + 7] ^= std::byte{0x01};
+        const fs::path damaged = dir / "outcome_signature.ac4";
+        write_bytes(damaged, bytes);
+        CHECK(run_cli("ac4-verify " + quoted(damaged) + verify, log) == kQcGate);
+        CHECK(contains(read_log(log), "result: signature-invalid"));
+    }
+    SECTION("metadata-altered") {
+        std::vector<std::byte> bytes = read_bytes(signed_file);
+        const std::string application = "ICL Forge forge";
+        const auto at = std::search(
+            bytes.begin(), bytes.end(), reinterpret_cast<const std::byte*>(application.data()),
+            reinterpret_cast<const std::byte*>(application.data()) + application.size());
+        REQUIRE(at != bytes.end());
+        bytes[static_cast<std::size_t>(at - bytes.begin())] = std::byte{'X'};
+        const fs::path damaged = dir / "outcome_metadata.ac4";
+        write_bytes(damaged, bytes);
+        CHECK(run_cli("ac4-verify " + quoted(damaged) + verify, log) == kQcGate);
+        CHECK(contains(read_log(log), "result: metadata-altered"));
+    }
+    SECTION("chain-rejected: a certificate that has expired") {
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + " trust-anchor=" + quoted(files.anchor),
+                      log) == kQcGate);
+        CHECK(contains(read_log(log), "result: chain-rejected"));
+    }
+}
+
+TEST_CASE("trust-key= trusts a signer by its public key, with no certificate to pin",
+          "[cli][ac4][content-signature][trust-key]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "trust_key.log";
+    const Files files = write_credentials();
+    const fs::path plain = plain_stream("trust_key_plain");
+    const fs::path signed_file = dir / "trust_key_signed.ac4";
+    REQUIRE(run_cli("ac4-sign " + quoted(plain) + " " + quoted(signed_file) +
+                        key_chain_options(files) + " signed-date=" + std::string{kWhenAllValid},
+                    log) == 0);
+    const pki::TestChain chain = pki::make_chain();
+    const fs::path signer_pub = dir / "signer.pub.pem";
+    const fs::path other_pub = dir / "other.pub.pem";
+    write_public_key_pem(signer_pub, chain.leaf_key);
+    write_public_key_pem(other_pub, pki::key_for("icl-forge-test-stranger"));
+    const std::string when = " verify-time=signed";
+
+    SECTION("the signer's key makes it valid, and the report says so") {
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + when + " trust-key=" +
+                          quoted(signer_pub),
+                      log) == 0);
+        const std::string text = read_log(log);
+        CHECK(contains(text, "result: valid"));
+        CHECK(contains(text, "trusted key"));
+    }
+    SECTION("another key leaves it untrusted") {
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + when + " trust-key=" +
+                          quoted(other_pub),
+                      log) == kQcGate);
+        CHECK(contains(read_log(log), "result: untrusted"));
+    }
+    SECTION("a key does not rescue a stream that was changed") {
+        std::vector<std::byte> bytes = read_bytes(signed_file);
+        bytes[bytes.size() / 3] ^= std::byte{0x01};
+        const fs::path damaged = dir / "trust_key_damaged.ac4";
+        write_bytes(damaged, bytes);
+        CHECK(run_cli("ac4-verify " + quoted(damaged) + when + " trust-key=" + quoted(signer_pub),
+                      log) == kQcGate);
+        CHECK(contains(read_log(log), "result: content-altered"));
+    }
+    SECTION("decode takes it too") {
+        const fs::path wav = dir / "trust_key_out.wav";
+        // verify-content also holds the signer information to CS spec 5.3 (a publisher UUID),
+        // which this signature was made without; check-content reports the verdict and plays on.
+        CHECK(run_cli("decode " + quoted(signed_file) + " " + quoted(wav) +
+                          " check-content verify-time=signed trust-key=" + quoted(signer_pub),
+                      log) == 0);
+        CHECK(contains(read_log(log), "result: valid"));
+    }
+    SECTION("a file that is not a public key is an input error") {
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + when + " trust-key=" +
+                          quoted(files.chain),
+                      log) == kExitInput);
+        CHECK(run_cli("ac4-verify " + quoted(signed_file) + when + " trust-key=" +
+                          quoted(dir / "absent.pem"),
+                      log) == kExitInput);
+    }
+    SECTION("it is refused where nothing checks a signature") {
+        CHECK(run_cli("ac4-sign " + quoted(plain) + " " + quoted(dir / "refused.ac4") +
+                          key_chain_options(files) + " trust-key=" + quoted(signer_pub),
+                      log) == kExitUsage);
+    }
 }

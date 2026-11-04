@@ -374,6 +374,29 @@ const char* iclforge_ac4_dac4_refusal(const iclforge_ac4_toc_t*) {
 int iclforge_ac4_media_timing(const iclforge_ac4_toc_t*, uint32_t*, uint32_t*) { return 0; }
 int iclforge_ac4_samples_per_frame(const iclforge_ac4_toc_t*, uint32_t*) { return 0; }
 
+iclforge_status_t iclforge_ac4_sign_stream(const uint8_t*, size_t,
+                                           const iclforge_ac4_sign_config_t*,
+                                           iclforge_bytes_t** out_signed,
+                                           iclforge_bytes_t** out_detail) {
+    if (out_signed != nullptr) {
+        *out_signed = nullptr;
+    }
+    if (out_detail != nullptr) {
+        *out_detail = nullptr;
+    }
+    return ICLFORGE_ERROR_UNSUPPORTED;
+}
+
+iclforge_status_t iclforge_ac4_verify_stream(const uint8_t*, size_t,
+                                             const iclforge_ac4_verify_config_t*,
+                                             iclforge_ac4_signature_outcome_t*,
+                                             iclforge_bytes_t** out_detail) {
+    if (out_detail != nullptr) {
+        *out_detail = nullptr;
+    }
+    return ICLFORGE_ERROR_UNSUPPORTED;
+}
+
 iclforge_status_t iclforge_ac4_sync_frame(const uint8_t*, size_t, int,
                                           iclforge_bytes_t** out_bytes) {
     if (out_bytes != nullptr) {

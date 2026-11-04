@@ -291,6 +291,47 @@ std::expected<P256PrivateKey, CredentialError> parse_p256_private_key(
     return parse_key_text(contents, 0);
 }
 
+std::expected<P256PublicKey, CredentialError> parse_p256_public_key(
+    std::span<const std::byte> contents) {
+    const std::span<const std::byte> trimmed = trim_ascii_space(contents);
+    if (trimmed.empty()) {
+        return error(CredentialErrorKind::kEmpty, "the public key source is empty");
+    }
+    std::vector<std::byte> der_bytes(trimmed.begin(), trimmed.end());
+    if (const auto blocks = pem_decode(as_text(trimmed)); blocks.has_value() && !blocks->empty()) {
+        if (blocks->size() != 1 || blocks->front().label != "PUBLIC KEY") {
+            return error(CredentialErrorKind::kMalformed,
+                         "expected one PEM \"PUBLIC KEY\" block (openssl pkey -pubout)");
+        }
+        der_bytes = blocks->front().der;
+    } else if (const auto decoded = base64_decode(as_text(trimmed)); decoded.has_value()) {
+        der_bytes = *decoded;
+    }
+    const auto key = parse_public_key_info_der(der_bytes);
+    if (!key.has_value()) {
+        return error(CredentialErrorKind::kMalformed,
+                     "not a P-256 SubjectPublicKeyInfo (PEM \"PUBLIC KEY\", DER or base64 of DER)");
+    }
+    return *key;
+}
+
+std::expected<std::vector<P256PublicKey>, CredentialError> load_public_key_files(
+    std::span<const std::string> paths) {
+    std::vector<P256PublicKey> keys;
+    for (const std::string& path : paths) {
+        auto bytes = read_file(path);
+        if (!bytes.has_value()) {
+            return std::unexpected(bytes.error());
+        }
+        auto key = parse_p256_public_key(*bytes);
+        if (!key.has_value()) {
+            return error(key.error().kind, path + ": " + key.error().message);
+        }
+        keys.push_back(*key);
+    }
+    return keys;
+}
+
 std::expected<std::vector<Certificate>, CredentialError> parse_certificates(
     std::span<const std::byte> contents) {
     const std::span<const std::byte> trimmed = trim_ascii_space(contents);

@@ -37,6 +37,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     (void)iclforge::ac4::strip_signature(stream);
 
     std::vector<crypto::Certificate> anchors;
+    std::vector<crypto::P256PublicKey> keys;
     if (located.has_value() && located->present) {
         // The trailer is inside the stream and the prefix before it is the content: the two
         // spans meet exactly, which is what the digest boundary relies on.
@@ -46,6 +47,9 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         }
         if (const auto parsed = crypto::parse_content_signature(located->blob)) {
             anchors = parsed->chain;
+            if (!anchors.empty()) {
+                keys.push_back(anchors.back().public_key);
+            }
         }
     }
     for (const auto basis : {crypto::TimeBasis::kNow, crypto::TimeBasis::kSignedDate,
@@ -54,7 +58,18 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         policy.time_basis = basis;
         policy.now = 1'780'000'000;
         policy.instant = 1'700'000'000;
-        (void)iclforge::ac4::verify_stream(stream, policy);
+        const crypto::VerifyReport plain = iclforge::ac4::verify_stream(stream, policy);
+        // The one-word outcome and the verdict are two readings of one report: a stream is
+        // "valid" in one exactly when it is kValid in the other.
+        if ((crypto::classify(plain) == crypto::VerifyOutcome::kValid) !=
+            (plain.verdict == crypto::Verdict::kValid)) {
+            __builtin_trap();
+        }
+        if (!keys.empty()) {
+            policy.trust_keys = keys;
+            (void)crypto::classify(iclforge::ac4::verify_stream(stream, policy));
+            policy.trust_keys = {};
+        }
         if (!anchors.empty()) {
             policy.trust_anchors = anchors;
             policy.required_leaf_title.clear();

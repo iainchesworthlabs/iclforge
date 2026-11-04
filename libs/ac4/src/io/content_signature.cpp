@@ -1,7 +1,9 @@
 #include "iclforge/ac4/io/content_signature.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <optional>
 #include <span>
@@ -12,6 +14,7 @@
 
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
+#include "iclforge/base/crypto/credentials.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
 #include "iclforge/base/crypto/x509.hpp"
 
@@ -204,6 +207,7 @@ base::crypto::VerifyReport verify_stream(std::span<const std::byte> stream,
     if (!located.has_value() || !located->present) {
         base::crypto::VerifyReport report;
         report.verdict = base::crypto::Verdict::kInvalid;
+        report.no_signature = true;
         std::string message = "the stream carries no content signature";
         if (!located.has_value()) {
             message = located.error().message;
@@ -231,6 +235,82 @@ std::expected<std::vector<std::byte>, StreamSignatureError> strip_signature(
     }
     const auto prefix = stream.first(located->content_size);
     return std::vector<std::byte>(prefix.begin(), prefix.end());
+}
+
+namespace {
+
+std::int64_t system_now() {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+}  // namespace
+
+std::expected<std::vector<std::byte>, StreamSignatureError> sign_stream_with_key(
+    std::span<const std::byte> stream, const KeySigningRequest& request) {
+    auto key = base::crypto::parse_p256_private_key(request.private_key);
+    if (!key.has_value()) {
+        return failure(StreamSignatureErrorKind::kBadCredentials, key.error().message);
+    }
+    auto certificates = base::crypto::parse_certificates(request.chain);
+    if (!certificates.has_value()) {
+        return failure(StreamSignatureErrorKind::kBadCredentials, certificates.error().message);
+    }
+    auto credentials = base::crypto::make_credentials(std::move(*key), std::move(*certificates));
+    if (!credentials.has_value()) {
+        // The key is not the leaf's, or the certificates do not form one chain.
+        return failure(StreamSignatureErrorKind::kSigning, credentials.error().message);
+    }
+    base::crypto::SignOptions options;
+    options.signed_date = request.signed_date.empty()
+                              ? base::crypto::format_iso8601_utc(request.now_unix != 0
+                                                                     ? request.now_unix
+                                                                     : system_now())
+                              : request.signed_date;
+    const std::optional<std::int64_t> signed_at = base::crypto::parse_iso8601_utc(options.signed_date);
+    if (!signed_at.has_value()) {
+        return failure(StreamSignatureErrorKind::kBadCredentials,
+                       "signed_date is not YYYY-MM-DDTHH:MM:SS");
+    }
+    options.chain_policy.valid_at = *signed_at;
+    options.chain_policy.required_leaf_title = std::string(base::crypto::kDefaultLeafTitle);
+    options.metadata.publisher_uuid = request.publisher_uuid;
+    options.metadata.publisher_name = request.publisher_name;
+    return sign_stream(stream, *credentials, options);
+}
+
+std::expected<StreamVerification, StreamSignatureError> verify_stream_with_trust(
+    std::span<const std::byte> stream, const TrustRequest& request) {
+    std::vector<base::crypto::Certificate> anchors;
+    if (!request.trust_anchors.empty()) {
+        auto parsed = base::crypto::parse_certificates(request.trust_anchors);
+        if (!parsed.has_value()) {
+            return failure(StreamSignatureErrorKind::kBadCredentials, parsed.error().message);
+        }
+        anchors = std::move(*parsed);
+    }
+    std::vector<base::crypto::P256PublicKey> keys;
+    if (!request.trust_key.empty()) {
+        auto parsed = base::crypto::parse_p256_public_key(request.trust_key);
+        if (!parsed.has_value()) {
+            return failure(StreamSignatureErrorKind::kBadCredentials, parsed.error().message);
+        }
+        keys.push_back(*parsed);
+    }
+    base::crypto::VerifyPolicy policy;
+    policy.trust_anchors = anchors;
+    policy.trust_keys = keys;
+    policy.now = request.now_unix != 0 ? request.now_unix : system_now();
+    policy.time_basis = request.judge_at_signed_date ? base::crypto::TimeBasis::kSignedDate
+                                                     : base::crypto::TimeBasis::kNow;
+    const base::crypto::VerifyReport report = verify_stream(stream, policy);
+    StreamVerification result;
+    result.outcome = base::crypto::classify(report);
+    if (report.fault.has_value()) {
+        result.detail = report.fault->message;
+    }
+    return result;
 }
 
 SignatureSummary summarise_signature(std::span<const std::byte> stream) {
