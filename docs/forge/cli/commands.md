@@ -1127,14 +1127,25 @@ status 2 (the measurement is strict), and `normalize` takes no option but `quiet
 with no oracle until the DEE set (`libs/truehd/ERRATA.md`, question 51).
 
 **Options a TrueHD or MLP run does not apply are refused, not dropped.** `decode` of a TrueHD or MLP stream takes
-`truehd-presentation=` and `truehd-check=` and refuses every other option by name with exit status 1 and no output: the
+`truehd-presentation=`, `truehd-check=` and the object-signing options `verify-objects`, `gate-objects` and `signing-key=`
+(see below), and refuses every other option by name with exit status 1 and no output: the
 output stage (`channels=`, `downmix=`, `mix-lfe`), `drc=` and `drcmode=`, `programme=`, the object outputs (`objects_dir`,
-`adm_out`, `bed-only`) and the verification flags (`verify-content`, `check-content`, `verify-objects`, `syntax-trace=`),
+`adm_out`, `bed-only`), `sign-objects` and the verification flags (`verify-content`, `check-content`, `syntax-trace=`),
 which never succeed without checking something. `levels` and `loudness` take the same two options, `truehd-encode` its own
 and `verify` (the metadata, layout and multi-source options of the other encoders, such as `dialnorm=`, `layout=`, `src=` and
 `map=`, are refused), `probe` takes `json=` and `detail=evolution`, `structure` and `format` (`detail=frames` and `blocks` have no TrueHD form), and `mkv`, `mp4`, `ts`, `spdif` and `remux` take
 none (`mainid=`, `asvc=` and `programme=` describe a service of the AC-3 family). `quiet` and `verbose` apply everywhere. The
 transform choices `fast-mdct`, `fast-imdct` and `mode=` change nothing for a codec with no transform, and are warned about.
+
+**TrueHD object signing: `sign-objects`, `verify-objects`, `gate-objects`.** The evolution frame that carries a TrueHD stream's object
+metadata has a protection field, and `iclforge::truehd::signing` writes and checks a keyed tag in it with the operator's own key
+(`signing-key=<path>`, or `ICLFORGE_SIGNING_KEY[_FILE]`). `metadata <in> <out> sign-objects signing-key=<path>` signs every evolution
+frame (alone, or together with the channel-meaning edits; no length changes). `decode <in> <out> verify-objects signing-key=<path>`
+refuses the stream on a mismatch, and takes several `signing-key=` for a keyring. `gate-objects` is the permissive policy: a unit whose
+tag verifies is kept, any other has its object layer removed and plays as the bed, and `truehd-presentation=all` is refused when
+anything was gated. `probe` says without a key how many evolution frames carry a tag
+(`truehd.evolution.protection.tagged_frames`). This is iclforge's own scheme, not a Dolby tag: a licensed decoder holds other keys and
+will not accept these tags as Dolby-authentic. See [Object signing](../../concepts/object-signing.md#sibling-truehd-evolution).
 
 ### AC-4 content signing: `ac4-sign`, `ac4-verify`
 
@@ -1165,7 +1176,11 @@ MP4: signing an MP4 is out of scope in CS spec v2.6 (§8.3.2), which names no bo
 signature, so `ac4-sign` and `sign-content` exit 1 saying so and ask for the raw `.ac4` stream
 instead. `verify-content` on `decode` stops (exit 2) unless the signature, the chain and an anchor
 all check, before anything is decoded; `check-content` prints the checks and plays on. The exit code
-of `ac4-verify` is 0 for valid and anchored, 6 for anything else.
+of `ac4-verify` is 0 for valid and anchored, 6 for anything else; the reason is the `result:` line
+it prints under the verdict: `valid`, `untrusted` (it checks out, nothing you trust vouches for the
+signer), `no-signature`, `unreadable`, `chain-rejected`, `signature-invalid`, `content-altered`,
+`metadata-altered` or `refused-by-policy`. A signature made with your own key does not chain to
+Dolby's or PACE's trust root; see [Object signing](../../concepts/object-signing.md#sibling-ac-4).
 
 **Who signed.** A signature names its publisher, product and platform (CS spec v2.6 §5.3). `ac4-sign`
 and `sign-content` take them as `publisher-uuid=` (the UUID of your PACE publisher account),
@@ -1191,7 +1206,9 @@ and `check-content`, which reports and carries on, judges at the signed date. Th
 time it used and why. The leaf must carry the title
 `Code/Content Signer` unless `leaf-title=` says otherwise (`any` checks none). `pin=` takes a
 certificate's SHA-1 (40 hex digits) or SHA-256 (64) fingerprint and trusts that certificate wherever it
-appears in the chain; `trust-anchor=` takes a certificate file. Both repeat. The options are listed in
+appears in the chain; `trust-anchor=` takes a certificate file; `trust-key=` takes the signer's P-256
+public key (a PEM "PUBLIC KEY" block or DER, which `openssl pkey -in signer.key -pubout` writes) and
+trusts a chain whose signing certificate carries it. All three repeat. The options are listed in
 [options and grammars](metadata-options.md); an option that says how to
 sign or check, without the command that signs or checks, is refused rather than dropped.
 

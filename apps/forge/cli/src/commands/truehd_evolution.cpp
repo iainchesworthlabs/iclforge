@@ -16,6 +16,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
+#include "iclforge/truehd/signing/evolution_signer.hpp"
 #include "json_sink.hpp"
 
 namespace forge_cli::commands {
@@ -99,6 +100,13 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
     }
     if (frame == nullptr) {
         return;
+    }
+    // Whether the frame carries a tag, answered without a key (the field is not all zero). Present,
+    // never valid: only decode verify-objects with signing-key= says that.
+    if (iclforge::truehd::signing::has_evolution_tag(
+            extra.bytes, std::string_view(reading) == "spec36" ? th::EvolutionReading::kSpec36
+                                                               : th::EvolutionReading::kEmdf)) {
+        ++tagged_;
     }
     ++frames_read_;
     for (const th::EvolutionPayload& payload : frame->payloads) {
@@ -239,6 +247,8 @@ void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     };
     codes("primary_codes", primary_codes_);
     codes("secondary_codes", secondary_codes_);
+    // Key-free: frames whose primary protection field is not all zero. Present, not authenticated.
+    json.member("tagged_frames", tagged_);
     json.member("verified", false);
     json.end_object();
     json.member("signature_verified", false);
@@ -400,6 +410,9 @@ void EvolutionSurvey::print_text() const {
                         "+ 32 x factor): {}",
                         histogram(starts_in_unit_)));
     }
+    continuation(fmt::format("protection tag present in {}/{} frame(s), answered without a key "
+                             "(present, not verified)",
+                             tagged_, frames_read_));
     continuation("not verified: the protection bytes and any signature");
     if (detail_enabled_) {
         detail_.print_text();

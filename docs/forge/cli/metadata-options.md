@@ -161,8 +161,10 @@ metadata options (any order, after the positional arguments):
                     builds for (see docs/platforms/bare-metal/esp32-s3.md). Harmless on a
                     stream with no object layer
   sign-objects      atmos/atmos-path/atmos-encode/atmos-cbi: write a keyed EMDF object
-                    signature (needs signing-key=); see docs/concepts/object-signing.md
-  verify-objects    decode/monitor: check each frame's EMDF object signature against
+                    signature (needs signing-key=); metadata on a TrueHD stream: sign its
+                    evolution frames (iclforge's own tag, not Dolby's); see
+                    docs/concepts/object-signing.md
+  verify-objects    decode/monitor (and decode of TrueHD): check each frame's object signature against
                     signing-key= instead of just playing it - a mismatch refuses the command;
                     omitted (the default) decodes signed and unsigned streams alike, unchecked
   gate-objects      decode/monitor/spatial: the licensed policy - frames whose object
@@ -191,6 +193,8 @@ metadata options (any order, after the positional arguments):
   content-chain=<path>  the certificates for that key, a bundle; repeat for more (or
                     ICLFORGE_CONTENT_CHAIN_FILE)
   trust-anchor=<path>  a certificate to trust as the top of the chain; repeat for more
+  trust-key=<path>  a P-256 public key (PEM "PUBLIC KEY" or DER) to trust to sign; a chain whose
+                    signing certificate carries it is anchored; repeat for more
   pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted
                     wherever it appears in the chain; repeat for more
   leaf-title=<text|any>  the title the signing certificate must carry (default

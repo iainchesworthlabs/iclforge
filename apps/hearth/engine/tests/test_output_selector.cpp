@@ -28,6 +28,7 @@ using iclforge::audio::SinkAudioCapabilities;
 using iclforge::hearth::CapabilitySource;
 using iclforge::hearth::EndpointReading;
 using iclforge::hearth::HeldOutput;
+using iclforge::hearth::ItemCodec;
 using iclforge::hearth::ItemFacts;
 using iclforge::hearth::OutputMode;
 using iclforge::hearth::OutputPreferences;
@@ -141,6 +142,47 @@ TEST_CASE("output selector: a row carries MAT only when the probe and the descri
     CHECK_FALSE(endpoint_facts(device, std::unexpected(EdidError::kNoEdid)).accepts_mat);
     // No reader on this platform: the open is all there is.
     CHECK(endpoint_facts(device, std::unexpected(EdidError::kNoBackend)).accepts_mat);
+}
+
+TEST_CASE("output selector: a TrueHD item is sent as MAT to an output that takes it when Bitstream is pinned, and decoded otherwise on a platform not run",
+          "[hearth][output-decision][truehd]") {
+    RenderDeviceInfo device = hdmi(false, false);
+    device.supports_mat_passthrough = true;
+    SinkAudioCapabilities with_mat = descriptor(false, false);
+    with_mat.mat = true;
+    const auto source = [&](std::uint32_t) {
+        return std::vector<EndpointReading>{EndpointReading{.device = device, .descriptor = with_mat}};
+    };
+    ItemFacts truehd;
+    truehd.codec = ItemCodec::kTruehd;
+    truehd.sample_rate = 48000;
+    truehd.channels = 6;
+
+    // Pinned to Bitstream: MAT, whatever platform this is.
+    OutputSelector pinned{source};
+    OutputPreferences preferences;
+    preferences.pinned = OutputMode::kBitstream;
+    pinned.set_preferences(preferences);
+    const auto sent = pinned.choose(truehd);
+    CHECK(sent.mode == OutputMode::kBitstream);
+    CHECK(sent.stream == BitstreamFormat::kMat);
+    CHECK(sent.endpoint_id == "hdmi-id");
+
+    // Automatic: MAT only where a run has passed for this build's platform (mat_status.hpp);
+    // anywhere else it is decoded here and the reason says why.
+    OutputSelector automatic{source};
+    const auto chosen = automatic.choose(truehd);
+    const bool run_here = iclforge::hearth::mat_status(iclforge::audio::passthrough_backend()).run ==
+                          iclforge::hearth::MatRun::kRun;
+    CHECK(chosen.mode == (run_here ? OutputMode::kBitstream : OutputMode::kLocalPcm));
+    if (!run_here) {
+        CHECK(mentions(chosen.reason, "has not been run against a receiver"));
+    }
+
+    // MLP is never sent as MAT.
+    ItemFacts mlp = truehd;
+    mlp.codec = ItemCodec::kMlp;
+    CHECK(pinned.choose(mlp).mode == OutputMode::kLocalPcm);
 }
 
 TEST_CASE("output selector: rows are read once a rate, and again after a refresh",

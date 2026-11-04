@@ -55,6 +55,11 @@ namespace {
     }
     switch (mode) {
         case OutputMode::kBitstream:
+            // TrueHD has no stream of its own on the item: it is sent as MAT, and a link carrying
+            // MAT takes the next TrueHD item at the same rate.
+            if (next.codec == ItemCodec::kTruehd && open.stream == audio::BitstreamFormat::kMat) {
+                return true;
+            }
             return next.stream.has_value() && next.stream == open.stream;
         case OutputMode::kBitstreamAsAc3:
             return next.stream == audio::BitstreamFormat::kEac3;

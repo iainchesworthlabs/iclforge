@@ -520,11 +520,47 @@ stream-set manifest, the per-chip pages and the sink guides. Size M.
 
 Phases 0 and 1 need no decision and can start at once. Phase 2 onwards wait on one or more answers.
 
+## The S3 and the forms it is offered (planned 2026-11-04)
+
+The S3 measured past real time for 5.1 (1.03 to 1.13, [above](#measured-on-the-c6-and-the-p4-2026-11-01)). The
+sender needs no new negotiation for that: `plan_group_forms()` already refuses a stream whose channels exceed the
+sink's `max_coded_channels` for its data type (`sink_form.cpp`, the "decodes TrueHD up to N channels" reason),
+and, when no sink in a group takes the whole stream, cuts a TrueHD stream with downmix substreams to the
+highest presentation some sink takes (`GroupPlan::coded_substreams`, 1 = the 2-channel one). A sink that states
+2 channels therefore gets the first substream of a 5.1 or 7.1 stream, and a stream without downmix substreams
+is not sent coded (the engine decodes it and sends PCM). What is missing is the sink saying 2, and nothing
+yet lists TrueHD in a sink's hello, so no sink is wrong today.
+
+**Steps, in order.** None needs an owner decision; step 2 is shared with Phase 2.
+
+1. **Measure the cheap presentation on the S3.** Add `Presentation::k2ch` and `k6ch` passes to the probe
+   (`firmware/truehd-probe`), for the fixtures that carry downmix substreams (check that `truehd_m51_*` do;
+   if not, make one with the encoder). On the host the 2-channel presentation costs 0.28 to 0.43 of the full
+   decode, which would put a 5.1 stream on the S3 at about 0.4 to 0.5: an estimate, not a measurement.
+   Done when the S3's `k2ch` factor for a 5.1 and a 7.1 stream is in `results/esp32s3.txt`; if it is above
+   about 0.6, the S3 states no TrueHD and takes PCM.
+2. **A TrueHD limit of its own in the sink's hello.** `firmware/hearth-sink/main/sendspin/player/sendspin.cpp`
+   (the loop that sets `max_coded_channels` for every listed type) applies one build value, the DD+ one, to every
+   type but AC-4. Give TrueHD its own Kconfig symbol, as AC-4 has (`..._TRUEHD_MAX_CODED_CHANNELS`, and
+   `..._TRUEHD_MAX_DATA_RATE_KBPS` for `max_data_rate`), with the S3's default 2 and the P4's 6 until step 4 measures 8.
+   The loop becomes a `switch` over the type (`-Werror=switch` keeps a new type from slipping through). The
+   S3 states one sample rate, so 96 and 192 kHz are already refused by name; leave that.
+3. **Host tests.** The cut and the 2-channel limit are pinned already (`test_sink_form.cpp`, "the channel and chunk-rate
+   limits apply to TrueHD", and `test_engine_network_group.cpp`, "a TrueHD item no sink takes whole is cut to the
+   presentation one does"). Add what is missing: a sink with the S3's hello (TrueHD at 2 channels, 48 kHz only)
+   refuses a 96 kHz 2.0 stream by name and gets a 7.1 stream with presentations {2, 6, 8} as `coded_substreams == 1`;
+   a sink at 6 (the P4's) gets `coded_substreams == 2`. Mutation check: set the S3's limit to 6 and the first test must fail.
+4. **The P4's 7.1.** Measure the full 7.1 decode on the P4 (the probe has 5.1 only: 0.32) before it states 8.
+5. **A play on the board** is Phase 3 and waits on Phase 2's decoder in the sink: S3 plays the cut stream,
+   its output bit-exact against the host's decode of substream 0 (Phase 5's done-when).
+
+Nothing here changes the extension document: `max_coded_channels` and `max_data_rate` are already per type.
+
 ## Open questions
 
 1. **Which tiers are in scope for TrueHD?** The P4 and S3 only, or the C6 too? Recommendation: P4 and S3. The
    C6 fails on heap, stack, ring and (above 2.0) CPU, and the tier page already calls 2.0 its durable ceiling
-   ([esp32-sink-tiers.md](esp32-sink-tiers.md)); state the C6 as refusing TrueHD by name, and revisit only if
+   ([esp32-sink-tiers.md](esp32-sink-tiers.md)); state the C6 as refusing TrueHD by name (and the S3 as 2.0 only, see [above](#the-s3-and-the-forms-it-is-offered-planned-2026-11-04)), and revisit only if
    Phase 1 gets the 2.0 decoder under about 60 KB and a board shows the ring problem solved.
 2. **What carries TrueHD over Sendspin?** Raw access units grouped into chunks by duration and size, as E-AC-3
    groups syncframes into a burst, or MAT bursts as the existing packer writes them? MAT is 61,440 B for 20 ms

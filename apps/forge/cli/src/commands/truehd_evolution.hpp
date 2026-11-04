@@ -75,6 +75,7 @@ class EvolutionSurvey {
     std::uint64_t length_fits_ = 0;
     std::array<ReadingTally, 2> readings_{};  // EMDF, then the letter of §15.4
     std::uint64_t frames_read_ = 0;           // by either
+    std::uint64_t tagged_ = 0;                // of them, with a non-zero primary protection field
     std::map<std::uint64_t, std::uint64_t> payload_ids_{};
     std::map<std::uint64_t, std::uint64_t> primary_codes_{};
     std::map<std::uint64_t, std::uint64_t> secondary_codes_{};

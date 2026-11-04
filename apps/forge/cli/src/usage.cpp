@@ -57,6 +57,7 @@ constexpr std::array<OptionToken, 164> kOptionTokens{{
     {"content-key=", "the operator's private key for the AC-4 content signature (PEM or DER, P-256)"},
     {"content-chain=", "the certificates that vouch for content-key=: a bundle, or repeat it"},
     {"trust-anchor=", "a certificate to trust as the top of a content-signature chain; repeat for more"},
+    {"trust-key=", "a P-256 public key (PEM or DER) to trust to sign content: a chain whose signing certificate carries it is anchored; repeat for more"},
     {"pin=", "a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted wherever it appears in the chain"},
     {"leaf-title=", "the title the signing certificate must carry (default Code/Content Signer), or any"},
     {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now, which is what CS spec 5.3 asks for; another date is warned about)"},
@@ -1030,8 +1031,11 @@ void print_option_blocks(std::uint32_t mask) {
                      "(planning/arithmetic-tiers.md): what a part with little time for the "
                      "search gives up, measured on the ESP32-S3 page");
         fmt::println("  sign-objects      atmos/atmos-path/atmos-encode/atmos-cbi: write a keyed EMDF "
-                     "object signature (needs signing-key=); see docs/concepts/object-signing.md");
-        fmt::println("  verify-objects    decode/monitor: check each frame's EMDF object signature "
+                     "object signature (needs signing-key=); metadata on a TrueHD stream: sign "
+                     "its evolution frames (iclforge's own tag, not Dolby's); see "
+                     "docs/concepts/object-signing.md");
+        fmt::println("  verify-objects    decode/monitor (and decode of TrueHD): check each frame's "
+                     "object signature "
                      "against signing-key= instead of just playing it - a mismatch refuses the "
                      "command; omitted (the default) decodes signed and unsigned streams alike, "
                      "unchecked");
@@ -1181,6 +1185,8 @@ void print_option_blocks(std::uint32_t mask) {
                      "for more (or ICLFORGE_CONTENT_CHAIN_FILE)");
         fmt::println("  trust-anchor=<path>   a certificate to trust as the top of the chain; repeat "
                      "for more");
+        fmt::println("  trust-key=<path>      a P-256 public key (PEM or DER) to trust to sign; a chain "
+                     "whose signing certificate carries it is anchored; repeat for more");
         fmt::println("  pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) "
                      "fingerprint, trusted wherever it appears in the chain");
         fmt::println("  leaf-title=<text|any>  the title the signing certificate must carry (default "
