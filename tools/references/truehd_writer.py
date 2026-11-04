@@ -665,7 +665,8 @@ def build_stream(stream):
                         lsbs, offset = coding[ch]
                         encode_residual(body, sub.channels[ch], res[ch][i], lsbs, offset)
                 if sub.data_check:
-                    w.put(body.count, 16)  # the bits of the sample data, not its own 16 (TH spec 8.1)
+                    # the bits of the sample data, not its own 16 (TH spec 8.1)
+                    w.put(body.count, 16)
                 w.append(body)
                 if sub.data_check:
                     # the block header CRC: polynomial 0x1D, initial value 0xA2, over the bits of
