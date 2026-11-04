@@ -717,8 +717,8 @@ what forge writes: the structure is that of one sample and one specification
 ([the open questions](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac4/ERRATA.md)),
 and the chain it was written for ends in roots this project does not hold. FFmpeg's raw AC-4
 demuxer takes the trailer for five more packets, so ffprobe does not agree with forge's frame count on
-a signed file; forge's own decode of the signed and unsigned stream is what is compared. TrueHD has no counterpart: nothing signs or
-verifies a TrueHD stream, and the owner's specification lists the evolution frame's signature layout as unconfirmed
+a signed file; forge's own decode of the signed and unsigned stream is what is compared. TrueHD has no counterpart for the content
+signature: the owner's specification lists the evolution frame's signature layout as unconfirmed (the per-frame protection tag is iclforge's own scheme, checked against an independent Python transcription, and is not a Dolby tag)
 ([Object signing](concepts/object-signing.md#sibling-truehd-evolution)).
 
 A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before

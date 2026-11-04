@@ -11,6 +11,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     io/test_metadata_edit.cpp
     io/test_presentation_cut.cpp
     io/test_scan.cpp
+    signing/test_evolution_signer.cpp
     decoder/test_decoder.cpp
     decoder/test_decoder_checks.cpp
     decoder/test_ffmpeg_fixtures.cpp
@@ -37,6 +38,10 @@ target_link_libraries(iclforge-truehd-tests PRIVATE iclforge::truehd iclforge::b
 # coverage number on one. Same shape as libs/ac3/tests: a directory outside the public include
 # tree, on this target's path only.
 target_include_directories(iclforge-truehd-tests PRIVATE ../fuzz)
+# signing/test_evolution_signer.cpp reads the signer's own sources to prove they hold no key.
+target_compile_definitions(iclforge-truehd-tests PRIVATE
+    ICLFORGE_TRUEHD_SIGNING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
+    ICLFORGE_TRUEHD_REFERENCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tools/references")
 # The encoder's coefficient quantiser and the verify comparison are internal (hidden in a shared
 # build), so the tests that exercise them compile coding.cpp themselves and see src/.
 target_sources(iclforge-truehd-tests PRIVATE ../src/encoder/coding.cpp)

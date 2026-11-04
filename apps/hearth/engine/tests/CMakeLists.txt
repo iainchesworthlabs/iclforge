@@ -28,6 +28,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_player.cpp
     test_player_bitstream.cpp
     test_player_truehd.cpp
+    test_player_truehd_mat.cpp
     test_queue.cpp
     test_reference_melody.cpp
     test_session.cpp

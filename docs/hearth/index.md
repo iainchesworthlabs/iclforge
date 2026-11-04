@@ -10,10 +10,12 @@ audio. `hearth_sink` is the firmware for the ESP32 boards that join such a group
 [Using the desktop player](desktop-player.md) walks through the window with a picture of each
 page. This page is the reference.
 
-!!! note "TrueHD and MLP are decoded here, and not passed through"
+!!! note "TrueHD and MLP are decoded here; TrueHD can also be sent to a receiver as MAT"
     The desktop player decodes TrueHD and MLP (`.thd`, `.mlp`, and the TrueHD track of an MP4, Matroska or MPEG-TS file) and plays
-    the result as PCM, to this computer's outputs and to a network group. It does not send TrueHD to a receiver as it is (the
-    output decision says "Passthrough of TrueHD is not available"). A network sink that lists `truehd` is sent the stream's access
+    the result as PCM, to this computer's outputs and to a network group. It can send TrueHD (not MLP) to a receiver as it is, packed
+    into MAT bursts of 24 access units on an eight-channel link: automatically through ALSA and PipeWire, which a receiver has been run through,
+    and through any other platform's output when Bitstream is chosen in the Output picker. The receiver takes a few seconds to lock on the
+    first burst, so the first seconds of an item are silent on it. A network sink that lists `truehd` is sent the stream's access
     units, 24 to a chunk, and decodes them itself (tested against the Hearth test sink only); every other sink is sent PCM or Opus,
     converted to a rate it lists. Hearth for Android and the ESP32 sinks do not take TrueHD. The decode is lossless and 24 bits wide, and what reaches the output is float32
     through the operating system's mixer, so it is not a bit-exact path. How the work is staged is in the
@@ -23,8 +25,7 @@ page. This page is the reference.
 
     The audio library can now open the eight-channel MAT link for TrueHD (ALSA, PipeWire and WASAPI; Android has a bridge that has not
     been built; Core Audio refuses it), and the output decision knows it. **ALSA and PipeWire are marked "run", and every other
-    platform "not run"**: on 2026-11-01 an Onkyo TX-RZ740 reported TrueHD for a stream from a Raspberry Pi through each of them. The player does
-    not yet pack MAT bursts, so a TrueHD item is still decoded whatever is chosen. The Output picker lists an output that opens the link as
+    platform "not run"**: on 2026-11-01 an Onkyo TX-RZ740 reported TrueHD for a stream from a Raspberry Pi through each of them. The Output picker lists an output that opens the link as
     "TrueHD (MAT) ✓" on a platform that has been run and "TrueHD (MAT) opens, not run" on any other, and the reason line says which.
     The decision also works out, for a TrueHD item that is decoded, which of the stream's own presentations the output's width calls for (8 or 6
     channels, else stereo) as the owner's fallback chain says; the player does not apply it yet, and there is no transcode.
