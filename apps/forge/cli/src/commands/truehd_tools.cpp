@@ -31,6 +31,7 @@
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
+#include "iclforge/truehd/signing/evolution_signer.hpp"
 #include "truehd.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_signing.hpp"
@@ -135,7 +136,8 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
                         std::string_view out_path, const Options& meta) {
     // dialnorm=, compr=, bsmod=, insert and the rest are E-AC-3's: refused by name, never dropped.
     // sign-objects (with signing-key=) is applied: it writes the per-frame evolution tag, on its
-    // own or after the edit (the tag covers the evolution payload, which an edit does not touch).
+    // own or after the edit (the tag covers the whole access unit, the major sync included, so the
+    // edit comes first and the signing after it).
     std::vector<std::string_view> applied(kMetadataOptions.begin(), kMetadataOptions.end());
     applied.emplace_back("sign-objects");
     applied.emplace_back("signing-key=");
@@ -153,6 +155,7 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
         return kExitUsage;
     }
     std::optional<th::StreamEditSummary> summary;
+    const int tags_before = th::signing::count_evolution_tags(bytes);
     if (!meta.thd_meaning.empty()) {
         auto edited = th::edit_channel_meaning(bytes, meta.thd_meaning);
         if (!edited) {
@@ -161,6 +164,16 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
         summary = std::move(*edited);
     }
     const auto status = status_stream(out_path);
+    if (tags_before > 0 && summary && summary->changed > 0 && !meta.sign_objects) {
+        // The tag covers the whole access unit, the major sync with it: this edit has just broken
+        // the ones that were there. Said, not refused: the edit is what was asked for.
+        fmt::println(stderr,
+                     "warning: {} evolution frame(s) of {} carry a tag, and the major sync you "
+                     "changed is part of what the tag covers: they no longer verify (a licensed "
+                     "decoder and verify-objects read them as failing). Give sign-objects "
+                     "signing-key=<path> to sign them again",
+                     tags_before, in_path);
+    }
     if (!apply_truehd_object_signing(bytes, meta, status)) {
         return kExitUsage;
     }

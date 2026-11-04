@@ -326,3 +326,40 @@ TEST_CASE("no TrueHD command takes the content-signature options, and probe has 
     const auto document = nlohmann::json::parse(read_text(log));
     CHECK_FALSE(document["truehd"].contains("content_signature"));
 }
+
+TEST_CASE("a channel-meaning edit breaks the tags it covers, says so, and sign-objects signs again",
+          "[forge-cli][truehd][signing]") {
+    // The tag covers the whole access unit, the major sync included, so an edit of the major sync
+    // fails the tags that were there.
+    const fs::path dir = scratch_dir();
+    const fs::path plain = write_stream(dir, "edit_plain.thd");
+    const fs::path key = write_key(dir, "e.key", 9);
+    const fs::path signed_file = dir / "edit_signed.thd";
+    const fs::path log = dir / "edit.log";
+    const std::string signing_key = "signing-key=\"" + key.string() + "\"";
+    REQUIRE(
+        run_cli("metadata " + cli_arg(plain) + cli_arg(signed_file) + "sign-objects " + signing_key,
+                log) == 0);
+
+    const fs::path edited = dir / "edit_edited.thd";
+    REQUIRE(run_cli("metadata " + cli_arg(signed_file) + cli_arg(edited) + "truehd-dialnorm-2ch=20",
+                    log) == 0);
+    CHECK(read_text(log).find("no longer verify") != std::string::npos);
+    const fs::path wav = dir / "edit.wav";
+    CHECK(run_cli("decode " + cli_arg(edited) + cli_arg(wav) + "verify-objects " + signing_key,
+                  log) == kExitInput);
+
+    const fs::path resigned = dir / "edit_resigned.thd";
+    REQUIRE(run_cli("metadata " + cli_arg(signed_file) + cli_arg(resigned) +
+                        "truehd-dialnorm-2ch=20 sign-objects " + signing_key,
+                    log) == 0);
+    CHECK(read_text(log).find("no longer verify") == std::string::npos);
+    REQUIRE(run_cli("decode " + cli_arg(resigned) + cli_arg(wav) + "verify-objects " + signing_key,
+                    log) == 0);
+    CHECK(read_text(log).find("6 valid, 0 mismatched") != std::string::npos);
+    // A stream with no tags says nothing: the edit broke none.
+    REQUIRE(run_cli("metadata " + cli_arg(plain) + cli_arg(dir / "edit_plain_out.thd") +
+                        "truehd-dialnorm-2ch=20",
+                    log) == 0);
+    CHECK(read_text(log).find("no longer verify") == std::string::npos);
+}
