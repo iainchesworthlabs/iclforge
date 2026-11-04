@@ -553,6 +553,7 @@ struct StageWork {
     std::vector<Plane> residual;  // per coded row, in units of 2^quant
     std::vector<BlockPlan> blocks;
     int max_lsbs = 0;
+    int max_bits = 0;        // the restart header's bound on the output samples (TH spec §19.3)
     std::uint8_t check = 0;  // the fold of this interval's output
 };
 
@@ -1689,15 +1690,22 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
     // --- the lossless check of this interval, per stage --------------------------------------
     for (StageWork& stage : work) {
         std::uint32_t fold = 0;
+        std::uint64_t peak = 0;  // the largest output sample after the output shift
         for (std::size_t t = 0; t < n; ++t) {
             for (int k = 0; k < stage.spec.out_rows(); ++k) {
-                const auto value =
-                    static_cast<std::uint32_t>(stage.outputs[static_cast<std::size_t>(k)][t])
-                    << stage.shifts[static_cast<std::size_t>(k)];
+                const auto sample = stage.outputs[static_cast<std::size_t>(k)][t];
+                const auto value = static_cast<std::uint32_t>(sample)
+                                   << stage.shifts[static_cast<std::size_t>(k)];
                 fold = lossless_fold_step(fold, value, stage_ch_assign(k));
+                const std::int64_t shifted = static_cast<std::int64_t>(sample)
+                                             * (std::int64_t{1} << stage.shifts[static_cast<std::size_t>(k)]);
+                peak = std::max(peak, static_cast<std::uint64_t>(shifted < 0 ? -shifted : shifted));
             }
         }
         stage.check = lossless_check_of(fold);
+        // The Dolby decoder refuses a stream whose samples exceed max_bits (TH spec §19.3): the bit
+        // length of the largest magnitude, plus the sign, and 0 for a silent interval.
+        stage.max_bits = peak == 0 ? 0 : std::min(std::bit_width(peak) + 1, 31);
     }
 
     // --- the access units --------------------------------------------------------------------
@@ -1771,8 +1779,8 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
                         restart.noisegen_seed = stage.noise_seed;
                         restart.max_shift = static_cast<std::uint8_t>(stage.output_shift);
                         restart.max_lsbs = static_cast<std::uint8_t>(std::min(stage.max_lsbs, 31));
-                        restart.max_bits = 24;
-                        restart.max_bits_repeat = 24;
+                        restart.max_bits = static_cast<std::uint8_t>(stage.max_bits);
+                        restart.max_bits_repeat = restart.max_bits;
                         restart.data_check_present = false;
                         restart.lossless_check = previous_check[s];
                         for (int c = 0; c <= stage.spec.last_row; ++c) {

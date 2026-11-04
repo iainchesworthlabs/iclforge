@@ -600,6 +600,16 @@ def pad_signals(stream):
         sub.bypass = {m: list(bits) + [0] * extra for m, bits in sub.bypass.items()}
 
 
+def block_header_crc(value, bits):
+    register = 0xA2
+    for position in range(bits - 1, -1, -1):
+        top = register & 0x80
+        register = ((register << 1) | ((value >> position) & 1)) & 0xFF
+        if top:
+            register ^= 0x1D
+    return register
+
+
 def build_stream(stream):
     per_unit = stream.per_unit
     interval = stream.restart_interval * per_unit
@@ -636,9 +646,13 @@ def build_stream(stream):
                     this = unit // stream.restart_interval
                     check = lossless_fold(rows, assign_of(sub, this - 1)) if previous else 0
                     w.append(write_restart_header(sub, check, assign=assign_of(sub, this)))
+                    header_start = w.count
                     write_full_block_header(w, sub, coding, size, sub.sections.get(position))
                 else:
+                    header_start = w.count
                     write_light_block_header(w, sub, size, sub.sections.get(position))
+                header_bits = w.count - header_start
+                header_value = w.value & ((1 << header_bits) - 1)
                 body = BitWriter()
                 for i in range(position, position + size):
                     if sub.object_bypass is not None:
@@ -651,12 +665,12 @@ def build_stream(stream):
                         lsbs, offset = coding[ch]
                         encode_residual(body, sub.channels[ch], res[ch][i], lsbs, offset)
                 if sub.data_check:
-                    w.put(body.count + 16, 16)  # counted from the start of this field (ERRATA 21)
+                    w.put(body.count, 16)  # the bits of the sample data, not its own 16 (TH spec 8.1)
                 w.append(body)
                 if sub.data_check:
-                    w.put(
-                        0, 8
-                    )  # block_data_crc: the algorithm is not known (ERRATA open question 9)
+                    # the block header CRC: polynomial 0x1D, initial value 0xA2, over the bits of
+                    # block_header() and nothing else (TH spec 8.1)
+                    w.put(block_header_crc(header_value, header_bits), 8)
                 w.put(1 if block_index == len(blocks) - 1 else 0, 1)
                 position += size
             if stream.marker == "every" or (stream.marker == "last" and padding):
@@ -2688,6 +2702,12 @@ REFUSED = {}
 #              the SHA-256 of what it returns: the model of what it does is in ffmpeg_outcome)
 FFMPEG_VERSION = "6.1.1"
 FFMPEG = {
+    "hb_data_check": {
+        "outcome": "refused",
+        "note": "FFmpeg counts block_data_bits from the start of its own 16 bit field (the sample "
+        "data and 16) and reports a mismatch for the count of TH spec 8.1, which the Dolby "
+        "decoder requires (it reports 0xE4 for FFmpeg's)",
+    },
     "hb_marker_every": {
         "outcome": "short",
         "returned": 80,

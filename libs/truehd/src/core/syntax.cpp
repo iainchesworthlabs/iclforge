@@ -445,7 +445,9 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
                                                         const BlockContext& context) {
     BlockHeaderSpec header;
     std::uint8_t flags = context.presence_flags;
-    if (reader.read(1) != 0) {
+    // new_guards exists only while bit 0 is set (TH spec §8.2); a block that clears it cannot
+    // replace the flags again until the next restart.
+    if ((flags & presence::kGuards) != 0 && reader.read(1) != 0) {
         flags = static_cast<std::uint8_t>(reader.read(8));
         header.presence_flags = flags;
     }
@@ -473,37 +475,36 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
         }
         header.quant_step = steps;
     }
-    if ((flags & presence::kChannels) != 0) {
-        for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
-            ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
-            if (reader.read(1) == 0) {
-                continue;
-            }
-            update.present = true;
-            if ((flags & presence::kFir) != 0 && reader.read(1) != 0) {
-                auto fir = read_filter(reader, kMaxFirOrder);
-                if (!fir) {
-                    return std::unexpected(fir.error());
-                }
-                if (fir->has_state) {
-                    return std::unexpected(
-                        Error{ErrorKind::kBadParameter, "a FIR filter with state (TH spec §9.2)"});
-                }
-                update.fir = *fir;
-            }
-            if ((flags & presence::kIir) != 0 && reader.read(1) != 0) {
-                auto iir = read_filter(reader, kMaxIirOrder);
-                if (!iir) {
-                    return std::unexpected(iir.error());
-                }
-                update.iir = *iir;
-            }
-            if ((flags & presence::kHuffOffset) != 0 && reader.read(1) != 0) {
-                update.huff_offset = read_signed(reader, 15);
-            }
-            update.huff_type = static_cast<std::uint8_t>(reader.read(2));
-            update.huff_lsbs = static_cast<std::uint8_t>(reader.read(5));
+    // The loop over the channels' parameters is not gated by the flags (TH spec §8.2).
+    for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
+        ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
+        if (reader.read(1) == 0) {
+            continue;
         }
+        update.present = true;
+        if ((flags & presence::kFir) != 0 && reader.read(1) != 0) {
+            auto fir = read_filter(reader, kMaxFirOrder);
+            if (!fir) {
+                return std::unexpected(fir.error());
+            }
+            if (fir->has_state) {
+                return std::unexpected(
+                    Error{ErrorKind::kBadParameter, "a FIR filter with state (TH spec §9.2)"});
+            }
+            update.fir = *fir;
+        }
+        if ((flags & presence::kIir) != 0 && reader.read(1) != 0) {
+            auto iir = read_filter(reader, kMaxIirOrder);
+            if (!iir) {
+                return std::unexpected(iir.error());
+            }
+            update.iir = *iir;
+        }
+        if ((flags & presence::kHuffOffset) != 0 && reader.read(1) != 0) {
+            update.huff_offset = read_signed(reader, 15);
+        }
+        update.huff_type = static_cast<std::uint8_t>(reader.read(2));
+        update.huff_lsbs = static_cast<std::uint8_t>(reader.read(5));
     }
     if (reader.overflowed()) {
         return std::unexpected(truncated("block header"));
@@ -514,10 +515,12 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
 void write_block_header(BitWriter& writer, const BlockContext& context,
                         const BlockHeaderSpec& header) {
     std::uint8_t flags = context.presence_flags;
-    put_field(writer, header.presence_flags ? 1U : 0U, 1);
-    if (header.presence_flags) {
-        flags = *header.presence_flags;
-        put_field(writer, flags, 8);
+    if ((flags & presence::kGuards) != 0) {
+        put_field(writer, header.presence_flags ? 1U : 0U, 1);
+        if (header.presence_flags) {
+            flags = *header.presence_flags;
+            put_field(writer, flags, 8);
+        }
     }
     if ((flags & presence::kBlockSize) != 0) {
         put_field(writer, header.block_size ? 1U : 0U, 1);
@@ -547,34 +550,32 @@ void write_block_header(BitWriter& writer, const BlockContext& context,
             }
         }
     }
-    if ((flags & presence::kChannels) != 0) {
-        for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
-            const ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
-            put_field(writer, update.present ? 1U : 0U, 1);
-            if (!update.present) {
-                continue;
-            }
-            if ((flags & presence::kFir) != 0) {
-                put_field(writer, update.fir ? 1U : 0U, 1);
-                if (update.fir) {
-                    write_filter(writer, *update.fir);
-                }
-            }
-            if ((flags & presence::kIir) != 0) {
-                put_field(writer, update.iir ? 1U : 0U, 1);
-                if (update.iir) {
-                    write_filter(writer, *update.iir);
-                }
-            }
-            if ((flags & presence::kHuffOffset) != 0) {
-                put_field(writer, update.huff_offset ? 1U : 0U, 1);
-                if (update.huff_offset) {
-                    put_signed(writer, *update.huff_offset, 15);
-                }
-            }
-            put_field(writer, update.huff_type & 3U, 2);
-            put_field(writer, update.huff_lsbs & 0x1FU, 5);
+    for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
+        const ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
+        put_field(writer, update.present ? 1U : 0U, 1);
+        if (!update.present) {
+            continue;
         }
+        if ((flags & presence::kFir) != 0) {
+            put_field(writer, update.fir ? 1U : 0U, 1);
+            if (update.fir) {
+                write_filter(writer, *update.fir);
+            }
+        }
+        if ((flags & presence::kIir) != 0) {
+            put_field(writer, update.iir ? 1U : 0U, 1);
+            if (update.iir) {
+                write_filter(writer, *update.iir);
+            }
+        }
+        if ((flags & presence::kHuffOffset) != 0) {
+            put_field(writer, update.huff_offset ? 1U : 0U, 1);
+            if (update.huff_offset) {
+                put_signed(writer, *update.huff_offset, 15);
+            }
+        }
+        put_field(writer, update.huff_type & 3U, 2);
+        put_field(writer, update.huff_lsbs & 0x1FU, 5);
     }
 }
 
