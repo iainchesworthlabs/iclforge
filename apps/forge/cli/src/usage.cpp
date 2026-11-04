@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 164> kOptionTokens{{
+constexpr std::array<OptionToken, 165> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -1031,8 +1031,11 @@ void print_option_blocks(std::uint32_t mask) {
                      "(planning/arithmetic-tiers.md): what a part with little time for the "
                      "search gives up, measured on the ESP32-S3 page");
         fmt::println("  sign-objects      atmos/atmos-path/atmos-encode/atmos-cbi: write a keyed EMDF "
-                     "object signature (needs signing-key=); metadata on a TrueHD stream: sign "
-                     "its evolution frames (iclforge's own tag, not Dolby's); see "
+                     "object signature (needs signing-key=); truehd-atmos and metadata on a "
+                     "TrueHD stream: sign its evolution frames (iclforge's own tag, not Dolby's). "
+                     "A truehd-atmos stream carries the Atmos flag (0x1000) either way, so a "
+                     "licensed decoder checks its frames and logs \"Consecutive Evo frames fail "
+                     "security check\" for tags that are not its own; see "
                      "docs/concepts/object-signing.md");
         fmt::println("  verify-objects    decode/monitor (and decode of TrueHD): check each frame's "
                      "object signature "

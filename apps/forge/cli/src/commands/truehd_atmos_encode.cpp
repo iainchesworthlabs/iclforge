@@ -36,6 +36,7 @@
 #include "truehd_meaning.hpp"
 #include "truehd_objects.hpp"
 #include "truehd_rate.hpp"
+#include "truehd_signing.hpp"
 #include "truehd_render.hpp"
 
 namespace forge_cli::commands {
@@ -197,6 +198,7 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
                                                          "truehd-drc-start-up-gain=",
                                                          "truehd-bed=",
                                                          "truehd-objects-lfe=",
+                                                         "sign-objects", "signing-key=",
                                                          "verify"});
         refused != kExitOk) {
         return refused;
@@ -499,6 +501,12 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
     const double pcm_bytes =
         static_cast<double>(frames) * static_cast<double>(kBedChannels + channels) * 3.0;
     FILE* status = status_stream(out_path);
+    // sign-objects with a key (signing-key= or ICLFORGE_SIGNING_KEY[_FILE]) signs every evolution
+    // frame, as E-AC-3's does; without it the stream is as encoded, unsigned.
+    const std::optional<int> signed_frames = apply_truehd_object_signing(stream, meta, status);
+    if (!signed_frames) {
+        return kExitUsage;
+    }
     const auto describe = [&] {
         status_println(status,
                        "encoded {} samples of a 7.1 bed and {} object channel(s) at {} Hz: {} "
@@ -539,9 +547,19 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
             status_println(status, "verified: {} access units decode to the input",
                            stats.verified_units);
         }
+        if (*signed_frames > 0) {
+            status_println(status,
+                           "  signed {} evolution frame(s) with the operator's key (ICL Forge's "
+                           "scheme, not a Dolby tag)",
+                           *signed_frames);
+        }
         status_println(status,
-                       "  provisional: no decoder outside this repository reads substream 3, and "
-                       "the stream is not signed (libs/truehd/ERRATA.md entries 61 to 64)");
+                       "  provisional: no decoder outside this repository reads substream 3 "
+                       "(libs/truehd/ERRATA.md entries 61 to 64)");
+        status_println(status,
+                       "  the major sync carries the Atmos flag (0x1000, TH spec 4.1.1): a licensed "
+                       "decoder checks the evolution frames' tags, and reports \"Consecutive Evo "
+                       "frames fail security check\" for a stream whose tags are not its own");
     };
 
     if (kind == EncodeOutput::kRaw) {
