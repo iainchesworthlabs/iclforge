@@ -99,6 +99,69 @@ TEST_CASE("the extension of the channel meaning has a body of length + 1 words (
     }
 }
 
+TEST_CASE("a major sync with the 16-channel extension is written as the owner's discs have it",
+          "[truehd][io]") {
+    // A dynamic-object-only programme with an LFE and 11 other channels: the 4 bit length (1) and
+    // 18 bits of fields, in 2 words, which is the 32 byte major sync of the owner's Blu-rays
+    // (planning/truehd-disc-findings.md, question 2: dialogue norm 31, mix level 35, 11 channels).
+    MajorSync sync = stereo_major_sync();
+    sync.num_substreams = 4;
+    sync.extended_substream_info = 3;
+    sync.substream_info = 0xFC;
+    sync.channel_meaning.extra_present = true;
+    ExtraChannelMeaning extra;
+    extra.sixteench_dialogue_norm = 31;
+    extra.sixteench_mix_level = 35;
+    extra.sixteench_channel_count = 11;
+    extra.dyn_object_only = true;
+    extra.lfe_present = true;
+    sync.extra = extra;
+    auto bytes = write_major_sync(sync);
+    REQUIRE(bytes.has_value());
+    REQUIRE(bytes->size() == 32);
+    CHECK((std::to_integer<unsigned>((*bytes)[26]) >> 4U) == 1U);  // extra_channel_meaning_length
+
+    auto read = parse_major_sync(*bytes);
+    REQUIRE(read.has_value());
+    CHECK(read->size_bytes == 32);
+    REQUIRE(read->extra.has_value());
+    CHECK(read->extra->length == 1);
+    CHECK(read->extra->size_from_length);
+    CHECK(read->extra->nibble_in_body);
+    CHECK(read->extra->sixteench_dialogue_norm == 31);
+    CHECK(read->extra->sixteench_mix_level == 35);
+    CHECK(read->extra->sixteench_channel_count == 11);
+    CHECK(read->extra->dyn_object_only);
+    CHECK(read->extra->lfe_present);
+
+    // A programme with beds, ISF and dynamic objects takes more words, and the length follows.
+    ExtraChannelMeaning bed;
+    bed.sixteench_channel_count = 16;
+    bed.content_description = 7;
+    bed.channel_assignment = 0x1F;
+    bed.isf = 3;
+    bed.dynamic_object_count = 9;
+    sync.extra = bed;
+    bytes = write_major_sync(sync);
+    REQUIRE(bytes.has_value());
+    // 4 + 16 + 4 + 2 + 10 + 3 + 5 = 44 bits: 3 words.
+    CHECK(bytes->size() == 26 + 6 + 2);
+    read = parse_major_sync(*bytes);
+    REQUIRE(read.has_value());
+    REQUIRE(read->extra.has_value());
+    CHECK(read->extra->length == 2);
+    CHECK(read->extra->channel_assignment == 0x1F);
+    CHECK(read->extra->isf == 3);
+    CHECK(read->extra->dynamic_object_count == 9);
+
+    // The fields have to fit, and the stream has to say it has an extension.
+    sync.extra->sixteench_mix_level = 64;
+    CHECK(write_major_sync(sync).error().kind == ErrorKind::kBadParameter);
+    sync.extra = extra;
+    sync.channel_meaning.extra_present = false;
+    CHECK(write_major_sync(sync).error().kind == ErrorKind::kBadParameter);
+}
+
 TEST_CASE("extended_substream_info is the low pair of the four bits after the substream count",
           "[truehd][io]") {
     // TH spec §4.1: "2+2 bits (low 2 bits used, upper 2 reserved)". The owner's Blu-ray (an Atmos

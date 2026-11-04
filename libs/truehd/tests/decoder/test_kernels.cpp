@@ -133,9 +133,9 @@ TEST_CASE("the residual reader gives back what the encoder's writer put, in ever
             }
         }
         std::array<std::int32_t, kBlock * kStride> rows{};
-        std::array<std::uint16_t, kBlock> bypass{};
+        std::array<std::uint64_t, kBlock> bypass{};
         iclforge::BitReader reader(writer.bytes());
-        REQUIRE(kernels::read_residuals(reader, kBlock, 0, kChannels - 1, plans.data(), 0, nullptr,
+        REQUIRE(kernels::read_residuals(reader, kBlock, 0, kChannels - 1, plans.data(), 0, nullptr, nullptr,
                                         rows.data(), kStride, bypass.data()));
         for (int i = 0; i < kBlock; ++i) {
             for (int c = 0; c < kChannels; ++c) {
@@ -158,19 +158,160 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         base[static_cast<std::size_t>(i * kStride + 2)] = c[static_cast<std::size_t>(50 + i)];
     }
 
-    SECTION("the matrix is the sum of channel times coefficient, shifted by 14, with the step cleared") {
+    SECTION("the matrix is the sum of channel times coefficient, shifted by 15, with the step cleared") {
         auto rows = base;
         const std::array<std::uint8_t, 3> channel = {0, 1, 2};
-        const std::array<std::int32_t, 3> coeff = {16384, -8192, 3001};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::int32_t, 3> coeff = {32768, -16384, 6003};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::apply_matrix(kBlock, 3, channel.data(), coeff.data(), 5, 0xFFFFFFF8U, false, 0,
                               bypass.data(), rows.data(), kStride);
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
-            const std::int64_t sum = std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192 +
-                                     std::int64_t{base[row + 2]} * 3001;
-            REQUIRE(rows[row + 5] == static_cast<std::int32_t>(static_cast<std::uint32_t>(sum >> 14) &
+            const std::int64_t sum = std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * -16384 +
+                                     std::int64_t{base[row + 2]} * 6003;
+            REQUIRE(rows[row + 5] == static_cast<std::int32_t>(static_cast<std::uint32_t>(sum >> 15) &
                                                               0xFFFFFFF8U));
+        }
+    }
+
+    SECTION("a coefficient of frac_bits 15 keeps its last bit") {
+        // 2^-15 is the finest coefficient (ERRATA.md entry 60): a coefficient of 1 is one part in
+        // 32768, which a scale of 2^-14 could not hold.
+        auto rows = base;
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        const std::array<std::int32_t, 2> coeff = {32768 + 1, -3};
+        const std::array<std::uint64_t, kBlock> bypass{};
+        kernels::apply_matrix(kBlock, 2, channel.data(), coeff.data(), 4, 0xFFFFFFFFU, false, 0,
+                              bypass.data(), rows.data(), kStride);
+        bool differs_from_a_shift_of_14 = false;
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t sum =
+                std::int64_t{base[row]} * (32768 + 1) + std::int64_t{base[row + 1]} * -3;
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 15));
+            differs_from_a_shift_of_14 = differs_from_a_shift_of_14 || (sum >> 15) != (sum >> 14);
+        }
+        REQUIRE(differs_from_a_shift_of_14);
+    }
+
+    SECTION("an object matrix adds the slope as a ramp that grows a sample at a time, from 0 at the start of the unit") {
+        // ERRATA.md entry 69: the coefficients run at 2^-18; the sample adds
+        // ((sum of channel times slope) >> scale) * ramp, the ramp growing by 6552 a sample.
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        const std::array<std::uint64_t, kBlock> bypass{};
+        kernels::ObjectMatrixState state;
+        state.coeff[0] = 1 << kernels::kObjectShift;
+        state.coeff[1] = -(3 << 16);
+        state.slope[0] = 0;
+        state.slope[1] = 3986;
+        state.scale = 3;
+        state.extension = true;
+        auto rows = base;
+        kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), rows.data(), kStride);
+        bool differs_from_none = false;
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t main = std::int64_t{base[row]} * (1 << 18) + std::int64_t{base[row + 1]} * -(3 << 16);
+            const std::int64_t shared = (std::int64_t{base[row + 1]} * 3986) >> 3;
+            const std::int64_t sum = main + shared * (6552 * i);
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 18));
+            differs_from_none = differs_from_none || rows[row + 4] != static_cast<std::int32_t>(main >> 18);
+        }
+        REQUIRE(differs_from_none);
+        REQUIRE(state.ramp == 6552 * kBlock);
+        // The unit goes on in the next block: the ramp is not reset, and the coefficients are
+        // those of the start of the unit.
+        auto next = base;
+        kernels::apply_object_matrix(kBlock, false, false, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), next.data(), kStride);
+        const std::int64_t expected_first =
+            std::int64_t{base[0]} * (1 << 18) + std::int64_t{base[1]} * -(3 << 16) +
+            ((std::int64_t{base[1]} * 3986) >> 3) * (6552 * kBlock);
+        REQUIRE(next[4] == static_cast<std::int32_t>(expected_first >> 18));
+        // A new unit starts the ramp at 0 again.
+        auto again = base;
+        kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), again.data(), kStride);
+        REQUIRE(again == rows);
+    }
+
+    SECTION("at the end of a unit every coefficient moves by its slope, scaled to 2^-18") {
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        const std::array<std::uint64_t, kBlock> bypass{};
+        kernels::ObjectMatrixState state;
+        state.coeff[0] = 1000;
+        state.coeff[1] = -2000;
+        state.slope[0] = 5;
+        state.slope[1] = -7;
+        state.scale = 3;
+        state.extension = true;
+        auto rows = base;
+        kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), rows.data(), kStride);
+        REQUIRE(state.coeff[0] == 1000);
+        REQUIRE(state.coeff[1] == -2000);
+        kernels::apply_object_matrix(kBlock, false, true, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), rows.data(), kStride);
+        REQUIRE(state.coeff[0] == 1000 + (5 << 15));
+        REQUIRE(state.coeff[1] == -2000 + (-7 * (1 << 15)));
+        // Without the extension nothing moves.
+        state.extension = false;
+        const auto before = state.coeff;
+        kernels::apply_object_matrix(kBlock, false, true, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), rows.data(), kStride);
+        REQUIRE(state.coeff == before);
+    }
+
+    SECTION("an object matrix without the bypass masks its whole sum, one with it adds its bits to the unmasked value") {
+        const std::array<std::uint8_t, 2> channel = {0, 1};
+        std::array<std::uint64_t, kBlock> bypass{};
+        for (int i = 0; i < kBlock; ++i) {
+            bypass[static_cast<std::size_t>(i)] = static_cast<std::uint64_t>(i % 3) << 4U;  // matrix 1
+        }
+        kernels::ObjectMatrixState state;
+        state.coeff[0] = 1 << 19;  // 2.0
+        state.coeff[1] = 3 << 15;
+        auto plain = base;
+        kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFCU, false, 1, bypass.data(), plain.data(), kStride);
+        auto bypassed = base;
+        kernels::apply_object_matrix(kBlock, true, false, 6552, 2, channel.data(), state, 4,
+                                     0xFFFFFFFCU, true, 1, bypass.data(), bypassed.data(), kStride);
+        bool low_bits_differ = false;
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const auto sum = (std::int64_t{base[row]} * (1 << 19) + std::int64_t{base[row + 1]} * (3 << 15)) >> 18;
+            REQUIRE(plain[row + 4] ==
+                    static_cast<std::int32_t>(static_cast<std::uint32_t>(sum) & 0xFFFFFFFCU));
+            REQUIRE(bypassed[row + 4] == static_cast<std::int32_t>(sum + i % 3));
+            low_bits_differ = low_bits_differ || (static_cast<std::uint32_t>(sum) & 3U) != 0U;
+        }
+        REQUIRE(low_bits_differ);
+    }
+
+    SECTION("an object matrix's noise is scaled to 2^-18 as the shift plus 11") {
+        const std::array<std::uint8_t, 1> channel = {0};
+        const std::array<std::uint64_t, kBlock> bypass{};
+        std::array<std::int8_t, 64> buffer{};
+        for (std::size_t i = 0; i < buffer.size(); ++i) {
+            buffer[i] = static_cast<std::int8_t>(static_cast<int>(i % 11) * 9 - 40);
+        }
+        kernels::ObjectMatrixState state;
+        state.coeff[0] = 1 << 18;
+        kernels::NoiseDraw noise;
+        noise.buffer = buffer.data();
+        noise.shift = 2;
+        noise.first = 3;
+        noise.stride = 5;
+        noise.mask = 63;
+        auto rows = base;
+        kernels::apply_object_matrix(kBlock, true, false, 6552, 1, channel.data(), state, 4,
+                                     0xFFFFFFFFU, false, 0, bypass.data(), rows.data(), kStride, noise);
+        for (int i = 0; i < kBlock; ++i) {
+            const auto row = static_cast<std::size_t>(i * kStride);
+            const std::int64_t draw = std::int64_t{buffer[(3U + 5U * static_cast<unsigned>(i)) & 63U]} * (1 << (2 + 11));
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>((std::int64_t{base[row]} * (1 << 18) + draw) >> 18));
         }
     }
 
@@ -209,8 +350,8 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         }
         auto rows = base;
         const std::array<std::uint8_t, 2> channel = {0, 1};
-        const std::array<std::int32_t, 2> coeff = {16384, -8192};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::int32_t, 2> coeff = {32768, -16384};
+        const std::array<std::uint64_t, kBlock> bypass{};
         kernels::NoiseDraw noise;
         noise.buffer = buffer.data();
         noise.shift = 3;
@@ -221,11 +362,12 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
                               bypass.data(), rows.data(), kStride, noise);
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
+            // The draw is defined against a sum at 2^-14: at 2^-15 it is twice as large.
             const std::int64_t draw =
-                std::int64_t{buffer[(2U + 5U * static_cast<unsigned>(i)) & 63U]} * (1 << 10);
+                std::int64_t{buffer[(2U + 5U * static_cast<unsigned>(i)) & 63U]} * (1 << 11);
             const std::int64_t sum =
-                std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192 + draw;
-            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 14));
+                std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * -16384 + draw;
+            REQUIRE(rows[row + 4] == static_cast<std::int32_t>(sum >> 15));
         }
         // No shift, no draw: the same matrix without noise gives the sum without it.
         auto plain = base;
@@ -235,8 +377,8 @@ TEST_CASE("a matrix, the output stage and the noise generator compute what the s
         for (int i = 0; i < kBlock; ++i) {
             const auto row = static_cast<std::size_t>(i * kStride);
             const std::int64_t sum =
-                std::int64_t{base[row]} * 16384 + std::int64_t{base[row + 1]} * -8192;
-            REQUIRE(plain[row + 4] == static_cast<std::int32_t>(sum >> 14));
+                std::int64_t{base[row]} * 32768 + std::int64_t{base[row + 1]} * -16384;
+            REQUIRE(plain[row + 4] == static_cast<std::int32_t>(sum >> 15));
         }
     }
 

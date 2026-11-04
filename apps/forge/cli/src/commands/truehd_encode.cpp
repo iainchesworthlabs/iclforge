@@ -27,17 +27,20 @@
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
+#include "truehd_encode.hpp"
 #include "truehd_encode_core.hpp"
 #include "truehd_meaning.hpp"
+#include "truehd_rate.hpp"
 
 namespace forge_cli::commands {
 
-namespace {
-
 namespace th = iclforge::truehd;
 
+namespace {
 
-enum class Output : std::uint8_t { kRaw, kMatroska, kMp4, kTransport, kUnknown };
+constexpr double kFullScale = 8388608.0;  // 2^23: a 24 bit sample against the WAV reader's [-1, 1)
+
+}  // namespace
 
 std::string lower_extension(std::string_view path) {
     std::string ext = std::filesystem::path{std::string{path}}.extension().string();
@@ -46,24 +49,24 @@ std::string lower_extension(std::string_view path) {
     return ext;
 }
 
-Output output_kind(std::string_view out_path) {
+EncodeOutput output_kind(std::string_view out_path) {
     if (is_stdio_path(out_path)) {
-        return Output::kRaw;
+        return EncodeOutput::kRaw;
     }
     const std::string ext = lower_extension(out_path);
     if (ext == ".thd") {
-        return Output::kRaw;
+        return EncodeOutput::kRaw;
     }
     if (ext == ".mkv" || ext == ".mka" || ext == ".webm") {
-        return Output::kMatroska;
+        return EncodeOutput::kMatroska;
     }
     if (ext == ".mp4" || ext == ".m4a" || ext == ".mov") {
-        return Output::kMp4;
+        return EncodeOutput::kMp4;
     }
     if (ext == ".ts" || ext == ".m2ts") {
-        return Output::kTransport;
+        return EncodeOutput::kTransport;
     }
-    return Output::kUnknown;
+    return EncodeOutput::kUnknown;
 }
 
 
@@ -83,17 +86,36 @@ int exit_code_for(th::EncodeErrorKind kind) {
     return kExitInternal;
 }
 
-void report(const th::EncodeError& error) {
-    fmt::println(stderr, "error: truehd-encode: {}{}{}", th::to_string(error.kind),
+void report_encode_error(std::string_view command, const th::EncodeError& error) {
+    fmt::println(stderr, "error: {}: {}{}{}", command, th::to_string(error.kind),
                  error.detail.empty() ? "" : ": ", error.detail);
     if (error.kind == th::EncodeErrorKind::kRateExceeded) {
         fmt::println(stderr,
                      "  the stream cannot be sent within the peak rate and TH spec §18's 75 ms: "
-                     "raise truehd-peak-rate= or write it anyway with truehd-rate-check=lenient");
+                     "raise truehd-peak-rate= or write it anyway with truehd-rate-check=lenient "
+                     "(truehd-atmos can also let the objects give up low bits with "
+                     "truehd-rate-mode=shape)");
     }
 }
 
-bool write_raw(std::string_view out_path, std::span<const std::byte> bytes) {
+// The WAV reader's [-1, 1) floats back to the integers they were read from: a 16 or 24 bit PCM
+// sample survives the trip exactly (a float32 holds 24 bits), and a wider one or a float is rounded
+// to 24 bits. Stream channel k comes from WAV channel `wav_index[k]`.
+void interleave_wav(const iclforge::ac3::io::WavData& wav, std::span<const std::size_t> wav_index,
+                    std::size_t begin, std::size_t end, std::vector<std::int32_t>& out) {
+    const std::size_t channels = wav.channels.size();
+    out.resize((end - begin) * channels);
+    for (std::size_t i = begin; i < end; ++i) {
+        for (std::size_t c = 0; c < channels; ++c) {
+            const double scaled =
+                std::nearbyint(static_cast<double>(wav.channels[wav_index[c]][i]) * kFullScale);
+            out[(i - begin) * channels + c] =
+                static_cast<std::int32_t>(std::clamp(scaled, -kFullScale, kFullScale - 1.0));
+        }
+    }
+}
+
+bool write_raw_stream(std::string_view out_path, std::span<const std::byte> bytes) {
     if (is_stdio_path(out_path)) {
         iclforge::cli::platform::set_stdio_binary();
         return std::fwrite(bytes.data(), 1, bytes.size(), stdout) == bytes.size() &&
@@ -115,15 +137,14 @@ bool write_raw(std::string_view out_path, std::span<const std::byte> bytes) {
     return true;
 }
 
-}  // namespace
-
 int run_truehd_encode(std::string_view in_path, std::string_view out_path, const Options& meta) {
     // The metadata, layout and multi-source options of the other encoders are not applied here:
     // refused by name, so that a second source or a dialnorm is not dropped from a run that exits 0.
     if (const int refused = check_options_applied(
             meta,
             {"truehd-downmix=", "truehd-downmix-gains=", "truehd-restart=", "truehd-peak-rate=",
-             "truehd-rate-check=", "truehd-fir-order=", "truehd-matrix=", "truehd-stereo-mode=",
+             "truehd-rate-check=", "truehd-rate-mode=", "truehd-bitrate=",
+             "truehd-major-sync=", "truehd-fir-order=", "truehd-matrix=", "truehd-stereo-mode=",
              "truehd-dialnorm-2ch=", "truehd-dialnorm-6ch=", "truehd-dialnorm-8ch=",
              "truehd-mix-level-2ch=", "truehd-mix-level-6ch=", "truehd-mix-level-8ch=",
              "truehd-source-format-6ch=", "truehd-source-format-8ch=", "truehd-control-2ch=",
@@ -133,8 +154,8 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         return refused;
     }
     const Options::TruehdEncode& opts = meta.thdenc;
-    const Output kind = output_kind(out_path);
-    if (kind == Output::kUnknown) {
+    const EncodeOutput kind = output_kind(out_path);
+    if (kind == EncodeOutput::kUnknown) {
         fmt::println(
             stderr,
             "error: truehd-encode writes a bare .thd, or Matroska (.mkv), MP4 (.mp4) or a "
@@ -182,6 +203,12 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         config.peak_data_rate_bps = *opts.peak_rate_kbps * 1000U;
     }
     config.allow_rate_violations = opts.rate_lenient;
+    if (opts.bitrate_kbps) {
+        config.rate_control.target_bitrate_bps = *opts.bitrate_kbps * 1000U;
+    }
+    if (opts.major_sync_units) {
+        config.major_sync_interval_units = *opts.major_sync_units;
+    }
     if (opts.fir_order) {
         config.max_fir_order = *opts.fir_order;
     }
@@ -198,7 +225,7 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
 
     auto outcome = iclforge::apps::truehd_encode::encode_wav(*wav, *layout, config);
     if (!outcome) {
-        report(outcome.error().error);
+        report_encode_error("truehd-encode", outcome.error().error);
         return exit_code_for(outcome.error().error.kind);
     }
     const std::vector<std::byte>& stream = outcome->stream;
@@ -222,6 +249,11 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
                 status,
                 "warning: {} access unit(s) exceed the peak rate (truehd-rate-check=lenient)",
                 stats.rate_violations);
+        }
+        if (opts.bitrate_kbps) {
+            status_println(status, "  rate: held to {} kbit/s over {} ms; least headroom {} ms",
+                           *opts.bitrate_kbps, th::kRateLatencyMs,
+                           format_headroom_ms(stats.min_headroom_us));
         }
         if (stats.downmix_reduced_intervals != 0) {
             status_println(
@@ -248,8 +280,8 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         }
     };
 
-    if (kind == Output::kRaw) {
-        if (!write_raw(out_path, stream)) {
+    if (kind == EncodeOutput::kRaw) {
+        if (!write_raw_stream(out_path, stream)) {
             return kExitOutput;
         }
         describe();
@@ -258,10 +290,10 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         return kExitOk;
     }
     describe();
-    if (kind == Output::kMatroska) {
+    if (kind == EncodeOutput::kMatroska) {
         return run_mkv_truehd(stream, in_path, out_path);
     }
-    if (kind == Output::kMp4) {
+    if (kind == EncodeOutput::kMp4) {
         return run_mp4_truehd(stream, in_path, out_path);
     }
     return run_ts_truehd(stream, in_path, out_path, "");

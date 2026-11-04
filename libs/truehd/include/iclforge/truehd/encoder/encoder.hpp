@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
+#include "iclforge/truehd/encoder/ratectl.hpp"
 #include "iclforge/truehd/export.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
@@ -38,8 +40,9 @@
 // substreams' matrices undo exactly.
 //
 // What it does not write: noise generation (the generator is not defined, ERRATA.md open
-// question 5), the Atmos substream and its evolution payload (phase T2b; this class only frames a
-// payload it is handed, see EncoderConfig::extra_data), and MLP (0xF8726FBB). The block data CRC
+// question 5), the evolution payload (this class only frames a payload it is handed, see
+// EncoderConfig::extra_data), and MLP (0xF8726FBB). The Atmos substream is written with
+// EncoderConfig::object_channels. The block data CRC
 // is not written either, because the specification does not say what it covers (ERRATA.md entry
 // 21).
 //
@@ -103,6 +106,47 @@ struct ExperimentalTools {
 // writes the framing of TH spec §16.1 and §16.4 around the bytes and never looks inside them.
 using ExtraDataSource = std::function<std::vector<std::byte>(std::uint64_t access_unit_index)>;
 
+// What substream 3 codes (TH spec §15.3; ERRATA.md entries 63 and 70).
+enum class ObjectLayout : std::uint8_t {
+    // The channels of substream 3 are coded as they are, with no matrix and no prediction from the
+    // bed, and `min_chan` 0. The bed is whatever the caller gives. This is not the structure of the
+    // owner's streams.
+    kIndependent,
+    // The structure of the owner's streams: substream 3 codes only the channels from 8 up
+    // (`min_chan` 8), and its primitive matrices rebuild all the output channels from the 7.1 bed
+    // of substreams 0 to 2 and those coded channels. The 7.1 bed is therefore not an input: it is
+    // the first eight objects with the rest mixed in by a fixed render, and the PCM given to
+    // encode() is the `object_channels` objects alone. `object_channels` is 9 to 16 and the
+    // downmix is DownmixMode::kNone.
+    kBedMatrices,
+};
+
+// What the encoder does when a unit would arrive later than the model of libs/truehd/ratectl.hpp
+// allows (ERRATA.md entry 71).
+enum class RateMode : std::uint8_t {
+    // Nothing: the stream is lossless, so a unit that does not fit is kRateExceeded (or counted, with
+    // EncoderConfig::allow_rate_violations).
+    kStrict,
+    // The object channels of substream 3 give up low bits, one at a time, in the restart interval
+    // that does not fit, until it does (RateControl::max_shape_bits at most). The 7.1 bed of
+    // substreams 0 to 2 is never touched. The objects of such an interval are no longer the input's:
+    // each sample is the input's rounded to a multiple of 2^k, and EncoderStats::shaped_intervals
+    // says how many intervals it happened in. Needs object_channels. PROVISIONAL: whether the owner
+    // accepts a lossy object substream at all is ERRATA.md question 71.
+    kShape,
+};
+
+struct RateControl {
+    RateMode mode = RateMode::kStrict;
+    // The bitrate the stream is held to, over any 75 ms (the arrival model run at this rate). 0: the
+    // declared peak data rate, which is as much as a decoder is told to expect. Above the declared
+    // peak rate it changes nothing.
+    std::uint32_t target_bitrate_bps = 0;
+    // kShape: the most low bits an interval's object channels give up beyond the ones the input
+    // leaves clear. 0 to 16.
+    int max_shape_bits = 8;
+};
+
 struct EncoderConfig {
     StreamKind kind = StreamKind::kTrueHd;  // only kTrueHd is written
     std::uint32_t sample_rate = 48000;
@@ -118,8 +162,17 @@ struct EncoderConfig {
     // units than this has one restart header. A longer interval makes a smaller stream, a shorter
     // one a smaller delay before the first unit leaves the encoder and a quicker random access.
     int restart_interval_units = 128;
+    // The access units between major syncs: 0 (a major sync at every restart header, the default
+    // and what the encoder always wrote) or a multiple of restart_interval_units. The restarts
+    // between two major syncs have a restart header in every substream and no major sync
+    // (layout.hpp, LayoutCadence).
+    int major_sync_interval_units = 0;
     // TH spec §4.4, §18: the rate the stream is declared not to exceed. 18 Mbps is Blu-ray's.
     std::uint32_t peak_data_rate_bps = 18'000'000;
+    // What happens to a unit that would arrive late at that rate, or at the bitrate chosen in
+    // `rate_control` (ratectl.hpp). The extra_data source may be called more than once for a unit:
+    // a restart interval that is coded again asks again.
+    RateControl rate_control{};
     // false: a stream that cannot be sent within peak_data_rate_bps and the 75 ms of TH spec §18
     // is an error (kRateExceeded). true: it is written anyway and counted in
     // EncoderStats::rate_violations.
@@ -129,13 +182,64 @@ struct EncoderConfig {
     // The 2 channel mode of TH spec §5.4: 0 stereo, 1 Lt/Rt matrix encoded, 2 headphone.
     unsigned stereo_mode = 0;
     // TH spec §14: dialogue normalisation, mix levels, source formats, the control-enabled bits and
-    // the DRC start-up gains, per presentation (2, 6 and 8 channels), written into every major sync.
-    // All zero by default, as in FFmpeg's streams, so a configuration that does not set them writes
-    // the stream it always wrote. A field wider than its width (channel_meaning_problem()) or
-    // `extra_present` (the sixteen-channel extension is not written) is kInvalidConfig, the detail
-    // naming the field. Provisional, no oracle until the DEE set: what the values mean (units, which
-    // presentation applies when, what a control-enabled bit gates) is ERRATA.md questions 51 to 55.
+    // the DRC start-up gains, per presentation (2, 6 and 8 channels), written into every major
+    // sync. All zero by default, as in FFmpeg's streams, so a configuration that does not set them
+    // writes the stream it always wrote. A field wider than its width (channel_meaning_problem())
+    // or `extra_present` (the sixteen-channel extension is not written) is kInvalidConfig, the
+    // detail naming the field. Provisional, no oracle until the DEE set: what the values mean
+    // (units, which presentation applies when, what a control-enabled bit gates) is ERRATA.md
+    // questions 51 to 55.
     ChannelMeaning channel_meaning{};
+    // TrueHD Atmos (TH spec §15, v3.9): the channels of substream 3, 1 to 16 (the Atmos
+    // presentations are 12, 14 and 16, §15.17; the owner's discs have 12), written with restart
+    // sync 0x31EC and the 16-channel extension of the major sync (§14.2). 0 writes none. The PCM
+    // given to encode() then has `channels` + `object_channels` values a frame: the 7.1 bed first
+    // (`channels` must be 8, substreams 0 to 2, 48 kHz only, §15.2, §20.2), then the object
+    // channels, which (ObjectLayout::kIndependent) are coded as substream 3 on their own, with no
+    // matrix or prediction from the bed; `object_layout` says what kBedMatrices changes. A decode
+    // of the best presentation gives the bed; Presentation::kAll gives the object channels. The
+    // programme they carry (which are beds, which objects) is the object audio metadata's, written
+    // by the caller in the extra data (`extra_data`); this only says in the major sync what
+    // `object_meaning` says. PROVISIONAL, no oracle but this library's decoder and the Python
+    // reference (ERRATA.md entry 63; questions 61 to 63).
+    int object_channels = 0;
+    // How substream 3 relates to the bed (ERRATA.md entries 63 and 70).
+    ObjectLayout object_layout = ObjectLayout::kIndependent;
+    // kBedMatrices only: the noise shift (0 to 15; 0 draws none, 1 is what the owner's silent
+    // streams have) of the matrices that mix the objects into the bed. The matrices draw generator
+    // 1's noise, which the encoder reproduces to the bit.
+    int object_noise_shift = 0;
+    // kBedMatrices only: one matrix with the LSB bypass (object_channels - 1, 2.0 on itself), which
+    // sends one bit a sample for the low bit the doubling loses. Needs a quantiser step of 0, so
+    // the encoder leaves the bits below the output shift's reach in the samples (a 16 bit source
+    // loses the one bit of saving it would otherwise have).
+    bool object_lsb_bypass = false;
+    // kBedMatrices only: the bits a sample the LSB bypass matrix sends, 1 to 3 (its coefficient on
+    // itself is 2^n and its header's two bits are n).
+    int object_bypass_bits = 1;
+    // kBedMatrices only: where the objects sit in the bed over time (object_paths.hpp). Empty: each
+    // object is mixed into its own bed row at -3 dB for the whole stream, as before. Otherwise the
+    // matrices that mix the objects into the bed follow the paths: the matrix sections of
+    // substream 3 change from block to block.
+    std::vector<ObjectPath> object_paths{};
+    // kBedMatrices with paths: an update every this many access units (the first access unit
+    // updates at each of its two blocks). A coefficient holds from one update to the next.
+    int object_update_units = 1;
+    // kBedMatrices with paths: send the extension's slopes (object_paths.hpp): a moving object is a
+    // section with its coefficients and their slopes, and a new section only when the path turns
+    // or the coefficient has drifted. Needs object_update_units 1.
+    ObjectExtension object_extension = ObjectExtension::kNone;
+    // kBedMatrices with paths: a mixing matrix whose coefficients are all 0 in a block is left out
+    // of that block's list (the section sends new headers when the list changes).
+    bool object_drop_idle_matrices = false;
+    // kBedMatrices with paths: one mixing matrix for each object a bed row takes, not one for each
+    // bed row (so that an object that moves between rows has a matrix on each, and a stream can
+    // carry up to the 16 matrices of the section; more is refused).
+    bool object_split_mixes = false;
+    // The 16-channel fields of the major sync (§14.2). `sixteench_channel_count` is filled in by
+    // the encoder: the object channels, less the LFE of a dynamic-object-only programme, which is
+    // how the owner's discs count them. Used only with object_channels.
+    ExtraChannelMeaning object_meaning{};
     // The largest FIR order tried (TH spec §9.3: 8). 0 turns prediction off.
     int max_fir_order = 8;
     // Decorrelate the channel pairs with a primitive matrix when it makes the stream smaller.
@@ -169,6 +273,17 @@ struct EncoderStats {
     // Restart intervals whose downmix had its gains lowered, or dropped, to stay within 24 bits.
     std::uint64_t downmix_reduced_intervals = 0;
     std::uint64_t verified_units = 0;
+    // ObjectLayout::kBedMatrices: restart intervals whose mix of the objects into the bed had its
+    // gain lowered, or dropped, to keep the bed within 24 bits.
+    std::uint64_t object_mix_reduced_intervals = 0;
+    // The smallest headroom of any unit under the declared peak rate (ratectl.hpp), in microseconds;
+    // below 0 only with allow_rate_violations.
+    std::int64_t min_headroom_us = 0;
+    // RateMode::kShape: restart intervals whose object channels gave up bits, the most any of them
+    // gave up beyond what the input leaves clear, and the intervals coded again on the way.
+    std::uint64_t shaped_intervals = 0;
+    int max_shape_bits = 0;
+    std::uint64_t shape_retries = 0;
 };
 
 class ICLFORGE_TRUEHD_EXPORT Encoder {
@@ -198,6 +313,9 @@ class ICLFORGE_TRUEHD_EXPORT Encoder {
     [[nodiscard]] std::expected<std::vector<EncodedAccessUnit>, EncodeError> flush();
 
     [[nodiscard]] const EncoderStats& stats() const noexcept;
+    // The figures of every restart interval written so far, in order (ratectl.hpp): what
+    // analyse_rate() finds in the stream the units make.
+    [[nodiscard]] std::span<const IntervalRate> interval_rates() const noexcept;
     // The samples per channel in a full access unit: 40 at 44.1 and 48 kHz, 80 at 88.2 and 96,
     // 160 at 176.4 and 192.
     [[nodiscard]] int samples_per_access_unit() const noexcept;

@@ -37,6 +37,41 @@ TEST_CASE("the reader hands out the units of a stream", "[truehd][io]") {
     CHECK(reader.skipped_bytes() == 0);
 }
 
+TEST_CASE("AC-3 core frames between the units are set aside, not skipped", "[truehd][io]") {
+    // A Blu-ray track puts the programme's AC-3 core (here 448 kbit/s: 896 words, 1792 bytes)
+    // between its access units. Without this the reader lost every unit up to the next major sync.
+    std::vector<std::byte> core(1792, std::byte{0x5A});
+    core[0] = std::byte{0x0B};
+    core[1] = std::byte{0x77};
+    core[4] = std::byte{30};    // fscod 0 (48 kHz), frame size code 30
+    core[5] = std::byte{0x40};  // bsid 8
+    std::vector<std::byte> stream;
+    for (int n = 0; n < 7; ++n) {
+        const std::vector<std::byte> unit = stereo_unit(n == 0, static_cast<std::uint16_t>(n * 40));
+        stream.insert(stream.end(), unit.begin(), unit.end());
+        if (n == 0 || n == 3) {
+            stream.insert(stream.end(), core.begin(), core.end());
+        }
+    }
+    ElementaryReader reader(stream);
+    int count = 0;
+    while (reader.next()) {
+        ++count;
+    }
+    CHECK(count == 7);
+    CHECK(reader.skipped_bytes() == 0);
+    CHECK(reader.core_frames() == 2);
+    CHECK(reader.core_bytes() == 2 * core.size());
+    const auto info = probe_stream(stream);
+    REQUIRE(info.has_value());
+    CHECK(info->access_units == 7);
+
+    // The same bytes are a unit when the size code is one A/52 does not have.
+    CHECK(ac3_core_frame_bytes(core) == 1792);
+    core[4] = std::byte{0x3F};
+    CHECK(ac3_core_frame_bytes(core) == 0);
+}
+
 TEST_CASE("the reader starts at the first major sync and counts what it passed", "[truehd][io]") {
     std::vector<std::byte> stream(37, std::byte{0x55});
     const std::vector<std::byte> body = stream_of(3);

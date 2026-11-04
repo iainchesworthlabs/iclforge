@@ -62,6 +62,13 @@
         "other_program_frames": 0,
         "payloads": 0,
         "programs": [],
+        "timing": {
+          "block_offset_factors": [],
+          "block_starts_in_unit": [],
+          "payload_sample_offsets": [],
+          "ramp_durations": [],
+          "update_sample_offsets": []
+        },
         "unread": 0
       },
       "parity_ok": 20,

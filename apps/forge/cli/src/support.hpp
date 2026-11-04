@@ -154,6 +154,9 @@ struct Options {
     // 'decode', 'levels' and 'loudness' of TrueHD and MLP only: the substreams to read (best, 2ch,
     // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
     std::string truehd_presentation;
+    // decode of a TrueHD Atmos stream: the speaker layout to place the objects on instead of writing
+    // the channels of substream 3 (an iclforge::render::OutputLayout name or list); empty: none.
+    std::string truehd_render;
     bool truehd_lenient = false;
     // `decode truehd-reading=`: the other reading of a point the specification leaves open, for
     // scoring a provisional reading (libs/truehd/ERRATA.md question 101); empty is the library's.
@@ -169,6 +172,12 @@ struct Options {
         std::optional<int> restart_units;             // truehd-restart=
         std::optional<std::uint32_t> peak_rate_kbps;  // truehd-peak-rate=
         bool rate_lenient = false;                    // truehd-rate-check=lenient
+        // truehd-bitrate=: the bitrate the stream is held to over 75 ms (the encoders), or the rate
+        // the arrival model runs at (probe detail=rate; the declared peak rate when unset).
+        std::optional<std::uint32_t> bitrate_kbps;
+        bool shape = false;                   // truehd-rate-mode=shape (truehd-atmos only)
+        std::optional<int> shape_bits;        // truehd-shape-bits=
+        std::optional<int> major_sync_units;  // truehd-major-sync=
         std::optional<int> fir_order;                 // truehd-fir-order=
         bool matrix = true;                           // truehd-matrix=
         unsigned stereo_mode = 0;  // truehd-stereo-mode=: stereo, ltrt, headphone
@@ -176,6 +185,10 @@ struct Options {
         std::optional<std::array<double, 4>> downmix_gains;
     };
     TruehdEncode thdenc{};
+    // 'truehd-atmos' only: truehd-bed= (the 7.1 bed as a WAV; empty: rendered from the objects) and
+    // truehd-objects-lfe= (the first channel of the objects WAV is the LFE; the default).
+    std::string thd_bed_path;
+    bool thd_objects_lfe = true;
     // 'truehd-encode' and 'metadata' of TrueHD: the channel meaning of TH spec §14.1 the line names,
     // per presentation (2, 6 and 8 channels): dialogue norm, mix level, source format, the
     // control-enabled bit, and the two DRC start-up gains. Unset members are not touched.

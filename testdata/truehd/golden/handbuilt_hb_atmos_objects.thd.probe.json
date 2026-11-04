@@ -1,0 +1,232 @@
+{
+  "container": null,
+  "schema": "iclforge.probe/1",
+  "truehd": {
+    "ac3_core_frames": 0,
+    "access_units": 32,
+    "average_bit_rate_bps": 13560600,
+    "bytes": 45202,
+    "channel_meaning": {
+      "distinct_in_stream": 1,
+      "drc_start_up_gain": 0,
+      "heavy_drc_start_up_gain": 0,
+      "presentations": {
+        "2ch": {
+          "control_enabled": false,
+          "dialogue_norm": 0,
+          "dialogue_norm_dbfs": 0,
+          "in_stream": true,
+          "mix_level": 0
+        },
+        "6ch": {
+          "control_enabled": false,
+          "dialogue_norm": 0,
+          "dialogue_norm_dbfs": 0,
+          "in_stream": true,
+          "mix_level": 0,
+          "source_format": 0
+        },
+        "8ch": {
+          "control_enabled": false,
+          "dialogue_norm": 0,
+          "dialogue_norm_dbfs": 0,
+          "in_stream": true,
+          "mix_level": 0,
+          "source_format": 0
+        }
+      },
+      "provisional": true,
+      "question": "libs/truehd/ERRATA.md, questions 51 to 55"
+    },
+    "channels": [
+      2,
+      6,
+      8,
+      12
+    ],
+    "codec": "truehd",
+    "duration_seconds": 0.026667,
+    "evolution": {
+      "cadence": {
+        "first_unit": 0,
+        "last_unit": 16,
+        "max_gap_units": 16,
+        "min_gap_units": 16
+      },
+      "check_nibble_ok": 2,
+      "evo_reserved_zero": 2,
+      "frames_read": 2,
+      "framing_ok": 2,
+      "lead_hex": "02c0350b",
+      "length_fits": 2,
+      "oamd": {
+        "max_bytes": 53,
+        "min_bytes": 53,
+        "other_program_frames": 0,
+        "payloads": 2,
+        "programs": [
+          {
+            "bed_assignment": 0,
+            "bed_channels": [
+              "LFE"
+            ],
+            "bed_nonstandard": false,
+            "dynamic_objects": 11,
+            "dynamic_only": true,
+            "extra_bed_instances": 0,
+            "frames": 2,
+            "isf_index": -1,
+            "lfe": true,
+            "object_count": 12,
+            "update_blocks": 1
+          }
+        ],
+        "timing": {
+          "block_offset_factors": [
+            {
+              "count": 2,
+              "value": 0
+            }
+          ],
+          "block_starts_in_unit": [
+            {
+              "count": 2,
+              "value": 0
+            }
+          ],
+          "payload_sample_offsets": [
+            {
+              "count": 2,
+              "value": -1
+            }
+          ],
+          "ramp_durations": [
+            {
+              "count": 2,
+              "value": 1536
+            }
+          ],
+          "update_sample_offsets": [
+            {
+              "count": 2,
+              "value": 0
+            }
+          ]
+        },
+        "unread": 0
+      },
+      "parity_ok": 2,
+      "payload_ids": [
+        {
+          "frames": 2,
+          "id": 11
+        }
+      ],
+      "protection": {
+        "primary_codes": [
+          {
+            "code": 1,
+            "frames": 2
+          }
+        ],
+        "secondary_codes": [
+          {
+            "code": 0,
+            "frames": 2
+          }
+        ],
+        "tagged_frames": 2,
+        "verified": false
+      },
+      "provisional": true,
+      "question": "libs/truehd/ERRATA.md, Atmos spec v3.6, question 22",
+      "readings": {
+        "emdf": {
+          "clean_frames": 2,
+          "errors": [],
+          "frames": 2
+        },
+        "spec36": {
+          "clean_frames": 0,
+          "errors": [
+            {
+              "count": 2,
+              "kind": "truncated_protection"
+            }
+          ],
+          "frames": 0
+        }
+      },
+      "regions": 2,
+      "signature_verified": false
+    },
+    "extra_data_units": 2,
+    "leading_bytes": 0,
+    "lossless": null,
+    "major_syncs": 2,
+    "object_substream": true,
+    "peak_data_rate": 3199,
+    "peak_data_rate_bps": 9597000,
+    "presentations": [
+      {
+        "channels": 2,
+        "layout": [
+          "L",
+          "R"
+        ],
+        "name": "2ch",
+        "substream": 0
+      },
+      {
+        "channels": 6,
+        "layout": [
+          "L",
+          "R",
+          "C",
+          "LFE",
+          "Ls",
+          "Rs"
+        ],
+        "name": "6ch",
+        "substream": 1
+      },
+      {
+        "channels": 8,
+        "layout": [
+          "L",
+          "R",
+          "C",
+          "LFE",
+          "Ls",
+          "Rs",
+          "Lrs",
+          "Rrs"
+        ],
+        "name": "8ch",
+        "substream": 2
+      }
+    ],
+    "rate_model": {
+      "declared_bps": 9597000,
+      "max_unit_rate_bps": 16512000,
+      "violations": 32,
+      "worst_overrun_ms": 14.771
+    },
+    "restart_spacing": {
+      "major_syncs": 2,
+      "max_units": 16,
+      "min_units": 16
+    },
+    "sample_rate": 48000,
+    "samples_per_access_unit": 40,
+    "segment_failures": 0,
+    "segments_checked": 128,
+    "skipped_bytes": 0,
+    "substreams": 4,
+    "unreadable_units": 0,
+    "variable_rate": true,
+    "word_length": {
+      "decoded_bits": 24
+    }
+  }
+}

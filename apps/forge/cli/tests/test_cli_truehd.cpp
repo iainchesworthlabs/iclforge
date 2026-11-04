@@ -835,7 +835,7 @@ TEST_CASE("forge probe detail=format is both, and the TrueHD details are refused
     CHECK(run_cli("probe \"" + ec3.string() + "\" detail=evolution", log) == 1);
     CHECK(read_text(log).find("describes TrueHD and MLP streams") != std::string::npos);
     CHECK(run_cli("probe \"" + stream.string() + "\" detail=everything", log) == 1);
-    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format or checks") !=
+    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format, checks or rate") !=
           std::string::npos);
 }
 
@@ -1389,10 +1389,12 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
             CHECK(text.find("drc=0.5, mix-lfe") != std::string::npos);
             CHECK(text.find("truehd-check=lenient, ") == std::string::npos);
         }
-        SECTION("the objects directory and the ADM path are not dropped either") {
+        SECTION("the objects directory is not dropped either") {
             const fs::path objects = tone.dir / "objects_dir";
+            // Objects are the channels of substream 3, which truehd-presentation=all decodes.
             CHECK(run_cli("decode " + in + out + cli_arg(objects), log) == kExitUsage);
-            CHECK(read_text(log).find("writes no objects") != std::string::npos);
+            CHECK(read_text(log).find("only truehd-presentation=all decodes") !=
+                  std::string::npos);
             CHECK_FALSE(fs::exists(out_wav));
         }
         SECTION("the options it does apply, and a transform choice it warns about") {

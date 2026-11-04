@@ -450,7 +450,14 @@ std::vector<TextLine> text_head(const Report& report) {
 std::vector<TextLine> text_tail(const Report& report, std::size_t ac3_core_frames) {
     std::vector<TextLine> lines;
     if (report.info.has_object_substream) {
-        lines.push_back({"object substream", "present (read as a 16-channel substream, not rendered)"});
+        // The fourth substream's channels are its objects: 12, 14 or 16 on the owner's discs.
+        // decode truehd-presentation=all gives them, objects_dir= and adm_out= write them.
+        lines.push_back(
+            {"object substream",
+             fmt::format(" present{} (decode truehd-presentation=all gives its channels as objects)",
+                         report.info.num_substreams == th::kMaxSubstreams
+                             ? fmt::format(", {} channel(s)", report.info.channels[th::kMaxSubstreams - 1])
+                             : std::string{})});
     }
     if (report.extra_data_units != 0) {
         lines.push_back({"extra data", fmt::format("{} access unit(s) carry extra data (carried, not read)",
