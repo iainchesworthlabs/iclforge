@@ -846,11 +846,13 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES
 config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
     int "Stack for the Sendspin decode task, bytes"
     default 32768
-    range 12288 65536
+    range 12288 131072
     help
         As ICLFORGE_EXAMPLE_DECODE_STACK_BYTES, for the task that decodes a
         Sendspin stream's bursts: the decoder's frames are most of it. The
-        page's Sendspin section says what a run left spare.
+        page's Sendspin section says what a run left spare. A TrueHD decoder
+        reached 60,944 bytes on all three chips (firmware/truehd-probe), so
+        sdkconfig.truehd gives it 72 KiB.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
     int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
@@ -946,6 +948,47 @@ config ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE
         number of frames a second sits (25 takes 23.976, 24 and 25, 30 takes 29.97 and 30), and
         a frame of a faster stream is refused by the board, which only a server that did not read
         the figure sends. The ESP32-P4 states none: its 29.97 stream took 0.38 of a frame.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD
+    int "List TrueHD among the Sendspin data types (1) or not (0)"
+    default 1 if IDF_TARGET_ESP32P4 && ICLFORGE_TRUEHD
+    default 0
+    range 0 1
+    help
+        Whether the board's support object lists `truehd`, so that a server sends it TrueHD as it
+        is (one to 24 whole access units a chunk, 20 ms of sound when full) and the board decodes
+        it, up to ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS channels. Needs
+        ICLFORGE_TRUEHD (sdkconfig.truehd); with it off the board lists none and a server decodes
+        TrueHD itself and sends PCM.
+
+        firmware/truehd-probe measured the decoder as a share of one core, 24-bit at 48 kHz, with
+        no network: the ESP32-P4 0.13 for 2.0 and 0.32 for 5.1, the ESP32-S3 0.56 for 2.0 and 1.13
+        for 5.1 (not real time), the ESP32-C6 0.34 and 0.80. The P4 lists it by default; the S3
+        does not until a play of the decoder beside Wi-Fi and the I2S path has been measured on a
+        board, and the C6 cannot hold 158 KB of decoder and a 64 KiB stack beside Wi-Fi.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS
+    int "Widest TrueHD presentation decoded in real time: channels (0 = no limit)"
+    default 6 if IDF_TARGET_ESP32P4
+    default 2
+    range 0 24
+    help
+        The channel count the support object states for `truehd` (max_coded_channels): 2.0 is 2,
+        5.1 is 6, 7.1 is 8. A server sends a stream with downmix substreams as the first substreams
+        that fit (the 2.0 or 5.1 presentation, cut from the stream), and any other as PCM it
+        decodes, so a unit with more reaches the decoder only from a server that did not read the
+        figure, which the board then refuses with a console line. The P4 states 6 until its 7.1
+        decode has been measured; the S3 states 2.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_DATA_RATE_KBPS
+    int "Fastest TrueHD stream taken: peak data rate, kbit/s (0 = no limit)"
+    default 0
+    range 0 100000
+    help
+        The rate the support object states for `truehd` (max_data_rate), compared by a server with
+        the peak the stream declares in its major sync. A board whose link or ring cannot hold a
+        stream's declared peak states it; a server sends the stream as PCM it decodes. None is
+        stated by default: the peaks of the probe's streams are well under a Wi-Fi link's.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"

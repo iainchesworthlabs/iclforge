@@ -122,11 +122,13 @@ inline void inverse_filter(int block, int fir_order, const std::int32_t* fir_coe
 // shows gives a different sequence (ERRATA.md entry 23, open question 5; provisional). `rows`
 // points at the first row and `column` at the first noise channel in it.
 inline void generate_noise(int block, std::uint32_t& seed_state, int noise_shift,
-                           std::int32_t* rows, std::ptrdiff_t stride, int column) {
+                           std::int32_t* rows, std::ptrdiff_t stride, int column,
+                           bool shr7_32_bit = false) {
     std::uint32_t seed = seed_state;
     for (int i = 0; i < block; ++i) {
         std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
-        const std::uint32_t shr7 = (seed >> 7U) & 0xFFFFU;
+        // shr7_32_bit is the alternative reading of AlternativeReadings, for scoring only.
+        const std::uint32_t shr7 = shr7_32_bit ? seed >> 7U : (seed >> 7U) & 0xFFFFU;
         row[column] =
             static_cast<std::int32_t>(static_cast<std::int8_t>(seed >> 15U)) * (1 << noise_shift);
         row[column + 1] =
@@ -258,30 +260,62 @@ inline void apply_object_matrix(int block, bool starts_unit, bool ends_unit, int
 
 // The output of a block: each output channel from the matrix channel `source_channel` names for it
 // (the decoder builds that from ch_assign, which assigns matrix channels to output channels:
-// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is
-// indexed by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the
-// lossless check (TH spec §7.3) and, when `pcm` is not null, written as 24 bit samples,
-// `out_channels` to a sample time. Returns the new fold.
-[[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
-                                                 const std::uint8_t* source_channel,
-                                                 const std::int8_t* output_shift,
-                                                 const std::int32_t* rows, std::ptrdiff_t stride,
-                                                 std::int32_t* pcm, std::uint32_t fold) {
+// ERRATA.md entry 42), shifted by the output shift of that matrix channel (`output_shift` is indexed
+// by matrix channel, like the lossless check's fold: ERRATA.md entry 43), folded into the lossless
+// check (TH spec §7.3)
+// and, when `pcm` is not null, written as 24 bit samples, `out_channels` to a sample time. Returns
+// the new fold.
+//
+// ShiftByPosition and FoldByPosition are the alternative readings of AlternativeReadings, for
+// scoring only: they index the shift and the fold by the output channel instead of the matrix
+// channel. They are template parameters so the loop for the readings as specified is exactly the
+// loop without them. Tested per sample instead, they doubled this kernel's time
+// (truehd_output_assign, truehd_lossless_fold).
+template <bool ShiftByPosition, bool FoldByPosition>
+[[nodiscard]] inline std::uint32_t assign_output_as(int block, int out_channels,
+                                                    const std::uint8_t* source_channel,
+                                                    const std::int8_t* output_shift,
+                                                    const std::int32_t* rows, std::ptrdiff_t stride,
+                                                    std::int32_t* pcm, std::uint32_t fold) {
     for (int i = 0; i < block; ++i) {
         const std::int32_t* const row = rows + static_cast<std::ptrdiff_t>(i) * stride;
         for (int ch = 0; ch < out_channels; ++ch) {
             const std::int32_t source = row[source_channel[ch]];
-            const int shift = output_shift[source_channel[ch]];
+            const int shift_index = ShiftByPosition ? ch : source_channel[ch];
+            const int shift = output_shift[shift_index];
             const std::int32_t output =
                 shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(source) << shift)
                            : source >> -shift;
-            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output), source_channel[ch]);
+            const auto fold_channel =
+                static_cast<std::uint32_t>(FoldByPosition ? ch : source_channel[ch]);
+            fold = lossless_fold_step(fold, static_cast<std::uint32_t>(output), fold_channel);
             if (pcm != nullptr) {
                 pcm[static_cast<std::ptrdiff_t>(i) * out_channels + ch] = sign_extend_24(output);
             }
         }
     }
     return fold;
+}
+
+[[nodiscard]] inline std::uint32_t assign_output(int block, int out_channels,
+                                                 const std::uint8_t* source_channel,
+                                                 const std::int8_t* output_shift,
+                                                 const std::int32_t* rows, std::ptrdiff_t stride,
+                                                 std::int32_t* pcm, std::uint32_t fold,
+                                                 bool shift_by_position = false,
+                                                 bool fold_by_position = false) {
+    if (shift_by_position) {
+        return fold_by_position
+                   ? assign_output_as<true, true>(block, out_channels, source_channel, output_shift,
+                                                  rows, stride, pcm, fold)
+                   : assign_output_as<true, false>(block, out_channels, source_channel,
+                                                   output_shift, rows, stride, pcm, fold);
+    }
+    return fold_by_position
+               ? assign_output_as<false, true>(block, out_channels, source_channel, output_shift,
+                                               rows, stride, pcm, fold)
+               : assign_output_as<false, false>(block, out_channels, source_channel, output_shift,
+                                                rows, stride, pcm, fold);
 }
 
 }  // namespace iclforge::truehd::kernels

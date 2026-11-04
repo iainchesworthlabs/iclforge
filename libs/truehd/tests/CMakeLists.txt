@@ -16,6 +16,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     decoder/test_decoder_checks.cpp
     decoder/test_ffmpeg_fixtures.cpp
     decoder/test_fixture_features.cpp
+    decoder/test_alternative_readings.cpp
     decoder/test_handbuilt.cpp
     decoder/test_kernels.cpp
     decoder/test_object_robustness.cpp
@@ -107,3 +108,10 @@ target_link_libraries(iclforge-truehd-render-tool PRIVATE iclforge::truehd iclfo
 add_executable(iclforge-truehd-ss3-lab tools/ss3_lab.cpp)
 target_link_libraries(iclforge-truehd-ss3-lab PRIVATE iclforge::truehd iclforge::warnings)
 add_dependencies(iclforge-tests iclforge-truehd-ss3-lab)
+
+# decoder/test_object_robustness.cpp reads std::getenv (ICLFORGE_TRUEHD_MUTATIONS, for a longer
+# run of the mutation tests); MSVC's C4996 on it is an error under the warnings target - same
+# reasoning as libs/ac3/tests/core/test_simd_kernels.cpp.
+if(MSVC)
+    set_source_files_properties(decoder/test_object_robustness.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()

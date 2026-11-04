@@ -10,6 +10,7 @@
 
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/export.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
@@ -97,6 +98,12 @@ write_access_unit_prefix(const std::optional<MajorSync>& major_sync,
 // (a test, a tool that built it).
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::optional<ExtraData> read_extra_data(
     std::span<const std::byte> bytes);
+
+// The restart header of the first substream segment that opens with one (TH spec §7.1): none when
+// the unit has none, or when the header does not read. For a caller that wants a header's fields
+// (output_timing, TH spec §3.4) without decoding the unit.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::optional<RestartHeader> first_restart_header(
+    const AccessUnit& unit);
 
 // The unit's length in bytes from its first two bytes, 0 if there are fewer than two (TH spec
 // §3.3).

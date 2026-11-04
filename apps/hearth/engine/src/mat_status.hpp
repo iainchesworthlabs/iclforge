@@ -15,7 +15,8 @@
 // receiver on the desk. What the code does is a different thing from what has been seen to work,
 // and this file is where the two are kept apart. Run on 2026-11-01, from a Raspberry Pi 4B into
 // an Onkyo TX-RZ740 (Direct mode, status by eISCP, and for the aplay run the LCD): ALSA and
-// PipeWire, each through this library's own PassthroughSink.
+// PipeWire, each through this library's own PassthroughSink. Run on 2026-11-04, from an NVIDIA
+// Shield Pro through Hearth for Android into the same receiver (status by eISCP): Android.
 //
 // To mark a platform as run: the owner (or a session working with the owner's receiver) plays a
 // MAT stream through it to a receiver that shows TrueHD, the result goes into docs/platforms and
@@ -61,9 +62,9 @@ struct MatPlatformStatus {
             return {backend, MatRun::kNotRun,
                     "no Core Audio format is known for it, so the backend refuses it"};
         case PassthroughBackend::kAndroid:
-            return {backend, MatRun::kNotRun,
-                    "it needs an 8-channel IEC 61937 track from the app's bridge, and has not "
-                    "been tried on a Shield"};
+            return {backend, MatRun::kRun,
+                    "an Onkyo TX-RZ740 reported TrueHD for this library's sink through Hearth "
+                    "for Android on an NVIDIA Shield Pro on 2026-11-04, at 48 kHz stereo content"};
         case PassthroughBackend::kNone:
             break;
     }

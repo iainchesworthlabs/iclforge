@@ -69,7 +69,10 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
     extra.evolution_payload = bytes.subspan(kFramingBytes, extra.evo_frame_byte_length);
     // TH spec §16.4: the payload and the padding are the bytes between the framing and the parity
     // byte.
-    unsigned accumulator = extra.evo_reserved ^ extra.evo_frame_byte_length ^ kExtraDataSeed;
+    // The word of evo_reserved (4 bits) and evo_frame_byte_length (12) is the accumulator's start.
+    unsigned accumulator =
+        (((unsigned{extra.evo_reserved} & 0xFU) << 12U) | (extra.evo_frame_byte_length & 0xFFFU)) ^
+        kExtraDataSeed;
     for (std::size_t i = kFramingBytes; i + 1 < bytes.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(bytes[i]);
     }
@@ -256,6 +259,27 @@ std::expected<std::vector<std::byte>, Error> write_access_unit_prefix(
     }
     prefix.insert(prefix.end(), directory_bytes.begin(), directory_bytes.end());
     return prefix;
+}
+
+std::optional<RestartHeader> first_restart_header(const AccessUnit& unit) {
+    for (int i = 0; i < unit.num_substreams; ++i) {
+        const auto index = static_cast<std::size_t>(i);
+        if (unit.entries[index].restart_nonexistent) {
+            continue;
+        }
+        std::span<const std::byte> payload = unit.segments[index];
+        if (unit.entries[index].crc_present && payload.size() >= 3) {
+            payload = payload.first(payload.size() - 2);
+        }
+        BitReader reader(payload);
+        if (reader.read(1) == 0 || reader.read(1) == 0) {
+            continue;
+        }
+        if (auto header = read_restart_header(reader, payload, true)) {
+            return *header;
+        }
+    }
+    return std::nullopt;
 }
 
 }  // namespace iclforge::truehd

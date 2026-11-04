@@ -19,7 +19,7 @@ the server for the singer's karaoke choice (D8).
 
 TrueHD (2026-11-04): a server that lists `truehd` is sent the stream's access units, 24 to a chunk; `libs/sink` packs a chunk into one MAT
 burst, and the pass-through backend writes it to an `ENCODING_IEC61937` track on the 7.1 mask through the bridge's `openLink()`. The app lists `truehd` only when the
-route's `isLinkSupported()` is true. It is built and its packing is tested on the host; it has not run on a Shield.
+route's `isLinkSupported()` is true. It is built and its packing is tested on the host; on 2026-11-04 a Shield Pro was sent stereo 48 kHz TrueHD for 40 s and an Onkyo TX-RZ740 reported TrueHD (planning entry 139).
 
 What it does not do yet: decode locally for karaoke (phase 4), and play `player@v1`'s PCM, FLAC and
 Opus (5): a stream of those is accepted and dropped. AC-4 is not listed: nothing has shown a receiver decoding it over

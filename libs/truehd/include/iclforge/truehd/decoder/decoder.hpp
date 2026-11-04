@@ -74,10 +74,33 @@ struct DecoderLab {
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };
 
+// The other reading of a point the specification leaves open or contradicts, one for each reading
+// that is marked provisional until a stream scores it (ERRATA.md questions 5, 6 and 18; entries 43
+// and 45). They exist so that a stream can be decoded both ways and the readings told apart by
+// whether the decode is the source: a stream that decodes to its source with the library's reading
+// and to something else with the alternative is evidence for the reading, with a count of the
+// values that differ. They are for scoring and are never the default; `forge decode` takes them
+// only by name (`truehd-reading=`).
+struct AlternativeReadings {
+    // §17.2: `seed_shr7` is the 32 bits of the seed from bit 7 up, as the text shows, and not the
+    // 16 bits FFmpeg's decoder takes (question 5).
+    bool seed_shr7_32_bit = false;
+    // §7.1: a restart resets the filter histories, as the text says, and does not keep them
+    // (question 18).
+    bool zero_histories_at_restart = false;
+    // §8.2: `output_shift` is indexed by the output position, and not by the matrix channel the
+    // output takes (question 6; entry 43).
+    bool output_shift_by_position = false;
+    // §7.3: the lossless check's fold shifts a sample by the output position, and not by the matrix
+    // channel (question 6; entries 12 and 43).
+    bool fold_by_position = false;
+};
+
 struct DecoderConfig {
     Presentation presentation = Presentation::kBest;
     Strictness strictness = Strictness::kStrict;
     DecoderLab lab = {};
+    AlternativeReadings readings{};
 };
 
 // One decoded access unit. The views point into the decoder and stay valid until its next decode()
@@ -249,8 +272,10 @@ class ICLFORGE_TRUEHD_EXPORT Decoder {
 
     [[nodiscard]] const DecoderCounters& counters() const noexcept;
 
-    // Forgets the stream: the next unit has to carry a major sync.
-    void reset();
+    // Forgets the stream: the next unit has to carry a major sync. The decoder's buffers are kept
+    // and cleared where they are, so this allocates nothing and cannot fail; a device restarts a
+    // stream at a seek or a format change without holding the decoder's memory twice.
+    void reset() noexcept;
 
    private:
     struct Impl;

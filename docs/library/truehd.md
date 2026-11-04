@@ -216,7 +216,7 @@ stream and checks every unit's header, directory, parity and CRC, and exits 1 if
 | `tools/ci/fuzz_truehd_encoder_space.py`, random legal configurations against adversarial PCM, and the libFuzzer harness `fuzz_truehd_encode` | the encoder's whole configuration space, FFmpeg's strict decode of each stream | FFmpeg: sample for sample |
 | `tools/references/truehd_syntax.py`, an independent transcription | the same 25, and the hand-built streams | none beyond the two readings agreeing |
 | Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1 (at 48, 96 and 192 kHz), a negative output shift and an output shift on a moved channel, a 16 bit MLP stream, terminators of both kinds, several matrices with a permuted `ch_assign` (also one that changes at each restart), an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one, and one at the limits TH spec v3.6 gives substream 3 (15 matrices, `huff_lsbs` 31) | FFmpeg: the whole signal each was built from, for 19 of the 33, and the bed of four more (it leaves their substream 3 alone); the manifest names what FFmpeg does with the other 10 (it refuses the 16-channel and limit streams and a stream with a terminator, applies no negative output shift, and clears the low bits of a 16 bit MLP stream). **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
-| DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent; 13 of them are in `testdata/truehd-dee` (11 pass, the two at 96 kHz differ from their sources in the encoder, none fail) | the sources |
+| DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent; 13 of them are in `testdata/truehd-dee` (11 pass, the two at 96 kHz differ from their sources in the encoder, none fail); the full set of 142 legs scores 87 PASS, 9 ALTER (the DEE option alters the audio), 46 UNEXPLAINED (25 at 96 kHz, 21 stepped tones at 48 kHz: the decode is what the encoder coded and its lossless check passes), 0 FAIL | the sources |
 | The owner's Blu-ray (an Atmos 7.1 stream of four substreams), analysed on the owner's machine | `planning/truehd-disc-findings.md`: every lossless-check interval of the 2, 6 and 8 channel presentations, the 8 channel output against FFmpeg's | the disc's own lossless checks, and FFmpeg |
 
 FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, a non-zero noise coefficient or shift, the Atmos substream or
@@ -251,9 +251,12 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
 - Substream 3 of the owner's discs does not decode yet (the block header's fields, question 60), and the object layer is
   provisional (entries 61 to 64). Python, JavaScript and Rust bindings over the C API
   (`iclforge_truehd_*` in [the C API](c-api.md#truehd-and-mlp)) are not written.
-- Content signing: nothing signs or checks a TrueHD stream, and an evolution payload is carried, not read. The owner's
-  specification describes it as the container [AC-4's content signature](signing.md#ac-4-content-signing) uses; see
-  [the seam for other codecs](signing.md#the-seam-for-other-codecs).
+- Signing: the evolution frame's protection field can carry a per-frame tag made with your own key, and a gate that removes the
+  object layer of the frames whose tag does not check (`iclforge::truehd::signing`, [Object
+  signing](../concepts/object-signing.md#sibling-truehd-evolution)); it is iclforge's own and a licensed decoder will not take it as
+  Dolby-authentic. There is no whole-stream content signature for TrueHD; the owner's specification describes a nested one as the
+  container [AC-4's content signature](signing.md#ac-4-content-signing) uses (see [the seam for other
+  codecs](signing.md#the-seam-for-other-codecs)), which no stream examined carries.
 - Protected files: a protected (Common Encryption) `mlpa` track is refused by the MP4 reader's code for protected audio, which
   names the scheme; no fixture or test covers an `mlpa` one.
 - Nothing outside the library uses it but `forge` (and the C API's callers): the Forge GUI, Hearth and Crucible do not link it,

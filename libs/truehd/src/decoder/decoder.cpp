@@ -200,6 +200,10 @@ struct Decoder::Impl {
 
     [[nodiscard]] bool strict() const noexcept { return config.strictness == Strictness::kStrict; }
 
+    // What a new decoder holds, kept in the memory this one already has: no allocation, so it
+    // cannot fail and a device that has no second copy of the buffers to spare can restart a stream.
+    void clear() noexcept;
+
     [[nodiscard]] std::expected<AccessUnit, Error> parse_unit(std::span<const std::byte> data);
     void accept_major_sync(const MajorSync& incoming);
     [[nodiscard]] int substreams_wanted(int available) const noexcept;
@@ -407,7 +411,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
     // not running (the first restart, or the first after an error) starts from zero.
     const auto previous = state.channels;
-    const bool carry_history = state.running;
+    const bool carry_history = state.running && !config.readings.zero_histories_at_restart;
     state = SubstreamState{};
     if (carry_history) {
         for (std::size_t c = 0; c < kMaxChannels; ++c) {
@@ -731,7 +735,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         ICLFORGE_ZONE_SCOPED_N("truehd_noise");
         if (!state.context.noise_type) {
             kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base,
-                                    kRowStride, kMaxChannels);
+                                    kRowStride, kMaxChannels, config.readings.seed_shr7_32_bit);
         } else if (!state.noise_filled) {
             state.noise_seed =
                 detail::fill_noise_buffer(state.noise_seed, noise_size, state.noise_buffer.data());
@@ -841,7 +845,8 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
         state.interval_fold = kernels::assign_output(
             block, out_channels, state.output_source.data(), state.output_shift.data(), matrix_base,
-            kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
+            kRowStride, emit ? pcm_base : nullptr, state.interval_fold,
+            config.readings.output_shift_by_position, config.readings.fold_by_position);
         if (index == kObjectSubstream && counters.object_checks_kept < DecoderCounters::kObjectChecksKept) {
             for (int i = 0; i < block; ++i) {
                 const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
@@ -1228,9 +1233,25 @@ void Decoder::lost_data() noexcept {
     }
 }
 
-void Decoder::reset() {
-    const DecoderConfig config = impl_->config;
-    impl_ = std::make_unique<Impl>(config);
+void Decoder::Impl::clear() noexcept {
+    counters = DecoderCounters{};
+    major_sync.reset();
+    // Rebuilt where they stand: a substream's state is several kilobytes, and a temporary of it
+    // on the stack is what a small task stack cannot take.
+    for (SubstreamState& substream : substreams) {
+        std::destroy_at(&substream);
+        std::construct_at(&substream);
+    }
+    std::ranges::fill(rows, 0);
+    std::ranges::fill(matrixed, 0);
+    std::ranges::fill(pcm, 0);
+    extra_data.clear();
+    layout_eight.clear();
+    layout_six.clear();
+}
+
+void Decoder::reset() noexcept {
+    impl_->clear();
 }
 
 }  // namespace iclforge::truehd

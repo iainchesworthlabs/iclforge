@@ -388,3 +388,20 @@ TEST_CASE("an extra data header word is checked to XOR to 0xF and a zero word is
         CHECK(other->extra_data->check_ok);
     }
 }
+
+TEST_CASE("the first restart header of a unit is read from its segments", "[truehd][io]") {
+    const std::vector<std::byte> with = stereo_unit(true, 0x1234);
+    auto parsed = parse_access_unit(with, 0);
+    REQUIRE(parsed.has_value());
+    const auto header = first_restart_header(*parsed);
+    REQUIRE(header.has_value());
+    CHECK(header->sync == kRestartSyncStandard);
+    CHECK(header->max_chan == 1);
+    CHECK(header->ch_assign[1] == 1);
+
+    // A unit without a major sync has no restart header to read.
+    const std::vector<std::byte> without = stereo_unit(false);
+    auto inherited = parse_access_unit(without, 1);
+    REQUIRE(inherited.has_value());
+    CHECK_FALSE(first_restart_header(*inherited).has_value());
+}

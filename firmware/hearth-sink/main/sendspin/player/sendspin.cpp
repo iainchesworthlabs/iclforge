@@ -80,6 +80,13 @@ constexpr std::size_t kAc4MaxCodedChannels =
     CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS;
 // The most frames a second of an AC-4 stream the board keeps up with (0 = no limit).
 constexpr std::uint32_t kAc4MaxFrameRate = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE;
+// Whether the board lists TrueHD (where it decodes it, which needs CONFIG_ICLFORGE_TRUEHD), the most
+// channels of it a unit may decode to, and the peak data rate it takes in kbit/s (0 = states none).
+constexpr bool kListTruehd = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD != 0;
+constexpr std::size_t kTruehdMaxCodedChannels =
+    CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS;
+constexpr std::uint32_t kTruehdMaxDataRate =
+    CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_DATA_RATE_KBPS;
 // The objects of an E-AC-3 stream the board places in real time; -1 states none.
 constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
@@ -227,6 +234,10 @@ std::atomic<bool> g_name_pending{false};
     if (ac4) {
         s.data_types.push_back(ac::DataType::kAc4);
     }
+    // TrueHD, where the build decodes it and says to list it: one to 24 whole access units a chunk.
+    if (kListTruehd && iclforge::BurstPlayer::decodes_truehd()) {
+        s.data_types.push_back(ac::DataType::kTruehd);
+    }
     s.sample_rates = {static_cast<std::int32_t>(kSampleRate)};
     s.outputs.count = sink_slots();
     s.outputs.bit_depth = sink_slot_bits();
@@ -254,13 +265,23 @@ std::atomic<bool> g_name_pending{false};
     // The widest syncframe the player decodes (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS):
     // past it a syncframe is refused, so a server is told the figure rather than finding out a
     // burst at a time. 0 in the build states nothing.
+    // AC-4's and TrueHD's are the build's own: the DD+ figure is not what they keep up with.
     for (const ac::DataType type : s.data_types) {
-        const std::size_t limit = type == ac::DataType::kAc4 && kAc4MaxCodedChannels != 0
-                                      ? kAc4MaxCodedChannels
-                                      : kMaxCodedChannels;
+        std::size_t limit = kMaxCodedChannels;
+        if (type == ac::DataType::kAc4 && kAc4MaxCodedChannels != 0) {
+            limit = kAc4MaxCodedChannels;
+        } else if (type == ac::DataType::kTruehd) {
+            limit = kTruehdMaxCodedChannels;
+        }
         if (limit != 0) {
             s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(limit);
         }
+    }
+    // The peak data rate of a TrueHD stream the board takes (kbit/s), compared with the peak the
+    // stream declares; 0 in the build states none.
+    if (kTruehdMaxDataRate != 0 &&
+        std::ranges::find(s.data_types, ac::DataType::kTruehd) != s.data_types.end()) {
+        s.max_data_rate[static_cast<std::size_t>(ac::DataType::kTruehd)] = kTruehdMaxDataRate;
     }
     // The frames a second of AC-4 it keeps up with, where it lists AC-4 and the build says: a
     // server sends a faster stream another way, as it does one with more channels.
@@ -842,6 +863,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.max_coded_channels = kMaxCodedChannels;
     config.max_ac4_channels = kAc4MaxCodedChannels;
     config.max_ac4_frame_rate = kAc4MaxFrameRate;
+    config.max_truehd_channels = kTruehdMaxCodedChannels;
     // A stream declaring more objects than the board states it places is played as its bed
     // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
     if (kMaxObjects >= 0) {
@@ -1207,7 +1229,7 @@ SendspinPlaying sendspin_now_playing() {
             case ac::DataType::kAc4:
                 out.facts.codec = nv::Codec::kAc4;
                 break;
-            case ac::DataType::kTruehd:  // the sink does not list it, so it is never sent
+            case ac::DataType::kTruehd:  // the now-view has no name for it yet
                 out.facts.codec = nv::Codec::kUnknown;
                 break;
         }
