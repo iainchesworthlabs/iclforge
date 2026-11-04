@@ -1,8 +1,7 @@
 # feature/truehd-measured-bed-render: the bed render by the measured law
 
-Branch `feature/truehd-measured-bed-render`, stacked on `feature/truehd-atmos-substream3` (PR #1735, a67f4ee7f): the clustering and
-bed-render code it changes (`render_bed`, `cluster_elements`, `forge truehd-atmos`) lives in that PR and is not on `main`. Retarget to
-`main` when #1735 lands.
+Branch `feature/truehd-measured-bed-render`, on `main` after PR #1735 (TrueHD Atmos substream 3), whose clustering and bed-render
+code (`render_bed`, `cluster_elements`, `forge truehd-atmos`) it changes.
 
 New: `include/iclforge/truehd/encoder/bed_pan.hpp` and `src/encoder/bed_pan.cpp` (the law, the trim, the limiter, exported so that
 `forge` can use them); `PanLaw::kMeasured` in `render_bed` (now the default of `pan_to_bed`, `mix_gains`, `build_render_plan` and
