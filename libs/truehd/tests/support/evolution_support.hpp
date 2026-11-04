@@ -12,6 +12,8 @@
 #include "iclforge/base/crypto/hmac_sha256.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
+#include "stream_builder.hpp"
 
 // An evolution frame and the extra data around it, written here from TH spec v3.6 §15.4 and §16.1
 // to §16.4 and nothing else: no code of libs/truehd/src/signing and none of the library's reader,
@@ -89,20 +91,24 @@ inline std::vector<std::byte> build_frame(const FrameSpec& spec) {
 // frame length, the frame, `padding` bytes (zero unless the caller sets them) up to the word
 // boundary, and the parity byte (§16.4).
 inline std::vector<std::byte> build_region(std::span<const std::byte> frame,
-                                           std::span<const std::byte> padding = {}) {
+                                           std::span<const std::byte> padding = {},
+                                           unsigned evo_reserved = 0) {
     const std::size_t content = 4 + frame.size() + padding.size() + 1;
     const std::size_t words = (content + 1) / 2;
     const auto length = static_cast<std::uint32_t>(words - 1);
     const auto word0 = static_cast<std::uint32_t>(
         (std::uint32_t{extra_data_check_nibble(length)} << 12U) | (length & 0xFFFU));
-    std::vector<std::byte> out{static_cast<std::byte>(word0 >> 8U),
-                               static_cast<std::byte>(word0 & 0xFFU),
-                               static_cast<std::byte>((frame.size() >> 8U) & 0xFU),
-                               static_cast<std::byte>(frame.size() & 0xFFU)};
+    std::vector<std::byte> out{
+        static_cast<std::byte>(word0 >> 8U), static_cast<std::byte>(word0 & 0xFFU),
+        static_cast<std::byte>(((evo_reserved & 0xFU) << 4U) | ((frame.size() >> 8U) & 0xFU)),
+        static_cast<std::byte>(frame.size() & 0xFFU)};
     out.insert(out.end(), frame.begin(), frame.end());
     out.insert(out.end(), padding.begin(), padding.end());
     out.resize(words * 2, std::byte{0});  // zero up to the word boundary, then the parity byte
-    unsigned accumulator = static_cast<unsigned>(frame.size()) ^ 0xA9U;
+    // §16.4: the word of evo_reserved and the frame length, the seed, then the bytes after the
+    // framing.
+    unsigned accumulator =
+        (((evo_reserved & 0xFU) << 12U) | static_cast<unsigned>(frame.size())) ^ 0xA9U;
     for (std::size_t i = 4; i + 1 < out.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(out[i]);
     }
@@ -124,20 +130,54 @@ inline base::crypto::SigningKey make_test_key(std::uint32_t seed, std::size_t si
     return base::crypto::SigningKey(std::move(bytes));
 }
 
-// The tag a correct signer writes: the first `size` bytes of HMAC-SHA-256 over the frame built with
-// both protection fields zero.
-inline std::vector<std::byte> expected_tag(const base::crypto::SigningKey& key, FrameSpec spec) {
+// A whole access unit around `region`: the stereo unit of stream_builder.hpp (a major sync, a
+// directory of one substream and its segment) with the extra data after the segment, its length and
+// check nibble rewritten (TH spec §3.1, §3.2). Written here from the spec, not by the library.
+inline std::vector<std::byte> build_unit(std::span<const std::byte> region,
+                                         bool with_major_sync = true) {
+    std::vector<std::byte> unit = stereo_unit(with_major_sync);
+    unit.insert(unit.end(), region.begin(), region.end());
+    const std::size_t words = unit.size() / 2;
+    unit.at(0) = static_cast<std::byte>((words >> 8U) & 0xFU);
+    unit.at(1) = static_cast<std::byte>(words & 0xFFU);
+    const auto fold = [](std::span<const std::byte> bytes) {
+        unsigned x = 0;
+        for (const std::byte b : bytes) {
+            x ^= std::to_integer<unsigned>(b);
+        }
+        return ((x >> 4U) ^ x) & 0xFU;
+    };
+    const std::size_t directory = 4 + (with_major_sync ? kMajorSyncBaseBytes : 0U);
+    const unsigned nibble = 0xFU ^ fold(std::span<const std::byte>(unit).first(4)) ^
+                            fold(std::span<const std::byte>(unit).subspan(directory, 2));
+    unit[0] |= static_cast<std::byte>(nibble << 4U);
+    return unit;
+}
+
+inline std::vector<std::byte> build_unit(const FrameSpec& spec, bool with_major_sync = true) {
+    return build_unit(build_region(spec), with_major_sync);
+}
+
+// The tag a correct signer writes: the first `size` bytes of HMAC-SHA-256 over the whole access
+// unit built with both protection fields, the fill after the frame, the padding and the parity byte
+// zero. `spec`'s own tag, fill and padding are left out of the message by building it from the spec
+// with no tag and no padding, and by clearing the last byte, whatever the builder put there.
+inline std::vector<std::byte> expected_tag(const base::crypto::SigningKey& key, FrameSpec spec,
+                                           bool with_major_sync = true) {
     spec.primary.clear();
     spec.secondary.clear();
-    const std::vector<std::byte> message = build_frame(spec);
+    std::vector<std::byte> message = build_unit(spec, with_major_sync);
+    message.resize(message.size() - 1);  // the parity byte is zero in the message
+    message.push_back(std::byte{0});
     const auto digest = base::crypto::hmac_sha256(key.bytes(), message);
     return {digest.begin(),
             digest.begin() + static_cast<std::ptrdiff_t>(kTestProtectionBytes[spec.primary_code])};
 }
 
 // `spec` with its primary field set to the correct tag for `key`.
-inline FrameSpec signed_spec(const base::crypto::SigningKey& key, FrameSpec spec) {
-    spec.primary = expected_tag(key, spec);
+inline FrameSpec signed_spec(const base::crypto::SigningKey& key, FrameSpec spec,
+                             bool with_major_sync = true) {
+    spec.primary = expected_tag(key, spec, with_major_sync);
     return spec;
 }
 

@@ -230,9 +230,12 @@ the end-of-stream marker in every unit (FFmpeg returns two of the twenty units o
   FFmpeg's 7), on full-scale square waves, with a restart interval of 1 and with the downmix presentations.
 - The object renderer and the Atmos substream are phase T2b. Python, JavaScript and Rust bindings over the C API
   (`iclforge_truehd_*` in [the C API](c-api.md#truehd-and-mlp)) are not written.
-- Content signing: nothing signs or checks a TrueHD stream, and an evolution payload is carried, not read. The owner's
-  specification describes it as the container [AC-4's content signature](signing.md#ac-4-content-signing) uses; see
-  [the seam for other codecs](signing.md#the-seam-for-other-codecs).
+- Signing: the evolution frame's protection field can carry a per-frame tag made with your own key, and a gate that removes the
+  object layer of the frames whose tag does not check (`iclforge::truehd::signing`, [Object
+  signing](../concepts/object-signing.md#sibling-truehd-evolution)); it is iclforge's own and a licensed decoder will not take it as
+  Dolby-authentic. There is no whole-stream content signature for TrueHD; the owner's specification describes a nested one as the
+  container [AC-4's content signature](signing.md#ac-4-content-signing) uses (see [the seam for other
+  codecs](signing.md#the-seam-for-other-codecs)), which no stream examined carries.
 - Protected files: a protected (Common Encryption) `mlpa` track is refused by the MP4 reader's code for protected audio, which
   names the scheme; no fixture or test covers an `mlpa` one.
 - Nothing outside the library uses it but `forge` (and the C API's callers): the Forge GUI, Hearth and Crucible do not link it,

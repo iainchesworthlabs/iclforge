@@ -67,7 +67,10 @@ constexpr unsigned kExtraDataSeed = 0xA9;  // TH spec §16.4
     extra.evolution_payload = bytes.subspan(kFramingBytes, extra.evo_frame_byte_length);
     // TH spec §16.4: the payload and the padding are the bytes between the framing and the parity
     // byte.
-    unsigned accumulator = extra.evo_reserved ^ extra.evo_frame_byte_length ^ kExtraDataSeed;
+    // The word of evo_reserved (4 bits) and evo_frame_byte_length (12) is the accumulator's start.
+    unsigned accumulator =
+        (((unsigned{extra.evo_reserved} & 0xFU) << 12U) | (extra.evo_frame_byte_length & 0xFFFU)) ^
+        kExtraDataSeed;
     for (std::size_t i = kFramingBytes; i + 1 < bytes.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(bytes[i]);
     }
