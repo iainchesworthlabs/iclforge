@@ -1,6 +1,6 @@
 // iclforge-truehd-render-tool: writes the Atmos test streams of the render side (libs/truehd/notes/
 // feature-truehd-atmos-encoder-render.md) from deterministic synthetic masters: sine objects with
-// key tracks, clustered into 12, 14 or 16 elements, the bed rendered from them (PanLaw::kWall) and
+// key tracks, clustered into 12, 14 or 16 elements, the bed rendered from them (PanLaw::kMeasured) and
 // the plan written through EncoderConfig::object_paths. For handing to a decoder as a black box; no
 // object metadata is written beyond what the encoder writes itself.
 //
@@ -175,13 +175,13 @@ int run(const Scene& scene, const std::string& dir) {
     }
     ClusterConfig config;
     config.elements = scene.elements;
-    config.section_samples = 1920;
+    config.section_samples = 1536;  // the metadata's frame: a ramp of one frame to the value at its end
     auto clustered = cluster_objects(objects, config);
     if (!clustered) {
         std::fprintf(stderr, "%s: %s\n", scene.name.c_str(), clustered.error().detail.c_str());
         return 1;
     }
-    const RenderPlan plan = make_render_plan(*clustered, PanLaw::kWall);
+    const RenderPlan plan = make_render_plan(*clustered, PanLaw::kMeasured);
 
     EncoderConfig writer;
     writer.channels = 8;

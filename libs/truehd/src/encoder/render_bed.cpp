@@ -113,6 +113,9 @@ constexpr std::array<WallSpeaker, 7> kWall{{
 }  // namespace
 
 std::array<double, kRenderBedRows> pan_to_bed(double x, double y, double z, PanLaw law) noexcept {
+    if (law == PanLaw::kMeasured) {
+        return bed_pan_gains(bed_position_code(x, y, z));
+    }
     static_cast<void>(z);  // the legacy bed has no height: see the header
     if (law == PanLaw::kWall) {
         return pan_wall(x, y);

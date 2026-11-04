@@ -7,6 +7,7 @@
 
 #include "encoder/render_plan.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/encoder/bed_pan.hpp"
 #include "iclforge/truehd/encoder/object_paths.hpp"
 
 // The render rule of the object encoder: where an element sits, how much of it each row of the 7.1
@@ -15,8 +16,9 @@
 //
 // An element's place is a room position as the object metadata has it (TS 103 420 §4.2.1: x 0 at
 // the left wall to 1 at the right, y 0 at the front wall to 1 at the back, z -1 at the floor to +1
-// at the ceiling). The legacy 7.1 bed has no height, so a high element is panned by its azimuth
-// alone at full level, the rule libs/render states for a target without an upper layer.
+// at the ceiling). The legacy 7.1 bed has no height, so a high element is panned by its floor place
+// alone; with the measured law (the default) its height only enters the trim, and with the two
+// older laws it plays at full level, the rule libs/render states for a target without an upper layer.
 
 namespace iclforge::truehd::detail {
 
@@ -40,9 +42,16 @@ inline constexpr int kBedLfeRow = 3;
 // cosine and sine of the position along it (constant power, linear in the wall's coordinate). On a
 // wall it agrees with those streams to about 0.03; inside the room it is only the projection, which
 // the streams (ctl_j, ctl_l spread an interior place over three or four speakers) do not support.
+//
+// kMeasured is the rule read off the 7.1 presentation of the owner's DEE controls
+// (iclforge/truehd/encoder/bed_pan.hpp): the place is rounded to the metadata's 6 bit code, split
+// between the rows of speakers and then along each row by cos and sin, and a trim of up to -1.5 dB
+// (7.1) is applied by its distance from the front wall and its height. It is the default; the other
+// two are kept for the tests that hold them to libs/render and to the first fit.
 enum class PanLaw : std::uint8_t {
     kRing,
     kWall,
+    kMeasured,
 };
 
 // Where the speaker of a bed row sits on the room's wall: the place whose azimuth is the speaker's
@@ -51,18 +60,20 @@ enum class PanLaw : std::uint8_t {
 // front wall, which has no direction of its own.
 [[nodiscard]] ElementPlacement bed_speaker_placement(int row) noexcept;
 
-// The share of the 8 bed rows an element at (x, y, z) has: constant-power pairwise panning on the
-// 7.1 ring (L 30, C 0, R -30, Ls 90, Rs -90, Lrs 150, Rrs -150 degrees, counter-clockwise from the
-// front), height ignored. The squares of the shares add up to 1; the LFE row is 0. A place at the
-// exact centre of the room has no direction and is rendered at the front.
-[[nodiscard]] std::array<double, kRenderBedRows> pan_to_bed(double x, double y, double z = 0.0,
-                                                            PanLaw law = PanLaw::kRing) noexcept;
+// The share of the 8 bed rows an element at (x, y, z) has. By the ring law: constant-power pairwise
+// panning on the 7.1 ring (L 30, C 0, R -30, Ls 90, Rs -90, Lrs 150, Rrs -150 degrees,
+// counter-clockwise from the front), height ignored; the squares of the shares add up to 1 and a
+// place at the exact centre of the room has no direction and is rendered at the front. By the
+// measured law: see bed_pan.hpp, with the trim of the 7.1 layout, so the squares add up to
+// 10^(-0.15 * w) at most. The LFE row is 0.
+[[nodiscard]] std::array<double, kRenderBedRows> pan_to_bed(
+    double x, double y, double z = 0.0, PanLaw law = PanLaw::kMeasured) noexcept;
 
 // The gains of the free elements (8 and up) into the bed rows, for elements placed as given:
 // gain[row][k] = pan_to_bed(placement k)[row] times the placement's gain. Elements beyond
 // `free_elements.size()` get 0.
 [[nodiscard]] BedMixGains mix_gains(std::span<const ElementPlacement> free_elements,
-                                    PanLaw law = PanLaw::kRing) noexcept;
+                                    PanLaw law = PanLaw::kMeasured) noexcept;
 
 // The plan for elements placed at the boundaries of sections: boundary s is the first sample of
 // section s, so there is one more boundary than there are sections, and `placements[s][k]` is the
@@ -71,7 +82,7 @@ enum class PanLaw : std::uint8_t {
 // the last, which ends at `total_samples`.
 [[nodiscard]] RenderPlan build_render_plan(
     int elements, std::int64_t section_samples, std::int64_t total_samples,
-    std::span<const std::vector<ElementPlacement>> placements, PanLaw law = PanLaw::kRing);
+    std::span<const std::vector<ElementPlacement>> placements, PanLaw law = PanLaw::kMeasured);
 
 // The gains at one sample of the stream: the plan's trajectory in a straight line from the
 // boundary before the sample to the one after it. Held at the first and last boundary outside.

@@ -46,7 +46,7 @@ TEST_CASE("the bed panner agrees with libs/render's ring panner over the whole r
                 std::atan2(0.5 - x, 0.5 - y) * 180.0 / 3.14159265358979323846;
             std::array<double, 7> reference{};
             iclforge::spatial::pan_ring(azimuth, kRingAzimuths, reference);
-            const auto ours = pan_to_bed(x, y, 0.0);
+            const auto ours = pan_to_bed(x, y, 0.0, PanLaw::kRing);
             for (std::size_t r = 0; r < kRingRows.size(); ++r) {
                 CAPTURE(x, y, r);
                 CHECK(ours[static_cast<std::size_t>(kRingRows[r])] ==
@@ -62,8 +62,8 @@ TEST_CASE("the bed panner keeps power, leaves the LFE alone and ignores height",
           "[truehd][encoder][atmos][render]") {
     for (int ix = 0; ix <= 10; ++ix) {
         for (int iy = 0; iy <= 10; ++iy) {
-            const auto flat = pan_to_bed(ix / 10.0, iy / 10.0, 0.0);
-            const auto high = pan_to_bed(ix / 10.0, iy / 10.0, 0.9);
+            const auto flat = pan_to_bed(ix / 10.0, iy / 10.0, 0.0, PanLaw::kRing);
+            const auto high = pan_to_bed(ix / 10.0, iy / 10.0, 0.9, PanLaw::kRing);
             double power = 0.0;
             for (const double g : flat) {
                 power += g * g;
@@ -74,7 +74,7 @@ TEST_CASE("the bed panner keeps power, leaves the LFE alone and ignores height",
         }
     }
     // the centre of the room is rendered at the front
-    CHECK(pan_to_bed(0.5, 0.5)[2] == Approx(1.0));
+    CHECK(pan_to_bed(0.5, 0.5, 0.0, PanLaw::kRing)[2] == Approx(1.0));
 }
 
 TEST_CASE("the wall pan law follows the shares of the owner's 7.1 presentations on a wall",
@@ -173,7 +173,7 @@ TEST_CASE("a speaker's wall position pans to its own row and to no other",
         CHECK(place.x <= 1.0 + 1e-12);
         CHECK(place.y >= -1e-12);
         CHECK(place.y <= 1.0 + 1e-12);
-        const auto gains = pan_to_bed(place.x, place.y);
+        const auto gains = pan_to_bed(place.x, place.y, 0.0, PanLaw::kRing);
         for (std::size_t r = 0; r < gains.size(); ++r) {
             CHECK(gains[r] == Approx(r == static_cast<std::size_t>(row) ? 1.0 : 0.0).margin(1e-9));
         }
@@ -341,4 +341,39 @@ TEST_CASE("the bed-row matrices run backwards exactly and give the definition's 
     // and the decoder's side gives the elements back
     apply_object_chain(chain, shape, bypass, rows);
     CHECK(rows == elements);
+}
+
+TEST_CASE("the measured law is the default and a plan reaches each frame's place at its end",
+          "[truehd][encoder][atmos][render]") {
+    // one free element on the front wall, at the left corner then at the centre, over one frame
+    // of 1536 samples: the gains run in a straight line from all L to all C, as the object
+    // metadata's ramp does (the value sent for a frame is the one at its end)
+    const std::vector<std::vector<ElementPlacement>> boundaries{
+        {ElementPlacement{0.0, 0.0, 0.0, 1.0}}, {ElementPlacement{0.5, 0.0, 0.0, 1.0}}};
+    const RenderPlan plan = build_render_plan(12, 1536, 1536, boundaries);
+    REQUIRE(plan.sections.size() == 1);
+    const RenderSection& section = plan.sections.front();
+    CHECK(section.begin[0][0] == Approx(1.0).margin(1e-12));
+    CHECK(section.begin[2][0] == Approx(0.0).margin(1e-12));
+    CHECK(section.end[0][0] == Approx(0.0).margin(1e-12));
+    CHECK(section.end[2][0] == Approx(1.0).margin(1e-12));
+    const BedMixGains middle = gains_at(plan, 768);
+    CHECK(middle[0][0] == Approx(0.5).margin(1e-12));
+    CHECK(middle[2][0] == Approx(0.5).margin(1e-12));
+    // no gain for the number of objects: a second element at the same place has the same shares
+    const std::vector<std::vector<ElementPlacement>> two{
+        {ElementPlacement{0.0, 0.0, 0.0, 1.0}, ElementPlacement{0.0, 0.0, 0.0, 1.0}},
+        {ElementPlacement{0.5, 0.0, 0.0, 1.0}, ElementPlacement{0.5, 0.0, 0.0, 1.0}}};
+    const RenderPlan pair = build_render_plan(12, 1536, 1536, two);
+    CHECK(pair.sections.front().end[2][1] == pair.sections.front().end[2][0]);
+    // the default is the measured law, trim and all, and not the ring
+    const auto place = pan_to_bed(0.7, 0.9, 0.0);
+    CHECK(place == pan_to_bed(0.7, 0.9, 0.0, PanLaw::kMeasured));
+    CHECK(place != pan_to_bed(0.7, 0.9, 0.0, PanLaw::kRing));
+    // y 0.9 is code 56, w is 1, and the squares add up to 10^(-0.15)
+    double power = 0.0;
+    for (const double g : place) {
+        power += g * g;
+    }
+    CHECK(power == Approx(std::pow(10.0, -0.15)).margin(1e-12));
 }
