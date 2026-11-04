@@ -39,17 +39,21 @@ LFE on bed row 3 and the free elements' pans through `bed_pan_gains`.
 ## 2. What was checked, and what the numbers are
 
 All on the 7.1 bed as this repository's decoder gives it (`iclforge-truehd-render-dump`; the streams pass their lossless checks, 48,028 of
-48,028 segments). **Not a DRP run:** the Dolby Reference Player licence is for the owner's runner, which was asked for presentation 8 of the
-same three streams; if its WAVs differ from the decoder's bed this note is wrong. Comparisons are of the bed row `r` against
-`gain_r(t) * element_1(t)` (the one object; the tone peaks at 0.1 FS), with the gain from the payload's codes by the law.
+48,028 segments), **and checked against the Dolby Reference Player's presentation 8** of the same three streams (the owner's runner,
+`D:/ac3bld/drp-acceptance/dee-controls-p8`, 2026-11-05): the player's WAV is 16 bit, the channels are in the decoder's row order (the
+y sweep of `ctl_k` plays on channels 0, 4, 6 in that order), and sample for sample it is the decoder's bed times 10^(-8/20) (a
+constant, probably the dialogue normalisation, not checked) rounded to 16 bits: the largest difference over 470,000 frames is 0.47 (`ctl_b`) and 0.51 (`ctl_e`,
+`ctl_k`) of a 16 bit step. So the decoder's bed is the player's bed, and the numbers below hold for either; the last column of the
+table gives the error against the player's WAV in 16 bit steps. Comparisons are of the bed row `r` against `gain_r(t) * element_1(t)` (the
+one object; the tone peaks at 0.1 FS, 1305 steps in the player's WAV), with the gain from the payload's codes by the law.
 
 | Control | What it holds | Result |
 |---|---|---|
-| `ctl_b` | one object, static at x 62, y 5, z 0 | max error 164 LSB of 24 bits = 1.96e-5 FS (0.02 % of the tone); R 0.946, Rs 0.245 (law 0.9459, 0.2449) |
+| `ctl_b` | one object, static at x 62, y 5, z 0 | max error 164 LSB of 24 bits = 1.96e-5 FS (0.02 % of the tone); R 0.946, Rs 0.245 (law 0.9459, 0.2449). Against the player's WAV: max 0.7 step, rms 0.16 |
 | `ctl_e` | y 0, x 0..62 in 62 code steps, one per 5 frames | in 533 of 533 steady windows the bed holds the law's value for the payload's code; gain residual to the nearest code median 1.6e-4, max 4.7e-3 |
 | `ctl_k` | x 0, y 0..62 | 452 of 481 steady windows on the payload's code, 29 one code lower; median 5.0e-4, max 1.06e-2 |
 | `ctl_k`, trim | `w` read from the bed's power against `y / 37.2` | 0.079 vs 0.081 (y 3), 0.427 vs 0.430 (y 16), 0.749 vs 0.753 (y 28), 0.991 vs 0.995 (y 37), 1.00 above: within 0.01 |
-| `ctl_e`, `ctl_k` through the sweep, sample by sample | the 1536 ramp model | max 28,544 and 30,319 LSB (3.4e-3 and 3.6e-3 FS, about two thirds of a code step of gain against the tone's 0.1 FS peak), rms 1445 and 2998 LSB |
+| `ctl_e`, `ctl_k` through the sweep, sample by sample | the 1536 ramp model | max 28,544 and 30,319 LSB (3.4e-3 and 3.6e-3 FS, about two thirds of a code step of gain against the tone's 0.1 FS peak), rms 1445 and 2998 LSB. Against the player's WAV: max 44.5 and 47.6 steps (3.4 % and 3.7 % of the tone), rms 2.3 and 4.7 steps |
 
 The last row is the honest limit. The DEE controls' own beds do not ramp over the metadata's 1536 samples: the slope of the bed's gain
 shows ramps of 1.6 k samples (a code step at the start of the stream) and of 5.1 k samples (a restart interval, 128 units) centred on the
@@ -80,10 +84,11 @@ ceiling, look-ahead, linked gain, transparency below the ceiling and absence of 
 
 ## 4. Questions
 
-1. **Which bed row is which speaker.** The rows are in the decoder's order L R C LFE Ls Rs Lrs Rrs, and `ctl_k` shows row 4 on the left
-   side (y 31) and row 6 on the left rear (y 62); the report's p8 PCM order (L R C LFE Lrs Rrs Ls Rs) puts the rears first. If the DRP WAV
-   differs from the decoder's, the rows 4 to 7 here are named for the decoder. Recommendation: confirm with the DRP p8 WAVs of the controls
-   (asked of the runner).
+1. **Which bed row is which speaker (answered by the player's WAVs).** The rows are the decoder's L R C LFE Ls Rs Lrs Rrs, and the
+   player's WAV has the same channel order: in `ctl_k` channel 4 carries the place at y 31 and channel 6 the place at y 62. The report's
+   B1 says the p8 PCM order is L R C LFE Lrs Rrs Ls Rs (positions 4 and 5 the rear corners): for these controls that would put y 62 on
+   channel 4, which the player does not do. Either B1's order describes the file's channel mask (0xC3F) and not the samples, or its names
+   for y 31 and y 62 are swapped. Recommendation: have the analysis session look at B1; this branch follows the samples.
 2. **Interior and height.** No control moves z, and the interior is measured only as the outer product along y at x 0 and at the front.
    `ctl_j` and `ctl_l` (not available to this session) are the ones to check the outer product against. Recommendation: run
    `iclforge-truehd-render-dump` on them and compare as above.
