@@ -89,20 +89,24 @@ inline std::vector<std::byte> build_frame(const FrameSpec& spec) {
 // frame length, the frame, `padding` bytes (zero unless the caller sets them) up to the word
 // boundary, and the parity byte (§16.4).
 inline std::vector<std::byte> build_region(std::span<const std::byte> frame,
-                                           std::span<const std::byte> padding = {}) {
+                                           std::span<const std::byte> padding = {},
+                                           unsigned evo_reserved = 0) {
     const std::size_t content = 4 + frame.size() + padding.size() + 1;
     const std::size_t words = (content + 1) / 2;
     const auto length = static_cast<std::uint32_t>(words - 1);
     const auto word0 = static_cast<std::uint32_t>(
         (std::uint32_t{extra_data_check_nibble(length)} << 12U) | (length & 0xFFFU));
-    std::vector<std::byte> out{static_cast<std::byte>(word0 >> 8U),
-                               static_cast<std::byte>(word0 & 0xFFU),
-                               static_cast<std::byte>((frame.size() >> 8U) & 0xFU),
-                               static_cast<std::byte>(frame.size() & 0xFFU)};
+    std::vector<std::byte> out{
+        static_cast<std::byte>(word0 >> 8U), static_cast<std::byte>(word0 & 0xFFU),
+        static_cast<std::byte>(((evo_reserved & 0xFU) << 4U) | ((frame.size() >> 8U) & 0xFU)),
+        static_cast<std::byte>(frame.size() & 0xFFU)};
     out.insert(out.end(), frame.begin(), frame.end());
     out.insert(out.end(), padding.begin(), padding.end());
     out.resize(words * 2, std::byte{0});  // zero up to the word boundary, then the parity byte
-    unsigned accumulator = static_cast<unsigned>(frame.size()) ^ 0xA9U;
+    // §16.4: the word of evo_reserved and the frame length, the seed, then the bytes after the
+    // framing.
+    unsigned accumulator =
+        (((evo_reserved & 0xFU) << 12U) | static_cast<unsigned>(frame.size())) ^ 0xA9U;
     for (std::size_t i = 4; i + 1 < out.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(out[i]);
     }

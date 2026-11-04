@@ -294,3 +294,35 @@ TEST_CASE("the object signing options are applied only where they mean something
         CHECK(text.find("found no evolution frame to sign") != std::string::npos);
     }
 }
+
+TEST_CASE("no TrueHD command takes the content-signature options, and probe has no such line",
+          "[forge-cli][truehd][signing]") {
+    // The whole-stream content signature is AC-4's. TrueHD signs per frame (sign-objects) and
+    // nothing else, so the names are refused, never accepted and dropped.
+    const fs::path dir = scratch_dir();
+    const fs::path plain = write_stream(dir, "removal.thd");
+    const fs::path key = write_key(dir, "r.key", 7);
+    const fs::path out = dir / "removal_out.thd";
+    const fs::path wav = dir / "removal.wav";
+    const fs::path log = dir / "removal.log";
+
+    CHECK(run_cli("metadata " + cli_arg(plain) + cli_arg(out) + "sign-content", log) == kExitUsage);
+    CHECK_FALSE(fs::exists(out));
+    CHECK(run_cli("decode " + cli_arg(plain) + cli_arg(wav) + "verify-content", log) == kExitUsage);
+    CHECK(read_text(log).find("Nothing was verified") != std::string::npos);
+    CHECK(run_cli("decode " + cli_arg(plain) + cli_arg(wav) + "check-content", log) == kExitUsage);
+    CHECK_FALSE(fs::exists(wav));
+
+    // A signed stream's probe says the tags are there, and says nothing of a content signature.
+    const fs::path signed_file = dir / "removal_signed.thd";
+    REQUIRE(run_cli("metadata " + cli_arg(plain) + cli_arg(signed_file) +
+                        "sign-objects signing-key=\"" + key.string() + "\"",
+                    log) == 0);
+    REQUIRE(run_cli("probe " + cli_arg(signed_file), log) == 0);
+    const std::string text = read_text(log);
+    CHECK(text.find("protection tag present in 6/6") != std::string::npos);
+    CHECK(text.find("content sig") == std::string::npos);
+    REQUIRE(run_cli("probe " + cli_arg(signed_file) + "json=1", log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    CHECK_FALSE(document["truehd"].contains("content_signature"));
+}

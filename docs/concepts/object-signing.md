@@ -253,7 +253,9 @@ codes and the zero fill are all covered, and the secondary field is zeroed like 
 E-AC-3 message is `A || B`; this one is the container alone), and nothing is chained from one unit to the next. Signing writes the
 tag and recomputes the extra data's parity byte (TH spec §16.4); no length changes. A frame is verified only when it is the **sole
 container**: nothing in the unit's extra data lies outside what the tag covers (no bytes after the container inside the payload, zero
-padding after it), so a frame that carries more than the signer wrote is a mismatch even when the digest matches.
+padding after it), so a frame that carries more than the signer wrote is a mismatch even when the digest matches. For the same reason
+signing refuses such a frame (it returns false and changes nothing, rather than write a tag that would then fail), which is one more
+condition than the empty key, no readable frame and a primary length code of 0 that Rev 2's own text lists.
 
 **This is iclforge's own scheme.** The construction is this library's, built from HMAC (RFC 2104), SHA-256 (FIPS 180-4) and the
 container layout TH spec §15.4 and ETSI TS 102 366 Annex H describe. It is not observed in any Dolby stream and not a recovery of any

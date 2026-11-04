@@ -112,9 +112,11 @@ struct Located {
 
 [[nodiscard]] std::uint8_t parity_byte(const ExtraData& extra,
                                        std::span<const std::byte> bytes) noexcept {
-    // TH spec §16.4: evo_reserved, the frame length and the seed, then every byte between the
-    // framing and the parity byte.
-    unsigned accumulator = extra.evo_reserved ^ extra.evo_frame_byte_length ^ kExtraDataSeed;
+    // TH spec §16.4: the 16-bit word of evo_reserved (4 bits) and the frame length (12), the seed,
+    // then every byte between the framing and the parity byte.
+    unsigned accumulator =
+        (((unsigned{extra.evo_reserved} & 0xFU) << 12U) | (extra.evo_frame_byte_length & 0xFFFU)) ^
+        kExtraDataSeed;
     for (std::size_t i = kFramingBytes; i + 1 < bytes.size(); ++i) {
         accumulator ^= std::to_integer<unsigned>(bytes[i]);
     }

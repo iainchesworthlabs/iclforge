@@ -273,6 +273,35 @@ TEST_CASE("length codes 1, 2 and 3 give a one, four and sixteen byte tag; code 0
     }
 }
 
+TEST_CASE("the parity byte follows TH spec 16.4 with a non-zero evo_reserved nibble",
+          "[truehd][signing][parity]") {
+    // evo_reserved is 0 in every stream there is (§16.8), where the word form and a bare XOR of the
+    // two fields agree. With a nibble set they differ, and the region built here (from the spec's
+    // word, not from the library) is what the reader and the signer have to agree with.
+    const SigningKey key = key_a();
+    for (const unsigned reserved : {0U, 1U, 5U, 15U}) {
+        CAPTURE(reserved);
+        const FrameSpec spec = testing::sample_spec(2);
+        const std::vector<std::byte> frame = testing::build_frame(spec);
+        const std::vector<std::byte> region = testing::build_region(frame, {}, reserved);
+        const auto read = read_extra_data(region);
+        REQUIRE(read.has_value());
+        CHECK(read->evo_reserved == reserved);
+        CHECK(read->parity_ok);  // the reader accepts the independent builder's parity
+
+        std::vector<std::byte> signed_region = region;
+        REQUIRE(sign_evolution_frame(signed_region, key));
+        CHECK(signed_region ==
+              testing::build_region(testing::build_frame(testing::signed_spec(key, spec)), {},
+                                    reserved));
+        const auto after = read_extra_data(signed_region);
+        REQUIRE(after.has_value());
+        CHECK(after->parity_ok);
+        CHECK(after->evo_reserved == reserved);
+        CHECK(verify_evolution_frame(signed_region, key) == VerifyResult::kValid);
+    }
+}
+
 TEST_CASE("the same tag is written whichever reading parses the frame", "[truehd][signing]") {
     const SigningKey key = key_a();
     FrameSpec spec = testing::sample_spec(4);
@@ -468,6 +497,12 @@ TEST_CASE("the gate passes the units that verify and removes the object layer fr
     CHECK(expected == gated->bytes);
     // The bed plays the same as the stream it was cut from.
     CHECK(decode_stream(gated->bytes) == decode_stream(built.bytes));
+    // A gated stream has no evolution frame that fails its tag, so no two in a row (which a
+    // licensed decoder with the Atmos flag set treats as fatal, where one is tolerated): what is
+    // left is the frames that verify, and that is by construction, not by luck.
+    const KeyringSummary left = verify_evolution_stream_any(gated->bytes, ring_a);
+    CHECK(left.totals.mismatch == 0);
+    CHECK(left.totals.valid == under_a);
 
     // With both keys the units signed under B pass as well; with none, every frame is gated.
     const std::array<SigningKey, 2> both{a, b};
@@ -479,6 +514,10 @@ TEST_CASE("the gate passes the units that verify and removes the object layer fr
     REQUIRE(closed.has_value());
     CHECK(closed->summary.passed == 0);
     CHECK(closed->summary.gated == built.frames);
+    // With no key every frame goes, and what is left has none to fail.
+    const KeyringSummary none_left = verify_evolution_stream_any(closed->bytes, ring_a);
+    CHECK(none_left.totals.valid == 0);
+    CHECK(none_left.totals.mismatch == 0);
 }
 
 TEST_CASE("a stream with no object layer gates to itself", "[truehd][signing][gate]") {
@@ -668,12 +707,11 @@ std::string read_text(const std::filesystem::path& path) {
 
 TEST_CASE("the signer and its tests contain no key constant", "[truehd][signing][no-key]") {
     const std::filesystem::path root(ICLFORGE_TRUEHD_SIGNING_SOURCE_DIR);
-    const std::array<std::filesystem::path, 5> files{
+    const std::array<std::filesystem::path, 4> files{
         root / "include/iclforge/truehd/signing/evolution_signer.hpp",
         root / "src/signing/evolution_signer.cpp",
         root / "tests/signing/test_evolution_signer.cpp",
         root / "tests/support/evolution_support.hpp",
-        root / "tests/signing/test_content_signer.cpp",
     };
     // A run of eight or more 0xHH bytes, a quoted run of 24 or more base64 characters, a run of 32
     // or more hex digits: the three shapes a key written into source takes. The patterns are built
@@ -684,9 +722,7 @@ TEST_CASE("the signer and its tests contain no key constant", "[truehd][signing]
     const std::regex hex_run(std::string("[0-9A-Fa-f]") + "{32,}");
     int scanned = 0;
     for (const auto& file : files) {
-        if (!std::filesystem::exists(file)) {
-            continue;  // test_content_signer.cpp arrives with Rev 3
-        }
+        REQUIRE(std::filesystem::exists(file));
         ++scanned;
         const std::string text = read_text(file);
         CAPTURE(file.string());
@@ -694,7 +730,7 @@ TEST_CASE("the signer and its tests contain no key constant", "[truehd][signing]
         CHECK_FALSE(std::regex_search(text, base64_literal));
         CHECK_FALSE(std::regex_search(text, hex_run));
     }
-    CHECK(scanned >= 4);
+    CHECK(scanned == 4);
 }
 
 }  // namespace
