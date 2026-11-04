@@ -34,6 +34,7 @@ qt_add_executable(forge-gui
     src/truehd_encode_controller.hpp
     ../../shared/media/src/truehd_encode_core.cpp
     ../../shared/media/src/probe_truehd.cpp
+    ../../shared/media/src/truehd_stream.cpp
     src/stream_player_controller.hpp
     src/background_jobs.hpp
     src/channel_geometry.cpp

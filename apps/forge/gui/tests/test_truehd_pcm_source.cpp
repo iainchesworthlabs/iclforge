@@ -118,6 +118,28 @@ TEST_CASE("the TrueHD player's windows add up to FFmpeg's decode", "[gui][truehd
     }
 }
 
+TEST_CASE("the padding of the last unit is not part of the stream the player delivers", "[gui][truehd]") {
+    // 44.1 kHz: 276 units of 40 samples is 11,040 samples, and the stream codes 11,025: the
+    // end-of-stream marker counts the last 15 as padding (TH spec section 16.5). The player's length
+    // and its last window stop where the stream does, and the samples are FFmpeg's decode
+    // (pcm_sha256 of truehd_st44_s24 in testdata/truehd/manifest.json).
+    auto source = forge_gui::TruehdPcmSource::open(fixture("truehd_st44_s24.thd"));
+    REQUIRE(source.has_value());
+    const forge_gui::TruehdPcmInfo& info = (*source)->info();
+    CHECK(info.units == 276);
+    CHECK(info.frames == 11025);
+    CHECK(info.sample_rate == 44100);
+    for (const std::size_t window : {std::size_t{1000}, std::size_t{4096}}) {
+        const std::vector<std::byte> pcm = decode_all(**source, window);
+        CHECK(pcm.size() == 11025 * 2 * 4);
+        CHECK(hex(iclforge::base::crypto::sha256(pcm)) ==
+              "9b494e652bc2f58753d92d3e5acf544c1fa87913483af46425802e78588f4db9");
+    }
+    std::vector<std::vector<float>> planar;
+    CHECK((*source)->read(11025, 100, planar) == 0);
+    CHECK((*source)->read(11020, 100, planar) == 5);
+}
+
 TEST_CASE("the TrueHD player names the speakers and fills its rate model", "[gui][truehd]") {
     auto source = forge_gui::TruehdPcmSource::open(fixture("truehd_m51_s24.thd"));
     REQUIRE(source.has_value());
