@@ -238,3 +238,169 @@ TEST_CASE("probe detail=frames lists every access unit", "[forge-cli][truehd][pr
         CHECK(read_file(log).find("CHECK FAILED") != std::string::npos);
     }
 }
+
+// --- detail=matrix ------------------------------------------------------------------------------
+// Every matrix section and output_shift of the block headers, in all four substreams and with no
+// cap, so that a substream with none reads as none.
+
+namespace {
+
+fs::path handbuilt(const std::string& name) {
+    return fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / (name + ".thd");
+}
+
+// The `matrix` member of `probe detail=matrix json=1`.
+nlohmann::json matrix_json(const fs::path& file, const fs::path& dir) {
+    return probe_json(file, dir, "detail=matrix")["truehd"]["matrix"];
+}
+
+}  // namespace
+
+TEST_CASE("probe detail=matrix lists the matrices of a stream this encoder wrote",
+          "[forge-cli][truehd][probe][matrix]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "matrix_encode.log";
+    const fs::path source = dir / "matrix_51.wav";
+    const fs::path stream = dir / "matrix_own.thd";
+    REQUIRE(run_cli("decode " + arg(fixture("truehd_m51_s24.thd")) + arg(source), log) == 0);
+    // The standard downmix puts the 2.0 matrices in substream 1 and sends them at each restart.
+    REQUIRE(run_cli("truehd-encode " + arg(source) + arg(stream) + "truehd-downmix=standard", log) ==
+            0);
+
+    const auto matrix = matrix_json(stream, dir);
+    CHECK(matrix["capped"] == false);
+    REQUIRE(matrix["substreams"].size() == 4);
+    CHECK(matrix["substreams"][0]["matrix_sets"] == 0);
+    CHECK(matrix["substreams"][1]["matrix_sets"] == 3);
+    CHECK(matrix["substreams"][1]["matrices"] == 6);
+    CHECK(matrix["substreams"][2]["matrix_sets"] == 0);
+    // No object substream: it reads as none, not as cut off.
+    CHECK(matrix["substreams"][3]["matrix_sets"] == 0);
+    CHECK(matrix["substreams"][3]["matrices"] == 0);
+    REQUIRE(matrix["headers"].size() == 3);
+    const auto& first = matrix["headers"][0];
+    CHECK(first["unit"] == 0);
+    CHECK(first["substream"] == 1);
+    CHECK(first["restart"] == true);
+    CHECK(first["matrix_channels"] == 6);
+    REQUIRE(first["matrices"].size() == 2);
+    CHECK(first["matrices"][0]["out"] == 0);
+    CHECK(first["matrices"][0]["frac_bits"] == 14);
+    CHECK(first["matrices"][0]["coeff"]["m0"] == 16384);
+    CHECK(first["matrices"][0]["coeff"]["m2"] == -11585);
+    CHECK(matrix["headers"][2]["unit"] == 256);
+
+    // The text form says the same, and the plain report is untouched.
+    REQUIRE(run_cli("probe " + arg(stream) + "detail=matrix", log) == 0);
+    const std::string text = read_file(log);
+    CHECK(text.find("3 block header(s) with matrices or output shifts, all substreams, no cap") !=
+          std::string::npos);
+    CHECK(text.find("substream 3: 0 matrix set(s) with 0 matrices") != std::string::npos);
+    CHECK(text.find("unit 128 sub 1 block 0 sample 0 restart yes matrix_channels 6 count 2") !=
+          std::string::npos);
+    CHECK(text.find("coeff m0:16384 m2:-11585 m4:-11585") != std::string::npos);
+    const auto plain = probe_json(stream, dir)["truehd"];
+    auto detailed = probe_json(stream, dir, "detail=matrix")["truehd"];
+    CHECK_FALSE(plain.contains("matrix"));
+    detailed.erase("matrix");
+    CHECK(detailed == plain);
+    REQUIRE(run_cli("probe " + arg(stream), log) == 0);
+    CHECK(read_file(log).find("matrix_set") == std::string::npos);
+}
+
+TEST_CASE("probe detail=matrix reads the matrices of the hand-built streams, substream 3 among them",
+          "[forge-cli][truehd][probe][matrix]") {
+    const fs::path dir = scratch_dir();
+
+    SECTION("hb_matrices: three primitive matrices of the bed, coefficients as sent") {
+        const auto matrix = matrix_json(handbuilt("hb_matrices"), dir);
+        CHECK(matrix["capped"] == false);
+        CHECK(matrix["substreams"][0]["matrix_sets"] == 3);
+        CHECK(matrix["substreams"][0]["matrices"] == 9);
+        CHECK(matrix["substreams"][3]["matrix_sets"] == 0);
+        const auto& header = matrix["headers"][0];
+        REQUIRE(header["matrices"].size() == 3);
+        CHECK(header["matrices"][0]["out"] == 4);
+        CHECK(header["matrices"][0]["frac_bits"] == 8);
+        CHECK(header["matrices"][0]["coeff"] ==
+              nlohmann::json({{"m2", 41}, {"m3", -23}, {"m4", 256}}));
+        CHECK(header["matrices"][1]["coeff"] == nlohmann::json({{"m0", 90}, {"m5", 256}}));
+        CHECK(header["matrices"][0]["slope"].empty());
+    }
+
+    SECTION("hb_substream3_object_extension: the object substream's matrices, slopes and fields") {
+        const auto matrix = matrix_json(handbuilt("hb_substream3_object_extension"), dir);
+        // The matrices are all in substream 3; the three bed substreams send none.
+        for (std::size_t s = 0; s < 3; ++s) {
+            CHECK(matrix["substreams"][s]["matrix_sets"] == 0);
+        }
+        CHECK(matrix["substreams"][3]["matrix_sets"] == 12);
+        CHECK(matrix["substreams"][3]["matrices"] == 48);
+        const nlohmann::json* object_header = nullptr;
+        for (const auto& header : matrix["headers"]) {
+            if (header["substream"] == 3 && header.contains("matrices")) {
+                object_header = &header;
+                break;
+            }
+        }
+        REQUIRE(object_header != nullptr);
+        CHECK((*object_header)["extension"] == true);
+        CHECK((*object_header)["coeffs_sent"] == true);
+        CHECK((*object_header)["deltas_sent"] == true);
+        REQUIRE((*object_header)["matrices"].size() == 4);
+        const auto& m0 = (*object_header)["matrices"][0];
+        CHECK(m0["out"] == 8);
+        CHECK(m0["frac_bits"] == 12);
+        CHECK(m0["field_m4"] == 2);
+        CHECK(m0["ext_width"] == 3);
+        CHECK(m0["ext_field2"] == 1);
+        CHECK(m0["coeff"] == nlohmann::json({{"m1", 777}, {"m3", -1500}, {"m4", 0}, {"m8", 4096}}));
+        CHECK(m0["slope"] == nlohmann::json({{"m1", -5}, {"m3", 7}, {"m4", 6}, {"m8", 0}}));
+        const auto& m1 = (*object_header)["matrices"][1];
+        CHECK(m1["f_shift"] == 1);
+        CHECK(m1["frac_bits"] == 13);
+        // A matrix without a width has no slope.
+        CHECK((*object_header)["matrices"][3]["slope"].empty());
+    }
+}
+
+TEST_CASE("probe detail=matrix prints output_shift by matrix channel, with the output it goes to",
+          "[forge-cli][truehd][probe][matrix]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "matrix_shift.log";
+
+    // hb_output_shift_negative: ch_assign [2, 0, 1] and shifts -1, -3, 0, sent at both restarts.
+    const auto matrix = matrix_json(handbuilt("hb_output_shift_negative"), dir);
+    CHECK(matrix["substreams"][0]["output_shift_headers"] == 2);
+    CHECK(matrix["substreams"][0]["output_shift_headers_nonzero"] == 2);
+    CHECK(matrix["substreams"][0]["matrix_sets"] == 0);
+    REQUIRE(matrix["headers"].size() == 2);
+    const auto expected = nlohmann::json::parse(
+        R"([{"matrix_channel":0,"output_channel":2,"shift":-1},)"
+        R"({"matrix_channel":1,"output_channel":0,"shift":-3},)"
+        R"({"matrix_channel":2,"output_channel":1,"shift":0}])");
+    CHECK(matrix["headers"][0]["output_shift"] == expected);
+    CHECK_FALSE(matrix["headers"][0].contains("matrices"));
+
+    REQUIRE(run_cli("probe " + arg(handbuilt("hb_output_shift_negative")) + "detail=matrix", log) ==
+            0);
+    CHECK(read_file(log).find("unit 16 sub 0 block 0 sample 0 restart yes shifts m0->out2:-1 "
+                              "m1->out0:-3 m2->out1:0") != std::string::npos);
+
+    // A permuted assignment with positive shifts: the shift stays with the matrix channel.
+    const auto permuted = matrix_json(handbuilt("hb_output_shift_permuted"), dir);
+    const auto& shifts = permuted["headers"][0]["output_shift"];
+    REQUIRE(shifts.size() == 3);
+    CHECK(shifts[0]["shift"] == 1);
+    CHECK(shifts[1]["shift"] == 2);
+    CHECK(shifts[2]["shift"] == 3);
+}
+
+TEST_CASE("probe detail=matrix is refused for a stream that is not TrueHD or MLP",
+          "[forge-cli][truehd][probe][matrix]") {
+    const fs::path dir = scratch_dir();
+    const fs::path ec3 =
+        fs::path{ICLFORGE_GOLDEN_AUDIO_DIR} / "reference_51_eac3_448k_cplbndstrce0.ec3";
+    const fs::path log = dir / "matrix_ec3.log";
+    CHECK(run_cli("probe " + arg(ec3) + "detail=matrix", log) == 1);
+}

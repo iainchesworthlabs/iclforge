@@ -219,6 +219,9 @@ struct Decoder::Impl {
     void record_tail(int index, BitReader reader, std::size_t left);
     [[nodiscard]] std::expected<void, Error> apply_block_header(
         SubstreamState& state, const BlockHeaderSpec& header) const;
+    // Appends a block header's matrices and output shifts to counters.block_header_log.
+    void log_block_header(int index, unsigned block, int sample_in_unit, bool restart,
+                          const BlockHeaderSpec& header, const RestartHeader& restart_header);
     [[nodiscard]] std::expected<void, Error> decode_block(int index, SubstreamState& state,
                                                           BitReader& reader,
                                                           std::span<const std::byte> payload,
@@ -874,6 +877,52 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     return {};
 }
 
+void Decoder::Impl::log_block_header(int index, unsigned block, int sample_in_unit, bool restart,
+                                     const BlockHeaderSpec& header,
+                                     const RestartHeader& restart_header) {
+    DecoderCounters::BlockHeaderLog entry;
+    entry.unit = counters.units - 1U;  // counters.units counts the unit being decoded
+    entry.substream = static_cast<std::uint8_t>(index);
+    entry.block = static_cast<std::uint16_t>(block);
+    entry.sample_in_unit = static_cast<std::uint16_t>(sample_in_unit);
+    entry.restart = restart;
+    entry.matrix_channels = static_cast<std::uint8_t>(restart_header.matrix_channels());
+    entry.ch_assign = restart_header.ch_assign;
+    if (header.output_shift) {
+        entry.has_output_shift = true;
+        entry.output_shift = *header.output_shift;
+    }
+    if (header.matrices) {
+        const MatrixSet& set = *header.matrices;
+        entry.has_matrices = true;
+        entry.extension = set.extension;
+        entry.coeffs_sent = set.coeffs_sent;
+        entry.deltas_sent = set.deltas_sent;
+        for (unsigned m = 0; m < set.count; ++m) {
+            const MatrixSpec& spec = set.items[m];
+            DecoderCounters::BlockHeaderLog::Matrix row;
+            row.out = spec.out_ch;
+            row.frac_bits = spec.frac_bits;
+            row.lsb_bypass = spec.lsb_bypass;
+            row.noise_shift = spec.noise_shift;
+            row.f_shift = spec.f_shift;
+            row.field_2b = spec.field_2b;
+            row.field_m4 = spec.field_m4;
+            row.ext_width = spec.ext_width;
+            row.ext_field2 = spec.ext_field2;
+            row.coeff = spec.coeff;
+            row.ext_value = spec.ext_value;
+            for (std::size_t c = 0; c < spec.present.size(); ++c) {
+                if (spec.present[c]) {
+                    row.mask |= 1U << c;
+                }
+            }
+            entry.matrices.push_back(row);
+        }
+    }
+    counters.block_header_log.push_back(std::move(entry));
+}
+
 std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     int index, const SubstreamEntry& entry, std::span<const std::byte> segment, bool emit,
     int expected_samples) {
@@ -905,6 +954,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     BitReader reader(payload);
     SegmentResult result;
     bool first_block = true;
+    unsigned blocks_in_segment = 0;  // blocks of this segment read so far (for the block header log)
     std::string segment_trace;  // lab: where each block of the segment starts and ends
     state.noise_filled = false;
     while (true) {
@@ -912,6 +962,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
         bool block_carries = false;
         bool block_extension = false;
         std::uint8_t block_matrices = 0;
+        bool restart_here = false;  // this block carries a restart header
         if (reader.read(1) != 0) {
             if (reader.read(1) != 0) {
                 if (auto started = begin_restart(index, state, reader, payload); !started) {
@@ -919,6 +970,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     return std::unexpected(started.error());
                 }
                 result.restarted = true;
+                restart_here = true;
             } else if (!state.running) {
                 result.waiting = true;
                 return result;
@@ -1011,6 +1063,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 state.running = false;
                 return std::unexpected(applied.error());
             }
+            if (config.lab.log_block_headers && (header->matrices || header->output_shift)) {
+                log_block_header(index, blocks_in_segment, result.samples, restart_here, *header,
+                                 state.restart);
+            }
             block_header = true;
             block_carries = header->matrices.has_value();
             block_matrices = header->matrices ? static_cast<std::uint8_t>(header->matrices->count) : 0;
@@ -1036,6 +1092,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             state.block_header_end_bit = state.block_header_first_bit;
         }
         first_block = false;
+        ++blocks_in_segment;
 
         if (reader.overflowed()) {
             state.running = false;

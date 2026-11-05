@@ -673,11 +673,11 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
                             const std::function<void()>& container_text,
                             std::size_t ac3_core_frames) {
     // detail=frames and detail=blocks ask for per-unit lines this report does not have, and are
-    // refused; detail=evolution, structure, format, checks and rate are its own.
+    // refused; detail=evolution, structure, format, matrix, checks and rate are its own.
     if (const int refused = check_options_applied(
             meta,
             {"json=", "detail=frames", "detail=evolution", "detail=structure", "detail=format",
-             "detail=checks", "detail=rate", "truehd-bitrate="});
+             "detail=matrix", "detail=checks", "detail=rate", "truehd-bitrate="});
         refused != kExitOk) {
         return refused;
     }
@@ -689,6 +689,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         meta.detail.has_value() && (*meta.detail == "evolution" || *meta.detail == "format");
     const bool want_structure =
         meta.detail.has_value() && (*meta.detail == "structure" || *meta.detail == "format");
+    // detail=matrix: every matrix section and output_shift of the block headers, all substreams.
+    const bool want_matrix = meta.detail.has_value() && *meta.detail == "matrix";
     const bool want_lossless = meta.detail.has_value() && *meta.detail == "checks";
     const bool want_frames = meta.detail.has_value() && *meta.detail == "frames";
     // detail=rate: the arrival model over the stream, at the declared peak rate or at
@@ -715,8 +717,8 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         fmt::println(stderr, "error: {}: {}", in_path, error_text(report.error()));
         return 1;
     }
-    if (want_structure) {
-        structure.decode(stream);
+    if (want_structure || want_matrix) {
+        structure.decode(stream, want_matrix);
     }
     const th::MajorSync& major_sync = report->info.major_sync;
     rate.run(stream);
@@ -748,6 +750,10 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
             if (want_structure) {
                 sink.key("structure");
                 structure.write_json(sink);
+            }
+            if (want_matrix) {
+                sink.key("matrix");
+                structure.write_matrix_json(sink);
             }
             if (want_rate) {
                 sink.key("rate");
@@ -785,6 +791,9 @@ int run_probe_truehd_stream(std::span<const std::byte> stream, std::string_view 
         evolution.print_text();
         if (want_structure) {
             structure.print_text();
+        }
+        if (want_matrix) {
+            structure.print_matrix_text();
         }
         rate.print_text();
     }
