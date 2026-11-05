@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -250,10 +251,29 @@ TEST_CASE("an Atmos configuration the stream cannot carry is refused", "[truehd]
         config.channels = 6;
         CHECK(refusal(config).find("channels must be 8") != std::string::npos);
     }
-    SECTION("a rate other than 48 kHz") {
-        EncoderConfig config = atmos_config();
-        config.sample_rate = 96000;
-        CHECK(refusal(config).find("48 kHz only") != std::string::npos);
+    SECTION("a rate Atmos is not written at") {
+        for (const std::uint32_t rate : {44100U, 88200U, 176400U}) {
+            EncoderConfig config = atmos_config();
+            config.sample_rate = rate;
+            CAPTURE(rate);
+            CHECK(refusal(config).find("48, 96 or 192 kHz only") != std::string::npos);
+        }
+    }
+    SECTION("96 and 192 kHz are accepted, with the 7.1 bed") {
+        for (const std::uint32_t rate : {96000U, 192000U}) {
+            EncoderConfig config = atmos_config();
+            config.sample_rate = rate;
+            CAPTURE(rate);
+            CHECK(refusal(config).empty());
+            config.channels = 6;
+            CHECK(refusal(config).find("channels must be 8") != std::string::npos);
+        }
+    }
+    SECTION("a plain stream keeps the six channel limit at 192 kHz") {
+        EncoderConfig config;
+        config.sample_rate = 192000;
+        config.channels = 8;
+        CHECK(refusal(config).find("at most 6 channels") != std::string::npos);
     }
     SECTION("more than sixteen channels") {
         EncoderConfig config = atmos_config();
@@ -270,4 +290,61 @@ TEST_CASE("an Atmos configuration the stream cannot carry is refused", "[truehd]
         config.channel_meaning.extra_present = true;
         CHECK(refusal(config).find("extra_present") != std::string::npos);
     }
+}
+
+// --- 96 and 192 kHz (libs/truehd/notes/feature-truehd-atmos-96-192.md; PROVISIONAL above 48 kHz:
+// the library's decoder agrees with the library's encoder, no Dolby stream at those rates exists
+// to check either) ---------------------------------------------------------------------------
+
+TEST_CASE("the ramp step of the object matrices halves with each doubling of the rate",
+          "[truehd][encoder][atmos][rates]") {
+    CHECK(object_ramp_step(rate_factor(0)) == 6552);   // 48 kHz
+    CHECK(object_ramp_step(rate_factor(1)) == 3276);   // 96 kHz
+    CHECK(object_ramp_step(rate_factor(2)) == 1636);   // 192 kHz
+    CHECK(object_ramp_step(rate_factor(10)) == 1636);  // 176.4 kHz is the same factor
+    CHECK(nominal_samples_per_access_unit(0) == 40);
+    CHECK(nominal_samples_per_access_unit(1) == 80);
+    CHECK(nominal_samples_per_access_unit(2) == 160);
+}
+
+TEST_CASE("an Atmos stream at 96 and 192 kHz decodes to its bed and its objects, sample for sample",
+          "[truehd][encoder][atmos][rates]") {
+    const std::uint32_t rate = GENERATE(96000U, 192000U);
+    const int unit = rate == 96000U ? 80 : 160;
+    CAPTURE(rate);
+    constexpr int kFrames = 1200;
+    // Quiet noise: a unit holds at most 4095 16-bit words, so 20 channels of full-scale noise do
+    // not fit the 160 samples of a 192 kHz unit (the encoder says so: kRateExceeded).
+    std::vector<std::int32_t> bed = make_pcm(kBedChannels, kFrames, 24, 21);
+    std::vector<std::int32_t> objects = make_pcm(kObjects, kFrames, 24, 22);
+    for (auto* v : {&bed, &objects}) {
+        for (std::int32_t& s : *v) {
+            s >>= 9;
+        }
+    }
+    std::vector<std::int32_t> pcm;
+    for (int t = 0; t < kFrames; ++t) {
+        for (int c = 0; c < kBedChannels; ++c) {
+            pcm.push_back(bed[static_cast<std::size_t>(t * kBedChannels + c)]);
+        }
+        for (int c = 0; c < kObjects; ++c) {
+            pcm.push_back(objects[static_cast<std::size_t>(t * kObjects + c)]);
+        }
+    }
+    EncoderConfig config = atmos_config();
+    config.sample_rate = rate;
+    config.verify = true;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE_FALSE(encoded.units.empty());
+    CHECK(encoded.stats.verified_units == encoded.units.size());
+    CHECK(encoded.units.size() == static_cast<std::size_t>((kFrames + unit - 1) / unit));
+
+    const auto first = parse_access_unit(encoded.units.front().bytes, 0);
+    REQUIRE(first.has_value());
+    REQUIRE(first->major_sync.has_value());
+    CHECK(first->major_sync->sample_rate() == rate);
+    CHECK(first->major_sync->num_substreams == 4);
+
+    CHECK(decode_all(encoded.units, 24, kBedChannels) == bed);
+    CHECK(decode_all(encoded.units, 24, kObjects, Presentation::kAll) == objects);
 }

@@ -764,8 +764,13 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
         if (config.channels != 8) {
             return "an Atmos stream carries a 7.1 bed: channels must be 8 (TH spec §20.2)";
         }
-        if (config.sample_rate != 48000) {
-            return "Atmos is 48 kHz only (TH spec §15.2)";
+        // Substream 3 is legal at 48, 96 and 192 kHz (spec-answers A3, which supersedes the
+        // 48 kHz rule of §15.2); no 44.1 kHz family rate carries it. The ramp step, rate model,
+        // OAMD cadence and the fine-sum width at 96 and 192 kHz are PROVISIONAL: see
+        // libs/truehd/notes/feature-truehd-atmos-96-192.md.
+        if (config.sample_rate != 48000 && config.sample_rate != 96000 &&
+            config.sample_rate != 192000) {
+            return "Atmos is written at 48, 96 or 192 kHz only (TH spec §15.2, spec-answers A3)";
         }
         if (const std::string_view field = extra_channel_meaning_problem(config.object_meaning);
             !field.empty()) {
@@ -857,7 +862,10 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
         }
     }
     const unsigned bits = ratebits_of(config.sample_rate);
-    if (rate_factor(bits) >= 2 && config.channels > 6) {
+    // The 6 channel limit is not applied to an Atmos stream, whose 7.1 bed is mandatory (TH spec
+    // §20.2): its 8 channel bed at 192 kHz is outside §9.6 and §21.6 as this encoder reads them,
+    // and the Dolby Reference Player plays it. PROVISIONAL (feature-truehd-atmos-96-192.md).
+    if (rate_factor(bits) >= 2 && config.channels > 6 && config.object_channels == 0) {
         return "at 176.4 and 192 kHz at most 6 channels are written (TH spec §9.6, §21.6)";
     }
     if (config.downmix == DownmixMode::kStandard && config.channels > 2) {

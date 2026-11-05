@@ -417,7 +417,9 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
             }
             return evolution_frame_of(payload_of_frame(frame, offset));
         },
-        kUnitSamples, static_cast<int>(kFrameSamples));
+        // The access unit holds 40 samples at 48 kHz, 80 at 96 kHz, 160 at 192 kHz.
+        kUnitSamples * static_cast<int>(config.sample_rate / 48000U),
+        static_cast<int>(kFrameSamples));
 
     auto encoder = th::Encoder::create(config);
     if (!encoder) {

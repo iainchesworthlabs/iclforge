@@ -105,6 +105,26 @@ TEST_CASE("a unit that is late at a lower rate is on time at a higher one",
     CHECK(slow.admit(0, kBytesFor40Samples).arrival == 80);
 }
 
+TEST_CASE("the same bytes take 2 and 4 times the samples to arrive at 96 and 192 kHz",
+          "[truehd][rate][ratectl][rates]") {
+    // 1875 bytes are 40 samples at 18 Mbit/s and 48 kHz (46.875 bytes a sample); the unit holds
+    // 40, 80 or 160 samples and the rate is the same in bits a second, so a unit of 1875 bytes
+    // takes 80 samples at 96 kHz and 160 at 192 kHz, and a unit of the nominal length's share of
+    // the rate fills its slot at every rate. Written out by hand.
+    RateModel at96(96000, 80, 18'000'000);
+    RateModel at192(192000, 160, 18'000'000);
+    CHECK(at96.admit(0, kBytesFor40Samples).arrival == 80);
+    CHECK(at192.admit(0, kBytesFor40Samples).arrival == 160);
+    RateModel full96(96000, 80, 18'000'000);
+    RateModel full192(192000, 160, 18'000'000);
+    CHECK(full96.admit(0, 2 * kBytesFor40Samples).arrival == 160);
+    CHECK(full192.admit(0, 4 * kBytesFor40Samples).arrival == 640);
+    // the latency limit is in time, so it is in samples 2 and 4 times as many
+    CHECK(RateModel(48000, 40, 18'000'000).admit(0, 0).headroom == 3600);
+    CHECK(RateModel(96000, 80, 18'000'000).admit(0, 0).headroom == 7200);
+    CHECK(RateModel(192000, 160, 18'000'000).admit(0, 0).headroom == 14400);
+}
+
 TEST_CASE("the declared peak rate is what a reader gets back from the major sync field",
           "[truehd][rate][ratectl]") {
     CHECK(declared_peak_rate_bps(18'000'000, 48000) == 18'000'000);

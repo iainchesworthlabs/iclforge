@@ -186,6 +186,9 @@ and the objects separately, where the owner's discs predict one from the other; 
 writes that structure (entry 70: `min_chan` 8, the channels from 8 up coded, primitive matrices with optional noise and one LSB bypass
 rebuilding all 9 to 16 objects from the bed rows, the bed a fixed render of the objects so that `encode()` takes the objects alone;
 static within a restart interval). No decoder outside this repository reads substream 3.
+The Atmos stream is written at 48, 96 and 192 kHz (the bed is 7.1 at all three, so at 192 kHz it has 8 channels, past the 6 that §9.6 and §21.6 allow a plain stream). 96 and 192 kHz are PROVISIONAL: the ramp step
+(`object_ramp_step`: 6552, 3276, 1636), the rate model, the metadata frame (kept at 1536 samples at every rate, so 16 ms and 8 ms) and the width of the scaled fine sum are the rule's reading, written in
+[`libs/truehd/notes/feature-truehd-atmos-96-192.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/notes/feature-truehd-atmos-96-192.md) with what the Dolby Reference Player showed of them. The decoder reads any rate.
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
 records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;
 `iclforge-truehd-encode-tool` (WAV in, `.thd` out) is the test tool the interoperability checks use.

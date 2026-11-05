@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <array>
@@ -213,11 +214,13 @@ std::vector<OamdFrame> read_oamd_frames(const fs::path& file) {
     std::vector<OamdFrame> frames;
     std::uint64_t sample = 0;
     int substreams = 0;
+    int unit_samples = 40;  // 40, 80 or 160: the access unit of 48, 96 or 192 kHz
     while (const auto unit = reader.next()) {
         const auto parsed = th::parse_access_unit(*unit, substreams, true);
         REQUIRE(parsed.has_value());
         if (parsed->major_sync) {
             substreams = parsed->major_sync->num_substreams;
+            unit_samples = th::nominal_samples_per_access_unit(parsed->major_sync->ratebits());
         }
         if (parsed->extra_data) {
             const auto evolution = th::read_evolution(*parsed->extra_data);
@@ -226,7 +229,7 @@ std::vector<OamdFrame> read_oamd_frames(const fs::path& file) {
             REQUIRE(program.has_value());
             frames.push_back({sample, *program});
         }
-        sample += 40;
+        sample += static_cast<std::uint64_t>(unit_samples);
     }
     return frames;
 }
@@ -436,6 +439,60 @@ TEST_CASE("truehd-atmos writes a stream whose substream 3 is the WAV's channels,
     CHECK(frames[0].first_sample == 0);
 }
 
+TEST_CASE("truehd-atmos writes 96 and 192 kHz streams and places the metadata frames by sample",
+          "[forge-cli][truehd][atmos][truehd-atmos][rates]") {
+    // PROVISIONAL above 48 kHz (libs/truehd/notes/feature-truehd-atmos-96-192.md): the stream
+    // reads back through this repository's decoder; no Dolby tool has been shown to read its
+    // object metadata. The metadata frame stays 1536 samples at every rate, and the access unit
+    // holds 80 or 160 samples, so a frame's offset in its unit is up to 159.
+    const std::uint32_t rate = GENERATE(96000U, 192000U);
+    const std::size_t samples = 48000;
+    const fs::path dir = scratch_dir();
+    std::vector<std::vector<float>> channels(3, std::vector<float>(samples));
+    for (std::size_t c = 0; c < 3; ++c) {
+        for (std::size_t t = 0; t < samples; ++t) {
+            // on the 24 bit grid, so that the decoded channel is the WAV's bit for bit
+            channels[c][t] = static_cast<float>(
+                std::lround(0.25 * std::sin(0.01 * static_cast<double>((c + 1) * t)) * 8388608.0)) /
+                             8388608.0F;
+        }
+    }
+    const std::string tag = std::to_string(rate / 1000);
+    const fs::path wav = dir / ("atmos_rate_" + tag + "_in.wav");
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, rate).has_value());
+    const fs::path stream = dir / ("atmos_rate_" + tag + ".thd");
+    const fs::path log = dir / ("atmos_rate_" + tag + ".log");
+    REQUIRE(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(stream) + " verify", log) == 0);
+    CHECK(read_text(log).find(std::to_string(rate) + " Hz") != std::string::npos);
+
+    const fs::path objects = dir / ("atmos_rate_" + tag + "_objects");
+    fs::remove_all(objects);
+    const fs::path all_wav = dir / ("atmos_rate_" + tag + "_all.wav");
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(all_wav) + " " + quoted(objects) +
+                        " truehd-presentation=all",
+                    log) == 0);
+    for (std::size_t c = 0; c < 3; ++c) {
+        char name[32];
+        std::snprintf(name, sizeof name, "object_%02zu.wav", c);
+        const auto decoded = iclforge::ac3::io::read_wav((objects / name).string());
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->channels.size() == 1);
+        CHECK(decoded->sample_rate == rate);
+        CHECK(decoded->channels[0] == channels[c]);
+    }
+
+    const auto frames = read_oamd_frames(stream);
+    REQUIRE(frames.size() == 32);  // frames start at 0, 1536, ... below 48000
+    for (std::size_t k = 0; k < frames.size(); ++k) {
+        REQUIRE(frames[k].program.blocks.size() == 1);
+        const auto& block = frames[k].program.blocks.front();
+        CHECK(frames[k].first_sample + static_cast<std::uint64_t>(block.sample_offset) +
+                  32U * static_cast<std::uint64_t>(block.block_offset_factor) ==
+              1536U * k);
+        CHECK(block.ramp_duration == 1536);
+    }
+}
+
 TEST_CASE("truehd-atmos signs the evolution frames when sign-objects has a key, and not otherwise",
           "[forge-cli][truehd][atmos][truehd-atmos][signing]") {
     const fs::path dir = scratch_dir();
@@ -562,9 +619,9 @@ TEST_CASE("truehd-atmos refuses what substream 3 cannot carry",
     CHECK(read_text(log).find("2 to 16") != std::string::npos);
     CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "o.wav"), log) == kExitUsage);
     std::vector<std::vector<float>> twelve(12, std::vector<float>(4800, 0.1F));
-    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), twelve, 96000).has_value());
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), twelve, 88200).has_value());
     CHECK(run_cli("truehd-atmos " + quoted(wav) + " " + quoted(dir / "o.thd"), log) == kExitUsage);
-    CHECK(read_text(log).find("48 kHz only") != std::string::npos);
+    CHECK(read_text(log).find("48, 96 or 192 kHz only") != std::string::npos);
 }
 
 TEST_CASE("truehd-atmos takes a RIFF file with an axml chunk for an ADM master and says so",

@@ -1343,6 +1343,8 @@ no TrueHD stream here has an evolution frame, so nothing decides it.
     substream with sync 0x31EC or by index? What width is an Atmos channel's output (the decoder keeps the low 24 bits of a value, as
     the lossless check's three bytes do)? **Recommendation:** the decoder keys the `huff_lsbs` limit on the sync, accepts any rate and
     refuses nothing the sync does not allow; the encoder writes 48 kHz only. Section G says what the decoder does and the tests that hold it.
+    **Updated:** spec-answers A3 says substream 3 is legal at 96 and 192 kHz, and the encoder now writes it at 48, 96 and 192 kHz (a 7.1 bed at all three); the two higher rates are
+    PROVISIONAL (`notes/feature-truehd-atmos-96-192.md`). The decoder reading is unchanged.
 36. **Appendix E and §15.16 (B42, C2).** Appendix E uses the v3.5 field names and says ISF SHALL be NULL, which §15.6 contradicts.
     Can an Atmos program carry ISF objects? **Recommendation:** treat ISF as allowed (the standard defines it), and the rest of §15.16 as
     rules for an encoder that this library's encoder will keep (nothing is enforced on the read side).
@@ -1440,7 +1442,7 @@ is entry 32: three substreams, the third with sync 0x31EB, made by the encoder a
 | `huff_lsbs` at most 24, 31 for the object substreams (§8.3) | at most 24, or 31 when the restart sync is 0x31EC, whatever the substream index; above that `kBadParameter` (the message now says which limit) | `test_substream3.cpp` (31 accepted under 0x31EC and decoded, 25 refused under 0x31EA and 0x31EB, 24 accepted under all three), `hb_substream3_limits` (residuals that need `huff_lsbs` 29 to 31) |
 | Filter B (and A) output ±2^23 for substreams 0 and 1, ±2^31 for 2 and 3 (§9.3) | 32-bit samples and 64-bit sums in every substream; no 24-bit limit is applied anywhere (entry 41), so the 32-bit range is read as it is sent | `hb_substream3_limits`: a prediction filter of gain about -6 and an IIR filter whose residual reaches 2^28 or more, and coded channels of 25 bits before 15 matrices, decode to the 24-bit signal they were built from (the Python reference decodes it too) |
 | terminatorB (0x1234) ends substream 3 (§15.3, §16.5.2) | read after the last block of substream 3 | `hb_sixteen_channels`, `hb_substream3_limits` |
-| Atmos is 48 kHz only (§15.2) | not tested; any rate is decoded | -- (question 35) |
+| Atmos is 48 kHz only (§15.2) | superseded by spec-answers A3: any rate is decoded, the encoder writes 48, 96 and 192 kHz (provisional above 48) | `[truehd][encoder][atmos]` round trips at 96 and 192 kHz, `object_ramp_step` (question 35) |
 
 The stream `hb_substream3_limits` is made by `tools/references/truehd_writer.py`: four substreams, the last of 16 channels with sync 0x31EC,
 `max_matrix_chan` 15 and 15 primitive matrices on channels 8 to 15, two channels with a FIR filter of gain -5.9 and two with an IIR filter whose

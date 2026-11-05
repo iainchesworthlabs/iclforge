@@ -81,6 +81,17 @@ inline constexpr std::size_t kMajorSyncBaseBytes =
     return factor < 0 ? 0 : 40 << factor;
 }
 
+// Substream 3's object matrices: the ramp of a slope grows by `(0x666 >> r) * 4` a sample inside an
+// access unit, r the rate factor above (ERRATA.md entry 69; spec-answers A3): 6552 at 48 kHz, 3276
+// at 96 kHz, 1636 at 192 kHz, where the access unit holds 40, 80 and 160 samples. The 48 kHz step
+// is measured on discs; the other two are the rule's reading, with no stream at those rates to
+// check them (SUBSTREAM3.md section 6, feature-truehd-atmos-96-192.md): PROVISIONAL.
+[[nodiscard]] constexpr int object_ramp_step(int rate_factor_value) noexcept {
+    return (0x666 >> (rate_factor_value < 0 ? 0 : rate_factor_value)) * 4;
+}
+static_assert(object_ramp_step(0) == 6552 && object_ramp_step(1) == 3276 &&
+              object_ramp_step(2) == 1636);
+
 // TH spec §13.1: the speakers of a channel assignment, in the order the bits of the mask list them
 // (a bit with two speakers lists them left, then right). A TrueHD stream's channels are in this
 // order.

@@ -217,6 +217,10 @@ inline void apply_object_matrix(int block, bool starts_unit, bool ends_unit, int
             for (int k = 0; k < count; ++k) {
                 fine += std::int64_t{row[channel[k]]} * state.slope[channel[k]];
             }
+            // `fine` is a 64-bit sum. The 32-bit truncation of the scaled value below is the
+            // 48 kHz reading, which no stream distinguishes from a wider one; at 96 and 192 kHz
+            // (slower ramp, longer unit) whether the width stays 32 bits is not settled:
+            // PROVISIONAL (feature-truehd-atmos-96-192.md).
             const std::int64_t shared =
                 state.scale >= 0
                     ? fine >> state.scale

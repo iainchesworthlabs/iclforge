@@ -279,7 +279,7 @@ every coefficient plus 9 × delta / 2^3 equals the next section's base, also in 
 one matrix moves by 1.04 in 360 samples while the object moves 0.0015 of the room, and `ch_assign` differs from stream to stream, so a slot's order is not the speaker order.
 
 **Sample rates other than 48 kHz.** The ramp's step and the length of the access unit (40 << r samples) are measured at 48 kHz only; every stream in the
-corpus is 48 kHz. The step for 96 and 192 kHz is the rule's reading, untested.
+corpus is 48 kHz. The step for 96 and 192 kHz is the rule's reading (`object_ramp_step`: 3276 and 1636), untested against a Dolby stream; the encoder writes both rates (`notes/feature-truehd-atmos-96-192.md`) and the decoder reads them. PROVISIONAL.
 
 **Truncation of the scaled fine sum.** The truncation to 32 bits is not distinguished by the streams. (The quantiser mask with the bypass is settled: section 3, step 6.)
 

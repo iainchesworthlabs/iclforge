@@ -946,3 +946,31 @@ TEST_CASE("object paths and extension settings the stream cannot carry are refus
         CHECK(refusal(config).find("1.98") != std::string::npos);
     }
 }
+
+TEST_CASE("slopes run at 96 and 192 kHz and the objects come back exactly",
+          "[truehd][encoder][atmos][object-motion][rates]") {
+    // The ramp of a slope grows by 6552, 3276 or 1636 a sample inside a unit of 40, 80 or 160
+    // samples; the encoder's model and the decoder take the step from one function, so this holds
+    // them to each other at the three rates (the step above 48 kHz is PROVISIONAL, SUBSTREAM3.md
+    // section 6).
+    const std::uint32_t rate = GENERATE(48000U, 96000U, 192000U);
+    const int nominal = kNominal * static_cast<int>(rate / 48000U);
+    constexpr int kObjects = 12;
+    const int frames = nominal * kUnitsPerInterval * 6 + 17;
+    CAPTURE(rate);
+    const Case c{"fast, slopes", 1200, true, 1, false, 0, 0, false, 0.75, 0.0};
+    const std::vector<std::int32_t> pcm = quiet_objects(kObjects, frames);
+    EncoderConfig config = motion_config(c, kObjects, static_cast<std::size_t>(frames));
+    config.sample_rate = rate;
+    const Encoded encoded = encode_all(config, pcm);
+    REQUIRE_FALSE(encoded.units.empty());
+    CHECK(encoded.stats.verified_units == encoded.units.size());
+    CHECK(decode_objects(encoded.units, kObjects) == pcm);
+    // the slopes moved the bed: it is not the fixed render
+    EncoderConfig fixed = config;
+    fixed.object_paths.clear();
+    fixed.object_extension = ObjectExtension::kNone;
+    fixed.object_update_units = 1;
+    CHECK(decode_all(encode_all(fixed, pcm).units, 24, kBed) !=
+          decode_all(encoded.units, 24, kBed));
+}
