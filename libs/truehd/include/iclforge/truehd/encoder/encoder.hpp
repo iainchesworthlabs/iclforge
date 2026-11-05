@@ -237,6 +237,22 @@ struct EncoderConfig {
     // bed row (so that an object that moves between rows has a matrix on each, and a stream can
     // carry up to the 16 matrices of the section; more is refused).
     bool object_split_mixes = false;
+    // kBedMatrices only: a general downmix of the objects into the bed in place of the fixed render
+    // and the paths: 8 rows (L R C LFE Ls Rs Lrs Rrs) of `object_channels` gains, row-major, a bed
+    // row being the sum of the objects times its row's gains for the whole stream (TH spec 10.2.1d,
+    // "A chain for an arbitrary downmix"; ERRATA.md entry 70's chain is the special case of an
+    // object per row). The chain of primitive matrices is built from the gains (libs/truehd/notes/
+    // feature-truehd-atmos-spec-rules.md): each bed row takes the object of its largest gain through
+    // a non-identity ch_assign, a row that is one scaled object is closed with 4 to 7 of them in at
+    // most 15 primitives, and a row of all zeros is set to 0 by the matrices of the lower
+    // substreams (it needs the standard layout of three substreams). Takes no object_paths, slopes,
+    // LSB bypass, split mixes or update interval. Refused, by name: a row that is a combination of
+    // the other rows, eight single-object rows (17 primitives, substream 3 carries 16), a
+    // coefficient of 32 or more. The accuracy for rows of several objects (pair rows, pan laws of 9
+    // and 10 objects) is not established (TH spec 10.2.1d marks it open): they decode losslessly,
+    // the bed they give is within the rounding of the 2^-14 coefficients only where the chain's
+    // coefficients stay small. Empty: the render as before.
+    std::vector<double> object_downmix{};
     // The 16-channel fields of the major sync (§14.2). `sixteench_channel_count` is filled in by
     // the encoder: the object channels, less the LFE of a dynamic-object-only programme, which is
     // how the owner's discs count them. Used only with object_channels.

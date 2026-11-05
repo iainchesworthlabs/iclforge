@@ -3,9 +3,14 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstdlib>
 #include <iterator>
+#include <optional>
 #include <ranges>
+#include <span>
+#include <string_view>
+#include <utility>
 
 #include "core/noise.hpp"
 #include "iclforge/truehd/core/format.hpp"
@@ -856,6 +861,580 @@ std::size_t object_matrices_used(const ObjectTimeline& timeline) noexcept {
         used = std::max(used, block.matrices.size());
     }
     return used;
+}
+
+// --- a general downmix of the objects into the bed -------------------------------------------------
+
+namespace {
+
+constexpr int kChainFracBits = 14;  // the precision of a coefficient, 2^-14 (TH spec 10.2.1d)
+constexpr int kChainMaxShift = 4;   // f_shift 4 holds up to +-31.99, the bound DEE keeps to
+constexpr std::int32_t kChainMaxRaw = 32767;
+// A pivot this near 1 needs no tuning primitive (a coefficient is 2^-14 = 6.1e-5 coarse).
+constexpr double kChainPivotTolerance = 5e-5;
+// The pivot of a row after its tuning primitive, quantised, may be this far from 1.
+constexpr double kChainPivotLimit = 2e-3;
+// TH spec 10.2.1d: a row joins the shared group only if the pivot moves by at least this.
+constexpr double kChainGroupSlope = 0.05;
+// A realised bed row is this near the wanted one (the 2^-14 coefficients accumulate along the chain).
+constexpr double kChainReach = 1e-3;
+constexpr double kChainNegligible = 1e-9;
+
+using Form = std::vector<double>;  // a row as a linear form: its coefficient on each element
+
+// An encoder-side primitive: row[out] += sum of value(term) * row[term row]. The decoder's matrix is
+// its inverse: own coefficient +1 and every other coefficient negated.
+struct ChainOp {
+    int out = 0;
+    int f_shift = 0;
+    std::vector<std::pair<int, std::int32_t>> terms;  // (row, raw at 2^-(14 - f_shift))
+
+    [[nodiscard]] double value(const std::pair<int, std::int32_t>& term) const {
+        return std::ldexp(static_cast<double>(term.second), f_shift - kChainFracBits);
+    }
+};
+
+// Rounds the coefficients to the finest grid in which every one fits (TH spec 10.2.1d,
+// "Coefficient quantisation": f_shift is the smallest that holds the largest).
+std::optional<ChainOp> quantise_op(int out, const std::vector<std::pair<int, double>>& wanted) {
+    for (int shift = 0; shift <= kChainMaxShift; ++shift) {
+        const double scale = std::ldexp(1.0, kChainFracBits - shift);
+        ChainOp op;
+        op.out = out;
+        op.f_shift = shift;
+        bool fits = true;
+        for (const auto& [row, gain] : wanted) {
+            const double raw = std::round(gain * scale);
+            if (!(std::abs(raw) <= kChainMaxRaw)) {
+                fits = false;
+                break;
+            }
+            if (raw != 0.0) {
+                op.terms.emplace_back(row, static_cast<std::int32_t>(raw));
+            }
+        }
+        if (fits) {
+            return op;
+        }
+    }
+    return std::nullopt;
+}
+
+void apply_op(std::vector<Form>& forms, const ChainOp& op) {
+    Form& out = forms[static_cast<std::size_t>(op.out)];
+    for (const auto& term : op.terms) {
+        const double gain = op.value(term);
+        const Form& source = forms[static_cast<std::size_t>(term.first)];
+        for (std::size_t e = 0; e < out.size(); ++e) {
+            out[e] += gain * source[e];
+        }
+    }
+}
+
+// The coefficients m with sum_t m[t] * forms[t] = target; the forms are always independent (the
+// chain is a product of elementary matrices), so this only fails on a numerical accident.
+std::optional<std::vector<double>> coordinates(const std::vector<Form>& forms,
+                                               const Form& target) {
+    const std::size_t n = forms.size();
+    std::vector<std::vector<double>> system(n, std::vector<double>(n + 1, 0.0));
+    for (std::size_t e = 0; e < n; ++e) {
+        for (std::size_t t = 0; t < n; ++t) {
+            system[e][t] = forms[t][e];
+        }
+        system[e][n] = target[e];
+    }
+    for (std::size_t column = 0; column < n; ++column) {
+        std::size_t best = column;
+        for (std::size_t row = column + 1; row < n; ++row) {
+            if (std::abs(system[row][column]) > std::abs(system[best][column])) {
+                best = row;
+            }
+        }
+        if (std::abs(system[best][column]) < 1e-12) {
+            return std::nullopt;
+        }
+        std::swap(system[best], system[column]);
+        for (std::size_t row = 0; row < n; ++row) {
+            if (row == column) {
+                continue;
+            }
+            const double factor = system[row][column] / system[column][column];
+            if (factor == 0.0) {
+                continue;
+            }
+            for (std::size_t k = column; k <= n; ++k) {
+                system[row][k] -= factor * system[column][k];
+            }
+        }
+    }
+    std::vector<double> m(n);
+    for (std::size_t t = 0; t < n; ++t) {
+        m[t] = system[t][n] / system[t][t];
+    }
+    return m;
+}
+
+// The gain of the overlap primitive that gives a row with no other content something to tune
+// against: the product of it and the tuning gain is (1 - c) / c, spread over the two.
+double overlap_gain(double c) {
+    return std::clamp(std::sqrt(std::abs(1.0 - c) / std::abs(c)), 1.0, 8.0);
+}
+
+// The gain of `target` when it is one scaled element `element` and nothing else.
+std::optional<double> single_gain(const Form& target, int element) {
+    for (std::size_t e = 0; e < target.size(); ++e) {
+        if (static_cast<int>(e) != element && std::abs(target[e]) > kChainNegligible) {
+            return std::nullopt;
+        }
+    }
+    const double gain = target[static_cast<std::size_t>(element)];
+    return std::abs(gain) > kChainNegligible ? std::optional<double>(gain) : std::nullopt;
+}
+
+constexpr std::string_view kProblemLinear =
+    "object_downmix: a bed row is a combination of rows that are already finished (the rows of "
+    "the downmix must be independent; only a row that is exactly zero is allowed to depend on "
+    "nothing)";
+constexpr std::string_view kProblemRange =
+    "object_downmix: the chain needs a coefficient of 32 or more (a gain this small or a downmix "
+    "this ill-conditioned does not fit the matrices)";
+constexpr std::string_view kProblemReach =
+    "object_downmix: the chain does not reach the downmix to within 1e-3";
+
+// One design of the chain: forms of the 16 rows, the rows that are finished (the bed rows already
+// equal to their target, which no primitive may write again) and the primitives so far, in the order
+// the encoder applies them.
+struct ChainDesign {
+    int n = 0;
+    const std::vector<Form>* target = nullptr;  // the bed rows 0..7
+    std::vector<Form> forms;
+    std::vector<bool> finished;
+    std::vector<ChainOp> ops;
+    std::string_view problem;
+
+    [[nodiscard]] int spare() const noexcept { return n - 1; }
+
+    bool fail(std::string_view why) {
+        if (problem.empty()) {
+            problem = why;
+        }
+        return false;
+    }
+
+    bool emit(int out, const std::vector<std::pair<int, double>>& wanted) {
+        auto op = quantise_op(out, wanted);
+        if (!op) {
+            return fail(kProblemRange);
+        }
+        apply_op(forms, *op);
+        ops.push_back(std::move(*op));
+        return true;
+    }
+
+    // The row to tune against: an unfinished row, not `row`, with the largest coordinate, and one
+    // that gets the pivot to 1 with a coefficient under 30 (a row that shares only the rounding of
+    // the chain with the target would do it with a coefficient in the thousands).
+    [[nodiscard]] int tuning_row(const std::vector<double>& m, int row) const {
+        const double smallest =
+            std::max(1e-6, std::abs(m[static_cast<std::size_t>(row)] - 1.0) / 30.0);
+        int best = -1;
+        for (int t = 0; t < n; ++t) {
+            if (t == row || finished[static_cast<std::size_t>(t)] ||
+                std::abs(m[static_cast<std::size_t>(t)]) < smallest) {
+                continue;
+            }
+            if (best < 0 || std::abs(m[static_cast<std::size_t>(t)]) >
+                                std::abs(m[static_cast<std::size_t>(best)])) {
+                best = t;
+            }
+        }
+        return best;
+    }
+
+    // The main primitive of a row: its pivot coordinate is 1, so adding the other coordinates'
+    // rows makes it the target.
+    bool main_primitive(int row) {
+        const Form& want = (*target)[static_cast<std::size_t>(row)];
+        const auto m = coordinates(forms, want);
+        if (!m) {
+            return fail(kProblemRange);
+        }
+        std::vector<std::pair<int, double>> wanted;
+        for (int t = 0; t < n; ++t) {
+            if (t != row && std::abs((*m)[static_cast<std::size_t>(t)]) > kChainNegligible) {
+                wanted.emplace_back(t, (*m)[static_cast<std::size_t>(t)]);
+            }
+        }
+        if (!wanted.empty() && !emit(row, wanted)) {
+            return false;
+        }
+        finished[static_cast<std::size_t>(row)] = true;
+        const Form& got = forms[static_cast<std::size_t>(row)];
+        for (std::size_t e = 0; e < got.size(); ++e) {
+            if (std::abs(got[e] - want[e]) > kChainReach) {
+                return fail(kProblemReach);
+            }
+        }
+        return true;
+    }
+
+    // A row with its pivot made 1 (a tuning primitive, after an overlap one when no other
+    // unfinished row shares its content), then its main primitive.
+    bool finish_row(int row) {
+        const Form& want = (*target)[static_cast<std::size_t>(row)];
+        auto m = coordinates(forms, want);
+        if (!m) {
+            return fail(kProblemRange);
+        }
+        if (std::abs((*m)[static_cast<std::size_t>(row)] - 1.0) >= kChainPivotTolerance) {
+            int u = tuning_row(*m, row);
+            if (u < 0) {
+                const double c = (*m)[static_cast<std::size_t>(row)];
+                if (std::abs(c) < 1e-3) {
+                    return fail(kProblemLinear);
+                }
+                if (!emit(row, {{spare(), overlap_gain(c)}})) {
+                    return false;
+                }
+                m = coordinates(forms, want);
+                if (!m) {
+                    return fail(kProblemRange);
+                }
+                u = tuning_row(*m, row);
+                if (u < 0) {
+                    return fail(kProblemRange);
+                }
+            }
+            const double gain = ((*m)[static_cast<std::size_t>(row)] - 1.0) /
+                                (*m)[static_cast<std::size_t>(u)];
+            if (!emit(u, {{row, gain}})) {
+                return false;
+            }
+            m = coordinates(forms, want);
+            if (!m || std::abs((*m)[static_cast<std::size_t>(row)] - 1.0) > kChainPivotLimit) {
+                return fail(kProblemRange);
+            }
+        }
+        return main_primitive(row);
+    }
+};
+
+// The pivot of `row` once the shared primitive has added `x` times `row` and the earlier members'
+// multiples to the spare and the earlier members have been finished (not quantised: a replay of
+// the sequence for the affine search of TH spec 10.2.1d).
+std::optional<double> replay_pivot(const std::vector<Form>& start, const std::vector<Form>& target,
+                                   int spare, const std::vector<int>& group,
+                                   const std::vector<double>& multiples, int row, double x) {
+    std::vector<Form> forms = start;
+    const auto add_to_spare = [&](int member, double multiple) {
+        const Form source = forms[static_cast<std::size_t>(member)];
+        for (std::size_t e = 0; e < source.size(); ++e) {
+            forms[static_cast<std::size_t>(spare)][e] += multiple * source[e];
+        }
+    };
+    for (std::size_t i = 0; i < group.size(); ++i) {
+        add_to_spare(group[i], multiples[i]);
+    }
+    add_to_spare(row, x);
+    for (const int member : group) {
+        const auto m = coordinates(forms, target[static_cast<std::size_t>(member)]);
+        if (!m) {
+            return std::nullopt;
+        }
+        Form sum = forms[static_cast<std::size_t>(member)];
+        for (std::size_t t = 0; t < forms.size(); ++t) {
+            if (static_cast<int>(t) == member) {
+                continue;
+            }
+            for (std::size_t e = 0; e < sum.size(); ++e) {
+                sum[e] += (*m)[t] * forms[t][e];
+            }
+        }
+        forms[static_cast<std::size_t>(member)] = sum;
+    }
+    const auto m = coordinates(forms, target[static_cast<std::size_t>(row)]);
+    if (!m) {
+        return std::nullopt;
+    }
+    return (*m)[static_cast<std::size_t>(row)];
+}
+
+struct ChainResult {
+    std::vector<ChainOp> ops;
+    int group = 0;
+};
+
+// The chain of TH spec 10.2.1d for the targets (the bed rows), starting from the forms of the
+// positions (one element each). With `shared`, the single-element rows are tuned together.
+std::expected<ChainResult, std::string_view> design_chain(const std::vector<Form>& target,
+                                                          const std::vector<Form>& start,
+                                                          const std::vector<bool>& finished,
+                                                          const std::vector<int>& element_at,
+                                                          bool shared) {
+    ChainDesign design;
+    design.n = static_cast<int>(start.size());
+    design.target = &target;
+    design.forms = start;
+    design.finished = finished;
+    ChainResult result;
+
+    if (shared) {
+        std::vector<int> singles;
+        for (int r = 0; r < kBedChannels; ++r) {
+            if (!design.finished[static_cast<std::size_t>(r)] &&
+                single_gain(target[static_cast<std::size_t>(r)],
+                            element_at[static_cast<std::size_t>(r)])) {
+                singles.push_back(r);
+            }
+        }
+        if (singles.size() >= 2) {
+            for (const int r : singles) {
+                const double c = *single_gain(target[static_cast<std::size_t>(r)],
+                                              element_at[static_cast<std::size_t>(r)]);
+                if (!design.emit(r, {{design.spare(), overlap_gain(c)}})) {
+                    return std::unexpected(design.problem);
+                }
+            }
+            const std::vector<Form> base = design.forms;
+            const int spare = design.spare();
+            // pass 1: which singles the shared primitive tunes, and by how much
+            std::vector<int> group;
+            std::vector<double> multiples;
+            for (const int r : singles) {
+                const auto p0 = replay_pivot(base, target, spare, group, multiples, r, 0.0);
+                const auto p1 = replay_pivot(base, target, spare, group, multiples, r, 1.0);
+                if (!p0 || !p1 || std::abs(*p1 - *p0) < kChainGroupSlope) {
+                    continue;
+                }
+                group.push_back(r);
+                multiples.push_back((1.0 - *p0) / (*p1 - *p0));
+            }
+            if (!group.empty()) {
+                // pass 2: the multiples on the grid the shared primitive will have
+                double biggest = 0.0;
+                for (const double x : multiples) {
+                    biggest = std::max(biggest, std::abs(x));
+                }
+                int shift = 0;
+                while (shift < kChainMaxShift &&
+                       std::round(biggest * std::ldexp(1.0, kChainFracBits - shift)) >
+                           kChainMaxRaw) {
+                    ++shift;
+                }
+                const double scale = std::ldexp(1.0, kChainFracBits - shift);
+                std::vector<int> members;
+                std::vector<double> quantised;
+                for (const int r : group) {
+                    const auto p0 = replay_pivot(base, target, spare, members, quantised, r, 0.0);
+                    const auto p1 = replay_pivot(base, target, spare, members, quantised, r, 1.0);
+                    if (!p0 || !p1 || std::abs(*p1 - *p0) < kChainGroupSlope) {
+                        return std::unexpected(kProblemRange);
+                    }
+                    const double x = std::round((1.0 - *p0) / (*p1 - *p0) * scale) / scale;
+                    if (std::abs(x * scale) > kChainMaxRaw) {
+                        return std::unexpected(kProblemRange);
+                    }
+                    members.push_back(r);
+                    quantised.push_back(x);
+                }
+                std::vector<std::pair<int, double>> wanted;
+                for (std::size_t i = 0; i < members.size(); ++i) {
+                    wanted.emplace_back(members[i], quantised[i]);
+                }
+                if (!design.emit(spare, wanted)) {
+                    return std::unexpected(design.problem);
+                }
+                for (const int r : members) {
+                    if (!design.main_primitive(r)) {
+                        return std::unexpected(design.problem);
+                    }
+                }
+                result.group = static_cast<int>(members.size());
+            }
+        }
+    }
+    for (int r = 0; r < kBedChannels; ++r) {
+        if (!design.finished[static_cast<std::size_t>(r)] && !design.finish_row(r)) {
+            return std::unexpected(design.problem);
+        }
+    }
+    result.ops = std::move(design.ops);
+    return result;
+}
+
+}  // namespace
+
+std::expected<DownmixChain, std::string_view> build_downmix_chain(std::span<const double> downmix,
+                                                                  int objects, int noise_shift) {
+    if (objects <= kBedChannels || objects > kMaxChannels) {
+        return std::unexpected("the object downmix needs 9 to 16 channels");
+    }
+    const auto n = static_cast<std::size_t>(objects);
+    if (downmix.size() != static_cast<std::size_t>(kBedChannels) * n) {
+        return std::unexpected("object_downmix is 8 rows (L R C LFE Ls Rs Lrs Rrs) of object_channels gains");
+    }
+    if (noise_shift < 0 || noise_shift > 15) {
+        return std::unexpected("an object matrix parameter is out of range");
+    }
+    std::vector<Form> target(kBedChannels, Form(n, 0.0));
+    for (std::size_t r = 0; r < static_cast<std::size_t>(kBedChannels); ++r) {
+        for (std::size_t e = 0; e < n; ++e) {
+            const double gain = downmix[r * n + e];
+            if (!std::isfinite(gain) || std::abs(gain) > 4.0) {
+                return std::unexpected("an object_downmix gain is not a number within +-4");
+            }
+            target[r][e] = gain;
+        }
+    }
+
+    // Which element sits in which matrix channel (ch_assign): each bed row takes the element of
+    // its largest gain, the rows with the largest gains choosing first; the rest fill in, zero
+    // rows (which keep the element as it is) and the coded rows last.
+    std::vector<int> element_at(n, -1);
+    std::vector<bool> taken(n, false);
+    std::vector<bool> zero(kBedChannels, false);
+    std::vector<int> order;
+    for (int r = 0; r < kBedChannels; ++r) {
+        const Form& row = target[static_cast<std::size_t>(r)];
+        const double largest = *std::ranges::max_element(row, {}, [](double g) { return std::abs(g); });
+        zero[static_cast<std::size_t>(r)] = std::abs(largest) < kChainNegligible;
+        if (!zero[static_cast<std::size_t>(r)]) {
+            order.push_back(r);
+        }
+    }
+    const auto largest_of = [&](int r) {
+        double largest = 0.0;
+        for (const double g : target[static_cast<std::size_t>(r)]) {
+            largest = std::max(largest, std::abs(g));
+        }
+        return largest;
+    };
+    std::ranges::stable_sort(order, [&](int a, int b) { return largest_of(a) > largest_of(b); });
+    for (const int r : order) {
+        int best = -1;
+        for (int e = 0; e < objects; ++e) {
+            const double gain = std::abs(target[static_cast<std::size_t>(r)][static_cast<std::size_t>(e)]);
+            if (taken[static_cast<std::size_t>(e)] || gain < kChainNegligible) {
+                continue;
+            }
+            if (best < 0 ||
+                gain > std::abs(target[static_cast<std::size_t>(r)][static_cast<std::size_t>(best)])) {
+                best = e;
+            }
+        }
+        if (best >= 0) {
+            element_at[static_cast<std::size_t>(r)] = best;
+            taken[static_cast<std::size_t>(best)] = true;
+        }
+    }
+    int next_free = 0;
+    for (std::size_t position = 0; position < n; ++position) {
+        if (element_at[position] >= 0) {
+            continue;
+        }
+        while (taken[static_cast<std::size_t>(next_free)]) {
+            ++next_free;
+        }
+        element_at[position] = next_free;
+        taken[static_cast<std::size_t>(next_free)] = true;
+    }
+
+    std::vector<Form> start(n, Form(n, 0.0));
+    for (std::size_t position = 0; position < n; ++position) {
+        start[position][static_cast<std::size_t>(element_at[position])] = 1.0;
+    }
+    // A bed row that is already its target needs no primitive: the zero rows (the lower
+    // substreams zero them, the chain leaves the element in the row) and the unit rows.
+    std::vector<bool> finished(n, false);
+    std::vector<int> zero_rows;
+    int singles = 0;
+    for (int r = 0; r < kBedChannels; ++r) {
+        const auto row = static_cast<std::size_t>(r);
+        if (zero[row]) {
+            finished[row] = true;
+            zero_rows.push_back(r);
+            continue;
+        }
+        bool unit = true;
+        for (std::size_t e = 0; e < n; ++e) {
+            unit = unit && std::abs(target[row][e] - start[row][e]) < kChainNegligible;
+        }
+        finished[row] = unit;
+        if (!unit && single_gain(target[row], element_at[row])) {
+            ++singles;
+        }
+    }
+
+    auto individual = design_chain(target, start, finished, element_at, false);
+    auto shared = design_chain(target, start, finished, element_at, true);
+    const ChainResult* chosen = nullptr;
+    if (individual && (!shared || individual->ops.size() <= shared->ops.size())) {
+        chosen = &*individual;
+    } else if (shared) {
+        chosen = &*shared;
+    }
+    if (chosen == nullptr) {
+        return std::unexpected(individual.error());
+    }
+    if (chosen->ops.size() > static_cast<std::size_t>(kMaxObjectMatrices)) {
+        return std::unexpected(
+            singles >= kBedChannels
+                ? "object_downmix: eight single-element rows need 17 primitive matrices and "
+                  "substream 3 carries at most 16"
+                : "object_downmix: the chain needs more than the 16 primitive matrices substream 3 "
+                  "carries");
+    }
+
+    DownmixChain chain;
+    chain.zero_rows = std::move(zero_rows);
+    chain.single_rows = singles;
+    chain.group_rows = chosen->group;
+    for (std::size_t position = 0; position < n; ++position) {
+        chain.assign[position] = static_cast<std::uint8_t>(element_at[position]);
+    }
+    // the decoder's chain: the encoder's primitives last to first, each inverted
+    for (std::size_t i = chosen->ops.size(); i-- > 0;) {
+        const ChainOp& op = chosen->ops[i];
+        MatrixSpec matrix;
+        matrix.out_ch = static_cast<std::uint8_t>(op.out);
+        matrix.frac_bits = kChainFracBits;
+        matrix.f_shift = static_cast<std::int8_t>(op.f_shift);
+        matrix.field_m4 = static_cast<std::uint8_t>(noise_shift);
+        matrix.present[static_cast<std::size_t>(op.out)] = true;
+        matrix.coeff[static_cast<std::size_t>(op.out)] = 1 << (kChainFracBits - op.f_shift);
+        for (const auto& [row, raw] : op.terms) {
+            matrix.present[static_cast<std::size_t>(row)] = true;
+            matrix.coeff[static_cast<std::size_t>(row)] = -raw;
+        }
+        chain.matrices.push_back(matrix);
+    }
+    return chain;
+}
+
+ObjectTimeline fixed_chain_timeline(const std::vector<MatrixSpec>& chain,
+                                    const std::vector<std::pair<std::size_t, int>>& blocks) {
+    MatrixSet section;
+    section.count = static_cast<std::uint8_t>(chain.size());
+    for (std::size_t m = 0; m < chain.size(); ++m) {
+        section.items[m] = chain[m];
+    }
+    section.extension = false;
+    section.coeffs_sent = true;
+    section.deltas_sent = false;
+    const ObjectState state = apply_object_section(ObjectState{}, section);
+    ObjectTimeline timeline;
+    for (std::size_t j = 0; j < blocks.size(); ++j) {
+        ObjectBlock& block = timeline.blocks.emplace_back();
+        block.start = blocks[j].first;
+        block.size = blocks[j].second;
+        block.matrices = state.matrices;
+        block.run = state.run;
+        if (j == 0) {
+            block.send = true;
+            block.section = section;
+        }
+    }
+    return timeline;
 }
 
 }  // namespace iclforge::truehd::detail

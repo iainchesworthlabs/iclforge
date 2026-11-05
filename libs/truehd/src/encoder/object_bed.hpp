@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <array>
 #include <expected>
+#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -194,5 +196,40 @@ void put_object_bypass(BitWriter& writer, const ObjectTimeline& timeline,
 
 // The most matrices any block's list holds.
 [[nodiscard]] std::size_t object_matrices_used(const ObjectTimeline& timeline) noexcept;
+
+// --- a general downmix of the objects into the bed ----------------------------------------------
+
+// EncoderConfig::object_downmix: the 7.1 bed rows are an 8 by N matrix of gains on the N objects
+// (a static downmix), N = 9 to 16. The chain of primitive matrices is built the way TH spec 10.2.1d
+// "A chain for an arbitrary downmix" has it: each bed row takes the element of its largest gain
+// (the matrix channel assignment `assign`), a tuning primitive makes the row's pivot exactly 1 and
+// a main primitive makes it the downmix row. A row that is one scaled element has no other content
+// to tune against, so it gets an overlap primitive with the spare coded row first; with two or
+// more such rows one shared primitive on the spare tunes every one of them whose pivot it moves
+// (TH spec 10.2.1d, verified there: 15 primitives for 4 to 7 such rows, the first design needs 18).
+// A bed row that is exactly zero cannot be made by the chain (it is a linear form that must stay
+// independent of the others): the chain leaves the element in the row and the lower substreams
+// zero it (`zero_rows`).
+struct DownmixChain {
+    std::vector<MatrixSpec> matrices;  // in the order the decoder applies them
+    // ch_assign: assign[m] is the output channel (the object) matrix channel m becomes.
+    std::array<std::uint8_t, kMaxChannels> assign{};
+    std::vector<int> zero_rows;  // bed rows the lower substreams' matrices set to 0
+    int single_rows = 0;         // bed rows that are one scaled element (not already unit)
+    int group_rows = 0;          // rows the shared primitive tunes (0: none)
+};
+
+// The chain for `downmix` (row-major, 8 rows of `objects` gains: L R C LFE Ls Rs Lrs Rrs), or why
+// it cannot be made, in words that name the case (a string literal). `noise_shift` goes in every
+// matrix. Refused: gains that are not numbers within +-4, a row that is a combination of the other
+// rows (the rows must be independent), a chain of more than 16 primitives (eight single-element
+// rows need 17), a coefficient of 32 or more.
+[[nodiscard]] std::expected<DownmixChain, std::string_view> build_downmix_chain(
+    std::span<const double> downmix, int objects, int noise_shift);
+
+// The timeline of a chain whose coefficients never move: the whole section in the first block of
+// the interval, nothing after.
+[[nodiscard]] ObjectTimeline fixed_chain_timeline(
+    const std::vector<MatrixSpec>& chain, const std::vector<std::pair<std::size_t, int>>& blocks);
 
 }  // namespace iclforge::truehd::detail

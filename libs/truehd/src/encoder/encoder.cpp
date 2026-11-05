@@ -542,6 +542,21 @@ struct StageWork {
     bool noise = false;
     std::uint32_t noise_seed = 0;      // the restart header's, which generator 1 starts from
     std::vector<MatrixSpec> matrices;  // in the order the decoder applies them
+    // ch_assign of the stage: ch_assign[m] is the output channel matrix channel m becomes. Empty: the
+    // identity, which every stage but the object stage of a general downmix writes.
+    std::vector<std::uint8_t> ch_assign;
+    // The matrix channel output channel `output` takes (the lossless check folds by it).
+    [[nodiscard]] std::uint8_t matrix_channel_of_output(int output) const noexcept {
+        if (ch_assign.empty()) {
+            return static_cast<std::uint8_t>(output);
+        }
+        for (std::size_t m = 0; m < ch_assign.size(); ++m) {
+            if (ch_assign[m] == output) {
+                return static_cast<std::uint8_t>(m);
+            }
+        }
+        return static_cast<std::uint8_t>(output);
+    }
     // The object stage's matrices block by block (object_bed.hpp), and for each matrix with the
     // LSB bypass the bits it sends for every sample of the interval (ahead of the residuals).
     bool object_plan = false;
@@ -674,6 +689,13 @@ struct Encoder::Impl {
         if (config.downmix == DownmixMode::kStandard && config.channels > 2) {
             downmix_plan = make_downmix_plan(layout, stages, config.downmix_gains);
         }
+        if (!config.object_downmix.empty()) {
+            auto built = detail::build_downmix_chain(config.object_downmix, config.object_channels,
+                                                     config.object_noise_shift);
+            if (built) {
+                downmix_chain = std::move(*built);
+            }
+        }
         if (config.verify) {
             DecoderConfig decoder_config;
             decoder_config.presentation = Presentation::kBest;
@@ -713,6 +735,7 @@ struct Encoder::Impl {
     std::vector<IntervalRate> interval_log;
     std::unique_ptr<Decoder> verifier;
     std::unique_ptr<Decoder> object_verifier;  // Presentation::kAll, for substream 3
+    std::optional<detail::DownmixChain> downmix_chain;  // EncoderConfig::object_downmix
 
     // The values in a frame of the PCM the caller gives: the bed, then the object channels (the
     // object channels alone when the bed is made from them, ObjectLayout::kBedMatrices).
@@ -805,6 +828,22 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
                     return problem;
                 }
             }
+        }
+    }
+    if (!config.object_downmix.empty()) {
+        if (config.object_channels == 0 || config.object_layout != ObjectLayout::kBedMatrices) {
+            return "object_downmix needs object_channels and ObjectLayout::kBedMatrices";
+        }
+        if (!config.object_paths.empty() || config.object_extension != ObjectExtension::kNone ||
+            config.object_lsb_bypass || config.object_split_mixes ||
+            config.object_drop_idle_matrices || config.object_update_units != 1) {
+            return "object_downmix replaces the render: it takes no object_paths, slopes, LSB "
+                   "bypass, split mixes or update interval";
+        }
+        const auto chain = detail::build_downmix_chain(config.object_downmix, config.object_channels,
+                                                       config.object_noise_shift);
+        if (!chain) {
+            return chain.error();
         }
     }
     if (config.bits != 16 && config.bits != 20 && config.bits != 24) {
@@ -1298,6 +1337,19 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
     const std::vector<StageSpec> object_stages{StageSpec{0, objects - 1}};
     const std::vector<Channel> no_layout;
     const DownmixPlan no_downmix;
+    // The bed rows of a general downmix that are exactly zero: the chain leaves the object in the row
+    // (TH spec 10.2.1d) and one matrix with no coefficients in each substream that decodes the row
+    // sets it to 0 (the matrices of a substream do not reach the rows the object substream reads).
+    std::vector<int> bed_zero_rows;
+    std::vector<MatrixSpec> zero_matrices;
+    if (bed_chain && downmix_chain) {
+        bed_zero_rows = downmix_chain->zero_rows;
+        for (const int row : bed_zero_rows) {
+            MatrixSpec zero;
+            zero.out_ch = static_cast<std::uint8_t>(row);
+            zero_matrices.push_back(zero);
+        }
+    }
     const auto prepare = [&](const Program& program) -> std::expected<void, EncodeError> {
         const auto count = static_cast<std::size_t>(program.channels);
         // The rows, planar, with the output shift and quantiser step found. The low bits every
@@ -1438,6 +1490,11 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
                     stage.matrices.push_back(matrix);
                 }
             }
+            for (const MatrixSpec& matrix : zero_matrices) {
+                if (inside(matrix)) {
+                    stage.matrices.push_back(matrix);
+                }
+            }
             for (const MatrixSpec& matrix : stage.matrices) {
                 apply_matrix(matrix, stage.outputs, quants[static_cast<std::size_t>(matrix.out_ch)]);
             }
@@ -1447,7 +1504,11 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
         }
         // The last substream's decode is the source, whatever the matrices before it did.
         for (std::size_t k = 0; k < work.back().outputs.size(); ++k) {
-            if (work.back().outputs[k] != rows[k]) {
+            const bool zeroed = std::ranges::find(bed_zero_rows, static_cast<int>(k)) !=
+                                bed_zero_rows.end();
+            const Plane& output = work.back().outputs[k];
+            if (zeroed ? !std::ranges::all_of(output, [](std::int32_t v) { return v == 0; })
+                       : output != rows[k]) {
                 return std::unexpected(
                     make_error(EncodeErrorKind::kInternal,
                                "the matrices do not give back the source channels"));
@@ -1496,7 +1557,33 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
         // The largest mix of the objects into the bed whose bed stays within 24 bits (the last
         // step mixes nothing, which always does).
         bool fitted = false;
-        for (int step = 0; step < detail::kObjectMixSteps && !fitted; ++step) {
+        // The rows the matrices have to give back, in matrix channel order: the objects, which a
+        // general downmix's ch_assign puts in other matrix channels than their own.
+        std::vector<Plane> positioned;
+        const std::vector<Plane>* chain_target = &object_outputs;
+        if (downmix_chain) {
+            for (std::size_t m = 0; m < object_outputs.size(); ++m) {
+                positioned.push_back(object_outputs[downmix_chain->assign[m]]);
+            }
+            chain_target = &positioned;
+            timeline = detail::fixed_chain_timeline(downmix_chain->matrices, bounds);
+            chain_rows = positioned;
+            if (!detail::invert_object_timeline(timeline, chain_shape, chain_rows, chain_bypass)) {
+                return std::unexpected(make_error(EncodeErrorKind::kInternal,
+                                                  "the object matrices cannot be run backwards"));
+            }
+            // The bed rows and the rows substream 3 codes are all held to 24 bits.
+            fitted = std::ranges::all_of(chain_rows, [&](const Plane& row) {
+                return within_24_bits(row, chain_shift);
+            });
+            if (!fitted) {
+                return std::unexpected(make_error(
+                    EncodeErrorKind::kUnsupported,
+                    "object_downmix: the bed or a coded row does not fit 24 bits for this audio "
+                    "(lower the objects' levels or the downmix gains)"));
+            }
+        }
+        for (int step = 0; step < detail::kObjectMixSteps && !fitted && !downmix_chain; ++step) {
             detail::ObjectTimelineRequest request;
             request.objects = objects;
             request.noise_shift = config.object_noise_shift;
@@ -1533,7 +1620,7 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
         }
         std::vector<Plane> forward = chain_rows;
         detail::apply_object_timeline(timeline, chain_shape, chain_bypass, forward);
-        if (!fitted || forward != object_outputs) {
+        if (!fitted || forward != *chain_target) {
             return std::unexpected(make_error(EncodeErrorKind::kInternal,
                                               "the object matrices do not give back the objects"));
         }
@@ -1564,6 +1651,10 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
         stage.timeline = std::move(timeline);
         stage.bypass = std::move(chain_bypass);
         stage.outputs = object_outputs;
+        if (downmix_chain) {
+            stage.ch_assign.assign(downmix_chain->assign.begin(),
+                                   downmix_chain->assign.begin() + objects);
+        }
         stage.coded.assign(chain_rows.begin() + detail::kBedChannels, chain_rows.end());
         stats.matrices_used += detail::object_matrices_used(stage.timeline);
     } else if (objects > 0) {
@@ -1707,7 +1798,7 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
                 const auto sample = stage.outputs[static_cast<std::size_t>(k)][t];
                 const auto value = static_cast<std::uint32_t>(sample)
                                    << stage.shifts[static_cast<std::size_t>(k)];
-                fold = lossless_fold_step(fold, value, stage_ch_assign(k));
+                fold = lossless_fold_step(fold, value, stage.matrix_channel_of_output(k));
                 const std::int64_t shifted = static_cast<std::int64_t>(sample)
                                              * (std::int64_t{1} << stage.shifts[static_cast<std::size_t>(k)]);
                 peak = std::max(peak, static_cast<std::uint64_t>(shifted < 0 ? -shifted : shifted));
@@ -1795,7 +1886,9 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
                         restart.data_check_present = false;
                         restart.lossless_check = previous_check[s];
                         for (int c = 0; c <= stage.spec.last_row; ++c) {
-                            restart.ch_assign[static_cast<std::size_t>(c)] = stage_ch_assign(c);
+                            restart.ch_assign[static_cast<std::size_t>(c)] =
+                                stage.ch_assign.empty() ? stage_ch_assign(c)
+                                                        : stage.ch_assign[static_cast<std::size_t>(c)];
                         }
                         write_restart_header(w, restart);
                     }
@@ -1962,6 +2055,17 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
 
     // The interval fits (or may be written as it is): the decoder sees it now, and not before, so
     // that a try that was thrown away never reached it.
+    // The bed the decoder gives back: the rows as coded, except the rows a general downmix zeroes.
+    std::vector<Plane> expected_bed;
+    if (verifier && !bed_zero_rows.empty()) {
+        expected_bed.assign(input.begin(), input.begin() + channels);
+        for (const int row : bed_zero_rows) {
+            std::ranges::fill(expected_bed[static_cast<std::size_t>(row)], 0);
+        }
+    }
+    const std::span<const Plane> bed_expected =
+        expected_bed.empty() ? std::span<const Plane>(input).first(static_cast<std::size_t>(channels))
+                             : std::span<const Plane>(expected_bed);
     if (verifier) {
         for (int au = 0; au < units; ++au) {
             const EncodedAccessUnit& unit = units_out[static_cast<std::size_t>(au)].unit;
@@ -1975,8 +2079,7 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
             const std::size_t base =
                 static_cast<std::size_t>(au) * static_cast<std::size_t>(nominal);
             if (const auto mismatch = detail::verify_mismatch(
-                    got, channels, expected_samples,
-                    std::span<const Plane>(input).first(static_cast<std::size_t>(channels)), base);
+                    got, channels, expected_samples, bed_expected, base);
                 !mismatch.empty()) {
                 return std::unexpected(make_error(EncodeErrorKind::kVerifyFailed, mismatch));
             }

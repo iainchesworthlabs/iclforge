@@ -69,3 +69,57 @@ addendum relayed by the coordinator. Nothing else under `dee-analysis` was opene
 
 - 81. Does the decoder session want `presence::kChannels`'s old meaning kept anywhere? The spec now confirms the gated reading (DRP and an
   independent decoder read it so; the old reading failed `v_gate_c0/c2/ec`).
+
+## Chain limits of substream 3 (follow-up branch `claude/truehd-atmos-chain-limits-e4b9f6`, stacked on this one)
+
+Sources: TH spec v3.53 10.2.1c/10.2.1d and `ss3-closeout.md` section 7 (7a, 7b); nothing else under `dee-analysis` was opened.
+
+**The brief assumed a chain that did not exist.** `kBedMatrices` (ERRATA 70) only built the restricted form: bed row j is object j plus
+the objects mixed into it, own coefficient +1.0, one mixing matrix per row. There was no 8 by N downmix input, no tuning/main chain and
+no "18 primitives" construction in this repository (nor on `feature/truehd-atmos-substream3`, `-encoder-render` or
+`feature/truehd-measured-bed-render`). So the chain was written, not extended; the owner said to build it as a new opt-in path. The render,
+the paths and the slopes are untouched: with `object_downmix` empty the streams are byte for byte what they were (the `[encoder]` group
+passes, 103 cases).
+
+**What was built.** `EncoderConfig::object_downmix`: an 8 by N gain matrix (L R C LFE Ls Rs Lrs Rrs; N = 9 to 16), static for the stream.
+`detail::build_downmix_chain` (`object_bed.cpp`) designs the primitives of spec 10.2.1d in doubles with every coefficient quantised as it
+is emitted (frac_bits 14, the smallest f_shift that holds the largest, at most 4: coefficients stay under 32), so each later primitive
+absorbs the rounding of the earlier ones:
+
+- `ch_assign`: each bed row takes the element of its largest gain (rows with the largest gains choose first); the rest fill in, the
+  spare is the last matrix channel. This is the first non-identity `ch_assign` the encoder writes (`StageWork::ch_assign`; the lossless
+  fold uses the matrix channel an output takes, ERRATA 42).
+- Per row: pivot `m_r` = coordinate of the target on its own form; if not 1, tune `row_u += gamma row_r` with `gamma = (m_r - 1) / m_u` on
+  the unfinished row of the largest `|m_u|` (a coordinate that would need gamma over 30 is treated as none); then the main primitive
+  `row_r += sum m_t row_t`. A pivot of 0 with no unfinished row to tune against and `|c| >= 1e-3` gets an overlap primitive with the
+  spare first (`c_o = clamp(sqrt(|1 - c| / |c|), 1, 8)`).
+- Shared group: with two or more single-element rows, each gets its overlap primitive, then one PREP primitive on the spare tunes the ones
+  whose pivot moves by 0.05 or more (each multiple found by replaying the sequence at 0 and 1, the pivot being affine; the later
+  members' multiples drop out because their rows are still in the basis), the group's mains follow, the other rows are finished one by one.
+  Both the shared and the one-by-one design are made and the shorter is kept.
+- A zero row: the chain leaves the element in the row and `prepare()` adds one matrix with no coefficient flags and noise shift 0 to
+  every bed substream that decodes the row (0x31EB: its 4-bit noise shift; 0x31EA: the two noise columns, both written by the standard
+  matrix syntax). The last substream's output for the row is 0, and the encoder's own verify expects 0 there.
+
+**Checked** (`test_encoder_object_downmix.cpp`, `[object-downmix]`, 8 cases): 4, 5, 6 and 7 single rows (15 primitives each; the first
+design would have needed 18, 19, 20 and 21), 0 to 2 single rows (14 or 15), zero rows (row 6; rows 6 and 7; the centre; three single
+rows with a zero row; two zero rows), noise shifts 1 and 3, chunking independence, `ch_assign` a permutation and not the identity. Each
+decodes with the strict library decoder: the objects come back sample for sample, `lossless_check_failures` is 0 and substream 3's checks
+ran, the bed rows are -87 to -98 dB from `M * objects` (an exact row is exact), a zero row is exactly 0, and every matrix in the stream
+is primitive. Mutation: leaving the zero matrices out makes the zero-row cases fail ("the matrices do not give back the source").
+Refusals, with their words: eight single-element rows ("need 17 primitive matrices and substream 3 carries at most 16"), a row that is a
+combination of other rows ("must be independent"), gains that are not numbers within +-4, a wrong size, a coefficient of 32 or more,
+`object_downmix` together with paths, slopes, LSB bypass, split mixes or an update interval, and audio whose bed or coded rows pass
+24 bits (`kUnsupported`, found when the interval is coded).
+
+**Not done / not claimed.**
+- **Moving downmixes.** The matrices are static; a moving downmix needs the slopes of the object matrices on this chain (the spec's
+  accuracy tables are for a section every 8 units). The "eight moving single rows" limit is therefore a static one here (eight single rows
+  are refused for the count; a static gain could instead move to a lower-substream matrix, not done).
+- **Accuracy of pair rows and pan laws of 9 and 10 objects** is open in the report and is not claimed. The test downmixes' dense rows (one
+  object at 0.75 plus two others) are -87 dB or better; that is a statement about those gains only.
+- **LSB bypass and the mix-step headroom** of the render are not available with a downmix (a row that does not fit 24 bits is refused).
+- **No outside decoder.** The Dolby reference player, DRP and FFmpeg have not read these streams; the zero-row matrices are written by the
+  standard matrix syntax and read back by this library's decoder only.
+- ch_assign: no guarantee how a licensed decoder orders objects from a non-identity `ch_assign` beyond spec 7.4 and the DEE streams
+  (`ctl_c` has one); this library reads it as ERRATA 42.
