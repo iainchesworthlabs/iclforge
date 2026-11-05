@@ -32,6 +32,11 @@ class JsonSink;
 //     the end-of-stream marker).
 //
 // The decode is the work of `forge decode`; its samples are discarded.
+//
+// `forge probe detail=matrix` is the same decode with the block header log on: every matrix
+// section (substream, access unit, block, coefficients as sent, slope and transition fields) and
+// every output_shift, for all four substreams and with no cap, so an empty substream reads as "no
+// matrices" and never as "cut off".
 
 namespace forge_cli::commands {
 
@@ -39,11 +44,17 @@ class StructureSurvey {
    public:
     // One parsed access unit (the light pass: major syncs and restart headers).
     void add(std::uint64_t unit_index, const iclforge::truehd::AccessUnit& unit);
-    // The decode pass over the whole stream.
-    void decode(std::span<const std::byte> stream);
+    // The decode pass over the whole stream. With `log_block_headers` it also keeps every block
+    // header that sends matrices or output shifts, in every substream and with no cap, for
+    // write_matrix_json and print_matrix_text.
+    void decode(std::span<const std::byte> stream, bool log_block_headers = false);
 
     void write_json(iclforge::apps::JsonSink& json) const;
     void print_text() const;
+
+    // `forge probe detail=matrix`: the matrix sections and output shifts of the block headers.
+    void write_matrix_json(iclforge::apps::JsonSink& json) const;
+    void print_matrix_text() const;
 
    private:
     struct MajorSyncSummary {

@@ -71,6 +71,9 @@ struct DecoderLab {
     // The output sample from which the lab keeps the first 51,200 samples of the object substream
     // (DecoderCounters::object_first_out); 0 keeps the first ones.
     std::uint64_t record_from = 0;
+    // Keep every block header that sends matrices or output shifts, in every substream and with no
+    // cap (DecoderCounters::block_header_log). Off by default: the log grows with the stream.
+    bool log_block_headers = false;
     friend bool operator==(const DecoderLab&, const DecoderLab&) = default;
 };
 
@@ -199,6 +202,43 @@ struct DecoderCounters {
         std::vector<ObjectMatrixHeader> items;
     };
     std::vector<ObjectSection> object_sections;
+    // Every block header of every substream that sent matrices or output shifts, in stream order
+    // and with no cap, when DecoderLab::log_block_headers is set (`forge probe detail=matrix`).
+    // The matrices are as sent: coefficients raw, the extension's deltas raw.
+    struct BlockHeaderLog {
+        struct Matrix {
+            std::uint8_t out = 0;
+            std::uint8_t frac_bits = 0;
+            bool lsb_bypass = false;
+            std::uint8_t noise_shift = 0;
+            std::int8_t f_shift = 0;
+            std::uint8_t field_2b = 0;
+            std::uint8_t field_m4 = 0;
+            std::uint8_t ext_width = 0;
+            std::uint8_t ext_field2 = 0;
+            std::uint32_t mask = 0;  // bit c: coeff[c] was sent; c >= matrix_channels is a noise channel
+            std::array<std::int32_t, kMaxChannels + kNoiseChannels> coeff{};
+            std::array<std::int32_t, kMaxChannels> ext_value{};
+        };
+        std::uint64_t unit = 0;            // access unit index, from 0
+        std::uint8_t substream = 0;
+        std::uint16_t block = 0;           // index of the block in its segment, from 0
+        std::uint16_t sample_in_unit = 0;  // samples of the segment before this block
+        bool restart = false;              // the block carries a restart header
+        std::uint8_t matrix_channels = 0;  // of the restart header in force
+        bool has_matrices = false;
+        bool extension = false;
+        bool coeffs_sent = false;
+        bool deltas_sent = false;
+        bool has_output_shift = false;
+        // Indexed by matrix channel (ERRATA.md entry 43), matrix_channels of them; the decoder
+        // applies them as sent.
+        std::array<std::int8_t, kMaxChannels> output_shift{};
+        // The restart header's ch_assign: the output channel each matrix channel goes to.
+        std::array<std::uint8_t, kMaxChannels> ch_assign{};
+        std::vector<Matrix> matrices;
+    };
+    std::vector<BlockHeaderLog> block_header_log;
     // Every block of the object substream in the first ten intervals: the output sample it starts
     // at, its size, whether its header carries matrices (and how many) and whether it has the
     // extension (for the lab).

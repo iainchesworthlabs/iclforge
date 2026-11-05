@@ -838,7 +838,7 @@ int run_probe(std::string_view in_path, const Options& meta) {
     }
     if (meta.detail.has_value() &&
         (*meta.detail == "evolution" || *meta.detail == "structure" || *meta.detail == "format" ||
-         *meta.detail == "checks")) {
+         *meta.detail == "checks" || *meta.detail == "matrix")) {
         fmt::println(stderr, "error: detail={} describes TrueHD and MLP streams, and {} is not one",
                      *meta.detail, in_path);
         return 1;

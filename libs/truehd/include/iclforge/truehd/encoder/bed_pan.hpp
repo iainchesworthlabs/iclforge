@@ -28,13 +28,18 @@
 //   height   a 7.1 bed has no upper layer: z does not move the place (it plays where its floor
 //            position is) and only enters the trim below.
 //   trim     the only fixed gain between an object and the bed: T * w dB, with
-//            w = min(1, y / 37.2 + max(0, (z / 15 - 0.2) / 0.8)) and T set by the layout.
+//            w = min(1, y / 37.2 + max(0, (z - 3) / 12)) and T set by the layout. The height term is
+//            a dead zone for z 0 to 3 and then one twelfth of T per code; it is MEASURED (below).
 //   LFE      an object feeds no LFE. The LFE element is the bed's LFE row at unity, not filtered.
 //
 // What was measured: the shares and the trim on a grid of places along the front wall (ctl_e: x 0 to
 // 62 at y 0) and along the left wall (ctl_k: y 0 to 62 at x 0), and one place near a corner
-// (ctl_b: x 62, y 5). What was not: z (no control moves it), the interior of the room, and
-// everything of size, zone, snap and screen reference.
+// (ctl_b: x 62, y 5). The height term of the trim was measured afterwards on the Dolby Reference
+// Player's own renderer to 7.1.4, 5.1.4 and 7.1.2 (a centred front object, 12 element encodes, the z
+// axis only): max(0, (z - 3) / 12) fits to 0.005 to 0.006 dB, where z / 15 is off by up to 0.6 dB, and
+// the elevation pan there is exactly cos and sin (top / floor = tan(pi/2 * z / 15)); the 7.1 bed has
+// no upper layer, so only the trim applies to it. What was not measured: the interior of the room,
+// height away from a centred front object, and everything of size, zone, snap and screen reference.
 
 namespace iclforge::truehd {
 
@@ -76,8 +81,8 @@ enum class BedLayout : std::uint8_t {
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT BedPosition bed_position_code(double x, double y,
                                                                    double z) noexcept;
 
-// w of the trim: 0 at the front wall on the floor, 1 from y 37.2 (or from a z of 15) on. A code
-// outside its range is held in it.
+// w of the trim: 0 at the front wall on the floor, 1 from y 37.2 (or from a z of 15) on; z 0 to 3
+// adds nothing and each code above adds one twelfth. A code outside its range is held in it.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT double bed_trim_weight(int y_code, int z_code) noexcept;
 
 // The share of each of the 8 bed rows a place has, with the trim of `trim_db` (T) applied; the LFE
@@ -98,8 +103,9 @@ enum class BedLayout : std::uint8_t {
 // signal is not delayed (the samples that follow the block, which a caller who limits block by block
 // does not have, are taken as not over the ceiling). A signal that stays under the ceiling is left
 // exactly as it is. Returns the number of frames whose gain was below 1. The attack and release
-// shape is a choice of this library, not a measurement: what a Dolby player does is only known to
-// hold the ceiling and look 32 samples ahead.
+// shape is a choice of this library, not a measurement, and stays PROVISIONAL: a Dolby player is only
+// known to hold the ceiling and look 32 samples ahead (the renderer showed no gain reduction in the
+// one test that reached it, so the constants are unverified).
 inline constexpr int kBedLimiterLookAhead = 32;
 ICLFORGE_TRUEHD_EXPORT std::size_t limit_bed_peaks(std::span<double> samples, int channels,
                                                    int look_ahead = kBedLimiterLookAhead) noexcept;

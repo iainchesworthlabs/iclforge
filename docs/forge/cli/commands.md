@@ -1004,7 +1004,7 @@ its keys and gains these (owner question 8). The report is `apps/shared/media/sr
 
 
 
-`detail=evolution`, `detail=structure`, `detail=format` (both) and `detail=rate` are for the owner's check of a disc's stream and describe TrueHD and MLP
+`detail=evolution`, `detail=structure`, `detail=format` (both), `detail=matrix` and `detail=rate` are for the owner's check of a disc's stream and describe TrueHD and MLP
 streams only (any other stream is refused, exit status 1). `detail=evolution` lists the first frames one by one (the extra data's check
 nibble, framing and parity; the container's version, key id, each payload's id, size and configuration flags, the protection length
 codes), groups all the frames by shape (the payload ids, the protection codes and the reading) with how many frames and how large, and for a
@@ -1016,6 +1016,8 @@ substream's segments (terminators and the end marker). Nothing derived from the 
 signature or protection byte is printed. `libs/truehd/ERRATA.md` ("Atmos, spec v3.6", section H) says which field answers which open
 question.
 
+`detail=matrix` (TrueHD and MLP) decodes the stream, lenient, and lists every block header that sends matrices or `output_shift`, in all four substreams and with no cap on the count, so a substream with none reads as none and never as cut off. It opens with a `matrix` line (the headers listed) and one line per substream (matrix sets, matrices, `output_shift` headers and how many of those hold a shift other than 0). Each header then prints its place (`unit`, `sub`, `block` in its segment, `sample` before it in the unit and whether it carries a restart header). An `output_shift` line gives the shift of each matrix channel with the output channel the restart header's `ch_assign` sends it to (`m3->out5:-1`); the decoder applies the values as sent. A `matrix_set` line gives the section (matrix channels, count, and for the object audio matrices whether it has the extension, sends coefficients and sends deltas), and a `matrix` line each matrix: `out`, `frac_bits`, `f_shift` (the real coefficient is the raw value over 2 to the `scale`, shown as `2^-N`), `lsb_bypass`, `noise_shift`, the reserved `field_2b` and `field_m4`, the extension's `ext_width` and `ext_field2`, the coefficients as sent (`m<channel>:raw`, `n0` and `n1` for the two noise channels) and the extension's slopes (the per-unit change of each coefficient, `-` when the matrix has none). `json=1` adds a `matrix` member with the same figures. Counts and header fields only, never audio.
+
 `detail=rate` (TrueHD and MLP) runs the arrival model of TH spec §3.4 and §18 over the stream's access units and prints, for each restart
 interval, its bitrate (kbit/s), the rate of its largest access unit, the least headroom any unit has before it would arrive more than 75 ms
 after its slot (milliseconds, three decimals; negative means late) and how many units were late, after a summary line for the whole stream.
