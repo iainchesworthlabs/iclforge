@@ -3,6 +3,7 @@
 #include <fmt/base.h>
 #include <fmt/format.h>
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -129,10 +130,11 @@ void StructureSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
     }
 }
 
-void StructureSurvey::decode(std::span<const std::byte> stream) {
+void StructureSurvey::decode(std::span<const std::byte> stream, bool log_block_headers) {
     th::DecoderConfig config;
     config.presentation = th::Presentation::kAll;
     config.strictness = th::Strictness::kLenient;
+    config.lab.log_block_headers = log_block_headers;
     th::Decoder decoder(config);
     th::ElementaryReader reader(stream);
     while (const auto unit = reader.next()) {
@@ -354,6 +356,196 @@ void StructureSurvey::print_text() const {
             "", i, tail.segments, tail.zero, tail.terminator_a, tail.terminator_b,
             tail.terminator_b_at_end, tail.end_marker, tail.other, tail.bits_min, tail.bits_max);
     }
+}
+
+namespace {
+
+using BlockLog = th::DecoderCounters::BlockHeaderLog;
+
+// The tallies the summary prints for each substream: the log is complete (no cap), so a zero here
+// is a stream that sends none.
+struct MatrixTally {
+    std::uint64_t headers = 0;  // block headers that sent matrices or output shifts
+    std::uint64_t matrix_sets = 0;
+    std::uint64_t matrices = 0;
+    std::uint64_t output_shifts = 0;
+    std::uint64_t nonzero_output_shifts = 0;  // output_shift headers with a shift other than 0
+};
+
+std::array<MatrixTally, th::kMaxSubstreams> tally_block_log(const std::vector<BlockLog>& log) {
+    std::array<MatrixTally, th::kMaxSubstreams> tallies{};
+    for (const BlockLog& entry : log) {
+        MatrixTally& tally = tallies[std::min<std::size_t>(entry.substream, tallies.size() - 1U)];
+        ++tally.headers;
+        if (entry.has_matrices) {
+            ++tally.matrix_sets;
+            tally.matrices += entry.matrices.size();
+        }
+        if (entry.has_output_shift) {
+            ++tally.output_shifts;
+            for (int m = 0; m < entry.matrix_channels; ++m) {
+                if (entry.output_shift[static_cast<std::size_t>(m)] != 0) {
+                    ++tally.nonzero_output_shifts;
+                    break;
+                }
+            }
+        }
+    }
+    return tallies;
+}
+
+// The name of coefficient column c of a matrix with `matrix_channels` channels: m0.. for the matrix
+// channels, n0 and n1 for the two noise channels.
+std::string column_name(std::size_t c, int matrix_channels) {
+    const auto channels = static_cast<std::size_t>(matrix_channels);
+    return c < channels ? fmt::format("m{}", c) : fmt::format("n{}", c - channels);
+}
+
+}  // namespace
+
+void StructureSurvey::print_matrix_text() const {
+    const auto& log = counters_.block_header_log;
+    const auto tallies = tally_block_log(log);
+    fmt::println("{:<16}{} block header(s) with matrices or output shifts, all substreams, "
+                 "no cap",
+                 "matrix", log.size());
+    for (std::size_t s = 0; s < tallies.size(); ++s) {
+        fmt::println("{:<16}substream {}: {} matrix set(s) with {} matrices, {} output_shift "
+                     "header(s) of which {} with a shift other than 0",
+                     "", s, tallies[s].matrix_sets, tallies[s].matrices, tallies[s].output_shifts,
+                     tallies[s].nonzero_output_shifts);
+    }
+    for (const BlockLog& entry : log) {
+        const std::string where = fmt::format("unit {} sub {} block {} sample {}", entry.unit,
+                                              entry.substream, entry.block, entry.sample_in_unit);
+        if (entry.has_output_shift) {
+            // Indexed by matrix channel; the decoder applies shift[m] to the output channel
+            // ch_assign[m].
+            std::string shifts;
+            for (int m = 0; m < entry.matrix_channels; ++m) {
+                const auto at = static_cast<std::size_t>(m);
+                shifts += fmt::format(" m{}->out{}:{}", m, entry.ch_assign[at], entry.output_shift[at]);
+            }
+            fmt::println("{:<16}{} restart {} shifts{}", "output_shift", where,
+                         entry.restart ? "yes" : "no", shifts);
+        }
+        if (!entry.has_matrices) {
+            continue;
+        }
+        fmt::println("{:<16}{} restart {} matrix_channels {} count {} extension {} coeffs {} "
+                     "deltas {}",
+                     "matrix_set", where, entry.restart ? "yes" : "no", entry.matrix_channels,
+                     entry.matrices.size(), entry.extension ? "yes" : "no",
+                     entry.coeffs_sent ? "yes" : "no", entry.deltas_sent ? "yes" : "no");
+        for (std::size_t i = 0; i < entry.matrices.size(); ++i) {
+            const BlockLog::Matrix& row = entry.matrices[i];
+            std::string coeff;
+            for (std::size_t c = 0; c < row.coeff.size(); ++c) {
+                if ((row.mask & (1U << c)) != 0) {
+                    coeff += fmt::format(" {}:{}", column_name(c, entry.matrix_channels), row.coeff[c]);
+                }
+            }
+            std::string slope;
+            for (std::size_t c = 0; c < row.ext_value.size(); ++c) {
+                if (row.ext_width != 0 && (row.mask & (1U << c)) != 0) {
+                    slope += fmt::format(" {}:{}", column_name(c, entry.matrix_channels), row.ext_value[c]);
+                }
+            }
+            fmt::println("{:<16}{} m {} out {} frac_bits {} f_shift {} scale 2^-{} lsb_bypass {} "
+                         "noise_shift {} field_2b {} field_m4 {} ext_width {} ext_field2 {} "
+                         "coeff{} slope{}",
+                         "matrix", where, i, row.out, row.frac_bits, row.f_shift,
+                         row.frac_bits - row.f_shift, row.lsb_bypass ? 1 : 0, row.noise_shift,
+                         row.field_2b, row.field_m4, row.ext_width, row.ext_field2,
+                         coeff.empty() ? " -" : coeff, slope.empty() ? " -" : slope);
+        }
+    }
+}
+
+void StructureSurvey::write_matrix_json(iclforge::apps::JsonSink& json) const {
+    const auto& log = counters_.block_header_log;
+    const auto tallies = tally_block_log(log);
+    json.begin_object();
+    json.member("block_headers", static_cast<std::uint64_t>(log.size()));
+    json.member("capped", false);
+    json.key("substreams");
+    json.begin_array();
+    for (std::size_t s = 0; s < tallies.size(); ++s) {
+        json.begin_object();
+        json.member("substream", static_cast<std::int64_t>(s));
+        json.member("matrix_sets", tallies[s].matrix_sets);
+        json.member("matrices", tallies[s].matrices);
+        json.member("output_shift_headers", tallies[s].output_shifts);
+        json.member("output_shift_headers_nonzero", tallies[s].nonzero_output_shifts);
+        json.end_object();
+    }
+    json.end_array();
+    json.key("headers");
+    json.begin_array();
+    for (const BlockLog& entry : log) {
+        json.begin_object();
+        json.member("unit", entry.unit);
+        json.member("substream", static_cast<std::int64_t>(entry.substream));
+        json.member("block", static_cast<std::int64_t>(entry.block));
+        json.member("sample_in_unit", static_cast<std::int64_t>(entry.sample_in_unit));
+        json.member("restart", entry.restart);
+        json.member("matrix_channels", static_cast<std::int64_t>(entry.matrix_channels));
+        if (entry.has_output_shift) {
+            json.key("output_shift");
+            json.begin_array();
+            for (int m = 0; m < entry.matrix_channels; ++m) {
+                const auto at = static_cast<std::size_t>(m);
+                json.begin_object();
+                json.member("matrix_channel", static_cast<std::int64_t>(m));
+                json.member("output_channel", static_cast<std::int64_t>(entry.ch_assign[at]));
+                json.member("shift", static_cast<std::int64_t>(entry.output_shift[at]));
+                json.end_object();
+            }
+            json.end_array();
+        }
+        if (entry.has_matrices) {
+            json.member("extension", entry.extension);
+            json.member("coeffs_sent", entry.coeffs_sent);
+            json.member("deltas_sent", entry.deltas_sent);
+            json.key("matrices");
+            json.begin_array();
+            for (const BlockLog::Matrix& row : entry.matrices) {
+                json.begin_object();
+                json.member("out", static_cast<std::int64_t>(row.out));
+                json.member("frac_bits", static_cast<std::int64_t>(row.frac_bits));
+                json.member("f_shift", static_cast<std::int64_t>(row.f_shift));
+                json.member("lsb_bypass", row.lsb_bypass);
+                json.member("noise_shift", static_cast<std::int64_t>(row.noise_shift));
+                json.member("field_2b", static_cast<std::int64_t>(row.field_2b));
+                json.member("field_m4", static_cast<std::int64_t>(row.field_m4));
+                json.member("ext_width", static_cast<std::int64_t>(row.ext_width));
+                json.member("ext_field2", static_cast<std::int64_t>(row.ext_field2));
+                json.key("coeff");
+                json.begin_object();
+                for (std::size_t c = 0; c < row.coeff.size(); ++c) {
+                    if ((row.mask & (1U << c)) != 0) {
+                        json.member(column_name(c, entry.matrix_channels),
+                                    static_cast<std::int64_t>(row.coeff[c]));
+                    }
+                }
+                json.end_object();
+                json.key("slope");
+                json.begin_object();
+                for (std::size_t c = 0; c < row.ext_value.size(); ++c) {
+                    if (row.ext_width != 0 && (row.mask & (1U << c)) != 0) {
+                        json.member(column_name(c, entry.matrix_channels),
+                                    static_cast<std::int64_t>(row.ext_value[c]));
+                    }
+                }
+                json.end_object();
+                json.end_object();
+            }
+            json.end_array();
+        }
+        json.end_object();
+    }
+    json.end_array();
+    json.end_object();
 }
 
 }  // namespace forge_cli::commands

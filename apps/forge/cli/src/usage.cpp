@@ -1164,6 +1164,8 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
         fmt::println("                    headers, a decode check, what follows each last block");
         fmt::println("  detail=format     both; metadata only, no content");
+        fmt::println("  detail=matrix     TrueHD: every matrix section and output_shift of the block");
+        fmt::println("                    headers, all substreams, uncapped (a decode)");
         fmt::println("  detail=checks     TrueHD and MLP: decode the stream for the lossless check of every");
         fmt::println("                    restart interval (the cost of a decode); exit 1 when one fails");
         fmt::println("  detail=rate       TrueHD: per restart interval the bitrate, the largest unit's rate and");

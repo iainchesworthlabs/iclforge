@@ -835,7 +835,7 @@ TEST_CASE("forge probe detail=format is both, and the TrueHD details are refused
     CHECK(run_cli("probe \"" + ec3.string() + "\" detail=evolution", log) == 1);
     CHECK(read_text(log).find("describes TrueHD and MLP streams") != std::string::npos);
     CHECK(run_cli("probe \"" + stream.string() + "\" detail=everything", log) == 1);
-    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format, checks or rate") !=
+    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format, checks, rate or matrix") !=
           std::string::npos);
 }
 

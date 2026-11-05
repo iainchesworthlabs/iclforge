@@ -3569,9 +3569,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (key == "detail") {
             if (value != "frames" && value != "blocks" && value != "evolution" && value != "checks" &&
-                value != "structure" && value != "format" && value != "rate") {
+                value != "structure" && value != "format" && value != "rate" &&
+                value != "matrix") {
                 fmt::println(stderr,
-                             "error: detail must be frames, blocks, evolution, structure, format, checks or rate "
+                             "error: detail must be frames, blocks, evolution, structure, format, checks, rate or matrix "
                              "(got '{}')",
                              token);
                 return false;
