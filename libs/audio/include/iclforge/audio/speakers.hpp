@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -108,6 +109,26 @@ inline constexpr std::uint32_t kSpeakers7_1_4 = kSpeakers7_1_2 | kSpeakerTopBack
 // rear surrounds puts the surrounds at the sides, as locations_of() reads them
 // back.
 [[nodiscard]] std::uint32_t speakers_of(std::span<const Location> locations);
+
+// How a stream's channels have to be reordered for an output opened with the speaker mask that
+// names them, which takes its interleaved channels in the ascending order of the mask's bits. A
+// stream that lists its channels in another order (TrueHD's 7.1 is L R C LFE Ls Rs Lrs Rrs: the
+// side surrounds ahead of the rears, where the 7.1 mask lists the rears ahead of the sides) is
+// played with two pairs swapped unless it is put in the device's order first.
+struct SpeakerOrder {
+    // For output position i, the index of the stream channel that goes there. Empty when the
+    // stream's channels cannot all be given a speaker of their own (the second LFE, the wide and
+    // surround-direct pairs, a location named twice, or a back pair the mask would read as the
+    // surrounds of a 5.1 ring), and the stream's own order is the one to use.
+    std::vector<std::size_t> source;
+    // The mask to open the device with: one bit per channel. 0 when `source` is empty.
+    std::uint32_t mask = 0;
+
+    [[nodiscard]] bool placed() const { return !source.empty(); }
+};
+
+// `layout` lists the stream's channels in the order it carries them.
+[[nodiscard]] SpeakerOrder speaker_order(std::span<const Location> layout);
 
 // The arrangement a device of `channels` channels is taken to have when it
 // does not say: the KSAUDIO_SPEAKER_* constant of that width, and 0 for a

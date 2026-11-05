@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstddef>
+#include <initializer_list>
 #include <cstdint>
 #include <vector>
 
@@ -247,4 +249,81 @@ TEST_CASE("speakers: the encoder plan's reading of a mask is this library's",
     const std::uint32_t with_tbc = kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerTopBackCentre;
     CHECK(locations_of(with_tbc).size() == 2);
     CHECK_FALSE(plan::wav_mask_locations(with_tbc, 3).has_value());
+}
+
+namespace {
+
+using iclforge::audio::SpeakerOrder;
+using iclforge::audio::speaker_order;
+using BaseLocation = iclforge::audio::Location;
+
+std::vector<std::size_t> indices(std::initializer_list<std::size_t> list) {
+    return std::vector<std::size_t>(list);
+}
+
+}  // namespace
+
+TEST_CASE("a stream already in the device's order is not moved", "[audio][speakers][speaker-order]") {
+    SECTION("stereo") {
+        const std::array layout{BaseLocation::kLeft, BaseLocation::kRight};
+        const SpeakerOrder order = speaker_order(layout);
+        REQUIRE(order.placed());
+        CHECK(order.source == indices({0, 1}));
+        CHECK(order.mask == 0x3U);
+    }
+    SECTION("5.1 with its surrounds behind, which is KSAUDIO_SPEAKER_5POINT1") {
+        const std::array layout{BaseLocation::kLeft,         BaseLocation::kRight,         BaseLocation::kCentre,
+                                BaseLocation::kLfe,          BaseLocation::kLeftSurround,  BaseLocation::kRightSurround};
+        const SpeakerOrder order = speaker_order(layout);
+        REQUIRE(order.placed());
+        CHECK(order.source == indices({0, 1, 2, 3, 4, 5}));
+        CHECK(order.mask == 0x3FU);
+    }
+}
+
+TEST_CASE("TrueHD's 7.1 puts the side surrounds ahead of the rears, the 7.1 mask behind them",
+          "[audio][speakers][speaker-order]") {
+    // L R C LFE Ls Rs Lrs Rrs, as the decoder lists a 7.1 presentation.
+    const std::array layout{BaseLocation::kLeft, BaseLocation::kRight,        BaseLocation::kCentre, BaseLocation::kLfe,
+                            BaseLocation::kLeftSurround, BaseLocation::kRightSurround, BaseLocation::kLrs, BaseLocation::kRrs};
+    const SpeakerOrder order = speaker_order(layout);
+    REQUIRE(order.placed());
+    // KSAUDIO_SPEAKER_7POINT1_SURROUND: FL FR FC LFE BL BR SL SR, the rears first.
+    CHECK(order.mask == 0x63FU);
+    CHECK(order.source == indices({0, 1, 2, 3, 6, 7, 4, 5}));
+}
+
+TEST_CASE("heights go to their own bits and every channel is used once", "[audio][speakers][speaker-order]") {
+    const std::array layout{BaseLocation::kLeft, BaseLocation::kRight, BaseLocation::kCentre, BaseLocation::kLfe,
+                            BaseLocation::kLeftSurround, BaseLocation::kRightSurround, BaseLocation::kVhl, BaseLocation::kVhr};
+    const SpeakerOrder order = speaker_order(layout);
+    REQUIRE(order.placed());
+    CHECK(order.mask == (0x3FU | 0x1000U | 0x4000U));  // 5.1 with the top front pair
+    std::vector<bool> seen(layout.size(), false);
+    for (const std::size_t index : order.source) {
+        REQUIRE(index < layout.size());
+        CHECK_FALSE(seen[index]);
+        seen[index] = true;
+    }
+}
+
+TEST_CASE("a stream with a channel no speaker bit names is left in its own order", "[audio][speakers][speaker-order]") {
+    SECTION("the second LFE") {
+        const std::array layout{BaseLocation::kLeft, BaseLocation::kRight, BaseLocation::kLfe2};
+        const SpeakerOrder order = speaker_order(layout);
+        CHECK_FALSE(order.placed());
+        CHECK(order.mask == 0U);
+    }
+    SECTION("the same location twice") {
+        const std::array layout{BaseLocation::kLeft, BaseLocation::kLeft};
+        CHECK_FALSE(speaker_order(layout).placed());
+    }
+    SECTION("no channels") {
+        CHECK_FALSE(speaker_order({}).placed());
+    }
+    SECTION("rear surrounds with no side surrounds are read back as surrounds") {
+        // The mask cannot tell them apart from a 5.1 ring's, so the device would call them Ls Rs.
+        const std::array layout{BaseLocation::kLeft, BaseLocation::kRight, BaseLocation::kLrs, BaseLocation::kRrs};
+        CHECK_FALSE(speaker_order(layout).placed());
+    }
 }

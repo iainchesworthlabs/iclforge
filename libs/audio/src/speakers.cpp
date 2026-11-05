@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "iclforge/base/layout.hpp"
@@ -151,6 +152,35 @@ std::uint32_t speakers_of(std::span<const Location> locations) {
         mask |= speaker;
     }
     return mask;
+}
+
+SpeakerOrder speaker_order(std::span<const Location> layout) {
+    SpeakerOrder order;
+    if (layout.empty()) {
+        return order;
+    }
+    const std::uint32_t mask = speakers_of(layout);
+    if (speaker_count(mask) != layout.size()) {
+        return order;  // a location without a bit, or two on one
+    }
+    // The device takes the channels as locations_of() reads the mask back: the order of its bits
+    // and, for the back pair, the company it keeps.
+    const std::vector<Location> device = locations_of(mask);
+    if (device.size() != layout.size()) {
+        return order;
+    }
+    std::vector<std::size_t> source;
+    source.reserve(layout.size());
+    for (const Location want : device) {
+        const auto found = std::find(layout.begin(), layout.end(), want);
+        if (found == layout.end()) {
+            return order;  // the mask reads a location differently than the stream names it
+        }
+        source.push_back(static_cast<std::size_t>(found - layout.begin()));
+    }
+    order.source = std::move(source);
+    order.mask = mask;
+    return order;
 }
 
 std::uint32_t default_speakers(std::uint16_t channels) {
