@@ -542,7 +542,7 @@ struct IdleScreen {
 // --- what the stream is called ------------------------------------------------------------------------
 
 // kUnknown is a coded stream before its first unit has decoded.
-enum class Codec : std::uint8_t { kPcm, kAc3, kEac3, kAc4, kUnknown };
+enum class Codec : std::uint8_t { kPcm, kAc3, kEac3, kAc4, kTruehd, kUnknown };
 
 // What the decoder found in the stream, as the player reports it (the sink's DecoderReport).
 struct StreamFacts {
@@ -567,6 +567,8 @@ struct StreamFacts {
             return "Dolby Digital Plus";
         case Codec::kAc4:
             return "Dolby AC-4";
+        case Codec::kTruehd:
+            return "Dolby TrueHD";
         case Codec::kUnknown:
             return "Coded audio";
         case Codec::kPcm:

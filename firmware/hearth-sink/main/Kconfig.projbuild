@@ -964,8 +964,9 @@ config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD
         firmware/truehd-probe measured the decoder as a share of one core, 24-bit at 48 kHz, with
         no network: the ESP32-P4 0.13 for 2.0 and 0.32 for 5.1, the ESP32-S3 0.56 for 2.0 and 1.13
         for 5.1 (not real time), the ESP32-C6 0.34 and 0.80. The P4 lists it by default; the S3
-        does not until a play of the decoder beside Wi-Fi and the I2S path has been measured on a
-        board, and the C6 cannot hold 158 KB of decoder and a 64 KiB stack beside Wi-Fi.
+        played 2.0 with a burst of 0.83 of the chunk, over the 0.7 the plan asks for, so it does not
+        unless set by hand, and the C6 cannot: it has 53 KB of internal RAM free after start-up and no PSRAM,
+        against a 158 KB decoder and a 72 KiB stack (planning/truehd-parity-esp32-sinks.md).
 
 config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS
     int "Widest TrueHD presentation decoded in real time: channels (0 = no limit)"

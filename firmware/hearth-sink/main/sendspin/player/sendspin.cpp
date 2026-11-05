@@ -1229,8 +1229,8 @@ SendspinPlaying sendspin_now_playing() {
             case ac::DataType::kAc4:
                 out.facts.codec = nv::Codec::kAc4;
                 break;
-            case ac::DataType::kTruehd:  // the now-view has no name for it yet
-                out.facts.codec = nv::Codec::kUnknown;
+            case ac::DataType::kTruehd:
+                out.facts.codec = nv::Codec::kTruehd;
                 break;
         }
         out.facts.have_decoder = true;

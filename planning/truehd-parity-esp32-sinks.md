@@ -581,8 +581,56 @@ the first after the board had been paired by code, lost their first 25 and 76 ch
 way lost 13), and the two plays above, with the record held, lost none: the start-up is not TrueHD's.
 
 **Not shown.** No receiver or speaker was listened to; the P4b's output was not captured, so the samples are not compared
-bit for bit (the decoder is, in the probe, on the same silicon). The 7.1 decode has not been measured on the P4 (the board
-states 6). The S3 and the C6 have not played TrueHD in a sink. The Hearth now-view has no name for TrueHD yet.
+bit for bit (the decoder is, in the probe, on the same silicon). The Hearth now-view has no name for TrueHD yet.
+
+## TrueHD in the S3 and C6 sinks, played and refused (2026-11-06)
+
+**The S3 plays 2.0, and is not listed by default.** The same image as the P4's, built for the `s3-n16r8` profile with the
+`truehd` overlay and `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD=1` (the board states 2 channels), was sent by OTA to the S3b
+(ESP32-S3, 8 MB PSRAM, 240 MHz; 192.168.1.45, `hearth-47b39c`) and `hearth-testserver` played `truehd_st48_s24.thd` to it as
+`truehd` chunks over Wi-Fi. The image is 2,700,720 bytes; the decode task's 72 KiB stack and the 256 KiB ring are in PSRAM,
+and the decode stages ran on cores 1 and 0. Three plays:
+
+| Play | Chunks played | Late, dropped, invalid | Underruns, resyncs | Burst (decode and render) | Sink | Heap free |
+|---|---:|---|---|---:|---:|---:|
+| 20 s, the first after pairing | 1040 of 1040 | 0, 0, 0 | 8, 8 | 16.7 ms | 2.1 ms | 44,339 B |
+| 40 s | 2080 of 2080 | 0, 0, 0 | 0, 0 | 16.6 ms | 2.3 ms | 44,363 B |
+| 40 s | 2080 of 2080 | 0, 0, 0 | 0, 0 | 16.6 ms | 2.5 ms | 46,207 B |
+
+The first play's underruns are the start-up after a pairing that the P4's first plays showed; they did not come back. The
+burst is a running mean of 16.6 ms for a 20 ms chunk, 0.83 of the chunk and over the 0.7 that question 6 asks for. A
+fourth play of 606 seconds (the ten minutes it asks for) delivered 31,200 of 31,200 chunks with no late, dropped or invalid
+chunk and no underrun, at 16.6 ms. So the S3 decodes 2.0 TrueHD in real time for ten minutes with a thin margin, and
+the board **does not list `truehd` by default**: the Kconfig default stays off for an S3 and the overlay with the symbol
+set by hand is how a bench board takes it. The level for the left channel read 27,275 millionths, as the P4's did. The
+S3b was put back afterwards: `otadata` and `ota_1` rewritten from the backup of the whole 16 MB flash, and the first
+6.75 MB read back equal to it apart from two pages of NVS.
+
+**The C6 refuses, and by memory before anything else.** The `c6-4mb` profile with the overlay makes an image of 2,003,248
+bytes against a 1,966,080-byte slot (over by 37,168; the build's size check stops it). The board in the bench is a 16 MB part (`c6-16mb`: 4 MB slots), where
+the same image is over the profile's own 2,000,000-byte budget by 3,248 bytes and is built and written. Booted from the
+`ota_0` slot it reports `sendspin: player up with internal heap 53272 free, largest block 37888`, and its play budget is
+`verdict=below-floor` against 160,796 bytes. A decoder of 158,020 bytes and a stack of 72 KiB cannot be placed in 53 KB of
+internal RAM: there is no PSRAM. The board lists `ac3`, `eac3` and no `truehd`, and a server that cannot decode TrueHD has
+nothing to send it (`hearth-testserver` sent 0 chunks and failed); Music Assistant decodes and sends PCM. The C6 was put
+back byte-identical in its image and `otadata`. The C6 is out of scope for TrueHD, as question 1 recommended.
+
+**An error found on the way:** the 4 MB backups of the C6 in `truehd-probe-backup` and the first of this run read the first
+4 MB of what is a 16 MB flash, with the running image in `ota_1` at 0x420000, beyond them. Nothing was lost; the backup of
+this run was extended to the whole flash before an image was sent.
+
+**The P4 at 7.1.** An image stating 8 coded channels (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS=8`) was
+written to the P4b over USB and put back byte-identical afterwards. The 7.1 fixtures were made with `forge truehd-encode`
+from an 8-channel WAV (sines, 48 kHz, 24-bit, three substreams: 2.0, 5.1 and 7.1). The stream of 66 % of the PCM size
+(about 5 Mbit/s) played 1500 of 1500 chunks with no late, dropped or invalid chunk and no underrun at the second play,
+decode and render 12.4 ms of the 20 ms chunk (0.62), the sink 7.4 ms, 164 KB of heap free; the first play after a
+pairing lost 90 chunks as late and had 6 underruns, as the first plays do. A stream of white noise, 83 % of the PCM size
+(about 7.6 Mbit/s), did **not** play: 1399 of 1500 chunks late, though the decode and render was 11.8 ms. The limit there
+is the link (the P4's Wi-Fi is through the C6 co-processor), not the decoder, and the board states no `max_data_rate`;
+the figure at which to state one is not measured. Real 7.1 TrueHD music is below the noise stream's rate, but the
+board's ceiling is still open.
+
+**Still not shown:** a listen test and a bit-exact capture of either board.
 
 ## Open questions
 
