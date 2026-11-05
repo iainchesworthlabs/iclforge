@@ -3,6 +3,8 @@
 #include <fmt/format.h>
 #include <algorithm>
 #include <bit>
+#include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +12,8 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -134,6 +138,206 @@ std::expected<Layout, std::string> layout_of(const iclforge::ac3::io::WavData& w
             static_cast<std::size_t>(std::ranges::find(speakers, order[k]) - speakers.begin());
     }
     return layout;
+}
+
+
+namespace {
+
+// The assignment bits whose channels are all among `speakers`, and how many channels they cover.
+struct Cover {
+    std::uint32_t assignment = 0;
+    std::size_t covered = 0;
+};
+
+Cover cover_of(std::span<const th::Channel> speakers) {
+    Cover cover;
+    const auto has = [&](th::Channel channel) {
+        return std::ranges::find(speakers, channel) != speakers.end();
+    };
+    for (unsigned bit = 0; bit < th::kChannelAssignmentBits; ++bit) {
+        const std::vector<th::Channel> named = th::channels_of_assignment(1U << bit);
+        if (!named.empty() && std::ranges::all_of(named, has)) {
+            cover.assignment |= 1U << bit;
+            cover.covered += named.size();
+        }
+    }
+    return cover;
+}
+
+constexpr std::uint32_t kEveryAssignmentBit = (1U << th::kChannelAssignmentBits) - 1U;
+
+// `channels` as their names in an assignment's order, space separated.
+std::string names_of(std::span<const th::Channel> channels) {
+    std::string out;
+    for (const th::Channel channel : th::channels_of_assignment(kEveryAssignmentBit)) {
+        if (std::ranges::find(channels, channel) != channels.end()) {
+            out += out.empty() ? "" : " ";
+            out += th::channel_name(channel);
+        }
+    }
+    return out;
+}
+
+// The sentence for a set of places that is not an assignment: which group lacks a member, and the
+// two sets nearest to it (every such group completed, and every such group left out).
+std::string not_an_assignment(std::span<const th::Channel> speakers) {
+    const auto in_set = [&](th::Channel channel) {
+        return std::ranges::find(speakers, channel) != speakers.end();
+    };
+    std::vector<th::Channel> completed(speakers.begin(), speakers.end());
+    std::vector<th::Channel> trimmed(speakers.begin(), speakers.end());
+    std::string needs;
+    std::string groups;
+    for (unsigned bit = 0; bit < th::kChannelAssignmentBits; ++bit) {
+        const std::vector<th::Channel> group = th::channels_of_assignment(1U << bit);
+        groups += fmt::format("{}{}", groups.empty() ? "" : ", ", names_of(group));
+        const auto present = static_cast<std::size_t>(std::ranges::count_if(group, in_set));
+        if (present == 0 || present == group.size()) {
+            continue;
+        }
+        for (const th::Channel channel : group) {
+            if (in_set(channel)) {
+                std::erase(trimmed, channel);
+            } else {
+                completed.push_back(channel);
+            }
+        }
+        needs += fmt::format("{}{} needs {}", needs.empty() ? "" : "; ",
+                             th::channel_name(*std::ranges::find_if(group, in_set)),
+                             th::channel_name(*std::ranges::find_if_not(group, in_set)));
+    }
+    std::string nearest = names_of(completed);
+    if (!trimmed.empty()) {
+        nearest += " or " + names_of(trimmed);
+    }
+    return fmt::format(
+        "map= places {}, which is not a TrueHD channel set: the channels come in these groups, "
+        "each whole or not at all ({}). {}. The nearest sets are {}",
+        names_of(speakers), groups, needs, nearest);
+}
+
+}  // namespace
+
+std::optional<th::Channel> channel_named(std::string_view name) {
+    for (const th::Channel channel : th::channels_of_assignment(kEveryAssignmentBit)) {
+        const std::string_view candidate = th::channel_name(channel);
+        if (std::ranges::equal(candidate, name, [](char a, char b) {
+                return std::tolower(static_cast<unsigned char>(a)) ==
+                       std::tolower(static_cast<unsigned char>(b));
+            })) {
+            return channel;
+        }
+    }
+    return std::nullopt;
+}
+
+std::expected<std::vector<Placement>, std::string> parse_map(std::string_view spec) {
+    std::vector<Placement> out;
+    std::size_t at = 0;
+    while (at <= spec.size()) {
+        const std::size_t comma = std::min(spec.find(',', at), spec.size());
+        const std::string_view entry = spec.substr(at, comma - at);
+        at = comma + 1;
+        const auto bad = [&entry](std::string_view why) {
+            return std::unexpected(fmt::format(
+                "map= entry '{}': {} (each is <source>.<channel>:<place>, as in 0.0:L,0.1:R,1.0:C)",
+                entry, why));
+        };
+        const std::size_t dot = entry.find('.');
+        const std::size_t colon = entry.find(':');
+        if (dot == std::string_view::npos || colon == std::string_view::npos || colon < dot) {
+            return bad("needs a source, a channel and a place");
+        }
+        Placement placement;
+        const auto number = [](std::string_view text, std::size_t& value) {
+            const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+            return !text.empty() && ec == std::errc{} && ptr == text.data() + text.size();
+        };
+        if (!number(entry.substr(0, dot), placement.source) ||
+            !number(entry.substr(dot + 1, colon - dot - 1), placement.channel)) {
+            return bad("the source and the channel are numbers from 0");
+        }
+        const auto place = channel_named(entry.substr(colon + 1));
+        if (!place) {
+            return std::unexpected(fmt::format(
+                "map= entry '{}': '{}' is not a TrueHD channel (L R C LFE Ls Rs Lvh Rvh Lc Rc Lrs "
+                "Rrs Cs Ts Lsd Rsd Lw Rw Cvh LFE2)",
+                entry, entry.substr(colon + 1)));
+        }
+        placement.place = *place;
+        out.push_back(placement);
+    }
+    return out;
+}
+
+std::expected<Assembled, std::string> assemble(std::span<const iclforge::ac3::io::WavData> sources,
+                                               std::span<const std::size_t> offset_samples,
+                                               std::span<const Placement> placements) {
+    if (placements.empty()) {
+        return std::unexpected(std::string{"map= names no channel"});
+    }
+    std::vector<th::Channel> places;
+    std::vector<bool> used(sources.size(), false);
+    for (const Placement& p : placements) {
+        if (p.source >= sources.size()) {
+            return std::unexpected(fmt::format(
+                "map= names source {}, but there {} {} (the positional input is source 0, each src= "
+                "the next)",
+                p.source, sources.size() == 1 ? "is" : "are", sources.size()));
+        }
+        if (p.channel >= sources[p.source].channels.size()) {
+            return std::unexpected(fmt::format("map= names channel {} of source {}, which has {}",
+                                               p.channel, p.source,
+                                               sources[p.source].channels.size()));
+        }
+        if (std::ranges::find(places, p.place) != places.end()) {
+            return std::unexpected(fmt::format("map= places {} twice", th::channel_name(p.place)));
+        }
+        places.push_back(p.place);
+        used[p.source] = true;
+    }
+    for (std::size_t i = 0; i < sources.size(); ++i) {
+        if (!used[i]) {
+            return std::unexpected(fmt::format(
+                "source {} has no channel in map=: a source that is given and not placed is a "
+                "mistake, not a default",
+                i));
+        }
+        if (sources[i].sample_rate != sources.front().sample_rate) {
+            return std::unexpected(fmt::format(
+                "source {} is {} Hz, but source 0 is {} Hz - every source must share a sample rate",
+                i, sources[i].sample_rate, sources.front().sample_rate));
+        }
+    }
+    const Cover cover = cover_of(places);
+    if (cover.covered != places.size()) {
+        return std::unexpected(not_an_assignment(places));
+    }
+    Assembled out;
+    out.layout.assignment = cover.assignment;
+    out.wav.sample_rate = sources.front().sample_rate;
+    const auto offset_of = [&](std::size_t source) {
+        return source < offset_samples.size() ? offset_samples[source] : std::size_t{0};
+    };
+    std::size_t total = 0;
+    for (std::size_t i = 0; i < sources.size(); ++i) {
+        total = std::max(total, offset_of(i) + sources[i].frame_count());
+    }
+    for (const th::Channel place : th::channels_of_assignment(cover.assignment)) {
+        const Placement& p = *std::ranges::find(placements, place, &Placement::place);
+        std::vector<float> channel(total, 0.0F);
+        std::ranges::copy(sources[p.source].channels[p.channel],
+                          channel.begin() + static_cast<std::ptrdiff_t>(offset_of(p.source)));
+        out.wav.channels.push_back(std::move(channel));
+        out.layout.wav_index.push_back(out.wav.channels.size() - 1);
+    }
+    return out;
+}
+
+void pad_leading(iclforge::ac3::io::WavData& wav, std::size_t samples) {
+    for (auto& channel : wav.channels) {
+        channel.insert(channel.begin(), samples, 0.0F);
+    }
 }
 
 std::expected<Outcome, Failure> encode_wav(const iclforge::ac3::io::WavData& wav,

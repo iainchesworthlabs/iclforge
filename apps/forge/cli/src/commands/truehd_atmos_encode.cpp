@@ -429,7 +429,7 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
     const auto layout = iclforge::render::OutputLayout::parse(kBedLayout);
     std::optional<TrueHdObjectRenderer> renderer;
     if (!bed_wav) {
-        renderer.emplace(*layout, config.sample_rate);
+        renderer.emplace(*layout, config.sample_rate, true);
         renderer->set_plan(plan);
     }
     std::vector<std::byte> stream;
@@ -520,7 +520,16 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
                        "samples; the 7.1 bed is {}",
                        oba::object_count(program), lfe ? "the LFE and " : "", dynamic,
                        kFrameSamples,
-                       bed_wav ? "the bed WAV" : "the objects placed on 7.1 by the renderer");
+                       bed_wav ? "the bed WAV"
+                       : renderer && renderer->measured()
+                           ? "the objects placed on 7.1 by the measured law"
+                           : "the objects placed on 7.1 by the renderer");
+        if (renderer && renderer->limited() != 0) {
+            status_println(status,
+                           "note: the limiter (0 dBFS, 32 samples ahead) brought {} sample(s) of the "
+                           "rendered bed down",
+                           renderer->limited());
+        }
         if (renderer && renderer->clipped() != 0) {
             status_println(status, "warning: {} sample(s) of the rendered bed clipped",
                            renderer->clipped());

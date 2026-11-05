@@ -294,3 +294,72 @@ TEST_CASE("the object signing options are applied only where they mean something
         CHECK(text.find("found no evolution frame to sign") != std::string::npos);
     }
 }
+
+TEST_CASE("no TrueHD command takes the content-signature options, and probe has no such line",
+          "[forge-cli][truehd][signing]") {
+    // The whole-stream content signature is AC-4's. TrueHD signs per frame (sign-objects) and
+    // nothing else, so the names are refused, never accepted and dropped.
+    const fs::path dir = scratch_dir();
+    const fs::path plain = write_stream(dir, "removal.thd");
+    const fs::path key = write_key(dir, "r.key", 7);
+    const fs::path out = dir / "removal_out.thd";
+    const fs::path wav = dir / "removal.wav";
+    const fs::path log = dir / "removal.log";
+
+    CHECK(run_cli("metadata " + cli_arg(plain) + cli_arg(out) + "sign-content", log) == kExitUsage);
+    CHECK_FALSE(fs::exists(out));
+    CHECK(run_cli("decode " + cli_arg(plain) + cli_arg(wav) + "verify-content", log) == kExitUsage);
+    CHECK(read_text(log).find("Nothing was verified") != std::string::npos);
+    CHECK(run_cli("decode " + cli_arg(plain) + cli_arg(wav) + "check-content", log) == kExitUsage);
+    CHECK_FALSE(fs::exists(wav));
+
+    // A signed stream's probe says the tags are there, and says nothing of a content signature.
+    const fs::path signed_file = dir / "removal_signed.thd";
+    REQUIRE(run_cli("metadata " + cli_arg(plain) + cli_arg(signed_file) +
+                        "sign-objects signing-key=\"" + key.string() + "\"",
+                    log) == 0);
+    REQUIRE(run_cli("probe " + cli_arg(signed_file), log) == 0);
+    const std::string text = read_text(log);
+    CHECK(text.find("protection tag present in 6/6") != std::string::npos);
+    CHECK(text.find("content sig") == std::string::npos);
+    REQUIRE(run_cli("probe " + cli_arg(signed_file) + "json=1", log) == 0);
+    const auto document = nlohmann::json::parse(read_text(log));
+    CHECK_FALSE(document["truehd"].contains("content_signature"));
+}
+
+TEST_CASE("a channel-meaning edit breaks the tags it covers, says so, and sign-objects signs again",
+          "[forge-cli][truehd][signing]") {
+    // The tag covers the whole access unit, the major sync included, so an edit of the major sync
+    // fails the tags that were there.
+    const fs::path dir = scratch_dir();
+    const fs::path plain = write_stream(dir, "edit_plain.thd");
+    const fs::path key = write_key(dir, "e.key", 9);
+    const fs::path signed_file = dir / "edit_signed.thd";
+    const fs::path log = dir / "edit.log";
+    const std::string signing_key = "signing-key=\"" + key.string() + "\"";
+    REQUIRE(
+        run_cli("metadata " + cli_arg(plain) + cli_arg(signed_file) + "sign-objects " + signing_key,
+                log) == 0);
+
+    const fs::path edited = dir / "edit_edited.thd";
+    REQUIRE(run_cli("metadata " + cli_arg(signed_file) + cli_arg(edited) + "truehd-dialnorm-2ch=20",
+                    log) == 0);
+    CHECK(read_text(log).find("no longer verify") != std::string::npos);
+    const fs::path wav = dir / "edit.wav";
+    CHECK(run_cli("decode " + cli_arg(edited) + cli_arg(wav) + "verify-objects " + signing_key,
+                  log) == kExitInput);
+
+    const fs::path resigned = dir / "edit_resigned.thd";
+    REQUIRE(run_cli("metadata " + cli_arg(signed_file) + cli_arg(resigned) +
+                        "truehd-dialnorm-2ch=20 sign-objects " + signing_key,
+                    log) == 0);
+    CHECK(read_text(log).find("no longer verify") == std::string::npos);
+    REQUIRE(run_cli("decode " + cli_arg(resigned) + cli_arg(wav) + "verify-objects " + signing_key,
+                    log) == 0);
+    CHECK(read_text(log).find("6 valid, 0 mismatched") != std::string::npos);
+    // A stream with no tags says nothing: the edit broke none.
+    REQUIRE(run_cli("metadata " + cli_arg(plain) + cli_arg(dir / "edit_plain_out.thd") +
+                        "truehd-dialnorm-2ch=20",
+                    log) == 0);
+    CHECK(read_text(log).find("no longer verify") == std::string::npos);
+}

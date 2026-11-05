@@ -37,7 +37,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink`, `sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-android`, `hearth-sink`, `sink` | core |
 | `sink` (internal) | `libs/sink/` | A Sendspin sink a program runs: it listens and advertises, pairs, admits servers as the specification ranks them, keeps the identity and the pairing records, answers the roles a server lists, and hands each stream it is sent to an output the program supplies: the pass-through output hands the coded bursts on, and the decoding output (AC-3, E-AC-3, AC-4) decodes and renders them and hands the samples to a PcmSink. It was Hearth's test sink, which writes WAV files; the Android app gives the receiver the bytes. Internal; never installed. | `ac3`, `ac4`, `containers`, `lyrics`, `objects`, `render`, `sendspin`, `truehd` | `hearth`, `hearth-android` | core |
-| `truehd` | `libs/truehd/` | The TrueHD and MLP bitstream (access units, major sync, restart and block headers, the check values), the lossless decoder and the TrueHD encoder. | `base` | `app-media`, `capi`, `crucible`, `demo-wasm`, `forge`, `hearth`, `python`, `sink`, `tests`, `truehd-probe` | core |
+| `truehd` | `libs/truehd/` | The TrueHD and MLP bitstream (access units, major sync, restart and block headers, the check values), the lossless decoder and the TrueHD encoder. | `base` | `app-media`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `forge`, `hearth`, `python`, `sink`, `tests`, `truehd-probe` | core |
 
 ## Vendored code
 
@@ -79,7 +79,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `lyrics`, `objects`, `render`, `sendspin` | `hearth-sink` | esp |
+| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `lyrics`, `objects`, `render`, `sendspin`, `truehd` | `hearth-sink` | esp |
 
 ## Firmware
 

@@ -65,7 +65,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    FFmpeg's decoder reads it as 16 bits: on the hand-built `hb_noise_generator_0` its strict decode equals the library's over the whole
    stream (3200 values, the first restart interval's 1280 among them) with `shr7 = (seed >> 7) & 0xFFFF`, while the 32-bit reading
    diverged at the third noise sample. The library reads 16 bits. TH spec v3.7 §17.2 says the same (`seed_shr7` is 16 bits, TH-5):
-   confirmed by TH spec v3.7 §17.2; awaiting the DEE score. Evidence: `python3 tools/checks/verify_truehd_interop.py
+   confirmed by TH spec v3.7 §17.2. **Not scored by DEE:** with `truehd-reading=seed-shr7-32` not one of the 142 legs and 3 long legs changes status or figures, so no DEE stream draws on generator 0's noise channels and the mark stays (it needs a stream that does: a disc or a hand-built one). Evidence: `python3 tools/checks/verify_truehd_interop.py
    --handbuilt` (`hb_noise_generator_0`).
 6. **The lossless check's channel shift (§7.3).** Entry 12: the fold shifts a sample by its channel. The FFmpeg-made
    streams cannot say whether that is the output position or the matrix channel `ch_assign` names, because their
@@ -76,7 +76,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    (`python3 tools/checks/verify_truehd_interop.py --handbuilt`). The library follows FFmpeg, in decoder and encoder through
    one helper (`lossless_fold_step`). TH spec v3.9 §7.3 answers it: the shift is by the matrix channel, `mat_ch = ch_assign[out_ch]`,
    the sample masked to 24 bits after `output_shift`, the fold since the previous restart header, the first header after a start or
-   seek checking nothing (TH-6). **Confirmed by TH spec v3.9 §7.3; awaiting the DEE score.** A Blu-ray stream with a permuted `ch_assign` fits the matrix channel for both this fold and `output_shift`
+   seek checking nothing (TH-6). **Confirmed by TH spec v3.9 §7.3, by four Blu-ray discs (six streams: every lossless-check interval of substreams 0 to 2 passes) and by the DEE set.** With the output shift indexed by output position (`truehd-reading=shift-by-position`) 32 of the 87 PASS legs of 2026-10-31 (every one with a 6 or 8 channel substream) stop being the source, 44 legs FAIL and 4,961 of 34,600 lossless-check intervals fail; with the fold by position (`fold-by-position`) the samples are unchanged and 13,320 intervals in 77 legs fail the stream's own check; with the library's reading none of the 34,600 fails. A Blu-ray stream with a permuted `ch_assign` fits the matrix channel for both this fold and `output_shift`
    (entry 43); entry 45 has the rest.
 7. **Negative `output_shift` (§8.2).** The field is signed; the streams FFmpeg writes have none. TH spec v3.9 §8.2.1 answers it
    (TH-7): the field is a signed 4-bit value in [-8, +7] and a negative one is an arithmetic right shift, which DEE writes to gain
@@ -146,7 +146,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     zeroed them differed from the first sample of the second interval, by the contribution of the previous interval's
     last samples. Streams from FFmpeg's encoder are not affected, because their first block after a restart is not
     filtered and fills the history before the first filtered sample. Does the specification mean the history to
-    survive, or does a restart zero it and FFmpeg differ from the reference decoder? **Provisional, owner to confirm.**
+    survive, or does a restart zero it and FFmpeg differ from the reference decoder? **Provisional, owner to confirm.** TH spec v3.9 §9.6 says the histories survive (TH-18). **Not scored by DEE:** with `truehd-reading=zero-histories` not one of the 142 legs, nor one of the three 300 s legs (about 2,800 restart intervals in each), changes status or figures, so no DEE stream filters from the first sample after a restart; the mark stays until a stream does (the hand-built ones, in FFmpeg's decode).
     Evidence: `python3 tools/checks/verify_truehd_interop.py --handbuilt` (the FFmpeg leg for the hand-built set).
 
 19. **The length of the extra data (§16.1, §16.2, §16.8).** `extra_data_length` is "in 16-bit words" (§16.1, §16.2). §16.8's
@@ -159,7 +159,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     nibble used to be the XOR of the length's three nibbles without the 0xF, which only agreed with itself. It is now
     `nibble_2 ^ nibble_1 ^ nibble_0 ^ 0xF`, in the library, the encoder, the fuzz mutator, the Python references and the 135 vectors of
     `testdata/truehd/evolution`. A header word of zero (nibble and length both zero) is the padding-only form: exempt from the rule
-    and reported as `ExtraData::padding_only`. **Confirmed by TH spec v3.9 §16.2; awaiting the DEE score.**
+    and reported as `ExtraData::padding_only`. **Confirmed by TH spec v3.9 §16.2 and by the owner's discs.** DEE has no option for the extra data and the owner has no Atmos master that scores a leg of it, so the owner decided (2026-10-31) that the discs are the evidence: `forge probe detail=format` of 60 s of each of six Atmos streams from four discs (*Blade Runner 2049*, *Dune: Part Two* three times, *The Lord of the Rings: The Two Towers*, a Hans Zimmer concert disc) reads 11,376 extra-data regions, and in every one the check nibble, the framing, the parity byte and `evo_reserved` are right and the §16.8 capacity rule holds with the length as the words after the header word.
 
 20. **The lossless check across a join (§7.3; entry 12).** Two streams of one format joined end to end
     (`testdata/truehd/truehd_cat_st48_s24.thd`, `planning/truehd-fixtures.md`): the second stream's first restart header
@@ -231,15 +231,17 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     `ch_assign` between `(4, 5, 1, 0, 2, 3)` and `(4, 5, 2, 1, 0, 3)` inside the stream): `hb_ch_assign_changes` cycles those two
     assignments at every restart of a six-channel stream whose channels all have a FIR filter, FFmpeg 6.1.1's strict decode returns its
     signal, and `test_handbuilt.cpp` holds the decode to it (the test fails when the decoder drops the histories at such a restart).
-    **Confirmed by TH spec v3.9 §9.6; awaiting the DEE score.** The differential harness
+    **Confirmed by TH spec v3.9 §9.6; not scored by DEE** (question 18). The differential harness
     (`libs/truehd/fuzz/differential_oracle.hpp`) still skips a stream whose major syncs differ; it could stop. Evidence:
     `libs/truehd/fuzz/regressions/fuzz_differential_truehd_decode/major-sync-format-info-changes-mid-stream`.
 
 43. **The details of noise generator 1 that §17.3 leaves out (entry 44).** `access_unit_size_pow2`, the starting index (`index_orig`) and
     the unit the buffer is filled for are not defined in v3.7. The library takes 64 << the rate factor entries, one buffer for every access
     unit of the substream (a unit with no noise draw too), and for matrix `k` of `N` the start index `N - k` with stride `2 (N - k) + 1`,
-    which is what FFmpeg 6.1.1 does on hand-built streams. Does DEE do the same? **Recommendation:** keep it; every DEE leg with a
-    non-zero matrix noise shift is the check. **Provisional, owner to confirm.**
+    which is what FFmpeg 6.1.1 does on hand-built streams. Does DEE do the same? **Answered by the DEE set (2026-10-31):** the 76 legs that this decoder stopped on in the scoring of 2026-10-29 (forge's own message: a non-zero
+    matrix noise shift under restart sync 0x31EB) now decode with all 26,236 of their lossless-check intervals ok and none failed; 49 are the source bit for bit, 4 are altered by
+    their DEE option and 23 are the 96 kHz and stepped-tone legs, whose decode is what the encoder coded. A buffer, index or stride other than these would fail the check at the
+    first noise draw. **Recommendation:** keep it.
 
 44. **Where the length nibble of the extension of the channel meaning sits (§14.2, question 2).** v3.9 says the body is
     `extra_channel_meaning_length + 1` words and gives the field as 4 bits at the start of the extension. Is the nibble inside the first
@@ -286,6 +288,15 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     the codec is lossless at every rate here, and what differs is upstream of the stream. v3.9 §19.1 makes the apodising filters a
     configuration option, so it is not offered as the reason. **Open; the scorer reports the legs as UNEXPLAINED.** **Recommendation:** ask what DEE
     does to a 96 kHz input before coding (a resampler or a filter that its options name) rather than look in the decoder.
+    **Diagnostic legs (2026-10-31, `thd-last-*`).** The impulse at 48 kHz is the source bit for bit; the same impulse at 96 kHz, at 96 kHz and 16 bits, and at 96 kHz with `--optimize-data-rate 0`,
+    and tones at 5 and 15 kHz and at 25 and 40 kHz, are UNEXPLAINED (37 intervals ok each), as are all 20 96 kHz legs of the set. It is **not a delay or a filter**: the 96 kHz impulse source
+    holds eight non-zero samples (four of +0.5 in L, four of -0.25 in R), and its decode holds 96,548 non-zero samples in L (only +4,194,304 and -4,194,304, the source's own amplitude) and 95,620 in R (only
+    +/-2,097,152), spread over every 80-sample block of the stream, with no silence anywhere. FFmpeg 8.0.1's strict decode of this stream equals forge's, sample for sample. The lossless check is
+    a fold of the samples that does not tell a misplaced sample from a right one, so two readers that agree do not exclude a reading they share. **Recommendation:** put the stream to a third
+    reader (Dolby's decoder or player) before calling it DEE's behaviour; nothing in forge changes. The 48 kHz stepped-tone legs (18 of the UNEXPLAINED) differ by 1 in 52,022 (2.0), 130,055
+    (5.1) and 182,077 (7.1) values whatever the DRC profile; `thd-last-2ch-steps-48k24` with no option, with `--optimize-data-rate 0` and with the loudness measurement skipped each differ in the
+    same 52,022 values, so it is not the profile, the data-rate option or the loudness path. `thd-chn-70-8ch-48k24-wavlist` had no sound in its seventh source channel because its slot list
+    omitted it (six of seven channels equal the source to -472 dB); the slot list is corrected in `gen_dee_gold.py`.
 51. **Dialogue normalisation (TH spec §12.5, §14.1; `forge truehd-encode`, `metadata`, `normalize`, `probe`).** The channel meaning has one
     dialogue-norm field for each presentation: 6 bits for the 2 channel presentation (§12.5 gives the range 0 to 63 and no unit) and 5
     bits for the 6 and 8 channel ones ("0 to 31 -> 0 to -31 dBFS"). Open: (a) is the 2 channel field -n dBFS as well, and what do 32 to 63
@@ -296,19 +307,32 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     substream has a 2 channel presentation whatever its channel count). **Built, provisional, no oracle until the DEE set:** the library
     writes and reads the raw numbers, widths and ranges as §12.5 and §14.1 give them, rejecting a value outside its range by field name;
     `probe` shows each as n and as -n dBFS; `normalize` writes round(-LKFS) clamped to 1..31 for every presentation the stream has (the
-    mapping of ATSC A/85 §8 that E-AC-3's `normalize` uses, and the range the 5 bit fields hold, so no value relies on 32 to 63 and none is
-    0). **Recommendation:** as built; the DEE set is two encodes of one programme, one with dialnorm 0 and one with another value for each
+    mapping of ATSC A/85 §8 that E-AC-3's `normalize` uses, and the range the 5 bit fields hold, none is 0), and 6 more in the 2 channel
+    field, as DEE writes it (confirmed 2026-10-31, below); `qc` takes the 6 off before it compares. **Recommendation:** as built; the DEE set is two encodes of one programme, one with dialnorm 0 and one with another value for each
     presentation, and a read of the field, which settles (a) and (b); (c) and (d) need a statement from the owner or a decode of a stream
     with a known dialogue norm by a decoder that applies it.
+    **Measured (2026-10-31; the owner allowed it for known inputs, question 100)** on the DEE legs given a dialogue norm N (`skip:dialnorm=-N`: N = 1, 5, 10, 17, 20,
+    24, 27, 31) and read back with `forge probe`: (a) the 6 and 8 channel fields hold N, so the unit is -n dBFS in 5 bits; the 2 channel field of a stream that also has the 6
+    or 8 channel presentation holds **N + 6** (7, 11, 16, 23, 26, 30, 33, 37 for those N), so it uses its 6 bits and 32 to 63 are values, not errors; in a stream of the 2 channel
+    presentation alone it holds N and the other two fields repeat it. The same holds on the legs that measure the dialogue norm (a 7.1 programme measured 17: 17, 17 and 23), and on
+    all six Atmos discs probed (2 channel 37, 6 and 8 channel 31: N = 31 and +6). (b) DEE writes 1 to 31 only, so whether 0 is a level is not answered. (c) The values of the 2
+    channel presentation are 6 above the multichannel ones in every stream that has both, DEE's and the discs'. (d) A stream without the 8 channel presentation repeats the 6 channel
+    field in the 8 channel one, and a stream of the 2 channel presentation alone repeats it in the other two: the fields of an absent presentation are copies. **Recommendation:** `normalize`
+    writes the 6 and 8 channel fields as it does and the 2 channel field 6 higher (at most 63) when the stream has a larger presentation, which is what both encoders write;
+    not changed until the owner confirms.
 52. **Mix level (§12.5, §14.1).** 6 bits for each presentation, no unit, no table, no statement of the range in use. Whether it is a level in
     dB (an offset such as the 80 + n dB SPL of A/52's `mixlevel` in the audio production information, which is an analogy and not evidence),
     a code, or something else is not known. **Built, provisional:** written, read and shown as the raw number, never converted; `normalize`
     leaves it alone, as E-AC-3's `normalize` leaves its mixing metadata. **Recommendation:** raw until the DEE set shows what DEE writes for
     a known mixing level.
+    **Measured (2026-10-31):** 35 in the 6 and 8 channel fields of every DEE stream and in all three fields of a stream of the 2 channel presentation alone, 29 in the 2 channel field
+    of a stream with a larger presentation, whatever the input (tones, music, film, every dialogue norm); the six disc streams carry 29 and 35 in the same places. It is a default,
+    not a measurement, and its unit is not told by this: raw stays.
 53. **Source format (§12.5, §14.1).** 5 bits for the 6 channel presentation and 6 bits for the 8 channel one, none for the 2 channel one; no
     table of values and no reason for the extra bit. Whether it names the layout the stream was authored in (and so duplicates the channel
     assignment of §13), the programme's original format, or something else is not known. **Built, provisional:** raw, as the mix level.
     **Recommendation:** raw; the DEE set is a 5.1, a 7.1 and a stereo programme encoded as such and their fields read.
+    **Measured (2026-10-31):** 0 in every DEE stream (stereo, 5.1 and 7.1 programmes) and on the six disc streams: the field is not a function of the layout encoded, in either encoder.
 54. **What the `*_control_enabled` bits gate (§14.1).** `twoch_control_enabled`, `sixch_control_enabled` and `eightch_control_enabled` are one bit each,
     undescribed. If a bit says that a decoder applies the presentation's dialogue norm and mix level only when it is set, a dialogue norm
     written with the bit clear is ignored; if it only says that the fields are present, a decoder reads them either way. **Built,
@@ -319,18 +343,24 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     (planning/truehd-disc-findings.md), so a decoder meets both and the library's default of clear is one of the two. **Recommendation:** leave `normalize` as it is until the DEE set
     shows whether a stream with the bit clear carries a dialogue norm at all; if DEE sets the bit whenever it writes one, `normalize`
     should set it too.
+    **Measured (2026-10-31):** DEE sets `twoch_control_enabled` in every stream and `sixch_` and `eightch_control_enabled` only in a stream of the 2 channel presentation alone; it writes the
+    6 and 8 channel dialogue norms of a multichannel stream with their bit clear, so the bit does not say that a dialogue norm is present. The discs: the 2 channel bit is set in *Dune: Part
+    Two* (three streams) and the Zimmer disc and clear in *Blade Runner 2049* and *The Two Towers*; the 6 and 8 channel bits are clear. **Done on the owner's word of 2026-10-31:** `normalize` sets the 2 channel bit
+    (DEE always does), writes that field as the norm plus 6, and leaves the other two bits; tests pin both and fail when either is removed.
 55. **The DRC start-up gains (§12.3, §14.1).** `heavy_drc_start_up_gain` is signed, 6 bits, and `drc_start_up_gain` signed, 7 bits; no unit, and
     "start-up" is not explained: the gain a decoder applies before the first DRC word of the directory (§12.1) or the restart header (§12.2)
     arrives, or the gain at the start of each restart interval, or the reference level. Whether the most negative value means "off" is not
     given. **Built, provisional:** raw, in the stated ranges (-32 to 31 and -64 to 63); nothing applies them (the decoder does not apply
     the directory's DRC word either, entry 18). **Recommendation:** raw until the DEE set; then decide with the owner whether `decode`
     should apply them, which is a separate decision.
+    **Measured (2026-10-31):** `heavy_drc_start_up_gain` is 0 in every DEE stream and on all six disc streams; `drc_start_up_gain` is 0 in nearly every DEE stream (-1 in three legs, of dialnorm 31 and
+    27) and -6 to -64 on the discs, where it counts up from one major sync to the next. Raw stays.
 56. **What `forge qc` of a TrueHD stream fails (TH spec §7.3, §12.5, §18).** Built, as the parity audit recommended (question 2 of
     `planning/truehd-parity-forge.md`): an integrity gate and the existing loudness presets, exit 6 when either fails. The integrity gate fails on
     a byte the reader does not take for an access unit, a failed check (nibble, major sync CRC, restart header CRC, parity, segment CRC),
-    a restart interval whose lossless check fails, and a unit that cannot be sent within the declared peak rate and 75 ms by the encoder's own
-    model (the declared rate is `MajorSync::peak_data_rate_bps()`, the unit TH spec v3.9 §4.4 gives and question 12 records; the model is the
-    encoder's, so the gate is as provisional as the model is). Left, because each needs a decision: (a) whether a dialogue
+    a restart interval whose lossless check fails, and a unit that starts before the unit ahead of it has arrived at the declared peak rate (entry 99; the old
+    queue model, the encoder's, failed Dolby's own streams; the declared rate is `MajorSync::peak_data_rate_bps()`, the unit TH spec v3.9 §4.4 gives and question 12 records; the law is
+    per unit, so the gate is as provisional as that reading is). Left, because each needs a decision: (a) whether a dialogue
     norm that differs from the measurement by more than some tolerance fails a stream: E-AC-3's `qc` reports the difference and does not
     gate it, and for TrueHD the field is all zero in every stream FFmpeg writes with its control bit clear, so a gate would fail them all;
     (b) the rate check's tolerance (question 12 settled the scale: the field is in bits per second), and whether `input_timing` (§3.4) should be held to its three
@@ -470,6 +500,23 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     "real-time headroom" is that and the speed. **Not checked:** it has no test of its own for `block_data_bits` at most 16,000 or the
     blocks per segment (a 192 kHz 6 channel stream of white noise has more than 16,000 bits in a block of 160 samples if sent raw), which
     is a gap to measure with the stream probe and close in a later change. No tighter ceiling is known; the work-package README names none.
+100. **May the metadata fields of a DEE stream be read to settle questions 51 to 55?** Question 51's recommendation is to encode a programme with two
+    dialogue norms and read the field back; the rule for DEE's streams (the decision of 2026-09-26, `planning/work-packages/README.md` rule 4) is that they
+    are decoded and compared with their sources and not read for format facts. `gen_dee_gold.py` also stores `forge probe`'s output for every leg in the
+    manifest, so the fields are recorded whether or not anyone reads them. DEE writes a dialnorm of -31 to -1 only (`--loudness-management
+    skip:dialnorm=N`; the default measures it), so "dialnorm 0 against another value" cannot be made. Nothing reads the fields until this is answered.
+    **Recommendation:** allow it for the dialogue norm, mix level, source format and control bits, on the legs whose input value is known
+    (`thd-last-8ch-music-48k24-dmx6-dmx2-dialnorm-27` and `-5`, `thd-dialnorm-*`): a value set and read back is a check of a unit, not a look at how DEE
+    writes a stream; use the `measure_only` leg of the same programme as the "unset" case. Evidence for the legs: `planning/truehd-validation.md`.
+    **Answered by the owner on 2026-10-31: yes.** Read for those four fields on known-input legs only; the results are under questions 51 to 55.
+101. **A way to score a reading without reading a stream.** The scorer says a decode is the source, not that the leg depends on the reading under test
+    (the 16-bit `seed_shr7`, question 5; the filter histories across a restart, question 18; the shift by matrix channel, question 6). Decoding the leg with the other
+    reading and finding it differs from the source is a decode-and-compare that removes a mark with a number. It needs a switch in the decoder for each
+    alternative. **Recommendation:** three test-only switches that `forge decode` refuses by name unless given, and a scored set for each; without them the
+    marks of questions 5, 6 and 18 stay until the owner says what the rescore alone is to count as.
+    **Answered by the owner on 2026-10-31: yes. Built:** `AlternativeReadings` in `DecoderConfig`, `forge decode truehd-reading=` (`seed-shr7-32`, `zero-histories`, `shift-by-position`,
+    `fold-by-position`; only `decode` takes it), five library test cases and one CLI test, each switch held by a test that fails when the switch is made a no-op. The results are under
+    questions 5, 6 and 18.
 
 ## Entries
 
@@ -541,8 +588,8 @@ the restart header before to the one after (the header carries the check of the 
 header's value checks nothing). `explore27.py set/m51_48.thd 1000 1`: stored 129, 8, 13, 125, 180, 146 and the
 channel-shifted fold gives 129, 8, 13, 125, 180, 146; the plain byte fold gives 17, 41, 214, 201, 40, 103. The library's
 decode checks every interval of every FFmpeg stream tried (19 exploration streams and the 12 fixtures) (`m51_48.thd`: 298 intervals, 149 for each of its two
-substreams, none failing). Those streams have an identity `ch_assign`. The shift by `ch_assign` (Q6) is provisional: it
-is FFmpeg's, found with a stream that permutes it (`python3 tools/checks/verify_truehd_interop.py --handbuilt`, `hb_matrices`).
+substreams, none failing). Those streams have an identity `ch_assign`. The shift by `ch_assign` (Q6) is FFmpeg's, found with a stream that permutes it (`python3 tools/checks/verify_truehd_interop.py --handbuilt`, `hb_matrices`), and is
+confirmed by two discs and by the DEE set (Q6).
 
 **13. The FIR and IIR histories (§9.4, §9.5).** The FIR filter predicts from the channel's previous *outputs*. The
 "IIR" filter predicts from its previous *residuals* (`output - prediction`), not from previous outputs. The
@@ -771,7 +818,8 @@ sample for sample (2.9 million samples a channel, FFmpeg's channel order of entr
 position, the second and third substreams fail every interval. The streams that carry the same shift for every channel (FFmpeg's, the
 encoder's, the hand-built ones) cannot tell the two apart, which is why no fixture caught it. `test_channel_assignment.cpp` and
 `test_kernels.cpp` hold both; `tools/references/truehd_syntax.py` reads it the same way. The encoder writes one shift for all channels
-and is unchanged. **Provisional, owner to confirm** (the specification's §8.2 does not say which index).
+and is unchanged. **Confirmed (2026-10-31):** TH spec v3.9 §7.3 writes `output_shift[mat_ch]`, the discs agree, and so does the DEE set (question 6 has the numbers: 32 PASS legs fail
+with the shift by position).
 **44. Noise generator 1 (§17.3, §17.4; TH spec v3.7 and v3.9).** Restart sync 0x31EB is `noise_type` 1. Under it a substream fills a buffer of
 int8 values for every access unit from the table of §17.4, indexed by `seed >> 15` (low 8 bits), with `seed = (seed << 8) ^ index ^ (index
 << 5)` in 32 bits, and a matrix with a non-zero `matrix_noise_shift` adds `buffer[index] * 2^(shift + 7)` to its sum before the sum is
@@ -790,7 +838,7 @@ All three were measured, not read: FFmpeg 6.1.1's strict decode of hand-built st
 `hb_noise_type1_shift`, `hb_noise_type1_lsb_bypass`), whose expected samples `tools/references/truehd_writer.py` computes from the table
 and the three rules above independently of the decoders, equals those samples in FFmpeg, in `tools/references/truehd_syntax.py` and in the
 library, at 48, 96 and 192 kHz, with 1 to 3 matrices, shifts from 1 to 15, a quantised output channel and a restart interval that loads the
-seed three times. **Provisional, owner to confirm** (question 43). Held by `libs/truehd/tests/decoder/test_handbuilt.cpp`, `test_kernels.cpp`
+seed three times. **Scored by the DEE set (2026-10-31),** question 43 has the numbers. Held by `libs/truehd/tests/decoder/test_handbuilt.cpp`, `test_kernels.cpp`
 and `tools/checks/test_truehd_noise_table.py` (the table typed twice).
 
 **45. The output shift is listed by matrix channel: what the other oracles say (§7.3, §8.2; TH spec v3.9; with entry 43).** Entry 43 is
@@ -801,7 +849,7 @@ and FFmpeg 6.1.1's strict decode of `hb_output_shift_permuted` (`ch_assign` [1, 
 FFmpeg-made streams and `hb_matrices` (whose one shifted channel is a fixed point of its `ch_assign`) could not show. The DEE gold set
 showed it too: the 6 and 8 channel legs of `testdata/truehd-dee` stopped at access unit 128 with a failing lossless check in the second
 substream (`thd-fx-6ch-music-48k24`, `thd-fx-8ch-tones-48k24-dmx6-dmx2`) and decode to their sources, with every substream's check
-passing, since this was changed. Held by `hb_output_shift_permuted`, `hb_output_shift_negative` and `test_kernels.cpp`.
+passing, since this was changed; in the whole set the 6 and 8 channel legs that PASS are 57 of the 87 PASS legs of 2026-10-31. Held by `hb_output_shift_permuted`, `hb_output_shift_negative` and `test_kernels.cpp`.
 
 **46. What follows the last block of a segment (§3.5, §16.5; TH spec v3.9).** Zero padding to the end of the segment, or a terminator:
 terminatorA, `0xD234E` or `0x348D3`, followed by the 12-bit `zero_samples` count, as the last 32 bits of the segment of substream 0
@@ -1563,3 +1611,33 @@ channel presentations are exact over the whole 1,920,000 frames, from 5.0 s on t
 plain-51-96k24 and plain-51-48k16, byte-identical to the first round's, are accepted and exact as before. DRP's own limits are still not known. Tests: `a burst that needs more than a unit of channel time is met by the units before it` (inside a
 restart interval and across the boundary of two; fails with the old fixed lead), `a stream that never needs more than a unit of channel time keeps one
 unit of lead` and `the substream info byte follows the number of substreams`.
+
+**99. The data-rate gate reads each unit's `input_timing`, not a queue at the declared rate (TH spec §3.4, §18; entries 37 and 98; question 12; `forge qc`, `forge probe`, the Forge window's QC).**
+`RateModel` (`apps/shared/media/src/probe_truehd.cpp`) simulated a queue served at the first major sync's declared peak rate, each unit starting when the
+channel was free and carrying the backlog forward, and failed a unit that finished more than 75 ms after its slot. That is the encoder's old model
+(entry 37), and entry 98 had already found it is not what the Dolby Reference Player checks. It failed streams Dolby's own encoder wrote: the four
+streams of `D:/ac3bld/dee-single-channel` (DEE 6.5.4, 7.1 and 5.1, a tone in one channel at a time; `sc-71-p8`: field 600, 1.80 Mbit/s declared,
+average 1.22 Mbit/s, largest unit 5.22 Mbit/s, worst delivery 753 ms, 55,812 of 64,800 units late) while their parity, CRC and lossless checks
+all passed; the 0.25 s gold streams passed (they are short). A second session reading the specification found the same on a DEE Atmos stream, and
+that §18.2's law is per unit. **The law as built**, per unit, from the stream's own timing words: a unit takes `duration = ceil(bytes x 8 x rate / declared rate)`
+samples to arrive; `delta[n] = (input_timing[n] - input_timing[n-1]) mod 65536`; the lead is the decode time less the start, `output_timing - input_timing` at a unit with a
+restart header (`output_timing` is the unit's first sample, entry 37) and moved by `nominal - delta` from one unit to the next. A unit is out of the law when **(1)**
+`delta[n] < duration[n-1]` (the unit before had not arrived), **(2)** `delta[n] < nominal / 4` (10 samples at 48 kHz), **(3)** `lead[n] < max(duration[n], nominal)`
+(it arrives after its decode time, or leads by less than a slot), or **(4)** `lead[n] > 75 ms` (3,600 samples at 48 kHz). No backlog is carried: a burst sent early, as a real
+encoder does, is within the law. `violations` counts the units out of it and `worst_overrun_ms` is the largest miss (the JSON keys `worst_latency_ms` and
+`latency_limit_ms` are gone).
+**What carries each bound.** (1) and the arrival half of (3) are the per-unit law above and entry 98's DRP findings (0x75) and the owner's UHD disc. (2), the slot floor of (3)
+and (4) were proposed by a session that quoted a document of the analysis project (dee-analysis's own `TRUEHD_REFERENCE_SPECIFICATION.md`, not the licensed specification,
+whose provenance the owner has not cleared), and **no number was taken from it**: each was tested here as a hypothesis against the streams the project holds. The four Dolby
+single-channel streams, the 13 DEE gold streams and the 26 FFmpeg fixtures show a lead never under one slot (40 at 48 kHz, 80 at 96 kHz, 160 at 192 kHz; the single-channel
+streams reach exactly 40), never over the 75 ms (largest 3,586 of 3,600 at 48 kHz and 7,190 of 7,200 at 96 kHz), and a step between starts never under 11 samples at 48 kHz
+(`sc-71`; the floor is 10). A stream written at 1 Mbit/s with `truehd-rate-check=lenient` leads from -37,872 to +32,495 samples and has 11,411 units out of the law.
+Check (1) alone passes a stream the encoder wrote past its rate with `lenient` (it serialises the units but lets them arrive after their decode time), which is why (3) is there.
+**Also found:** entry 37 reads §3.4 as "a unit starts no sooner than one unit duration after the previous started". The Dolby streams contradict it (steps of 11, 17 and 36 samples at
+48 kHz where a slot is 40), so it is not a check.
+**Checked:** 0 violations on the four DEE single-channel streams, the 13 DEE gold streams, the 26 FFmpeg fixtures of `testdata/truehd` and two streams `forge sine` wrote; the 27 hand-built
+streams of `testdata/truehd/handbuilt`, whose timing words are not meant to mean anything, report violations in their goldens. **Not known:** that the floors and the ceiling sit
+exactly where the Reference Player puts them (only that every stream seen is inside and the Dolby ones come within 14 samples of the ceiling and 0 of the floor), whether the
+declared rate is the smallest that satisfies (1) (an authoring question, not a gate), and what a stream does to a player whose lead is out of the law. Tests:
+`probe json=1` of every fixture is its golden document (the `rate_model` member), `qc` of a stream written over its rate exits 6, and the cases `[gui][truehd][rate]` of
+`apps/forge/gui/tests/test_truehd_rate_model.cpp` hold each of the four, with a mutation for each.

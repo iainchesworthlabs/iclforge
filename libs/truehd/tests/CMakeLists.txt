@@ -16,6 +16,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     decoder/test_decoder_checks.cpp
     decoder/test_ffmpeg_fixtures.cpp
     decoder/test_fixture_features.cpp
+    decoder/test_alternative_readings.cpp
     decoder/test_handbuilt.cpp
     decoder/test_kernels.cpp
     decoder/test_object_robustness.cpp
@@ -29,6 +30,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder_object_bed.cpp
     encoder/test_encoder_object_downmix.cpp
     encoder/test_encoder_object_motion.cpp
+    encoder/test_bed_pan.cpp
     encoder/test_render_bed.cpp
     encoder/test_layout.cpp
     encoder/test_ratectl.cpp
@@ -103,8 +105,21 @@ add_executable(iclforge-truehd-render-tool tools/render_stream_tool.cpp
 target_include_directories(iclforge-truehd-render-tool PRIVATE ../src)
 target_link_libraries(iclforge-truehd-render-tool PRIVATE iclforge::truehd iclforge::warnings)
 
+# iclforge-truehd-render-dump - a stream's bed, elements and object positions laid out for the check of
+# the render rule against the owner's DEE controls (libs/truehd/notes/feature-truehd-measured-bed-render.md).
+add_executable(iclforge-truehd-render-dump tools/render_dump_tool.cpp)
+target_link_libraries(iclforge-truehd-render-dump PRIVATE iclforge::truehd iclforge::objects
+    iclforge::warnings)
+
 # iclforge-truehd-ss3-lab - the decoder under each setting of DecoderLab, for the owner to run on a
 # TrueHD Atmos stream (libs/truehd/ERRATA.md entry 69).
 add_executable(iclforge-truehd-ss3-lab tools/ss3_lab.cpp)
 target_link_libraries(iclforge-truehd-ss3-lab PRIVATE iclforge::truehd iclforge::warnings)
 add_dependencies(iclforge-tests iclforge-truehd-ss3-lab)
+
+# decoder/test_object_robustness.cpp reads std::getenv (ICLFORGE_TRUEHD_MUTATIONS, for a longer
+# run of the mutation tests); MSVC's C4996 on it is an error under the warnings target - same
+# reasoning as libs/ac3/tests/core/test_simd_kernels.cpp.
+if(MSVC)
+    set_source_files_properties(decoder/test_object_robustness.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()

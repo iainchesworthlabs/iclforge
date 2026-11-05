@@ -595,7 +595,7 @@ family, 3,840 link frames to a 61,440-byte burst. `iclforge::audio::BitstreamFor
 | PipeWire | Negotiates SPA's `TRUEHD` codec on the link rate with 16-byte frames; the node's `iec958.codecs` must list `TrueHD` | The codec mapping and the list reading, headless; no sink | **run** (2026-11-01, library sink on the Pi: TrueHD by status; stream and sink formats seen in `pw-dump`) |
 | WASAPI | Exclusive mode, `KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP`, 8 channels, the 7.1 mask | Every field of the format, against the SDK's own GUID; never opened on a device | not run |
 | Core Audio | Refuses (`kUnsupportedFormat`); no format ID is known | The refusal | not run, not offered |
-| Android | Two optional bridge methods open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND`; a bridge without them refuses | The pure half (`android_support.hpp`) only; **not built** (no NDK on the machine) | not run |
+| Android | Two optional bridge methods open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND`; a bridge without them refuses | The pure half (`android_support.hpp`), the sink's packing on the host, and a Shield run (entry 139) | **run** (2026-11-04, Shield Pro into an Onkyo TX-RZ740 through Hearth for Android: TrueHD by status, 48 kHz stereo; the owner's panel reading is pending) |
 
 **The output decision.** For a TrueHD item (MLP has no carriage) on a build whose player can send MAT (`OutputRequest::mat_passthrough`, false
 until the player is wired, see 127): an output that takes MAT through a platform that has been run is chosen automatically; one that
@@ -639,7 +639,7 @@ one; `follow=off`, or no output that can take PCM, refuses. It is carried in `Ou
 124. **Core Audio.** No format ID for TrueHD is known to the backend; the session had no Mac. A Mac may offer eight channels of 192 kHz linear PCM on
      HDMI, in which MAT could be sent as data. *Recommend:* leave refused; ask a Mac owner to list the HDMI stream's physical formats (the backend's
      `kAudioStreamPropertyAvailablePhysicalFormats`) before any code.
-125. **Android.** The bridge methods are written and not built; the Shield's HDMI policy lists TrueHD and IEC 61937 at 7.1 masks and only stereo IEC 61937
+125. **(Run 2026-11-04, entry 139.) Android.** The bridge methods are written and not built; the Shield's HDMI policy lists TrueHD and IEC 61937 at 7.1 masks and only stereo IEC 61937
      was tried (`hearth-android-findings.md`, S4). *Recommend:* let CI build the APK first, then one Shield run into the Onkyo; questions 12 and 5 of the
      audit are answered yes by the owner's decision of 2026-10-29, so no further permission is asked here.
 126. **The fallback chain's unstated width is stereo.** An output that does not state its width (0 channels) gets the stream's stereo mix, as the
@@ -706,6 +706,11 @@ Entries 136 to 139 are this block's, and they answer entry 134 (the Android app 
      receiver keeps a TrueHD lock on them is an assumption: on one receiver zeros lost the AC-3 lock in half a second and null bursts did not
      (`planning/hearth-android-findings.md`, F12), and nothing has shown it for MAT. An empty MAT frame is the other candidate. *Recommend:* the Shield run notes whether
      the receiver drops lock in the gaps between items, and if it does the output sends empty MAT frames instead; the Pi session can try both on the Onkyo first.
-139. **Not run.** Nothing here has run on a Shield or against a receiver. Not covered by a host test: `audio_link.cpp`'s mapping and `routes()` (Android-only code, built by the
+139. **Run on a Shield (2026-11-04), within limits.** An NVIDIA Shield Pro (`mdarcy`, Android 11) running the debug APK of PR #1749 (sha256 `e2748788...524f`) was sent
+     `truehd_cat_st48_s24.thd` replayed for 40 s by `hearth-testserver` (stereo, 48 kHz, 24-bit; paired by the code the sink showed): `openLink` opened the track (192,000 Hz, 8 channels,
+     buffer 491,520) at 23:55:11.9, and the Onkyo TX-RZ740 on SLI05 (Direct, volume 0) reported "Dolby TrueHD SUR, 48 kHz, 2.0 ch" from 23:55:12 (lock about 1.4 s) until
+     the track ended at 23:55:55. The sink counted 2,000 of 2,000 bursts played with no underrun, late, dropped or invalid burst. `mat_status.hpp` marks Android run. **Not shown:** the owner's
+     front-panel reading; lock across the Shield's 20.5 s HDMI flap (it did not recur); lock in the gap between two items (the stream was one continuous loop: entry 138 is
+     still open); 7.1 content; any rate but 48 kHz. Evidence: `D:\ac3bld\shield-apk\ifa-entry125.txt`, `shield-logcat-entry125.txt`, `server-run.log` (on the machine, not committed). Not covered by a host test: `audio_link.cpp`'s mapping and `routes()` (Android-only code, built by the
      Android lane), and the loopback end-to-end harness (`libs/sink/src/loopback_harness.cpp`, AC-3 and E-AC-3 only) was not extended to TrueHD. *Recommend:* the debug APK (below, in the
      Shield note) is run once on the Shield into the Onkyo with the desktop player as the server, and the lock, the first seconds and the gap between items are read.

@@ -68,6 +68,15 @@ struct OutputStageConfig {
     // Blu-ray's; the bed's raw PCM is 6.9 Mbit/s, so only a limit set far
     // lower than this makes the encoder refuse.
     std::uint32_t truehd_peak_data_rate_bps = 18'000'000;
+    // The TrueHD 5.1 leg only. How much audio, in milliseconds, the leg holds back before it hands
+    // the sink its first burst, and so how far ahead of the device it stays from then on. The
+    // encoder emits a restart interval at once and then bursts in batches of five or six every
+    // third or fourth frame, so a leg that handed every burst over as it came would have the
+    // device waiting on the next batch: a gap on the link, which a receiver reads as a lost lock.
+    // The bursts are held until at least this much is in hand (rounded up to whole 20 ms bursts)
+    // and then handed over together. It is added start-up delay for this mode and no other; 0
+    // hands every burst over as it comes (planning/truehd-parity-crucible.md, question 16).
+    int truehd_prefill_ms = 150;
 };
 
 struct OutputStatus {

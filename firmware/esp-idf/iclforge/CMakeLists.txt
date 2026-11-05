@@ -98,6 +98,13 @@ if(CONFIG_ICLFORGE_SENDSPIN)
     else()
         list(APPEND ICLFORGE_COMPONENT_SRCS "src/ac4_stream_none.cpp")
     endif()
+    # The TrueHD decoder the player calls: libs/truehd's through src/truehd_stream.hpp, or the one
+    # that decodes nothing. Chosen here, as the AC-4 decoder is.
+    if(CONFIG_ICLFORGE_TRUEHD)
+        list(APPEND ICLFORGE_COMPONENT_SRCS "src/truehd_stream.cpp")
+    else()
+        list(APPEND ICLFORGE_COMPONENT_SRCS "src/truehd_stream_none.cpp")
+    endif()
 endif()
 # The web page, gzipped at build time into this component's binary directory and embedded from there (below the
 # registration). A change to either file or to the script writes the .gz again. Not in IDF's first pass over this file,
@@ -308,6 +315,21 @@ else()
     set(ICLFORGE_MINIMAL_AC4 OFF CACHE BOOL "" FORCE)
 endif()
 
+# The TrueHD decoder, behind a switch that is off by default, as the AC-4 decoder is. The root's
+# ICLFORGE_BUILD_TRUEHD above stays off (it also builds the encoder and what the CLI links);
+# ICLFORGE_MINIMAL_TRUEHD is the root's option for libs/truehd/minimal.cmake's decode-only archive.
+if(CONFIG_ICLFORGE_TRUEHD)
+    if(NOT EXISTS "${ICLFORGE_ROOT}/libs/truehd/minimal.cmake")
+        message(FATAL_ERROR
+            "CONFIG_ICLFORGE_TRUEHD is on and there is no TrueHD decoder at '${ICLFORGE_ROOT}/libs/truehd'. "
+            "The component archive tools/packaging/pack_esp_component.py makes does not carry it yet "
+            "(only the AC-4 decoder has a --with option); build from the repository's tree.")
+    endif()
+    set(ICLFORGE_MINIMAL_TRUEHD ON CACHE BOOL "" FORCE)
+else()
+    set(ICLFORGE_MINIMAL_TRUEHD OFF CACHE BOOL "" FORCE)
+endif()
+
 # libs/sendspin's player half, for the Sendspin player: the core and the
 # player's session, pairing and Noise, with its crypto seam over ESP-IDF's own
 # mbedTLS (the PSA Crypto API, which v6.1's mbedTLS 4 provides). The WebSocket
@@ -411,6 +433,10 @@ endif()
 # src/ac4_bridge.cpp.
 if(CONFIG_ICLFORGE_AC4)
     target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac4_static)
+endif()
+# The TrueHD library's decode-only archive (libs/truehd/minimal.cmake), for src/truehd_stream.cpp.
+if(CONFIG_ICLFORGE_TRUEHD)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::truehd_static)
 endif()
 
 # The burst player's source under the same switch as player.cpp: it renders,

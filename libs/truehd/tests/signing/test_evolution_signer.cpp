@@ -16,6 +16,7 @@
 
 #include "../encoder/encoder_support.hpp"
 #include "../support/evolution_support.hpp"
+#include "iclforge/base/crypto/hmac_sha256.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
@@ -46,10 +47,11 @@ SigningKey key_b() {
     return testing::make_test_key(22, 48);
 }
 
-std::vector<std::byte> signed_region(const SigningKey& key, const FrameSpec& spec) {
-    std::vector<std::byte> region = testing::build_region(spec);
-    REQUIRE(sign_evolution_frame(region, key));
-    return region;
+std::vector<std::byte> signed_unit(const SigningKey& key, const FrameSpec& spec,
+                                   bool major_sync = true) {
+    std::vector<std::byte> unit = testing::build_unit(spec, major_sync);
+    REQUIRE(sign_evolution_unit(unit, key, major_sync ? 0 : 1));
+    return unit;
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -152,17 +154,23 @@ TEST_CASE(
     CHECK(decode_stream(stream) == decode_stream(built.bytes));
 }
 
-TEST_CASE("a signed region is the one an independent writer builds with the right tag",
+TEST_CASE("a signed unit is the one an independent writer builds with the right tag",
           "[truehd][signing]") {
     const SigningKey key = key_a();
     for (const unsigned code : kCodes) {
-        FrameSpec spec = testing::sample_spec(7);
-        spec.primary_code = code;
-        const std::vector<std::byte> region = signed_region(key, spec);
-        const FrameSpec want = testing::signed_spec(key, spec);
-        CHECK(testing::expected_tag(key, spec).size() == (code == 1 ? 1U : code == 2 ? 4U : 16U));
-        CHECK(region == testing::build_region(want));  // tag, zero fill and parity byte alike
-        CHECK(verify_evolution_frame(region, key) == VerifyResult::kValid);
+        for (const bool major : {true, false}) {
+            CAPTURE(code, major);
+            FrameSpec spec = testing::sample_spec(7);
+            spec.primary_code = code;
+            const std::vector<std::byte> unit = signed_unit(key, spec, major);
+            const FrameSpec want = testing::signed_spec(key, spec, major);
+            CHECK(testing::expected_tag(key, spec, major).size() == (code == 1   ? 1U
+                                                                     : code == 2 ? 4U
+                                                                                 : 16U));
+            // The tag, the fill and the parity byte alike are what the test's writer makes.
+            CHECK(unit == testing::build_unit(want, major));
+            CHECK(verify_evolution_unit(unit, key, major ? 0 : 1) == VerifyResult::kValid);
+        }
     }
 }
 
@@ -187,40 +195,73 @@ TEST_CASE("the wrong key fails every frame and an empty key signs and accepts no
     // A key shorter than the block and one longer than it are both just HMAC keys.
     for (const std::size_t size : {std::size_t{1}, std::size_t{64}, std::size_t{200}}) {
         const SigningKey key = testing::make_test_key(5, size);
-        const std::vector<std::byte> region = signed_region(key, testing::sample_spec(3));
-        CHECK(verify_evolution_frame(region, key) == VerifyResult::kValid);
-        CHECK(verify_evolution_frame(region, key_a()) == VerifyResult::kMismatch);
+        const std::vector<std::byte> unit = signed_unit(key, testing::sample_spec(3));
+        CHECK(verify_evolution_unit(unit, key) == VerifyResult::kValid);
+        CHECK(verify_evolution_unit(unit, key_a()) == VerifyResult::kMismatch);
     }
 }
 
-TEST_CASE("one flipped bit in key_id, the metadata, the configuration, the fill or the tag fails",
+TEST_CASE("a changed bit anywhere the tag covers fails it, and one in the zeroed regions does not",
           "[truehd][signing]") {
     const SigningKey key = key_a();
     FrameSpec spec = testing::sample_spec(9);
     spec.zero_fill_bytes = 3;
-    const std::vector<std::byte> good = signed_region(key, spec);
-    REQUIRE(verify_evolution_frame(good, key) == VerifyResult::kValid);
-
+    const std::vector<std::byte> good = signed_unit(key, spec);
+    REQUIRE(verify_evolution_unit(good, key) == VerifyResult::kValid);
+    const std::size_t region_bytes = testing::build_region(spec).size();
+    const std::size_t extra_at = good.size() - region_bytes;  // where the extra data begins
+    const std::size_t payload_bit0 = (extra_at + 4U) * 8U;
     const std::size_t payload_bits = testing::build_frame(spec).size() * 8U;
     const std::size_t prim_off = payload_bits - 3U * 8U - 4U * 8U;  // before the 3 fill bytes
+
+    const auto flipped = [&good](std::size_t bit) {
+        std::vector<std::byte> unit = good;
+        unit.at(bit >> 3U) ^= static_cast<std::byte>(0x80U >> (bit & 7U));
+        return unit;
+    };
     struct Place {
         const char* name;
         std::size_t bit;
     };
-    const std::array<Place, 6> places{{
-        {"key_id", 3},  // 5 bits in: version (2), then key_id (3)
-        {"payload id", 6},
-        {"configuration (priority)", 20},
-        {"object metadata byte", 10 + 15 + 9 + 8 * 5 + 2},
-        {"zero fill", payload_bits - 1},
-        {"tag", prim_off + 5},
+    // Covered: the object layer's own fields and the access unit around them.
+    const std::array<Place, 12> covered{{
+        {"key_id", payload_bit0 + 3},
+        {"payload id", payload_bit0 + 6},
+        {"configuration (priority)", payload_bit0 + 20},
+        {"object metadata byte", payload_bit0 + 10 + 15 + 9 + 8 * 5 + 2},
+        {"extra data header word", extra_at * 8U + 20},
+        {"evo_frame_byte_length", (extra_at + 3) * 8U + 3},
+        {"access unit length", 4},
+        {"input timing", 3 * 8U + 2},
+        {"major sync", (4 + 6) * 8U + 1},
+        {"substream directory", (4 + kMajorSyncBaseBytes) * 8U + 5},
+        {"an audio byte", (4 + kMajorSyncBaseBytes + 2 + 3) * 8U + 4},
+        {"the tag", payload_bit0 + prim_off + 5},
     }};
-    for (const Place& place : places) {
+    for (const Place& place : covered) {
         CAPTURE(place.name);
-        std::vector<std::byte> region = good;
-        testing::flip_payload_bit(region, place.bit);
-        CHECK(verify_evolution_frame(region, key) == VerifyResult::kMismatch);
+        // A flip may make the unit unreadable (no container) or the frame a mismatch; it is never
+        // valid.
+        const VerifyResult result = verify_evolution_unit(flipped(place.bit), key);
+        CHECK(result != VerifyResult::kValid);
     }
+    // The ones that leave the unit readable are mismatches, and the audio one is exactly the tag.
+    CHECK(verify_evolution_unit(flipped((4 + kMajorSyncBaseBytes + 2 + 3) * 8U + 4), key) ==
+          VerifyResult::kMismatch);
+    // (A flip in the header or the directory also breaks the unit's own check nibble, so there the
+    // unit does not read at all; it is not valid either way.)
+    CHECK(verify_evolution_unit(flipped(payload_bit0 + 3), key) == VerifyResult::kMismatch);
+
+    // The parity byte is not in the message: a changed one leaves the tag good (the parity is the
+    // extra data's own check, which the reader reports on its own).
+    std::vector<std::byte> parity = good;
+    parity.at(parity.size() - 1) ^= std::byte{0x5A};
+    CHECK(verify_evolution_unit(parity, key) == VerifyResult::kValid);
+    CHECK_FALSE(read_extra_data(std::span<const std::byte>(parity).subspan(extra_at))->parity_ok);
+    // The fill and the padding are not in it either; the sole-container rule is what keeps them
+    // empty, so a change there is a mismatch of that rule and not of the tag.
+    CHECK(verify_evolution_unit(flipped(payload_bit0 + payload_bits - 1), key) ==
+          VerifyResult::kMismatch);
 }
 
 TEST_CASE("the secondary field is zeroed in the message, so its value does not matter",
@@ -231,19 +272,19 @@ TEST_CASE("the secondary field is zeroed in the message, so its value does not m
     FrameSpec other = plain;
     other.secondary = bytes_of({0x5A});
 
-    const std::vector<std::byte> region = signed_region(key, plain);
-    CHECK(verify_evolution_frame(region, key) == VerifyResult::kValid);
-    // The same tag with a different secondary byte is the same frame as far as the tag goes.
+    const std::vector<std::byte> unit = signed_unit(key, plain);
+    CHECK(verify_evolution_unit(unit, key) == VerifyResult::kValid);
+    // The same tag with a different secondary byte is the same unit as far as the tag goes.
     other.primary = testing::expected_tag(key, plain);
     CHECK(testing::expected_tag(key, other) == other.primary);
-    CHECK(verify_evolution_frame(testing::build_region(other), key) == VerifyResult::kValid);
+    CHECK(verify_evolution_unit(testing::build_unit(other), key) == VerifyResult::kValid);
 
     // Signing leaves the secondary field as the writer made it.
-    std::vector<std::byte> with_secondary = testing::build_region(other);
+    std::vector<std::byte> with_secondary = testing::build_unit(other);
     other.primary.clear();
-    std::vector<std::byte> unsigned_region = testing::build_region(other);
-    REQUIRE(sign_evolution_frame(unsigned_region, key));
-    CHECK(unsigned_region == with_secondary);
+    std::vector<std::byte> unsigned_unit = testing::build_unit(other);
+    REQUIRE(sign_evolution_unit(unsigned_unit, key));
+    CHECK(unsigned_unit == with_secondary);
 }
 
 TEST_CASE("length codes 1, 2 and 3 give a one, four and sixteen byte tag; code 0 has no field",
@@ -252,10 +293,11 @@ TEST_CASE("length codes 1, 2 and 3 give a one, four and sixteen byte tag; code 0
     for (const unsigned code : kCodes) {
         FrameSpec spec = testing::sample_spec(code);
         spec.primary_code = code;
-        const std::vector<std::byte> region = signed_region(key, spec);
-        const auto extra = read_extra_data(region);
-        REQUIRE(extra.has_value());
-        const auto frame = parse_evolution_frame(extra->evolution_payload);
+        const std::vector<std::byte> unit = signed_unit(key, spec);
+        const auto parsed = parse_access_unit(unit, 0, true);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->extra_data.has_value());
+        const auto frame = parse_evolution_frame(parsed->extra_data->evolution_payload);
         REQUIRE(frame.has_value());
         CHECK(frame->protection.primary.size() == (code == 1 ? 1U : code == 2 ? 4U : 16U));
         CHECK(frame->protection.primary == testing::expected_tag(key, spec));
@@ -264,12 +306,50 @@ TEST_CASE("length codes 1, 2 and 3 give a one, four and sixteen byte tag; code 0
         FrameSpec spec = testing::sample_spec(1);
         spec.primary_code = 0;
         spec.spec36 = reading == EvolutionReading::kSpec36;
-        std::vector<std::byte> region = testing::build_region(spec);
-        const std::vector<std::byte> before = region;
-        CHECK_FALSE(sign_evolution_frame(region, key, reading));
-        CHECK(region == before);
-        CHECK(verify_evolution_frame(region, key, reading) == VerifyResult::kMismatch);
-        CHECK_FALSE(has_evolution_tag(region, reading));
+        std::vector<std::byte> unit = testing::build_unit(spec);
+        const std::vector<std::byte> before = unit;
+        CHECK_FALSE(sign_evolution_unit(unit, key, 0, reading));
+        CHECK(unit == before);
+        CHECK(verify_evolution_unit(unit, key, 0, reading) == VerifyResult::kMismatch);
+        const auto parsed = parse_access_unit(unit, 0, true);
+        REQUIRE(parsed.has_value());
+        CHECK_FALSE(has_evolution_tag(parsed->extra_data->bytes, reading));
+    }
+}
+
+TEST_CASE("the parity byte follows TH spec 16.4 with a non-zero evo_reserved nibble",
+          "[truehd][signing][parity]") {
+    // evo_reserved is 0 in every stream there is (§16.8), where the word form and a bare XOR of the
+    // two fields agree. With a nibble set they differ, and the unit built here (from the spec's
+    // word, not from the library) is what the reader and the signer have to agree with.
+    const SigningKey key = key_a();
+    for (const unsigned reserved : {0U, 1U, 5U, 15U}) {
+        CAPTURE(reserved);
+        const FrameSpec spec = testing::sample_spec(2);
+        const std::vector<std::byte> frame = testing::build_frame(spec);
+        const std::vector<std::byte> unit =
+            testing::build_unit(testing::build_region(frame, {}, reserved));
+        const auto read = parse_access_unit(unit, 0, true);
+        REQUIRE(read.has_value());
+        CHECK(read->extra_data->evo_reserved == reserved);
+        CHECK(read->extra_data->parity_ok);  // the reader accepts the independent builder's parity
+
+        std::vector<std::byte> signed_bytes = unit;
+        REQUIRE(sign_evolution_unit(signed_bytes, key));
+        // The nibble is in the unit the tag covers: worked out here over this unit, parity zeroed.
+        REQUIRE_FALSE(unit.empty());
+        std::vector<std::byte> message(unit.begin(), unit.end() - 1);
+        message.push_back(std::byte{0});
+        const auto digest = base::crypto::hmac_sha256(key.bytes(), message);
+        FrameSpec tagged = spec;
+        tagged.primary = {digest[0], digest[1], digest[2], digest[3]};  // code 2: four bytes
+        CHECK(signed_bytes == testing::build_unit(testing::build_region(
+                                  testing::build_frame(tagged), {}, reserved)));
+        const auto after = parse_access_unit(signed_bytes, 0, true);
+        REQUIRE(after.has_value());
+        CHECK(after->extra_data->parity_ok);
+        CHECK(after->extra_data->evo_reserved == reserved);
+        CHECK(verify_evolution_unit(signed_bytes, key) == VerifyResult::kValid);
     }
 }
 
@@ -277,10 +357,10 @@ TEST_CASE("the same tag is written whichever reading parses the frame", "[truehd
     const SigningKey key = key_a();
     FrameSpec spec = testing::sample_spec(4);
     spec.spec36 = true;
-    std::vector<std::byte> region = testing::build_region(spec);
-    REQUIRE(sign_evolution_frame(region, key, EvolutionReading::kSpec36));
-    CHECK(verify_evolution_frame(region, key, EvolutionReading::kSpec36) == VerifyResult::kValid);
-    CHECK(region == testing::build_region(testing::signed_spec(key, spec)));
+    std::vector<std::byte> unit = testing::build_unit(spec);
+    REQUIRE(sign_evolution_unit(unit, key, 0, EvolutionReading::kSpec36));
+    CHECK(verify_evolution_unit(unit, key, 0, EvolutionReading::kSpec36) == VerifyResult::kValid);
+    CHECK(unit == testing::build_unit(testing::signed_spec(key, spec)));
 }
 
 TEST_CASE("frames signed under two keys, spliced, verify under the keyring", "[truehd][signing]") {
@@ -292,11 +372,14 @@ TEST_CASE("frames signed under two keys, spliced, verify under the keyring", "[t
     REQUIRE(sign_evolution_stream(by_a, a) == built.frames);
     REQUIRE(sign_evolution_stream(by_b, b) == built.frames);
 
+    // Units are spliced whole: the tag covers the access unit, so only whole ones can be mixed.
     std::vector<std::byte> spliced = by_a;
     int from_b = 0;
     for (std::size_t i = 0; i < built.evolution_units.size(); ++i) {
         if (i % 2 == 1) {
-            const auto [at, size] = extra_of(built, built.evolution_units[i]);
+            const auto unit = built.evolution_units[i];
+            const auto at = built.unit_offsets[static_cast<std::size_t>(unit)];
+            const auto size = built.unit_offsets[static_cast<std::size_t>(unit) + 1] - at;
             std::copy_n(by_b.begin() + static_cast<std::ptrdiff_t>(at), size,
                         spliced.begin() + static_cast<std::ptrdiff_t>(at));
             ++from_b;
@@ -325,12 +408,28 @@ TEST_CASE("frames signed under two keys, spliced, verify under the keyring", "[t
     CHECK(no_keys.totals.valid == 0);
     CHECK(no_keys.totals.mismatch == built.frames);
 
-    // The first accepting key's index comes with the frame.
-    const std::vector<std::byte> region = signed_region(b, testing::sample_spec(1));
-    const KeyringVerdict verdict = verify_evolution_frame_any(region, ring);
+    // The first accepting key's index comes with the unit.
+    const std::vector<std::byte> unit = signed_unit(b, testing::sample_spec(1));
+    const KeyringVerdict verdict = verify_evolution_unit_any(unit, ring);
     CHECK(verdict.result == VerifyResult::kValid);
     CHECK(verdict.key_index == 1);
-    CHECK(verify_evolution_frame_any(region, {}).result == VerifyResult::kMismatch);
+    CHECK(verify_evolution_unit_any(unit, {}).result == VerifyResult::kMismatch);
+}
+
+TEST_CASE("a cut or joined stream keeps every per-frame tag valid", "[truehd][signing]") {
+    // The tag is per frame and carries nothing from one unit to the next: whole units dropped or
+    // joined leave each remaining tag good. This is a property of the format's element, not a
+    // weakness to fix here, and it is why a tag is not a stream signature.
+    const BuiltStream built = build_stream();
+    std::vector<std::byte> stream = built.bytes;
+    const SigningKey key = key_a();
+    REQUIRE(sign_evolution_stream(stream, key) == built.frames);
+    // A stream joined to itself: every tag of both halves is still valid.
+    std::vector<std::byte> joined = stream;
+    joined.insert(joined.end(), stream.begin(), stream.end());
+    const VerifySummary twice = verify_evolution_stream(joined, key);
+    CHECK(twice.valid == 2 * built.frames);
+    CHECK(twice.mismatch == 0);
 }
 
 TEST_CASE("a tag is present without a key once a frame is signed", "[truehd][signing]") {
@@ -342,17 +441,23 @@ TEST_CASE("a tag is present without a key once a frame is signed", "[truehd][sig
     CHECK_FALSE(has_evolution_tag(bytes_of({0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF})));
     // An unsigned frame: the field is all zero.
     const FrameSpec spec = testing::sample_spec(5);
-    std::vector<std::byte> region = testing::build_region(spec);
-    CHECK_FALSE(has_evolution_tag(region));
+    CHECK_FALSE(has_evolution_tag(testing::build_region(spec)));
     // Signed: present, with no key given to the call.
-    REQUIRE(sign_evolution_frame(region, key));
-    CHECK(has_evolution_tag(region));
+    std::vector<std::byte> unit = testing::build_unit(spec);
+    REQUIRE(sign_evolution_unit(unit, key));
+    const auto parsed = parse_access_unit(unit, 0, true);
+    REQUIRE(parsed.has_value());
+    CHECK(has_evolution_tag(parsed->extra_data->bytes));
+    CHECK(count_evolution_tags(unit) == 1);
     // A tag nobody here can reproduce is "present" too, and a mismatch under verify.
     FrameSpec foreign = spec;
     foreign.primary = bytes_of({1, 2, 3, 4});
-    const std::vector<std::byte> other = testing::build_region(foreign);
-    CHECK(has_evolution_tag(other));
-    CHECK(verify_evolution_frame(other, key) == VerifyResult::kMismatch);
+    const std::vector<std::byte> other = testing::build_unit(foreign);
+    const auto other_parsed = parse_access_unit(other, 0, true);
+    CHECK(has_evolution_tag(other_parsed->extra_data->bytes));
+    CHECK(verify_evolution_unit(other, key) == VerifyResult::kMismatch);
+    // An unsigned stream has none.
+    CHECK(count_evolution_tags(build_stream().bytes) == 0);
 }
 
 TEST_CASE("a frame with more in the extra data than the tag covers does not verify",
@@ -363,40 +468,49 @@ TEST_CASE("a frame with more in the extra data than the tag covers does not veri
     SECTION("bytes after the container inside the payload") {
         FrameSpec wide = spec;
         wide.trailing = bytes_of({0xAB, 0xCD});
-        // The right tag for those bytes, worked out by the test: the digest matches.
+        // The right tag for the rest of the unit, worked out by the test: the digest matches.
         const FrameSpec tagged = testing::signed_spec(key, wide);
-        const std::vector<std::byte> region = testing::build_region(tagged);
-        CHECK(verify_evolution_frame(region, key) == VerifyResult::kMismatch);
-        std::vector<std::byte> copy = region;
-        CHECK_FALSE(sign_evolution_frame(copy, key));
-        CHECK(copy == region);
+        const std::vector<std::byte> unit = testing::build_unit(tagged);
+        CHECK(verify_evolution_unit(unit, key) == VerifyResult::kMismatch);
+        std::vector<std::byte> copy = unit;
+        CHECK_FALSE(sign_evolution_unit(copy, key));
+        CHECK(copy == unit);
     }
-    SECTION("a second frame beside the first") {
+    SECTION("a second frame beside the first, in the padding") {
         const FrameSpec tagged = testing::signed_spec(key, spec);
         const std::vector<std::byte> second = testing::build_frame(testing::sample_spec(8));
-        const std::vector<std::byte> region =
-            testing::build_region(testing::build_frame(tagged), second);
+        const std::vector<std::byte> unit =
+            testing::build_unit(testing::build_region(testing::build_frame(tagged), second));
         // The first frame on its own is valid; with a second one next to it, it is not.
-        CHECK(verify_evolution_frame(testing::build_region(tagged), key) == VerifyResult::kValid);
-        CHECK(verify_evolution_frame(region, key) == VerifyResult::kMismatch);
+        CHECK(verify_evolution_unit(testing::build_unit(tagged), key) == VerifyResult::kValid);
+        CHECK(verify_evolution_unit(unit, key) == VerifyResult::kMismatch);
+        std::vector<std::byte> copy =
+            testing::build_unit(testing::build_region(testing::build_frame(spec), second));
+        CHECK_FALSE(sign_evolution_unit(copy, key));
     }
     SECTION("the container alone is valid") {
-        const std::vector<std::byte> region =
-            testing::build_region(testing::signed_spec(key, spec));
-        CHECK(verify_evolution_frame(region, key) == VerifyResult::kValid);
+        const std::vector<std::byte> unit = testing::build_unit(testing::signed_spec(key, spec));
+        CHECK(verify_evolution_unit(unit, key) == VerifyResult::kValid);
     }
 }
 
-TEST_CASE("extra data with no readable frame is neither verified nor failed", "[truehd][signing]") {
+TEST_CASE("a unit with no readable frame is neither verified nor failed", "[truehd][signing]") {
     const SigningKey key = key_a();
-    CHECK(verify_evolution_frame({}, key) == VerifyResult::kNoContainer);
-    CHECK(verify_evolution_frame(std::vector<std::byte>(8, std::byte{0}), key) ==
-          VerifyResult::kNoContainer);
+    // No extra data at all, and the padding-only form.
+    const std::vector<std::byte> bare = testing::stereo_unit(true);
+    CHECK(verify_evolution_unit(bare, key) == VerifyResult::kNoContainer);
+    CHECK(verify_evolution_unit(testing::build_unit(std::vector<std::byte>(8, std::byte{0})),
+                                key) == VerifyResult::kNoContainer);
     // A frame that ends inside a payload does not read.
     std::vector<std::byte> region = testing::build_region(testing::sample_spec(1));
     region[3] = static_cast<std::byte>(3);  // a frame length that cuts it short
-    CHECK(verify_evolution_frame(region, key) == VerifyResult::kNoContainer);
-    CHECK_FALSE(sign_evolution_frame(region, key));
+    std::vector<std::byte> broken = testing::build_unit(region);
+    CHECK(verify_evolution_unit(broken, key) == VerifyResult::kNoContainer);
+    CHECK_FALSE(sign_evolution_unit(broken, key));
+    // Bytes that are not a unit are no container either.
+    std::vector<std::byte> junk(40, std::byte{0x55});
+    CHECK(verify_evolution_unit(junk, key) == VerifyResult::kNoContainer);
+    CHECK_FALSE(sign_evolution_unit(junk, key));
 }
 
 TEST_CASE("the gate passes the units that verify and removes the object layer from the rest",
@@ -412,13 +526,16 @@ TEST_CASE("the gate passes the units that verify and removes the object layer fr
     int under_b = 0;
     int unsigned_units = 0;
     for (std::size_t i = 0; i < built.evolution_units.size(); ++i) {
-        const auto [at, size] = extra_of(built, built.evolution_units[i]);
-        const std::span<std::byte> region = std::span<std::byte>(stream).subspan(at, size);
+        const int index = built.evolution_units[i];
+        const auto from = built.unit_offsets[static_cast<std::size_t>(index)];
+        const auto unit = std::span<std::byte>(stream).subspan(
+            from, built.unit_offsets[static_cast<std::size_t>(index) + 1] - from);
+        const int inherited = index == 0 ? 0 : 1;  // only the first unit carries a major sync
         if (i % 3 == 0) {
-            REQUIRE(sign_evolution_frame(region, a));
+            REQUIRE(sign_evolution_unit(unit, a, inherited));
             ++under_a;
         } else if (i % 3 == 1) {
-            REQUIRE(sign_evolution_frame(region, b));
+            REQUIRE(sign_evolution_unit(unit, b, inherited));
             ++under_b;
         } else {
             ++unsigned_units;
@@ -468,6 +585,12 @@ TEST_CASE("the gate passes the units that verify and removes the object layer fr
     CHECK(expected == gated->bytes);
     // The bed plays the same as the stream it was cut from.
     CHECK(decode_stream(gated->bytes) == decode_stream(built.bytes));
+    // A gated stream has no evolution frame that fails its tag, so no two in a row (which a
+    // licensed decoder with the Atmos flag set treats as fatal, where one is tolerated): what is
+    // left is the frames that verify, and that is by construction, not by luck.
+    const KeyringSummary left = verify_evolution_stream_any(gated->bytes, ring_a);
+    CHECK(left.totals.mismatch == 0);
+    CHECK(left.totals.valid == under_a);
 
     // With both keys the units signed under B pass as well; with none, every frame is gated.
     const std::array<SigningKey, 2> both{a, b};
@@ -479,6 +602,10 @@ TEST_CASE("the gate passes the units that verify and removes the object layer fr
     REQUIRE(closed.has_value());
     CHECK(closed->summary.passed == 0);
     CHECK(closed->summary.gated == built.frames);
+    // With no key every frame goes, and what is left has none to fail.
+    const KeyringSummary none_left = verify_evolution_stream_any(closed->bytes, ring_a);
+    CHECK(none_left.totals.valid == 0);
+    CHECK(none_left.totals.mismatch == 0);
 }
 
 TEST_CASE("a stream with no object layer gates to itself", "[truehd][signing][gate]") {
@@ -560,22 +687,21 @@ std::vector<std::byte> from_hex(const std::string& text) {
 
 TEST_CASE("the Python transcription writes the same bytes as the C++ signer",
           "[truehd][signing][reference]") {
-    // Regions: the extra data of an encoded stream's units, and one of each length code under both
-    // readings. The key is made here from a seed; it goes to the script in a file in a directory
-    // this test makes and removes.
+    // Access units: those of an encoded stream that carry a frame, and one of each length code
+    // under both readings. The key is made here from a seed; it goes to the script in a file in a
+    // directory this test makes and removes.
     const SigningKey key = key_a();
     const BuiltStream built = build_stream();
     struct Case {
-        std::vector<std::byte> region;
+        std::vector<std::byte> unit;
+        int inherited;
         EvolutionReading reading;
     };
     std::vector<Case> cases;
     for (const int unit : built.evolution_units) {
-        const auto [at, size] = extra_of(built, unit);
-        cases.push_back(
-            {std::vector<std::byte>(built.bytes.begin() + static_cast<std::ptrdiff_t>(at),
-                                    built.bytes.begin() + static_cast<std::ptrdiff_t>(at + size)),
-             EvolutionReading::kEmdf});
+        const auto bytes = unit_of(built, built.bytes, unit);
+        cases.push_back({std::vector<std::byte>(bytes.begin(), bytes.end()), unit == 0 ? 0 : 1,
+                         EvolutionReading::kEmdf});
     }
     for (const unsigned code : kCodes) {
         for (const bool spec36 : {false, true}) {
@@ -584,7 +710,7 @@ TEST_CASE("the Python transcription writes the same bytes as the C++ signer",
             spec.secondary_code = code == 2 ? 1U : 0U;
             spec.secondary = bytes_of({0x3C});
             spec.spec36 = spec36;
-            cases.push_back({testing::build_region(spec),
+            cases.push_back({testing::build_unit(spec), 0,
                              spec36 ? EvolutionReading::kSpec36 : EvolutionReading::kEmdf});
         }
     }
@@ -609,11 +735,13 @@ TEST_CASE("the Python transcription writes the same bytes as the C++ signer",
         nlohmann::json job;
         job["key"] = hex_of(key.bytes());
         job["reading"] = reading == EvolutionReading::kEmdf ? "emdf" : "spec36";
-        job["regions"] = nlohmann::json::array();
+        job["units"] = nlohmann::json::array();
+        job["inherited"] = nlohmann::json::array();
         std::vector<const Case*> used;
         for (const Case& one : cases) {
             if (one.reading == reading) {
-                job["regions"].push_back(hex_of(one.region));
+                job["units"].push_back(hex_of(one.unit));
+                job["inherited"].push_back(one.inherited);
                 used.push_back(&one);
             }
         }
@@ -645,13 +773,13 @@ TEST_CASE("the Python transcription writes the same bytes as the C++ signer",
         REQUIRE(result["signed"].size() == used.size());
         for (std::size_t i = 0; i < used.size(); ++i) {
             CAPTURE(i);
-            std::vector<std::byte> mine = used[i]->region;
-            REQUIRE(sign_evolution_frame(mine, key, reading));
+            std::vector<std::byte> mine = used[i]->unit;
+            REQUIRE(sign_evolution_unit(mine, key, used[i]->inherited, reading));
             REQUIRE_FALSE(result["signed"][i].is_null());
             CHECK(result["signed"][i].get<std::string>() == hex_of(mine));
             CHECK(result["verdicts"][i].get<std::string>() == "valid");
-            CHECK(verify_evolution_frame(from_hex(result["signed"][i].get<std::string>()), key,
-                                         reading) == VerifyResult::kValid);
+            CHECK(verify_evolution_unit(from_hex(result["signed"][i].get<std::string>()), key,
+                                        used[i]->inherited, reading) == VerifyResult::kValid);
         }
     }
     CHECK(ran);
@@ -668,12 +796,11 @@ std::string read_text(const std::filesystem::path& path) {
 
 TEST_CASE("the signer and its tests contain no key constant", "[truehd][signing][no-key]") {
     const std::filesystem::path root(ICLFORGE_TRUEHD_SIGNING_SOURCE_DIR);
-    const std::array<std::filesystem::path, 5> files{
+    const std::array<std::filesystem::path, 4> files{
         root / "include/iclforge/truehd/signing/evolution_signer.hpp",
         root / "src/signing/evolution_signer.cpp",
         root / "tests/signing/test_evolution_signer.cpp",
         root / "tests/support/evolution_support.hpp",
-        root / "tests/signing/test_content_signer.cpp",
     };
     // A run of eight or more 0xHH bytes, a quoted run of 24 or more base64 characters, a run of 32
     // or more hex digits: the three shapes a key written into source takes. The patterns are built
@@ -684,9 +811,7 @@ TEST_CASE("the signer and its tests contain no key constant", "[truehd][signing]
     const std::regex hex_run(std::string("[0-9A-Fa-f]") + "{32,}");
     int scanned = 0;
     for (const auto& file : files) {
-        if (!std::filesystem::exists(file)) {
-            continue;  // test_content_signer.cpp arrives with Rev 3
-        }
+        REQUIRE(std::filesystem::exists(file));
         ++scanned;
         const std::string text = read_text(file);
         CAPTURE(file.string());
@@ -694,7 +819,7 @@ TEST_CASE("the signer and its tests contain no key constant", "[truehd][signing]
         CHECK_FALSE(std::regex_search(text, base64_literal));
         CHECK_FALSE(std::regex_search(text, hex_run));
     }
-    CHECK(scanned >= 4);
+    CHECK(scanned == 4);
 }
 
 }  // namespace

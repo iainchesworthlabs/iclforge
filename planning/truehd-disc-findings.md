@@ -84,3 +84,72 @@ TrueHD + Atmos 7.1 streams (streams 2, 5 and 8 of the clip), each 48 kHz. A 60 s
 - **`ch_assign` changes mid-stream.** Stream 2's second and third substreams change their `ch_assign` at a restart (from
   (4,5,1,0,2,3) to (4,5,2,1,0,3), for example), so a permutation is not fixed for a stream; the fix handles it.
 - `peak_data_rate` raw: 1849, 1792 and 1817 (against 2417 on the first disc); `twoch_control_enabled` is set here and not there.
+
+## The rest of the owner's discs (2026-10-31)
+
+`forge probe detail=format` (forge built from `1e4ee5c3e`) on the 60 s excerpts the other sessions had already cut: the three *Dune: Part Two* streams above, *The Lord of the
+Rings: The Two Towers* (`D:/ac3bld/bd-lotr/lotr.thd`) and a Hans Zimmer concert disc (`D:/ac3bld/bd-zimmer/zimmer.thd`), beside *Blade Runner 2049* again. Nothing from the
+discs is committed; the probe texts are in `D:/ac3bld/truehd-validation-probes/`. All six streams are Atmos with four substreams; **no non-Atmos TrueHD disc, no 5.1 Atmos disc
+and no Matroska or MP4 rip has been probed yet**, so ERRATA 15 (`substream_info` for one and three substreams) and the question whether a container carries an Atmos flag are not
+answered.
+
+| | *Blade Runner 2049* | *Dune* s2 | *Dune* s5 | *Dune* s8 | *Two Towers* | Zimmer |
+|---|---|---|---|---|---|---|
+| Substreams (channels) | 2, 6, 8, 12 | 2, 6, 8, 12 | 2, 6, 8, 12 | 2, 6, 8, 12 | 2, 6, 8, 12 | 2, 6, 8, 14 |
+| `peak_data_rate` raw (Mbit/s) | 2417 (7.25) | 1849 (5.55) | 1792 (5.38) | 1817 (5.45) | 1673 (5.02) | 3147 (9.44) |
+| 2 channel control bit | off | on | on | on | off | on |
+| Dialogue norm 2ch / 6ch / 8ch, mix level 2ch / 6ch / 8ch, source format | 37 / 31 / 31, 29 / 35 / 35, 0 | the same | the same | the same | the same | the same |
+| Standard DRC start-up gain (first major sync) | -40 | -64 | -6 | -6 | -26 | -25 |
+| Extra-data regions (all with nibble, framing, parity, `evo_reserved` and length right) | 1,895 | 1,897 | 1,897 | 1,897 | 1,897 | 1,893 |
+| Payload 11 (bytes) | 50 | 50 | 50 | 50 | 50 | 57 to 58 |
+| Segments passing parity and CRC | 291,012 of 291,012 | 291,368 | 291,340 | 291,308 | 291,448 | 290,812 |
+| Lossless-check intervals ok / failed (lenient, every substream) | 1,704 / 0 | 1,707 / 0 | 1,707 / 0 | 1,704 / 0 | 1,725 / 0 | 1,701 / 0 |
+| `data_check_present` set | 0 | 0 | 0 | 0 | 0 | 0 |
+| Terminators after the last block | none in 72,753 units | none | none | none | none | none |
+| The 16 bits that end the restart header's fixed part | 0x0000 x314, 0x8000 x255 | 0x0000 x331, 0x8000 x239 | x332, x238 | x330, x239 | x334, x242 | x331, x237 |
+| Matrices with LSB bypass | 0 | 26 | 0 | 0 | 5 | 0 |
+
+What it settles, with the library's readings unchanged:
+
+- **ERRATA 19 (the extra data's length and check nibble):** 11,376 regions on six streams of four discs, every one passes the check nibble as the library has it now, the framing, the parity
+  byte, `evo_reserved` zero and the capacity rule. The Zimmer disc's payloads are 7 or 8 bytes longer than the others' (57 to 58 bytes against 50) and still fit. This is the evidence the owner accepted
+  (2026-10-31) in place of a DEE score, which cannot be had without an Atmos master that scores a leg.
+- **ERRATA 3 (terminators):** none on any substream of any of the six streams. **ERRATA 9:** `data_check_present` is 0 everywhere, so the block data CRC still has no oracle.
+- **ERRATA 10:** the 16 bits are 0x0000 or 0x8000 in every restart header of every stream and the heavy DRC gain is 0 at every major sync; the bit at 0x8000 is set in 41 to 45 % of the restart headers
+  and is the same in all four substreams of a header. Where the heavy-DRC gate sits is still not told.
+- **ERRATA 2 and 44:** `extra_channel_meaning_length` is 1 in every major sync of every stream (the 4-byte extension, a 32-byte major sync), the 16-channel count field is 11 (13 on the Zimmer disc, whose
+  last substream has 14 channels); a larger length has not been seen. **ERRATA 46:** `extended_substream_info` is 3 in all six, `substream_info` 0xFC.
+- **ERRATA 51 to 55:** the channel meaning is the same on all six streams: dialogue norm 37 (2 channel) and 31 (6 and 8 channel), mix level 29 and 35, source format 0, the 2 channel control bit set on the
+  *Dune* and Zimmer discs and clear on the other two. DEE writes the same values for a dialogue norm of 31 (`planning/truehd-validation.md`, ERRATA 51).
+- **ERRATA 12 (`peak_data_rate`):** raw values 1673 to 3147 at 48 kHz, 5.0 to 9.4 Mbit/s with `(raw x rate + 8) >> 4`.
+- **Decoding:** the lenient decode of every substream stops on the 12 or 14 channel substream's matrices (`parameter out of range`, ERRATA "Not done" above, `frac_bits` above 14); the lossless checks of the substreams
+  it does decode (0 to 2) pass in every interval of every stream.
+
+## A seventh stream: the disc labelled CIVIL_WAR_UHD (2026-10-31)
+
+The owner's fifth disc, a UHD Blu-ray image mounted read-only at `G:` (label `CIVIL_WAR_UHD`, UDF), said to be a 5.1 Atmos disc. Main feature `BDMV/STREAM/00000.m2ts` (72.7 GB) holds one
+TrueHD stream (`ffprobe`: stream 2, `Dolby TrueHD + Dolby Atmos`, 48000 Hz, 8 channels), beside three AC-3 streams. A 60 s excerpt from 900 s was cut with `-c copy` (23.3 MB,
+`D:/ac3bld/bd-civilwar/excerpt-2.thd`) and probed with `detail=format` (`probe-2.txt`, `probe-2.json` beside it). Nothing from the disc is committed.
+
+**It does not answer ERRATA 15.** The stream has the same four substreams as the 7.1 discs (2, 6, 8 and 12 channels, `substream_info` 0xFC, `extended_substream_info` 3), so `substream_info` for one and
+three substreams is still unseen, and the disc is "5.1" only in its bed. What it adds:
+
+| | CIVIL_WAR_UHD |
+|---|---|
+| Substreams (channels) | 2, 6, 8, 12 |
+| `peak_data_rate` raw (Mbit/s) | 2411 (7.23) |
+| 2 channel control bit | on |
+| Dialogue norm 2ch / 6ch / 8ch, mix level 2ch / 6ch / 8ch, source format | 37 / 31 / 31, 29 / 35 / 35, 0 (the same as the other six streams) |
+| Start-up gains, heavy / standard | 0 / -4 |
+| Extra-data regions (nibble, framing, parity, `evo_reserved`, length all right) | 1,893, 58-byte frames, payload 11 of 50 bytes, 38 to 39 units apart |
+| Segments passing parity and CRC | 290,908 of 290,908 |
+| Lossless-check intervals ok / failed (lenient, every substream) | 1,704 / 0 |
+| `data_check_present` set | 0 |
+| Terminators after the last block | none in 72,727 units |
+| The 16 bits that end the restart header's fixed part | 0x0000 x316, 0x8000 x253 |
+| Matrices with LSB bypass | 0 |
+| Major syncs with a different channel meaning | 13 (the first is shown) |
+
+So ERRATA 3, 9, 10, 19, 44, 46 and 51 to 55 hold on a seventh stream of a fifth disc, with nothing new: the extra data are 1,893 more regions (13,269 on seven streams in all) and the
+channel meaning is the same constants again. The lenient decode stops on the 12 channel substream's matrices, as on the other discs (`parameter out of range` once per major sync, `frac_bits` above 14;
+ERRATA "Not done" above). The 60 s excerpt was the only part read.

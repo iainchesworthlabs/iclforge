@@ -63,10 +63,12 @@ ClusterResult cluster(const std::vector<ClusterObject>& objects, const ClusterCo
     return *result;
 }
 
-// The render the intended way, one object at a time: each dynamic object panned to the bed at its
+// The render the intended way, under the ring law (the tests of the chain and the ramps are about the
+// matrices, not the law: see test_render_bed.cpp and test_bed_pan.cpp for the measured one), one object
+// at a time: each dynamic object panned to the bed at its
 // own place and gain, a pinned object straight to its row. [row][sample], from the definition.
 std::vector<std::vector<double>> intended_bed(const std::vector<ClusterObject>& objects,
-                                              std::size_t samples) {
+                                              std::size_t samples, PanLaw law) {
     std::vector<std::vector<double>> bed(kBedRows, std::vector<double>(samples, 0.0));
     for (const ClusterObject& object : objects) {
         for (std::size_t t = 0; t < samples; ++t) {
@@ -90,7 +92,7 @@ std::vector<std::vector<double>> intended_bed(const std::vector<ClusterObject>& 
             if (object.bed_row >= 0) {
                 bed[static_cast<std::size_t>(object.bed_row)][t] += v;
             } else {
-                const auto pan = pan_to_bed(k.x, k.y, k.z);
+                const auto pan = pan_to_bed(k.x, k.y, k.z, law);
                 for (std::size_t row = 0; row < kBedRows; ++row) {
                     bed[row][t] += v * pan[row];
                 }
@@ -180,12 +182,12 @@ TEST_CASE("two objects that cross keep their elements, move their elements with 
         CHECK(result.placements[b][9].y == Approx(0.45 - 0.2 * f).margin(1e-9));
     }
     // the render: gains meet at every boundary and the decoded bed is close to the intended one
-    const RenderPlan plan = make_render_plan(result);
+    const RenderPlan plan = make_render_plan(result, PanLaw::kRing);
     REQUIRE(plan.sections.size() == 50);
     for (std::size_t s = 0; s + 1 < plan.sections.size(); ++s) {
         CHECK(plan.sections[s].end == plan.sections[s + 1].begin);
     }
-    const double db = error_db(intended_bed(objects, samples), planned_bed(result, plan));
+    const double db = error_db(intended_bed(objects, samples, PanLaw::kRing), planned_bed(result, plan));
     CAPTURE(db);
     CHECK(db < -35.0);
 }
@@ -206,7 +208,7 @@ TEST_CASE("the crossing's bed matrices, a block at a time, rebuild the elements 
     objects[1].pcm = b_pcm;
     objects[1].keys = {key(0, 0.2, 0.45), key(23999, 0.8, 0.25)};
     const ClusterResult result = cluster(objects, config_of());
-    const RenderPlan plan = make_render_plan(result);
+    const RenderPlan plan = make_render_plan(result, PanLaw::kRing);
 
     std::vector<std::vector<double>> decoded(kBedRows, std::vector<double>(samples, 0.0));
     ObjectChainShape shape;
@@ -231,7 +233,7 @@ TEST_CASE("the crossing's bed matrices, a block at a time, rebuild the elements 
         apply_object_chain(chain, shape, bypass, rows);
         REQUIRE(rows == elements);
     }
-    const double db = error_db(intended_bed(objects, samples), decoded);
+    const double db = error_db(intended_bed(objects, samples, PanLaw::kRing), decoded);
     CAPTURE(db);
     CHECK(db < -40.0);
 }
@@ -246,8 +248,8 @@ TEST_CASE("the planned bed is much closer to the intended one than a bed that ho
     objects[0].pcm = a_pcm;
     objects[0].keys = {key(0, 0.2, 0.25), key(23999, 0.8, 0.45)};
     const ClusterResult result = cluster(objects, config_of());
-    RenderPlan plan = make_render_plan(result);
-    const auto intended = intended_bed(objects, samples);
+    RenderPlan plan = make_render_plan(result, PanLaw::kRing);
+    const auto intended = intended_bed(objects, samples, PanLaw::kRing);
     const double ramped = error_db(intended, planned_bed(result, plan));
     for (RenderSection& section : plan.sections) {
         section.end = section.begin;
@@ -504,7 +506,7 @@ TEST_CASE("the crossing is written with the plan's paths and its bed is close to
     ClusterConfig config = config_of(elements);
     config.section_samples = 480;
     const ClusterResult result = cluster(objects, config);
-    const RenderPlan plan = make_render_plan(result);
+    const RenderPlan plan = make_render_plan(result, PanLaw::kRing);
 
     EncoderConfig writer;
     writer.channels = 8;
@@ -536,7 +538,7 @@ TEST_CASE("the crossing is written with the plan's paths and its bed is close to
             decoded[row][t] = bed[t * kBedRows + row];
         }
     }
-    const double db = error_db(intended_bed(objects, samples), decoded);
+    const double db = error_db(intended_bed(objects, samples, PanLaw::kRing), decoded);
     CAPTURE(db);
     CHECK(db < -35.0);
 }
