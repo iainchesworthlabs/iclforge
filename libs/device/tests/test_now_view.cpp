@@ -436,6 +436,11 @@ TEST_CASE("now_view: a stream is named for its codec and the layout it was coded
           "Dolby Digital 2.0");
     CHECK(nv::stream_name({.codec = Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true}) ==
           "Dolby Digital Plus 5.1");
+    CHECK(nv::stream_name({.codec = Codec::kTruehd}) == "Dolby TrueHD");
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 2, .lfe = false}) ==
+          "Dolby TrueHD 2.0");
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true}) ==
+          "Dolby TrueHD 5.1");
     CHECK(nv::stream_name({.codec = Codec::kAc4, .have_decoder = true, .acmod = 7, .lfe = true}) ==
           "Dolby AC-4 5.1");
 }
