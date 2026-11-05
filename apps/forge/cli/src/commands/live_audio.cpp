@@ -23,6 +23,7 @@
 #include "../support.hpp"
 #include "ac4_channels.hpp"
 #include "associated_mix.hpp"
+#include "iclforge/audio/speakers.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
@@ -233,11 +234,43 @@ int monitor_ac4(std::span<const std::byte> stream, std::string_view in_path,
     return kExitOk;
 }
 
+// The location a TrueHD channel names, for audio::speaker_order (the output's speaker order).
+iclforge::audio::Location truehd_location(iclforge::truehd::Channel channel) {
+    namespace th = iclforge::truehd;
+    using Location = iclforge::audio::Location;
+    switch (channel) {
+        case th::Channel::kL: return Location::kLeft;
+        case th::Channel::kR: return Location::kRight;
+        case th::Channel::kC: return Location::kCentre;
+        case th::Channel::kLfe: return Location::kLfe;
+        case th::Channel::kLs: return Location::kLeftSurround;
+        case th::Channel::kRs: return Location::kRightSurround;
+        case th::Channel::kLvh: return Location::kVhl;
+        case th::Channel::kRvh: return Location::kVhr;
+        case th::Channel::kLc: return Location::kLc;
+        case th::Channel::kRc: return Location::kRc;
+        case th::Channel::kLrs: return Location::kLrs;
+        case th::Channel::kRrs: return Location::kRrs;
+        case th::Channel::kCs: return Location::kCs;
+        case th::Channel::kTs: return Location::kTs;
+        case th::Channel::kLsd: return Location::kLsd;
+        case th::Channel::kRsd: return Location::kRsd;
+        case th::Channel::kLw: return Location::kLw;
+        case th::Channel::kRw: return Location::kRw;
+        case th::Channel::kCvh: return Location::kVhc;
+        case th::Channel::kLfe2: return Location::kLfe2;
+    }
+    return Location::kLeft;
+}
+
 // TrueHD and MLP: the decode of the presentation truehd-presentation= names, played as the units
 // decode (the channels in the order `decode` writes them, which is the WAV order the output
 // takes). The output is asked for the stream's own channel count and rate: the shared-mode device
 // says no if it does not take eight channels or 192 kHz, and the sentence says which it was
-// (planning/truehd-parity-forge.md, row L2).
+// (planning/truehd-parity-forge.md, row L2). The channels go to the device in the order of its
+// speaker mask, which is not the stream's for 7.1 (the side surrounds come ahead of the rears in
+// the stream, behind them in the mask); a stream with a channel no speaker bit names (the second
+// LFE, the wide and surround-direct pairs) is sent in its own order, and the status line says so.
 int monitor_truehd(std::span<const std::byte> stream, std::string_view in_path,
                    const MonitorTarget& target, const Options& meta) {
     namespace th = iclforge::truehd;
@@ -261,6 +294,7 @@ int monitor_truehd(std::span<const std::byte> stream, std::string_view in_path,
     std::size_t index = 0;
     std::size_t errors = 0;
     std::vector<float> chunk;
+    iclforge::audio::SpeakerOrder device_order;
     while (const auto unit = reader.next()) {
         const auto result = decoder.decode(*unit);
         ++index;
@@ -281,7 +315,15 @@ int monitor_truehd(std::span<const std::byte> stream, std::string_view in_path,
         if (channels == 0) {
             channels = decoded.channels;
             rate = decoded.sample_rate;
-            const auto started = sink.start(target.id, rate, static_cast<std::uint16_t>(channels));
+            std::vector<iclforge::audio::Location> locations;
+            if (decoded.layout.size() == static_cast<std::size_t>(channels)) {
+                for (const th::Channel channel : decoded.layout) {
+                    locations.push_back(truehd_location(channel));
+                }
+            }
+            device_order = iclforge::audio::speaker_order(locations);
+            const auto started = sink.start(target.id, rate, static_cast<std::uint16_t>(channels),
+                                            device_order.mask);
             if (!started.has_value()) {
                 fmt::println(stderr, "error: {} ({} channel(s) at {} Hz)",
                              iclforge::audio::describe(started.error()), channels, rate);
@@ -295,6 +337,11 @@ int monitor_truehd(std::span<const std::byte> stream, std::string_view in_path,
             status_println(status_stream(), "monitoring {} (TrueHD, {} channels{}, {} Hz) on \"{}\"…",
                            in_path, channels, names.empty() ? "" : " (" + names + ")", rate,
                            target.name);
+            if (!device_order.placed() && channels > 2) {
+                status_println(status_stream(),
+                               "  a channel here has no speaker of its own on the output: the "
+                               "channels are sent in the stream's order");
+            }
         } else if (decoded.channels != channels || decoded.sample_rate != rate) {
             fmt::println(stderr, "error: {}: access unit {}: the channel count or the rate changes",
                          in_path, index);
@@ -302,8 +349,18 @@ int monitor_truehd(std::span<const std::byte> stream, std::string_view in_path,
             return kExitInput;
         }
         chunk.resize(decoded.pcm.size());
-        for (std::size_t i = 0; i < decoded.pcm.size(); ++i) {
-            chunk[i] = static_cast<float>(decoded.pcm[i]) / 8388608.0F;
+        if (device_order.placed()) {
+            const std::size_t width = device_order.source.size();
+            for (std::size_t frame = 0; frame + width <= decoded.pcm.size(); frame += width) {
+                for (std::size_t out = 0; out < width; ++out) {
+                    chunk[frame + out] =
+                        static_cast<float>(decoded.pcm[frame + device_order.source[out]]) / 8388608.0F;
+                }
+            }
+        } else {
+            for (std::size_t i = 0; i < decoded.pcm.size(); ++i) {
+                chunk[i] = static_cast<float>(decoded.pcm[i]) / 8388608.0F;
+            }
         }
         if (!iclforge::apps::submit_while_running(sink, std::chrono::milliseconds(4), chunk)) {
             fmt::println(stderr, "error: \"{}\" went away ({}); playback stopped", target.name,

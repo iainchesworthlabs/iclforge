@@ -2783,3 +2783,38 @@ TEST_CASE("truehd-encode places the channels of several sources by name with map
         CHECK_FALSE(fs::exists(stream));
     }
 }
+
+TEST_CASE("monitor takes eight channels and the high rates, or names the one the output refused",
+          "[forge-cli][truehd][monitor]") {
+    // Like the case above: a machine with speakers plays a short burst (and sends the channels in
+    // the output's own speaker order, so no note that they are left in the stream's); one with
+    // none says why, and the sentence names the channel count and the rate that were asked for.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "monitor_wide.log";
+    // Eight channels at 96 kHz, and the six that 192 kHz allows (TH spec 9.6, 21.6).
+    for (const std::uint32_t rate : {96000U, 192000U}) {
+        const std::uint32_t channels = rate > 96000U ? 6U : 8U;
+        const std::string layout_names = channels == 8U ? "L R C LFE Ls Rs Lrs Rrs" : "L R C LFE Ls Rs";
+        const std::string name = "monitor_wide_" + std::to_string(rate);
+        const fs::path wav = dir / (name + ".wav");
+        const fs::path stream = dir / (name + ".thd");
+        write_wav(wav, rate, channels, channels == 8U ? 0x63F : 0x60F, marked_samples(rate / 20, channels, 7));
+        // Noise at 8 channels and these rates is past the peak rate; the stream is what is wanted here.
+        const int encoded = run_cli("truehd-encode " + cli_arg(wav) + cli_arg(stream) + "truehd-rate-check=lenient", log);
+        INFO(read_text(log));
+        REQUIRE(encoded == 0);
+        const int code = run_cli("monitor " + cli_arg(stream), log);
+        const std::string text = read_text(log);
+        INFO("rate " << rate << ": " << text);
+        CHECK(code != kExitUsage);
+        CHECK(text.find("does not read") == std::string::npos);
+        if (code == 0) {
+            CHECK(text.find("(TrueHD, " + std::to_string(channels) + " channels (" + layout_names + "), " +
+                            std::to_string(rate) + " Hz)") != std::string::npos);
+            CHECK(text.find("sent in the stream's order") == std::string::npos);
+        } else {
+            CHECK(text.find("(" + std::to_string(channels) + " channel(s) at " + std::to_string(rate) +
+                            " Hz)") != std::string::npos);
+        }
+    }
+}
