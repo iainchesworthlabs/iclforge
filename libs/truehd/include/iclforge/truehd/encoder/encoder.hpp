@@ -194,7 +194,8 @@ struct EncoderConfig {
     // presentations are 12, 14 and 16, §15.17; the owner's discs have 12), written with restart
     // sync 0x31EC and the 16-channel extension of the major sync (§14.2). 0 writes none. The PCM
     // given to encode() then has `channels` + `object_channels` values a frame: the 7.1 bed first
-    // (`channels` must be 8, substreams 0 to 2, 48 kHz only, §15.2, §20.2), then the object
+    // (`channels` must be 8, substreams 0 to 2, 48, 96 or 192 kHz, §20.2; the two higher rates are
+    // PROVISIONAL, libs/truehd/notes/feature-truehd-atmos-96-192.md), then the object
     // channels, which (ObjectLayout::kIndependent) are coded as substream 3 on their own, with no
     // matrix or prediction from the bed; `object_layout` says what kBedMatrices changes. A decode
     // of the best presentation gives the bed; Presentation::kAll gives the object channels. The

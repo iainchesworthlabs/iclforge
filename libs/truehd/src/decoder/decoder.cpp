@@ -755,8 +755,10 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         const int rate_shift = major_sync ? std::max(rate_factor(major_sync->ratebits()), 0) : 0;
         const int unit_size = 40 << rate_shift;
         // The ramp of the object matrices' slopes grows by 0x666 >> r, four times, a sample
-        // (ERRATA.md entry 69): 6552 at 48 kHz, where the access unit holds 40 samples.
-        const int ramp_step = (0x666 >> rate_shift) * 4;
+        // (ERRATA.md entry 69): 6552 at 48 kHz, 3276 at 96 kHz and 1636 at 192 kHz, where the
+        // access unit holds 40, 80 and 160 samples. The two higher steps are PROVISIONAL: no
+        // stream at those rates exists to check them (SUBSTREAM3.md section 6).
+        const int ramp_step = object_ramp_step(rate_shift);
         for (int m = 0; m < state.matrix_count; ++m) {
             MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
             const std::uint32_t keep =

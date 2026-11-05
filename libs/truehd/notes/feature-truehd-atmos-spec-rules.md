@@ -56,7 +56,7 @@ addendum relayed by the coordinator. Nothing else under `dee-analysis` was opene
 - **B7 items 1, 7, 8, 9** (extended_substream_info gate on `substream_info` bit 7; the default `kIndependent` layout pairing ext 3 with
   `min_chan` 8 and matrices; `sixteench_channel_count` without the LFE; `normalize` dialnorm): each changes goldens or fixtures across the
   suite and wants its own change and DRP check. Item 1 matters only for an Atmos stream with extended_substream_info 0.
-- **96/192 kHz Atmos output.** Substream 3 is legal at both rates (spec-answers A3), the ramp step is `(0x666 >> r) * 4`, and the width of
+- **96/192 kHz Atmos output (now done, `feature-truehd-atmos-96-192.md`; the text below is the question it answered).** Substream 3 is legal at both rates (spec-answers A3), the ramp step is `(0x666 >> r) * 4`, and the width of
   the scaled fine sum is not settled. Enabling it would need: the encoder's ramp/step per rate and a rate-aware object bed; the rate model
   at 4/8 times the arrival; the OAMD cadence (1536 samples at 48 kHz) and the evolution framing per rate; hand-built fixtures at both rates
   decoded by the Dolby player; a decision on the fine-sum width (an encoder must keep it inside 32 bits). Question for the owner: is the

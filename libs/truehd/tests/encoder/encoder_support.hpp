@@ -74,6 +74,10 @@ inline Encoded encode_all(const EncoderConfig& config, std::span<const std::int3
         }
     }
     auto tail = encoder->flush();
+    if (!tail) {
+        UNSCOPED_INFO("flush failed: " << to_string(tail.error().kind) << ": "
+                                       << tail.error().detail);
+    }
     REQUIRE(tail.has_value());
     for (auto& unit : *tail) {
         out.units.push_back(std::move(unit));

@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "core/noise.hpp"
+#include "iclforge/truehd/core/format.hpp"
 
 namespace iclforge::truehd::detail {
 
@@ -42,10 +43,11 @@ constexpr std::size_t kMatrixChannels = 16;
 }
 
 // The ramp of the slopes grows by this much a sample inside an access unit of `nominal` samples
-// (SUBSTREAM3.md section 3: 6552 at 48 kHz).
+// (SUBSTREAM3.md section 3: 6552 at 48 kHz, 3276 at 96 kHz and 1636 at 192 kHz, where the unit
+// holds 40, 80 and 160 samples; the last two are PROVISIONAL, see object_ramp_step).
 [[nodiscard]] std::int32_t ramp_step_of(int nominal) noexcept {
     const int units = nominal >= 40 && nominal % 40 == 0 ? nominal / 40 : 1;
-    return (0x666 >> std::countr_zero(static_cast<unsigned>(units))) * 4;
+    return object_ramp_step(std::countr_zero(static_cast<unsigned>(units)));
 }
 
 // Generator 1's buffers for every access unit of an interval (ERRATA.md, noise generator 1): the
@@ -107,6 +109,8 @@ class IntervalNoise {
         fine += row * run.slope[c];
     }
     if (run.extension) {
+        // 64-bit `fine`, truncated to 32 bits as the decoder does (kernels.hpp): the width is
+        // PROVISIONAL at 96 and 192 kHz, where no stream shows it.
         const std::int64_t shared =
             run.scale >= 0
                 ? fine >> run.scale

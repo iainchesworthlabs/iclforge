@@ -125,7 +125,7 @@ shift makes that test fail (checked by hand).
    session's element layout and gains (`render_plan.hpp`) can be given as `object_paths`. Nothing here
    reads object metadata (`forge truehd-atmos` still writes `kIndependent`).
 6. **Slopes and the 44.1 / 48 kHz restriction.** The ramp step depends on the unit length
-   (`0x666 >> r`); the encoder only writes 48 kHz Atmos, so the other steps are not exercised.
+   (`0x666 >> r`); the encoder now writes 96 and 192 kHz Atmos too (`feature-truehd-atmos-96-192.md`), so the other steps are exercised by the round trip, provisionally.
 7. **Style.** The brief asks for Allman braces, CAPITAL_SNAKE constants and `m_PascalCase` members; the
    repository's `.clang-format` (Google, 4 spaces) and the code around these files use attached
    braces, `kPascalCase` constants and `name_` members, so the new code follows the surroundings.

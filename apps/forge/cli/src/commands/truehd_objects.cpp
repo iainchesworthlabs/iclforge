@@ -77,6 +77,8 @@ TrueHdObjectSink::TrueHdObjectSink(std::string_view objects_dir, std::string_vie
                                    const std::optional<iclforge::render::OutputLayout>& layout)
     : objects_dir_(objects_dir), adm_out_(adm_out) {
     if (layout) {
+        // The renderer's gains are all that is used, and they do not depend on the rate (the
+        // stream's, 48, 96 or 192 kHz, is read later, in open_files).
         renderer_ = std::make_unique<TrueHdObjectRenderer>(*layout, 48000);
     }
 }
