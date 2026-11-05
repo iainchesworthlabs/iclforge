@@ -10,16 +10,19 @@
 #include <ios>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "truehd_encode_core.hpp"
+#include "truehd_wrap.hpp"
 
 namespace {
 
 namespace th = iclforge::truehd;
 namespace core = iclforge::apps::truehd_encode;
+namespace wrap = iclforge::apps::truehd_wrap;
 
 QString to_qstring(std::string_view text) {
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
@@ -28,6 +31,18 @@ QString to_qstring(std::string_view text) {
 // A path as a shell takes it on any of the three platforms: in double quotes.
 QString quoted(const QString& path) {
     return QStringLiteral("\"%1\"").arg(path);
+}
+
+QString container_label(wrap::Container container) {
+    switch (container) {
+        case wrap::Container::kMatroska:
+            return QStringLiteral("Matroska");
+        case wrap::Container::kMp4:
+            return QStringLiteral("MP4");
+        case wrap::Container::kTransport:
+            return QStringLiteral("a Blu-ray transport stream");
+    }
+    return {};
 }
 
 // Everything one run needs, copied out so the job holds nothing of the controller's.
@@ -87,10 +102,30 @@ Result run(const Job& job, const std::atomic<bool>& stop,
         }
         return result;
     }
+    // The bare stream, or the same access units in the container the output's name asks for.
+    std::vector<std::byte> wrapped;
+    QString container_name;
+    if (const auto container = wrap::container_of(job.output.toStdString())) {
+        const auto scan = wrap::scan_stream(outcome->stream, job.source.toStdString());
+        if (!scan) {
+            result.error = QStringLiteral("The stream could not be wrapped: %1")
+                               .arg(QString::fromStdString(scan.error()));
+            return result;
+        }
+        auto file = wrap::mux(*container, *scan);
+        if (!file) {
+            result.error = QStringLiteral("The stream could not be wrapped: %1")
+                               .arg(QString::fromStdString(file.error()));
+            return result;
+        }
+        wrapped = std::move(*file);
+        container_name = container_label(*container);
+    }
+    const std::vector<std::byte>& bytes = container_name.isEmpty() ? outcome->stream : wrapped;
     std::ofstream out{job.output.toStdString(), std::ios::binary | std::ios::trunc};
     if (out) {
-        out.write(reinterpret_cast<const char*>(outcome->stream.data()),
-                  static_cast<std::streamsize>(outcome->stream.size()));
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
         out.flush();
     }
     if (!out) {
@@ -100,15 +135,16 @@ Result run(const Job& job, const std::atomic<bool>& stop,
     const double pcm_bytes = static_cast<double>(outcome->frames) * outcome->channels * 3.0;
     result.summary =
         QStringLiteral("Wrote %1: %2 channel(s) at %3 Hz, %4 s, %5 access units, %6 restart "
-                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9")
+                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10")
             .arg(job.output)
             .arg(outcome->channels)
             .arg(outcome->sample_rate)
             .arg(static_cast<double>(outcome->frames) / outcome->sample_rate, 0, 'f', 2)
             .arg(outcome->access_units)
             .arg(outcome->stats.restart_intervals)
-            .arg(outcome->stream.size())
+            .arg(bytes.size())
             .arg(100.0 * static_cast<double>(outcome->stream.size()) / pcm_bytes, 0, 'f', 1)
+            .arg(container_name.isEmpty() ? QString() : QStringLiteral(" · in %1").arg(container_name))
             .arg(job.verify ? QStringLiteral(" · verified: every access unit decodes to the input")
                             : QString());
     return result;
@@ -184,8 +220,9 @@ void TruehdEncodeController::chooseOutput(const QUrl& url) {
     if (path.isEmpty()) {
         return;
     }
-    if (QFileInfo{path}.suffix().compare(QStringLiteral("thd"), Qt::CaseInsensitive) != 0) {
-        path += QStringLiteral(".thd");  // this window writes the bare stream
+    if (!wrap::container_of(path.toStdString()) &&
+        QFileInfo{path}.suffix().compare(QStringLiteral("thd"), Qt::CaseInsensitive) != 0) {
+        path += QStringLiteral(".thd");  // anything but a container's name is the bare stream
     }
     output_ = path;
     emit outputChanged();

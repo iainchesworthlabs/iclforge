@@ -3,7 +3,7 @@ import QtTest
 
 import ForgeGui
 
-// Encode TrueHD: a WAV coded losslessly into a bare .thd stream (TruehdEncodeController, the
+// Encode TrueHD: a WAV coded losslessly into a .thd stream or a container (TruehdEncodeController, the
 // dialog TruehdEncodeDialog.qml), the window's twin of `forge truehd-encode`. The proof is a round
 // trip through the window's own other surfaces: the stream it writes opens in the player as
 // TrueHD with the length of the WAV, and passes the integrity gate of QC; the encode's own verify
@@ -75,6 +75,54 @@ TestCase {
         TruehdEncodeController.chooseOutput(Qt.resolvedUrl("_test_output/named_oddly.wav"));
         verify(TruehdEncodeController.outputPath.slice(-4) === ".thd",
                TruehdEncodeController.outputPath);
+    }
+
+    // The name of the output decides the container: .mkv, .mp4 and .m2ts / .ts are kept as chosen,
+    // in any case, and a name that is none of those (or no name at all) is the bare stream.
+    function test_aContainerNameIsKeptAndAnyOtherIsMadeThd() {
+        TruehdEncodeController.chooseSource(speakers51Url);
+        const kept = ["a.mkv", "a.MP4", "a.m2ts", "a.ts", "a.mka", "a.thd"];
+        for (const name of kept) {
+            TruehdEncodeController.chooseOutput(Qt.resolvedUrl("_test_output/" + name));
+            verify(TruehdEncodeController.outputPath.slice(-name.length) === name,
+                   TruehdEncodeController.outputPath);
+        }
+        TruehdEncodeController.chooseOutput(Qt.resolvedUrl("_test_output/a.mlp"));
+        verify(TruehdEncodeController.outputPath.slice(-9) === "a.mlp.thd",
+               TruehdEncodeController.outputPath);
+    }
+
+    // Each container is written, and the summary names it. That the file holds the stream that
+    // was coded, access unit for access unit, is held by test_truehd_wrap.cpp (the player does not
+    // open a TrueHD track in a container yet, so it cannot be the proof here).
+    function test_eachContainerIsWrittenAndNamedInTheSummary() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        const containers = [
+            {file: "tst_truehd_encode.mkv", label: " · in Matroska"},
+            {file: "tst_truehd_encode.mp4", label: " · in MP4"},
+            {file: "tst_truehd_encode.m2ts", label: " · in a Blu-ray transport stream"}
+        ];
+        for (const entry of containers) {
+            const url = Qt.resolvedUrl("_test_output/" + entry.file);
+            TruehdEncodeController.chooseSource(speakers51Url);
+            TruehdEncodeController.chooseOutput(url);
+            verify(TruehdEncodeController.cliLine.indexOf(entry.file + "\"") > 0,
+                   TruehdEncodeController.cliLine);
+            TruehdEncodeController.encode();
+            tryCompare(TruehdEncodeController, "busy", false, 60000);
+            compare(TruehdEncodeController.error, "", entry.file);
+            verify(TruehdEncodeController.summary.indexOf("Wrote ") === 0,
+                   TruehdEncodeController.summary);
+            verify(TruehdEncodeController.summary.indexOf(entry.label) > 0,
+                   TruehdEncodeController.summary);
+        }
+        // A bare stream names no container.
+        TruehdEncodeController.chooseOutput(outputUrl);
+        TruehdEncodeController.encode();
+        tryCompare(TruehdEncodeController, "busy", false, 60000);
+        compare(TruehdEncodeController.error, "");
+        compare(TruehdEncodeController.summary.indexOf(" · in "), -1);
     }
 
     // A WAV with a channel mask is coded, with verify on, and the stream it writes is TrueHD that

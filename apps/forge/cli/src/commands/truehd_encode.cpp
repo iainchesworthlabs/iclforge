@@ -33,10 +33,12 @@
 #include "truehd_encode_core.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_rate.hpp"
+#include "truehd_wrap.hpp"
 
 namespace forge_cli::commands {
 
 namespace th = iclforge::truehd;
+namespace wrap = iclforge::apps::truehd_wrap;
 
 namespace {
 
@@ -59,14 +61,15 @@ EncodeOutput output_kind(std::string_view out_path) {
     if (ext == ".thd") {
         return EncodeOutput::kRaw;
     }
-    if (ext == ".mkv" || ext == ".mka" || ext == ".webm") {
-        return EncodeOutput::kMatroska;
-    }
-    if (ext == ".mp4" || ext == ".m4a" || ext == ".mov") {
-        return EncodeOutput::kMp4;
-    }
-    if (ext == ".ts" || ext == ".m2ts") {
-        return EncodeOutput::kTransport;
+    if (const auto container = wrap::container_of(out_path)) {
+        switch (*container) {
+            case wrap::Container::kMatroska:
+                return EncodeOutput::kMatroska;
+            case wrap::Container::kMp4:
+                return EncodeOutput::kMp4;
+            case wrap::Container::kTransport:
+                return EncodeOutput::kTransport;
+        }
     }
     return EncodeOutput::kUnknown;
 }

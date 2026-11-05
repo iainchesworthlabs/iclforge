@@ -19,8 +19,9 @@
 // own channel mask names the speakers, as it does for the command line.
 //
 // The run is off the GUI thread and can be stopped; cliLine is the command that does the same.
-// Bare .thd only: the containers (Matroska, MP4, a Blu-ray transport stream) are `forge truehd-encode
-// in.wav out.mkv` and `forge mkv`, `mp4`, `ts` of the stream.
+// The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream
+// (.m2ts, .ts), whichever its name asks for: the same writers `forge truehd-encode in.wav out.mkv`
+// uses (apps/shared/media/src/truehd_wrap.hpp).
 class TruehdEncodeController : public QObject {
     Q_OBJECT
     QML_ELEMENT
