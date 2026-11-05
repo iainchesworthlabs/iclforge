@@ -70,6 +70,16 @@ struct NowPlaying {
 // Fills `out` from the player, called five times a second. False when no stream is playing.
 [[nodiscard]] bool read_now_playing(NowPlaying& out);
 
+// What the footer says of the stream while a view that does not read the whole of NowPlaying shows (the lyric screens,
+// and the no-lyrics sentence): the decoder's facts and the coded bitrate, with no room, no levels and no heading, so a
+// read is a lock and a copy. Called twice a second (the bitrate is measured over windows of a second, so a slower read
+// would only delay it). False when no stream is playing.
+struct NowStream {
+    iclforge::nowview::StreamFacts facts;
+    int kbps = 0;
+};
+[[nodiscard]] bool read_now_stream(NowStream& out);
+
 // The levels of the last 100 ms window alone, which the speakers view reads itself every frame and follows when
 // the window is a new one (planning/p4x-speakers-options.md): a lock and two short arrays, no heap. `serial`
 // moves by one for each window the player closes, so that the view knows how long it has been since the last.

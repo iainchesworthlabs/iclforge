@@ -530,23 +530,64 @@ TEST_CASE("now_view: the bitrate starts again with a stream and is unknown while
     CHECK(meter.kbps() == 0);
 }
 
-TEST_CASE("now_view: a coded stream says it is decoded on this board, most to least", "[now_view]") {
+TEST_CASE("now_view: a coded stream is named in the footer, most to least", "[now_view]") {
     using Codec = nv::Codec;
     const nv::StreamFacts atmos{.codec = Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true, .objects = 15};
     const auto full = nv::stream_info_options(atmos, 768, "Music Assistant (d5369777-music-assistant)");
-    REQUIRE(full.size() == 5);
-    CHECK(full[0] == "Decoded on this board - 768 kb/s - from Music Assistant");
-    CHECK(full[1] == "Decoded here - 768 kb/s - from Music Assistant");
-    CHECK(full[2] == "Decoded on this board - 768 kb/s");
-    CHECK(full[3] == "Decoded here - 768 kb/s");
-    CHECK(full[4] == "768 kb/s");
+    REQUIRE(full.size() == 4);
+    CHECK(full[0] == "Dolby Digital Plus 5.1 + 15 objects - 768 kb/s - from Music Assistant");
+    CHECK(full[1] == "Dolby Digital Plus 5.1 + 15 objects - 768 kb/s");
+    CHECK(full[2] == "Dolby Digital Plus 5.1 + 15 objects");
+    CHECK(full[3] == "Dolby Digital Plus");
     // No figure yet, no server: nothing is made up.
     const auto bare = nv::stream_info_options(atmos, 0, "");
     REQUIRE(bare.size() == 2);
-    CHECK(bare[0] == "Decoded on this board");
-    CHECK(bare[1] == "Decoded here");
-    // Before the first unit has decoded it is still the board that will decode it.
-    CHECK(nv::stream_info_options({.codec = Codec::kUnknown}, 0, "Hearth")[0] == "Decoded on this board - from Hearth");
+    CHECK(bare[0] == "Dolby Digital Plus 5.1 + 15 objects");
+    CHECK(bare[1] == "Dolby Digital Plus");
+    // The server without a figure.
+    CHECK(nv::stream_info_options(atmos, 0, "Hearth")[0] == "Dolby Digital Plus 5.1 + 15 objects - from Hearth");
+    // Before the first unit has decoded it is a coded stream and no more, said once.
+    const auto unread = nv::stream_info_options({.codec = Codec::kUnknown}, 0, "Hearth");
+    REQUIRE(unread.size() == 2);
+    CHECK(unread[0] == "Coded audio - from Hearth");
+    CHECK(unread[1] == "Coded audio");
+    const auto unread_rate = nv::stream_info_options({.codec = Codec::kUnknown}, 640, "");
+    REQUIRE(unread_rate.size() == 2);
+    CHECK(unread_rate[0] == "Coded audio - 640 kb/s");
+    CHECK(unread_rate[1] == "Coded audio");
+}
+
+TEST_CASE("now_view: a layout the decoder counted is said from the count, not from A/52's mode", "[now_view]") {
+    using Codec = nv::Codec;
+    // TrueHD 7.1: eight channels, which the mode the sink derives (3/2) would call 5.1.
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true, .channels = 8}) ==
+          "Dolby TrueHD 7.1");
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true, .channels = 6}) ==
+          "Dolby TrueHD 5.1");
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 2, .lfe = false, .channels = 2}) ==
+          "Dolby TrueHD 2.0");
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true, .channels = 10}) ==
+          "Dolby TrueHD 9.1");
+    // No count, the mode says it as before.
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true}) == "Dolby TrueHD 5.1");
+    // Not before the first unit has decoded, and not for PCM.
+    CHECK(nv::stream_name({.codec = Codec::kTruehd, .channels = 8}) == "Dolby TrueHD");
+    CHECK(nv::stream_name({.codec = Codec::kPcm, .have_decoder = true, .channels = 8}) == "PCM");
+    CHECK(nv::heading({.codec = Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true, .channels = 8}, "7.1.4", 12) ==
+          "Dolby TrueHD 7.1 to 7.1.4");
+}
+
+TEST_CASE("now_view: a TrueHD stream is named in the footer with its layout and rate", "[now_view]") {
+    const nv::StreamFacts thd{.codec = nv::Codec::kTruehd, .have_decoder = true, .acmod = 7, .lfe = true};
+    const auto options = nv::stream_info_options(thd, 5200, "Music Assistant (d5369777-music-assistant)");
+    REQUIRE(options.size() == 4);
+    CHECK(options[0] == "Dolby TrueHD 5.1 - 5200 kb/s - from Music Assistant");
+    CHECK(options[2] == "Dolby TrueHD 5.1");
+    CHECK(options.back() == "Dolby TrueHD");
+    // Every line ends in something shorter than the one before it.
+    for (std::size_t i = 1; i < options.size(); ++i) {
+        CHECK(options[i].size() < options[i - 1].size());
+    }
 }
 
 TEST_CASE("now_view: a PCM stream says the server decoded it", "[now_view]") {

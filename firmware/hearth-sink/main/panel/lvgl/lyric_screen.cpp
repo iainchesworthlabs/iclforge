@@ -315,11 +315,22 @@ struct Screen {
     lv_obj_t* chip_name = nullptr;
     lv_obj_t* chip_line = nullptr;
     lv_obj_t* chip_delay = nullptr;
-    // The footer's line about the stream (decoded on this board, bitrate, who sends it) while a view with no
-    // lyrics shows, in the room the lyric chips leave.
+    // The footer's line about the stream (what it is, its bitrate, who sends it) while anything plays. Under a view with
+    // no lyrics it takes the columns the lyric chips would have (stream_x, stream_room); under lyrics it goes after the
+    // delay chip (stream_lyric_x, stream_lyric_room), and is left out where that leaves no room for a name.
     lv_obj_t* chip_stream = nullptr;
     std::string stream_text;
+    int stream_x = 0;
     int stream_room = 0;
+    int stream_lyric_x = 0;
+    int stream_lyric_room = 0;
+    bool stream_lyric_fits = false;
+    bool stream_at_lyric = false;
+    // What the player says of the stream, for that line: filled by the no-lyrics read when a view reads the player
+    // (g.now) and by read_now_stream() twice a second when none does.
+    NowStream stream;
+    bool stream_known = false;
+    std::uint64_t stream_read_us = 0;
     lv_obj_t* sheet = nullptr;
     lv_obj_t* sheet_delay = nullptr;
     lv_obj_t* sheet_size = nullptr;
@@ -855,12 +866,19 @@ void build_frame() {
         lv_obj_add_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
     }
     // From the name to the buttons, less a gap each side.
-    const int stream_x = wide ? 250 : m.margin + std::max(name_w, 0) + m.gap;
-    g.stream_room = std::max(0, prefs_x - 24 - stream_x);
+    g.stream_x = wide ? 250 : m.margin + std::max(name_w, 0) + m.gap;
+    g.stream_room = std::max(0, prefs_x - 24 - g.stream_x);
+    // Under lyrics the line and delay chips hold their columns (where they are shown), and the stream is named after them.
+    g.stream_lyric_x = g.chips ? delay_x + delay_w + 4 + 24 : g.stream_x;
+    g.stream_lyric_room = std::max(0, prefs_x - 24 - g.stream_lyric_x);
+    // The longest of the short names ("Dolby Digital Plus"): a footer with less room under lyrics than that (the kit's 1024 by
+    // 600, where the chips and the buttons leave none) has no line to show, and the player is not asked for one.
+    g.stream_lyric_fits = g.stream_lyric_room >= text_width("Dolby Digital Plus", g.small);
+    g.stream_at_lyric = false;
     g.chip_stream = make_label(footer, "", g.small, kMuted);
     lv_obj_set_width(g.chip_stream, std::max(g.stream_room, 1));
     lv_label_set_long_mode(g.chip_stream, LV_LABEL_LONG_MODE_CLIP);
-    lv_obj_set_pos(g.chip_stream, stream_x, label_y);
+    lv_obj_set_pos(g.chip_stream, g.stream_x, label_y);
     lv_obj_t* const prefs = make_button(footer, "Preferences", prefs_w, m.footer_button, Button::kPreferences, false);
     lv_obj_set_pos(prefs, prefs_x, button_y);
     lv_obj_t* const adjust = make_button(footer, "Adjust", adjust_w, m.footer_button, Button::kAdjust, false);
@@ -1500,15 +1518,26 @@ void update_header_and_footer(const Stage& stage) {
         lv_obj_set_width(g.progress, progress);
     }
 
-    // What the stream is: the most the footer has room for of "Decoded on this board - 768 kb/s - from Music
-    // Assistant" (or "PCM from ..." where the server decoded it). The clock view says nothing of it.
+    // What the stream is: the most the footer has room for of "Dolby TrueHD 7.1 - 5200 kb/s - from Music Assistant"
+    // (or "PCM from ..." where the server decoded it), under lyrics as under every other view. The clock view says
+    // nothing of it. Under lyrics the line goes after the chips, and where not even the codec's name fits it is left out
+    // (a name cut off is worse than none); under the views with no lyrics the shortest is cut off to its room.
+    const bool at_lyric = !g.np_active;
+    if (at_lyric != g.stream_at_lyric) {
+        g.stream_at_lyric = at_lyric;
+        lv_obj_set_x(g.chip_stream, at_lyric ? g.stream_lyric_x : g.stream_x);
+        lv_obj_set_width(g.chip_stream, std::max(at_lyric ? g.stream_lyric_room : g.stream_room, 1));
+    }
     std::string stream_line;
-    if (g.np_active && !g.np_clock) {
+    if (g.stream_known && !g.np_clock) {
+        const int room = at_lyric ? g.stream_lyric_room : g.stream_room;
         const std::string server = drawable_title(g.info.server);
-        const auto options = iclforge::nowview::stream_info_options(g.now.facts, g.now.kbps, server);
-        stream_line = options.back();
+        const auto options = iclforge::nowview::stream_info_options(g.stream.facts, g.stream.kbps, server);
+        if (!at_lyric) {
+            stream_line = options.back();
+        }
         for (const std::string& option : options) {
-            if (text_width(option, g.small) <= g.stream_room) {
+            if (text_width(option, g.small) <= room) {
                 stream_line = option;
                 break;
             }
@@ -1616,6 +1645,13 @@ bool screen_update() {
             if (!read) {
                 g.now.heading.clear();
             }
+            // The footer names the stream from the same read.
+            g.stream_known = read;
+            if (read) {
+                g.stream.facts = g.now.facts;
+                g.stream.kbps = g.now.kbps;
+            }
+            g.stream_read_us = 0;
             g.now_known = room_chosen && read && !g.now.spots.empty();
             g.now_key = g.now_known ? now_room_key(g.now) : 0;
             // What the server says is playing, in the same read (the clock has no use for it); a change of the
@@ -1639,6 +1675,17 @@ bool screen_update() {
         g.now_read_us = 0;
         g.now_known = false;
         g.now_key = 0;
+        // Under lyrics, and under the no-lyrics sentence, no view reads the player, but a footer with room for it still
+        // names the stream: facts and bitrate only, twice a second.
+        if (playing && g.stream_lyric_fits) {
+            if (g.stream_read_us == 0 || now_us - g.stream_read_us >= 500'000U) {
+                g.stream_read_us = now_us;
+                g.stream_known = read_now_stream(g.stream);
+            }
+        } else {
+            g.stream_known = false;
+            g.stream_read_us = 0;
+        }
     }
     // Nothing the server said is shown by any other view, so none of it is kept as shown: the next time a
     // view wants it, it is read afresh.
@@ -1728,6 +1775,7 @@ bool screen_update() {
         } else if (g.np_meters) {
             // The meters stop and stop asking the player for its output while the screen is dimmed.
             g.filling = now_update_meters(now_us, g.dimmed);
+            now_update_meters_status(g.now);
         } else if (g.np_active && !g.np_card && !g.dimmed) {
             now_update_speakers(g.now, now_us);
         }

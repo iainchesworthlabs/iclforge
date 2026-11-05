@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace iclforge::nowview {
@@ -555,6 +556,9 @@ struct StreamFacts {
     bool lfe = false;
     // Objects the stream carries.
     int objects = 0;
+    // The channels the decoder produced, the LFE among them; 0 where it does not say. A layout acmod cannot name (TrueHD
+    // 7.1) is said from this, and acmod stays what the other codecs' layouts are said from.
+    int channels = 0;
 
     friend constexpr bool operator==(const StreamFacts&, const StreamFacts&) = default;
 };
@@ -590,7 +594,11 @@ struct StreamFacts {
     if (!facts.have_decoder || facts.codec == Codec::kPcm) {
         return out;
     }
-    if (facts.acmod == 0) {
+    if (facts.channels > 0) {
+        // Counted by the decoder: the LFE is one of them and is said as the ".1".
+        const int full_bandwidth = facts.channels - (facts.lfe ? 1 : 0);
+        out += " " + std::to_string(full_bandwidth) + (facts.lfe ? ".1" : ".0");
+    } else if (facts.acmod == 0) {
         out += " dual mono";
     } else if (const int channels = acmod_channels(facts.acmod); channels > 0) {
         out += " " + std::to_string(channels) + (facts.lfe ? ".1" : ".0");
@@ -688,11 +696,11 @@ class BitrateMeter {
 }
 
 // The line the footer says about a stream, from the most to the least it can say; the screen takes the
-// first that fits its width. A coded stream is decoded on this board (the server sent it undecoded), and a
-// PCM one was decoded by the server.
-//   "Decoded on this board - 768 kb/s - from Music Assistant", "Decoded on this board - 768 kb/s",
-//   "Decoded here - 768 kb/s - from Music Assistant", "Decoded here - 768 kb/s", "768 kb/s"; "PCM from Music
-//   Assistant", "PCM".
+// first that fits its width. A coded stream is named as the heading names it (stream_name(): the codec, its
+// coded layout and its objects), with the rate that arrived and the server it came from; a PCM one was
+// decoded by the server. The list is never empty, and its last entry is the shortest.
+//   "Dolby TrueHD 7.1 - 5200 kb/s - from Music Assistant", "Dolby TrueHD 7.1 - 5200 kb/s", "Dolby TrueHD 7.1",
+//   "Dolby TrueHD"; "PCM from Music Assistant", "PCM". Each is shorter than the one before.
 [[nodiscard]] inline std::vector<std::string> stream_info_options(const StreamFacts& facts, int kbps,
                                                                   std::string_view server) {
     const std::string who = server_label(server);
@@ -703,22 +711,24 @@ class BitrateMeter {
         return out;
     }
     const std::string rate = kbps > 0 ? std::to_string(kbps) + " kb/s" : std::string();
-    const auto join = [&](const char* head) {
-        std::string line = head;
-        if (!rate.empty()) {
-            line += " - " + rate;
+    // A line the one before already was (a stream not yet decoded is "Coded audio" in full and short) is left out.
+    const auto add = [&out](std::string line) {
+        if (out.empty() || out.back() != line) {
+            out.push_back(std::move(line));
         }
-        return line;
     };
-    if (!who.empty()) {
-        out.push_back(join("Decoded on this board") + " - from " + who);
-        out.push_back(join("Decoded here") + " - from " + who);
-    }
-    out.push_back(join("Decoded on this board"));
-    out.push_back(join("Decoded here"));
+    const std::string full = stream_name(facts);
+    const std::string codec = codec_name(facts.codec);
     if (!rate.empty()) {
-        out.push_back(rate);
+        if (!who.empty()) {
+            add(full + " - " + rate + " - from " + who);
+        }
+        add(full + " - " + rate);
+    } else if (!who.empty()) {
+        add(full + " - from " + who);
     }
+    add(full);
+    add(codec);
     return out;
 }
 

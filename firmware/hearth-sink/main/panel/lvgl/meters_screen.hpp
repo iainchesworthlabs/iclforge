@@ -28,6 +28,11 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
 // cap the view at ten updates a second.
 bool now_update_meters(std::uint64_t now_us, bool dimmed);
 
+// The status line (the stream's name, its rate and its bitrate) follows the player: written when the view is built, and brought up to date
+// from `now` as the decoder finds the stream's layout and the bitrate settles. Cheap to call whenever `now` was read; it writes a label only
+// when what it says changed.
+void now_update_meters_status(const NowPlaying& now);
+
 // What the view has cost since it was last opened, and the rate it holds (iclforge/panel_stats.hpp): live while it shows, the last opening's
 // figures after. With LVGL locked, as the panel's own counters are read.
 [[nodiscard]] iclforge::panelstats::MetersStats now_meters_stats();
