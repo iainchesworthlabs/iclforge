@@ -1,0 +1,1 @@
+**The Hearth sink's now-view names a TrueHD stream "Dolby TrueHD".** A coded TrueHD stream was shown as "Coded audio" once the decoder had read it; it now reads "Dolby TrueHD 2.0", "Dolby TrueHD 5.1" and so on, as Dolby Digital Plus and AC-4 do.
