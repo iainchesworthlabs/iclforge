@@ -1237,6 +1237,7 @@ SendspinPlaying sendspin_now_playing() {
         out.facts.acmod = play.decoder.acmod;
         out.facts.lfe = play.decoder.lfe;
         out.facts.objects = play.decoder.objects;
+        out.facts.channels = play.decoder.channels;
     } else {
         // A burst stream before its first unit has decoded.
         out.facts.codec = nv::Codec::kUnknown;

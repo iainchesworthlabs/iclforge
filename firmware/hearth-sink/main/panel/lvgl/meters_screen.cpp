@@ -316,6 +316,11 @@ struct State {
     std::int64_t values_due_us = 0;  // when the numbers are next written (0: now)
     LvVector<std::uint8_t> outputs;  // a grid's: the output each bar is
     Value peak_text;
+    // The status line (what the stream is, the rate it plays at, its bitrate): the label, whether it names the room as well
+    // (the pair's, along the bottom, does; the spectrum's, over the plot, has the room in its title), and what it says.
+    lv_obj_t* status_label = nullptr;
+    bool status_room = false;
+    LvString status_text;
     float peak_held = mv::kSilentDb;
     // The analysis.
     Heavy* heavy = nullptr;
@@ -390,8 +395,12 @@ Block build_spectrum(lv_obj_t* parent, const Dim& d, std::string_view layout, st
         const std::string title = "Main mix  " + std::string(layout);
         label(parent, title.c_str(), d.f_label, 0x8B8583, left_x, top, plot_w - 300);
         if (!status.empty()) {
+            // Wide enough for "Dolby Digital Plus 5.1 + 15 objects  48.0 kHz  768 kb/s" and as far left as the title allows.
             const std::string text(status);
-            label(parent, text.c_str(), d.f_label - 2, 0x8B8583, left_x + plot_w - 460, top + 2, 460, Align::kRight);
+            const int status_w = std::max(460, plot_w - 300);
+            g.status_label = label(parent, text.c_str(), d.f_label - 2, 0x8B8583, left_x + plot_w - status_w, top + 2, status_w, Align::kRight);
+            g.status_room = false;
+            g.status_text.assign(text.data(), text.size());
         }
         plot_y = top + d.f_label + 8 + 8;
     }
@@ -503,8 +512,14 @@ std::string layout_of(const NowPlaying& now) {
     return std::string(at == std::string_view::npos ? std::string_view() : heading.substr(at + 4));
 }
 
-std::string status_of(const NowPlaying& now, const std::string& layout) {
-    std::string text = layout;
+// "Dolby TrueHD 5.1 to 7.1.4  48.0 kHz  5200 kb/s" (the pair's, which has no title to hold the room) or "Dolby TrueHD 5.1  48.0 kHz  5200 kb/s":
+// the stream as the decoder reported it, which moves from "Coded audio" to its name once the first unit has decoded, so the label is
+// brought up to date (now_update_meters_status) and not only written when the view is built.
+std::string status_of(const NowPlaying& now, const std::string& layout, bool with_room) {
+    std::string text = iclforge::nowview::stream_name(now.facts);
+    if (with_room && !layout.empty()) {
+        text += " to " + layout;
+    }
     text += "  48.0 kHz";
     if (now.kbps > 0) {
         text += "  " + std::to_string(now.kbps) + " kb/s";
@@ -539,7 +554,7 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
     const Dim& d = g.d;
     const bool tall = d.h >= 300;
     const std::string layout = layout_of(now);
-    const std::string status = status_of(now, layout);
+    const std::string status = status_of(now, layout, g.rep == mv::Representation::kPair);
 
     if (g.rep == mv::Representation::kPair) {
         const int meter_h = d.wide ? 18 : d.h >= 200 ? 12 : 8;
@@ -581,7 +596,9 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
             const int sy = d.h - status_h - d.m / 2;
             rect(parent, d.m, sy - 3, d.w - 2 * d.m, 1, 0x4B4645);
             const std::string line = status + (g.downmix ? "  stereo downmix" : "");
-            label(parent, line.c_str(), tall ? d.f_label - 2 : d.f_small, 0x8B8583, d.m, sy, d.w - 2 * d.m - 120);
+            g.status_label = label(parent, line.c_str(), tall ? d.f_label - 2 : d.f_small, 0x8B8583, d.m, sy, d.w - 2 * d.m - 120);
+            g.status_room = true;
+            g.status_text.assign(line.data(), line.size());
             g.peak_text.object = label(parent, "", tall ? d.f_label - 2 : d.f_small, kTickColour, d.w - d.m - 110, sy, 110, Align::kRight);
         }
     } else {
@@ -644,6 +661,20 @@ bool now_build_meters(lv_obj_t* parent, int width, int height, const NowPlaying&
     g.stats.height = height;
     tap.set_wanted(true);
     return true;
+}
+
+void now_update_meters_status(const NowPlaying& now) {
+    if (!g.built || g.status_label == nullptr) {
+        return;
+    }
+    std::string text = status_of(now, layout_of(now), g.status_room);
+    if (g.status_room && g.downmix) {
+        text += "  stereo downmix";
+    }
+    if (std::string_view(g.status_text.data(), g.status_text.size()) != text) {
+        g.status_text.assign(text.data(), text.size());
+        lv_label_set_text(g.status_label, text.c_str());
+    }
 }
 
 void now_forget_meters() {

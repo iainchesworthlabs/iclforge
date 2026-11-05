@@ -523,6 +523,32 @@ So stage 5 is that, and nothing from the seven:
   the pulse, in alternating order, against the +0.4% the first design cost a 5.1 burst; and the owner's eye on the
   glass.
 
+## The stream is named (2026-11-06)
+
+The name of a stream (*Dolby Digital Plus 5.1*, *Dolby TrueHD 7.1*, *PCM*) was the speakers view's header and the dimmed
+cover's line, and the header is the song as soon as a server has said one: with real playback the name was almost never
+on the glass, and the footer said how the stream was decoded and not what it was. Now:
+
+| Where | What it says |
+|---|---|
+| Footer, under the speakers, the title card, the Meters view and the no-lyrics sentence | the name, the bitrate and the server, in the most that fits (`stream_info_options()`): *Dolby TrueHD 7.1 - 5200 kb/s - from Music Assistant*, then without the server, then the name, then the codec alone |
+| Footer, under lyrics | the same where the chips leave room for at least *Dolby Digital Plus* (an 800 px panel); the kit's 1024 px one does not, and shows nothing |
+| Meters view's status line | the name, 48.0 kHz and the bitrate (the pair's line adds the room: *Dolby TrueHD 7.1 to 7.1.4*), brought up to date as the decoder reads the stream and the bitrate settles; it was written once when the view was built |
+| Header, dimmed cover | as before |
+
+- **TrueHD 7.1 was "5.1".** The sink reports an A/52 coding mode for a TrueHD stream (the nearest of the eight), which tops out
+  at five channels. `DecoderReport::channels` is the count the decoder produced, kept on the board (it is not in the state
+  message), and the name uses it when there is one.
+- **No Atmos label yet.** The sink places none of a TrueHD stream's objects, so it reports none and the name never says
+  *+ N objects* for TrueHD.
+- **Lyrics.** The footer's columns are the name (to 252 px), the line chip (290), the delay chip (458 to about 600) and the
+  buttons (from 643): no room for a name on the kit. The options, none run: the header, which is the song; the name
+  column; or dropping the delay chip's text at a delay of 0.
+- **Read.** A view that does not read the player (lyrics, the sentence) asks `read_now_stream()` twice a second: the
+  decoder's facts and the bitrate, with no room parsed and no levels copied, and not at all where the footer has no room.
+- **Measured:** the host cases (`test_now_view`), and the preview's `s20-footer-*` scenes and `footer-stream-<size>` shots with
+  their checks. **Not run:** a board, and a stream that is TrueHD on the glass.
+
 ## Open
 
 - **The idle screen** is the waiting screen now, and dims ([The waiting screen](#the-waiting-screen)). The kit has not
