@@ -24,6 +24,7 @@ iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/probe_truehd.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/truehd_stream.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/truehd_wrap.cpp"
+    # The container readers the player finds a TrueHD track with (container_input.hpp).
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/container_input.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_encode_core.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_objects_core.cpp"

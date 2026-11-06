@@ -13,6 +13,7 @@
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "byte_source.hpp"
+#include "container_input.hpp"
 #include "probe_truehd.hpp"
 #include "truehd_stream.hpp"
 
@@ -23,6 +24,12 @@
 // window at a time by the TruehdCursor Hearth plays from (apps/shared/media/src/truehd_stream.hpp),
 // its index says where a decode can begin and how many samples the stream holds, and a seek decodes
 // from the restart before the time asked.
+//
+// The file is a bare stream, or a Matroska, MP4 or Blu-ray transport stream whose first TrueHD track
+// is played. A Matroska or MP4 track is read where it lies in the file (iclforge::apps::ExtentSource,
+// as Hearth reads one), so a remux is never held beside its lossless track; a transport stream is read
+// whole, as its reader needs. An MP4 edit list's priming and padding are decoded and not delivered
+// (ElementaryStreamResult::trim), so the stream starts and ends where the container says it does.
 //
 // Qt-free, so the Catch2 cases of iclforge-forge-gui-tests hold it. One caller at a time: the
 // calls are serialised by a mutex, which is not a promise that two readers get sensible positions.
@@ -41,15 +48,25 @@ struct TruehdPcmInfo {
     // TH spec section 18 over the unit lengths (the declared peak rate, the largest unit, the units
     // that would arrive late), from the index pass.
     iclforge::apps::truehd_probe::RateReport rate{};
+    // The container the stream was read from (kUnknown for a bare stream), and, for an MP4 whose edit
+    // list has a shape the player does not apply, the sentence the reader gave.
+    iclforge::apps::ContainerKind container = iclforge::apps::ContainerKind::kUnknown;
+    std::string trim_note;
+    // Samples at the start of the stream's own count that are not delivered (an edit list's priming);
+    // `frames` is already net of them and of the trimmed end.
+    std::uint64_t skipped_frames = 0;
 };
 
 class TruehdPcmSource {
    public:
     // Reads the file's unit lengths once (the index) and decodes the first unit for the format. The
-    // error is a sentence for the dialog.
+    // error is a sentence for the dialog. `no_truehd_track`, when given, is set when the file is a
+    // container that is sound and holds no TrueHD track, so that a caller can hand it to the readers
+    // of the other codecs instead of reporting the error.
     [[nodiscard]] static std::expected<std::unique_ptr<TruehdPcmSource>, std::string> open(
         const std::filesystem::path& path,
-        iclforge::truehd::Presentation presentation = iclforge::truehd::Presentation::kBest);
+        iclforge::truehd::Presentation presentation = iclforge::truehd::Presentation::kBest,
+        bool* no_truehd_track = nullptr);
 
     [[nodiscard]] const TruehdPcmInfo& info() const noexcept { return info_; }
 
@@ -80,10 +97,14 @@ class TruehdPcmSource {
 
     std::filesystem::path path_;
     iclforge::truehd::Presentation presentation_ = iclforge::truehd::Presentation::kBest;
-    std::unique_ptr<iclforge::apps::ByteSource> bytes_;
+    std::shared_ptr<iclforge::apps::ByteSource> bytes_;
     std::unique_ptr<iclforge::apps::TruehdCursor> cursor_;
     iclforge::apps::TruehdIndex index_;
     TruehdPcmInfo info_;
+    // Where the delivered stream begins in the stream's own samples, and the samples that stream
+    // holds: read() takes and gives positions in the delivered stream.
+    std::uint64_t skip_ = 0;
+    std::uint64_t stream_samples_ = 0;
 
     std::unique_ptr<iclforge::truehd::Decoder> decoder_;
     bool ended_ = false;  // the cursor is out of units, or the stream changed shape

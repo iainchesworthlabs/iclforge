@@ -20,6 +20,8 @@
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "container_input.hpp"
+#include "container_stream.hpp"
 
 namespace forge_gui {
 
@@ -65,19 +67,86 @@ class FileByteSource final : public iclforge::apps::ByteSource {
 
 }  // namespace
 
+namespace {
+
+// How much of the head sniff_container is shown: a few KiB are enough (container_input.hpp).
+constexpr std::size_t kSniffBytes = 64 * 1024;
+
+// A transport stream is read whole, as its reader needs; the limit is the one Hearth holds to.
+constexpr std::uint64_t kTransportStreamLimit = 1ULL << 30;
+
+// The codecs the player reads from a container: TrueHD alone. A track in another codec is not the
+// player's to take from a container (it has never opened one), so a file without a TrueHD track is
+// reported as not holding one and left to the caller.
+constexpr iclforge::apps::CodecSet kTruehdOnly{.ac3 = false, .eac3 = false, .ac4 = false, .truehd = true};
+
+}  // namespace
+
 std::expected<std::unique_ptr<TruehdPcmSource>, std::string> TruehdPcmSource::open(
-    const std::filesystem::path& path, th::Presentation presentation) {
+    const std::filesystem::path& path, th::Presentation presentation, bool* no_truehd_track) {
+    if (no_truehd_track != nullptr) {
+        *no_truehd_track = false;
+    }
     std::unique_ptr<TruehdPcmSource> source{new TruehdPcmSource()};
     source->path_ = path;
     source->presentation_ = presentation;
-    auto bytes = std::make_unique<FileByteSource>(path);
-    if (!bytes->ok()) {
+    auto file = std::make_shared<FileByteSource>(path);
+    if (!file->ok()) {
         return std::unexpected("Could not open " + path.string() + ".");
     }
-    source->bytes_ = std::move(bytes);
+    // The file is told by its first bytes, not its name. A bare stream is not a container
+    // (sniff_container says kUnknown for one), and is read as it always was.
+    std::vector<std::byte> head(static_cast<std::size_t>(std::min<std::uint64_t>(file->size(), kSniffBytes)));
+    head.resize(file->read(0, head));
+    const iclforge::apps::ContainerKind kind = iclforge::apps::sniff_container(head);
+    iclforge::apps::StreamTrim trim;
+    if (kind == iclforge::apps::ContainerKind::kUnknown) {
+        source->bytes_ = std::move(file);
+    } else if (kind == iclforge::apps::ContainerKind::kMpegTs) {
+        if (file->size() > kTransportStreamLimit) {
+            return std::unexpected(path.string() +
+                                   " is a Transport Stream over 1 GiB, which is not read yet: its audio is held in memory.");
+        }
+        std::vector<std::byte> whole(static_cast<std::size_t>(file->size()));
+        whole.resize(file->read(0, whole));
+        auto stream = iclforge::apps::elementary_stream_from_bytes(whole, kTruehdOnly);
+        whole = {};
+        if (!stream.error.empty() || stream.codec != iclforge::apps::TrackCodec::kTruehd) {
+            if (no_truehd_track != nullptr) {
+                *no_truehd_track = stream.declined_codec.has_value();
+            }
+            return std::unexpected(stream.error.empty() ? path.string() + " holds no TrueHD track."
+                                                        : path.string() + ": " + stream.error);
+        }
+        trim = stream.trim;
+        source->info_.trim_note = std::move(stream.trim_note);
+        source->bytes_ = std::make_shared<iclforge::apps::MemoryByteSource>(std::move(stream.bytes));
+    } else {
+        // Matroska and MP4: the track is found where it lies and read from there.
+        auto track = iclforge::apps::index_container_track(*file, kTruehdOnly);
+        if (!track.error.empty() || track.codec != iclforge::apps::TrackCodec::kTruehd) {
+            if (no_truehd_track != nullptr) {
+                *no_truehd_track = track.declined_codec.has_value();
+            }
+            return std::unexpected(track.error.empty() ? path.string() + " holds no TrueHD track."
+                                                       : path.string() + ": " + track.error);
+        }
+        trim = track.trim;
+        source->info_.trim_note = std::move(track.trim_note);
+        source->bytes_ = std::make_shared<iclforge::apps::ExtentSource>(std::move(file), std::move(track.extents));
+    }
+    source->info_.container = kind;
     if (const std::string problem = source->scan(); !problem.empty()) {
         return std::unexpected(problem);
     }
+    // What the container says to play: skip `start` samples, then play `length` of them.
+    source->skip_ = std::min<std::uint64_t>(trim.start, source->stream_samples_);
+    std::uint64_t frames = source->stream_samples_ - source->skip_;
+    if (trim.length) {
+        frames = std::min<std::uint64_t>(frames, *trim.length);
+    }
+    source->info_.skipped_frames = source->skip_;
+    source->info_.frames = frames;
     // The first unit says how many channels there are and what they are.
     source->seek_to(0);
     if (!source->decode_next_unit() || source->info_.channels == 0) {
@@ -101,7 +170,8 @@ std::string TruehdPcmSource::scan() {
     info_.samples_per_unit = static_cast<int>(index_.samples_per_unit);
     info_.units = index_.units;
     info_.restarts = index_.major_syncs;
-    info_.frames = index_.samples();
+    stream_samples_ = index_.samples();
+    info_.frames = stream_samples_;
 
     // TH spec section 18 over the unit lengths: a second walk of the stream, since the index keeps
     // no lengths. The model needs the declared rate, which the first unit's major sync gives.
@@ -189,6 +259,10 @@ std::size_t TruehdPcmSource::read(std::uint64_t at, std::size_t frames,
     if (at >= info_.frames || frames == 0) {
         return 0;
     }
+    // The delivered stream starts skip_ samples into the stream's own; everything below counts in
+    // the stream's own samples, and the end is the stream's or the container's, whichever is first.
+    frames = static_cast<std::size_t>(std::min<std::uint64_t>(frames, info_.frames - at));
+    at += skip_;
     if (!decoder_ || at < pending_start_ || at > decoded_end_) {
         seek_to(at);
     }
