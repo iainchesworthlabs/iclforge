@@ -88,7 +88,7 @@ test('the page says what each output layout does with each stream', async ({ pag
     await field.fill('9.1.6');
     await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByRole('status')).toHaveText(
-        'Output layout 9.1.6 refused (409): it needs 16 slots and this sink has 12.',
+        /^Output layout 9\.1\.6 refused \(409\): 9\.1\.6 needs 16 slots; this board's output carries 12\./,
     );
 
     // A stream at 44.1 kHz: the player refuses it rather than play it fast.
