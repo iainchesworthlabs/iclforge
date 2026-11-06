@@ -224,13 +224,17 @@ controllers and the dialogs. Nothing is pressed in these rows: the tests call th
 | The windows of a TrueHD or MLP file add up to FFmpeg's decode (4 fixtures, 3 window sizes) | new | logic | iclforge-forge-gui-tests [gui][truehd]: the TrueHD player's windows add up to FFmpeg's decode |
 | A seek lands on the sample asked for (forward over restarts, back, mid-unit, at and past the end) | new | logic | [gui][truehd]: a seek in a TrueHD stream lands on the sample asked for; a seek past the last restart of a stream with few of them |
 | The length stops where the stream does: the last unit's padding is not delivered (44.1 kHz fixture, 15 samples) | new | logic | [gui][truehd]: the padding of the last unit is not part of the stream the player delivers |
+| A TrueHD track in Matroska, MP4 or a Blu-ray transport stream delivers the bare stream's samples (FFmpeg's SHA-256), with the same speakers, length and seeks | new | logic | [gui][truehd][container]: a TrueHD track in Matroska, MP4 or a Blu-ray transport stream plays as the bare stream does |
+| An MP4 edit list's priming is skipped and its end cut; a seek counts from the trimmed start | new | logic | [gui][truehd][container]: an MP4 edit list's priming is not delivered and its end is cut |
+| A container with no TrueHD track is reported as such, so the other readers take it | new | logic | [gui][truehd][container]: a container with no TrueHD track is left to the readers of the other codecs |
+| Open stream: a TrueHD `.mkv`, `.mp4` and `.m2ts` give the TrueHD summary line (naming the container), the speakers and the length | new | logic | TrueHd::test_aTrueHdTrackInAContainerOpensInThePlayer |
 | A file that is not a stream, or is missing, is refused with a sentence | new | logic | [gui][truehd]: a file that is not a TrueHD stream is refused with a sentence |
 | The exported WAV is the 24-bit WAV `forge decode` writes (header, mask 0x60F, samples) | new | logic | [gui][truehd]: the exported WAV is the 24-bit WAV forge decode writes |
 | Open stream: the summary line, the speakers, the length; MLP says so | new | logic | TrueHd::test_openingATrueHdStreamReportsItsFormatAndSpeakers, test_anMlpStreamSaysSo |
 | Seek while paused; Play (starts, or names the output it could not open) | new | logic (hardware) | TrueHd::test_seekWhilePausedMovesPositionOnATrueHdStream, test_playingATrueHdStreamStartsOrNamesTheOutputItCouldNotOpen |
 | Export decoded WAV from the player | new | logic | TrueHd::test_exportingAnTrueHdStreamWritesAWavWithoutError |
 | A dropped or launched `.thd` or `.mlp` opens the player, not the WAV source loader | new | logic | TrueHd::test_aDroppedTrueHdFileOpensThePlayer |
-| The Open stream and QC pickers offer `*.thd *.mlp` | new | none | No case: the tests set the picker's `selectedFile`, so a name filter is not exercised. |
+| The Open stream and QC pickers offer `*.thd *.mlp`; Open stream also offers a "TrueHD in a container" filter | new | none | No case: the tests set the picker's `selectedFile`, so a name filter is not exercised. |
 | QC: one programme for each presentation, with the stored dialogue norm beside the measurement | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate |
 | QC: the integrity gate passes a good stream and fails two streams joined end to end | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate, test_qcOfAStreamJoinedEndToEndFailsTheIntegrityGate |
 | QC of an AC-3 stream has no integrity row | new | logic | TrueHd::test_qcOfAnAc3StreamHasNoIntegrityGate |

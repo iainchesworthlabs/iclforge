@@ -5136,139 +5136,144 @@
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="49"/>
-        <location filename="../qml/StreamPlayerDialog.qml" line="58"/>
+        <source>TrueHD in a container (*.mkv *.mp4 *.m4a *.m2ts *.ts)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="50"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="59"/>
         <source>All files (*)</source>
         <translation>كل الملفات (*)</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="56"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="57"/>
         <source>Export decoded WAV</source>
         <translation>صدّر WAV المفكوك ترميزه</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="58"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="59"/>
         <source>WAV audio (*.wav)</source>
         <translation>صوت WAV (*.wav)</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="72"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="73"/>
         <source>Choose a folder for the exported objects</source>
         <translation>اختر مجلدًا للكائنات المصدَّرة</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="85"/>
-        <location filename="../qml/StreamPlayerDialog.qml" line="91"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="86"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="92"/>
         <source>Open stream</source>
         <translation>افتح بثًا</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="99"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="100"/>
         <source>Encode TrueHD…</source>
         <translation>ترميز TrueHD…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="107"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="108"/>
         <source>Close</source>
         <translation>إغلاق</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="114"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="115"/>
         <source>Decodes an already-encoded AC-3, E-AC-3, AC-4 or TrueHD file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.</source>
         <translation>يفك ترميز ملف AC-3 أو E-AC-3 أو AC-4 أو TrueHD مرمَّز مسبقًا ويشغّل طبقته الأساسية المفكوكة عبر مخرج عادي — ومثل كل فك ترميز في هذه النافذة، يشغّل بث Atmos طبقته الأساسية 5.1 هنا لا الكائنات غير الممزوجة (انظر «افحص الكائنات» لتلك). و«صدّر» يكتب ناتج فك الترميز إلى ملف WAV، ولبث Atmos ملف WAV لكل كائن.</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="125"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="126"/>
         <source>Choose file…</source>
         <translation>اختر ملفًا…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="133"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="134"/>
         <source>No file chosen yet</source>
         <translation>لم يُختر ملف بعد</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="145"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="146"/>
         <source>Decoding…</source>
         <translation>جارٍ فك الترميز…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="158"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="159"/>
         <source>PRESENTATION</source>
         <translation>العرض</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="168"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="169"/>
         <source>The decoder&apos;s choice</source>
         <translation>اختيار المفكّك</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="192"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="193"/>
         <source>Choose an AC-3/E-AC-3 file above to play it.</source>
         <translation>اختر ملف AC-3/E-AC-3 أعلاه لتشغيله.</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="226"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="227"/>
         <source>Pause</source>
         <translation>أوقف مؤقتًا</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="226"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="227"/>
         <source>Play</source>
         <translation>شغّل</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="253"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="254"/>
         <source>Position</source>
         <translation>الموضع</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="254"/>
-        <location filename="../qml/StreamPlayerDialog.qml" line="268"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="255"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="269"/>
         <source>%1 / %2 s</source>
         <translation>%1 / %2 s</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="291"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="292"/>
         <source>CD+G picture</source>
         <translation>صورة CD+G</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="299"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="300"/>
         <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
         <translation>صورة قرص الكاراوكي في %1 بجوار البث. كلماتها جزء من الصورة.</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="309"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="310"/>
         <source>The picture in %1 could not be shown: %2</source>
         <translation>تعذّر عرض الصورة في %1: %2</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="323"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="324"/>
         <source>Export decoded WAV…</source>
         <translation>صدّر WAV المفكوك ترميزه…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="329"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="330"/>
         <source>Export objects…</source>
         <translation>صدّر الكائنات…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="341"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="342"/>
         <source>Exporting…</source>
         <translation>جارٍ التصدير…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="357"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="358"/>
         <source>LEVELS</source>
         <translation>المستويات</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="386"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="387"/>
         <source>SOUNDFIELD</source>
         <translation>المجال الصوتي</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="394"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="395"/>
         <source>Solid dots are bed positions this stream carries. Objects are not here — this plays the 5.1 bed only; open Inspect objects for per-object playback and position.</source>
         <translation>النقاط الممتلئة مواضع في الطبقة الأساسية يحملها هذا البث. والكائنات ليست هنا — فهذا يشغّل الطبقة الأساسية 5.1 فقط؛ افتح «افحص الكائنات» لتشغيل كل كائن على حدة ومعرفة موضعه.</translation>
     </message>
