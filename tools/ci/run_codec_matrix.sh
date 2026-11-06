@@ -1642,26 +1642,22 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     fi
 done
 
-# Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage), where
-# cut and cat once stopped with AC-3's sync error (exit 2); the other
+# Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage); the other
 # transports' profiles do not apply to it; and an option a TrueHD run does not apply is refused, not
 # dropped (a verification flag above all, which must never exit 0 without verifying). play and
 # monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
 # this job has not got. Each line names the command and the exit status it gave.
 count=$((count + 1))
-echo "[$count] truehd is refused by cut, cat, transcode and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata, normalize and qc refuse E-AC-3's options)"
+echo "[$count] truehd is refused by fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata, normalize and qc refuse E-AC-3's options; cut, cat and transcode read TrueHD now, and decode applies verify-objects and channels=2)"
 th_in=th_truehd_st48_s24.thd
-for refused in "cut $th_in th_refused.thd 0.05 0.1" \
-    "cat th_refused.thd $th_in $th_in" \
-    "metadata $th_in th_refused.thd dialnorm=27" \
+for refused in "metadata $th_in th_refused.thd dialnorm=27" \
     "normalize $th_in th_refused.thd dialnorm=27" \
-    "transcode $th_in th_refused.ac3 192" \
     "qc $th_in layout=rendered" "fmp4 $th_in th_refused_fmp4 24" \
     "ts $th_in th_refused.ts dvb" "ts $th_in th_refused.ts atsc" \
     "remux th_truehd_st48_s24.mkv th_refused.ts dvb" \
     "decode $th_in th_refused.wav verify-content" "decode $th_in th_refused.wav check-content" \
-    "decode $th_in th_refused.wav verify-objects" "decode $th_in th_refused.wav syntax-trace=th_refused.trace" \
-    "decode $th_in th_refused.wav channels=2" "decode $th_in th_refused.wav programme=3" \
+    "decode $th_in th_refused.wav syntax-trace=th_refused.trace" \
+    "decode $th_in th_refused.wav programme=3" \
     "levels $th_in programme=1" "loudness $th_in programme=1" \
     "mkv $th_in th_refused.mkv mainid=1" "mp4 $th_in th_refused.mp4 asvc=1" \
     "ts $th_in th_refused.ts programme=1" "spdif $th_in th_refused.wav mainid=1"; do

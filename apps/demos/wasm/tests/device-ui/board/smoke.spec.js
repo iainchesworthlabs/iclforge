@@ -59,7 +59,7 @@ test('the board serves the page, and the page drives the board', async ({ page, 
     // What the board says it is and where: QEMU's Ethernet and its address,
     // the firmware this image is, and no wiring to choose on a capture sink,
     // which has no second line.
-    await expect(page.locator('#network')).toHaveText('Ethernet \u00b7 10.0.2.15');
+    await expect(page.locator('#network')).toHaveText('Wired \u00b7 10.0.2.15');
     await expect(page.locator('#hw-firmware')).toHaveText(/^iclforge_hearth_sink /);
     await expect(page.locator('#hw-idf')).toHaveText(/^v\d/);
     await expect(page.locator('#wiring-row')).toBeHidden();
@@ -83,7 +83,9 @@ test('the board serves the page, and the page drives the board', async ({ page, 
     // firmware, explained by the page; the layout stays.
     await page.getByRole('textbox', { name: 'Output layout' }).fill('5.1');
     await page.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByRole('status')).toHaveText('Output layout 5.1 refused (409): it needs 6 slots and this sink has 2.');
+    await expect(page.getByRole('status')).toHaveText(
+        /^Output layout 5\.1 refused \(409\): 5\.1 needs 6 slots; this board's output carries 2\./,
+    );
     expect((await status()).layout).toBe('2.0');
 
     // The volume, set over the REST surface as a server would, since the page

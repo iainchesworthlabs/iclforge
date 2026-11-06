@@ -499,7 +499,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ctest --preset test-linux-gcc-no-truehd -N | grep -q 'without ICLFORGE_BUILD_TRUEHD every TrueHD call is unsupported'
+          # Into a variable first: `ctest -N | grep -q` has grep quit at the first match, ctest then
+          # gets SIGPIPE while it still lists thousands of tests, and pipefail makes that 141.
+          listed=$(ctest --preset test-linux-gcc-no-truehd -N)
+          grep -q 'without ICLFORGE_BUILD_TRUEHD every TrueHD call is unsupported' <<< "$listed"
           ctest --preset test-linux-gcc-no-truehd -LE Performance
 
       - name: Record result
