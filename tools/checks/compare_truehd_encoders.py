@@ -307,9 +307,12 @@ def totals(rows, other):
 
 
 def markdown(rows, versions, args):
-    lines = [
+    header = (
         "| Source | Rate | Ch | Bits | s | DEE | FFmpeg | forge | forge/FFmpeg | forge/DEE "
-        "| bit-exact |",
+        "| bit-exact |"
+    )
+    lines = [
+        header,
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
 

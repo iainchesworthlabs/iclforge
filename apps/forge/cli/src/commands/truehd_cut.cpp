@@ -100,9 +100,11 @@ std::string_view difference(const Shape& a, const Shape& b) {
 std::expected<Walk, int> walk_units(std::span<const std::byte> stream, std::string_view path) {
     const auto info = th::probe_stream(stream);
     if (!info) {
-        fmt::println(stderr, "error: {}: {}", path,
-                     info.error().detail.empty() ? std::string{th::to_string(info.error().kind)}
-                                                 : info.error().detail);
+        std::string_view detail = info.error().detail;
+        if (detail.empty()) {
+            detail = th::to_string(info.error().kind);
+        }
+        fmt::println(stderr, "error: {}: {}", path, detail);
         return std::unexpected(kExitInput);
     }
     Walk walk{.info = *info, .units = {}};

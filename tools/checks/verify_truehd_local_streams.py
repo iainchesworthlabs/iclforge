@@ -423,37 +423,36 @@ def check_track(
     # The file as it is.
     core = "-"
     size_mib = path.stat().st_size / (1 << 20)
-    if True:
-        if size_mib <= args.max_container_mib:
-            container_probe = forge_probe(forge, path)
-            if container_probe is None:
+    if size_mib <= args.max_container_mib:
+        container_probe = forge_probe(forge, path)
+        if container_probe is None:
+            row.failed = True
+            row.notes.append("forge probe json=1 of the file is not valid JSON")
+        first = container_probe is not None and container_probe.get("truehd") is not None
+        core = str((container_probe or {}).get("truehd", {}).get("ac3_core_frames", "-"))
+        if first and ordinal == 0:
+            wav2 = scratch / "container.wav"
+            facts = forge_decode(forge, path, wav2, lenient=strict_failed)
+            digests = hash_wav(wav2) if wav2.exists() else None
+            wav2.unlink(missing_ok=True)
+            if digests is None or facts["status"] != 0:
                 row.failed = True
-                row.notes.append("forge probe json=1 of the file is not valid JSON")
-            first = container_probe is not None and container_probe.get("truehd") is not None
-            core = str((container_probe or {}).get("truehd", {}).get("ac3_core_frames", "-"))
-            if first and ordinal == 0:
-                wav2 = scratch / "container.wav"
-                facts = forge_decode(forge, path, wav2, lenient=strict_failed)
-                digests = hash_wav(wav2) if wav2.exists() else None
-                wav2.unlink(missing_ok=True)
-                if digests is None or facts["status"] != 0:
-                    row.failed = True
-                    row.notes.append(
-                        "forge on the file: " + ("; ".join(facts["errors"][:1]) or "no decode")
-                    )
-                    row.cells["file_leg"] = "FAILED"
-                elif forge_digests is not None and digests.digests() == forge_digests.digests():
-                    row.cells["file_leg"] = "identical"
-                else:
-                    row.failed = True
-                    row.cells["file_leg"] = "DIFFERENT"
-                    row.notes.append("forge on the file differs from forge on the extracted stream")
-                if facts.get("note"):
-                    row.notes.append(facts["note"].replace("note: ", "")[:140])
+                row.notes.append(
+                    "forge on the file: " + ("; ".join(facts["errors"][:1]) or "no decode")
+                )
+                row.cells["file_leg"] = "FAILED"
+            elif forge_digests is not None and digests.digests() == forge_digests.digests():
+                row.cells["file_leg"] = "identical"
             else:
-                row.cells["file_leg"] = "skipped (forge's first stream here is not this track)"
+                row.failed = True
+                row.cells["file_leg"] = "DIFFERENT"
+                row.notes.append("forge on the file differs from forge on the extracted stream")
+            if facts.get("note"):
+                row.notes.append(facts["note"].replace("note: ", "")[:140])
         else:
-            row.cells["file_leg"] = f"skipped (over {args.max_container_mib} MiB)"
+            row.cells["file_leg"] = "skipped (forge's first stream here is not this track)"
+    else:
+        row.cells["file_leg"] = f"skipped (over {args.max_container_mib} MiB)"
     row.cells["ac3_core"] = core
     return row
 
