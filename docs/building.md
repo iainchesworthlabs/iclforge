@@ -1280,10 +1280,10 @@ needs a real card) all live in `tools/checks/coverage_report.sh`, with the calib
 comment in `_ci-core.yml`.
 
 In the merge queue, for an entry that changes `src/`, `pr-gate.yml` calls `_compare.yml`. Its
-`performance-compare` and `memory-compare` jobs build the benchmarks at the commit the entry is
-queued on and at the entry's head, and write per-workload deltas to the job summary, using the same
-soft and hard tiers `tools/ci/append_performance_history.py` applies on merge. They are
-informational and have `continue-on-error`; a hard regression (twice as slow, or twice the heap
+`compare` job (speed and heap churn in one runner) builds the benchmarks at the commit the entry is
+queued on and at the entry's head, and writes per-workload deltas to the job summary, using the same
+soft and hard tiers `tools/ci/append_performance_history.py` applies on merge. It is
+informational and has `continue-on-error`; a hard regression (twice as slow, or twice the heap
 churn) reaches the separate, blocking `performance-gate` and `memory-gate` jobs, unless the pull
 request carries the matching approval label. `iclforge-perf` also enforces its absolute real-time budget
 on every leg whose test preset includes it, and the performance and memory trend jobs that run after
