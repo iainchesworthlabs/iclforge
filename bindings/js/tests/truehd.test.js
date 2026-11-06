@@ -204,7 +204,7 @@ test("TruehdScannedStream passes the spacing on, defaults it, and reads its info
   assert.deepEqual(log.scans[0], { data, spacing: 1 });
   assert.deepEqual(stream.info, { sampleRate: 48000, samples: 12000 });
   assert.deepEqual(stream.restarts(), [{ unit: 0, offset: 0 }]);
-  new TruehdScannedStream(module, data);
+  assert.ok(new TruehdScannedStream(module, data));
   assert.equal(log.scans[1].spacing, TRUEHD_DEFAULT_RESTART_SPACING);
   assert.equal(TRUEHD_DEFAULT_RESTART_SPACING, 256);
 });
@@ -244,13 +244,13 @@ test("TruehdScannedStream.close releases the native object once", () => {
 
 test("TruehdDecoder defaults to the best presentation and a strict decode", () => {
   const { module, log } = makeFake();
-  new TruehdDecoder(module);
+  assert.ok(new TruehdDecoder(module));
   assert.deepEqual(log.decoders[0], { presentation: TruehdPresentation.Best, lenient: false });
 });
 
 test("TruehdDecoder passes its options through", () => {
   const { module, log } = makeFake();
-  new TruehdDecoder(module, { presentation: TruehdPresentation.SixChannel, lenient: true });
+  assert.ok(new TruehdDecoder(module, { presentation: TruehdPresentation.SixChannel, lenient: true }));
   assert.deepEqual(log.decoders[0], { presentation: 2, lenient: true });
 });
 
