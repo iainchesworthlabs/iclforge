@@ -5322,156 +5322,217 @@
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="102"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="151"/>
         <source>default</source>
         <translation>Par défaut</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="117"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="169"/>
         <source>Encode TrueHD</source>
         <translation>Encoder en TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="125"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="177"/>
         <source>Close</source>
         <translation>Fermer</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="185"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
         <translation>Code un fichier WAV sans perte en TrueHD : le flux se décode exactement en les échantillons d’origine. Le masque de canaux du WAV nomme les enceintes ; un fichier sans masque est pris dans l’ordre où forge decode écrit. La sortie est un flux .thd brut, ou du Matroska (.mkv), du MP4 (.mp4) ou un flux de transport Blu-ray (.m2ts, .ts), selon ce que demande son nom.</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="142"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="194"/>
         <source>Choose WAV…</source>
         <translation>Choisir un WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="151"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="203"/>
         <source>No file chosen</source>
         <translation>Aucun fichier choisi</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="161"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="213"/>
         <source>Save as…</source>
         <translation>Enregistrer sous…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="170"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="222"/>
         <source>Not chosen yet</source>
         <translation>Pas encore choisi</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="178"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="230"/>
         <source>Verify: decode every access unit and compare it with the input</source>
         <translation>Vérifier : décoder chaque unité d’accès et la comparer à l’entrée</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="186"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="238"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
         <translation>Écrire les présentations 2 et 6 canaux comme mixages réduits (truehd-downmix=standard)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="194"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="246"/>
         <source>Fewer options</source>
         <translation>Moins d’options</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="194"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="246"/>
         <source>More options…</source>
         <translation>Plus d’options…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="208"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="260"/>
         <source>These are the truehd- options of forge truehd-encode. Leave one empty for the encoder&apos;s own choice.</source>
         <translation>Voici les options truehd- de forge truehd-encode. Laissez-en une vide pour que l’encodeur choisisse.</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="214"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="266"/>
         <source>Access units between restarts</source>
         <translation>Unités d’accès entre redémarrages</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="215"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="267"/>
         <source>1 or 8 to 4096</source>
         <translation>1 ou 8 à 4096</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="219"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="271"/>
         <source>Access units between major syncs</source>
         <translation>Unités d’accès entre synchronisations majeures</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="220"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="272"/>
         <source>0 or a multiple of the restart, up to 65536</source>
         <translation>0 ou un multiple du redémarrage, jusqu’à 65536</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="224"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="276"/>
         <source>Peak data rate (kbit/s)</source>
         <translation>Débit de crête (kbit/s)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="225"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="277"/>
         <source>1 to 100000</source>
         <translation>1 à 100000</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="229"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="281"/>
         <source>Hold the rate to (kbit/s)</source>
         <translation>Tenir le débit à (kbit/s)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="230"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="282"/>
         <source>1000 to 100000</source>
         <translation>1000 à 100000</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="234"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="286"/>
         <source>Highest prediction filter order</source>
         <translation>Ordre maximal du filtre de prédiction</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="235"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="287"/>
         <source>0 to 8</source>
         <translation>0 à 8</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="239"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="291"/>
         <source>Downmix gains in dB</source>
         <translation>Gains du mixage réducteur en dB</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="240"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="292"/>
         <source>C, Ls and Rs, LFE, Lrs and Rrs: -3,-3,off,-3</source>
         <translation>C, Ls et Rs, LFE, Lrs et Rrs : -3,-3,off,-3</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="244"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="296"/>
         <source>Peak rate check</source>
         <translation>Vérification du débit de crête</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="249"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="301"/>
         <source>Matrix search</source>
         <translation>Recherche de matrice</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="254"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="306"/>
         <source>Stereo presentation</source>
         <translation>Présentation stéréo</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="259"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="311"/>
         <source>Back to the defaults</source>
         <translation>Revenir aux valeurs par défaut</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="269"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="319"/>
+        <source>Hide channel meaning</source>
+        <translation>Masquer la signification des canaux</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="319"/>
+        <source>Channel meaning…</source>
+        <translation>Signification des canaux…</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="333"/>
+        <source>The channel meaning of each presentation (TH spec §14.1), written into every major sync of the stream. Provisional: no decoder here applies it and what the values mean is not settled, so there is no oracle until the DEE set. A field left empty is written as zero.</source>
+        <translation>La signification des canaux de chaque présentation (spécification TH §14.1), écrite dans chaque synchronisation majeure du flux. Provisoire : aucun décodeur d’ici ne l’applique et le sens des valeurs n’est pas établi, il n’y a donc pas d’oracle avant l’ensemble DEE. Un champ laissé vide est écrit à zéro.</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="345"/>
+        <source>Dialogue norm</source>
+        <translation>Norme de dialogue</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="346"/>
+        <source>Mix level</source>
+        <translation>Niveau de mixage</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="347"/>
+        <source>Source format</source>
+        <translation>Format source</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="348"/>
+        <source>Control</source>
+        <translation>Contrôle</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="350"/>
+        <source>2 channel</source>
+        <translation>2 canaux</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="356"/>
+        <source>6 channel</source>
+        <translation>6 canaux</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="362"/>
+        <source>8 channel</source>
+        <translation>8 canaux</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="375"/>
+        <source>Heavy DRC start-up gain</source>
+        <translation>Gain initial DRC fort</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="377"/>
+        <source>DRC start-up gain</source>
+        <translation>Gain initial DRC</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="386"/>
         <source>Encode</source>
         <translation>Encoder</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="275"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="392"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>

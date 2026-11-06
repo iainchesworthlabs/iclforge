@@ -107,6 +107,58 @@ Dialog {
         }
     }
 
+    // One field of the channel meaning that is a number: a cell of the table below, with the
+    // sentence that says what the option takes under it when the text is not that.
+    component MeaningNumber: ColumnLayout {
+        id: cell
+        property string optionName
+        property string hint
+        Layout.fillWidth: true
+        Layout.preferredWidth: 1
+        Layout.alignment: Qt.AlignTop
+        spacing: 2
+        TextField {
+            objectName: "truehdEncodeOption_" + cell.optionName
+            Layout.fillWidth: true
+            text: TruehdEncodeController.options[cell.optionName]
+            placeholderText: cell.hint
+            enabled: !TruehdEncodeController.busy
+            font.pixelSize: Theme.fontSmall
+            onTextEdited: TruehdEncodeController.setOption(cell.optionName, text)
+        }
+        Text {
+            objectName: "truehdEncodeOptionError_" + cell.optionName
+            Layout.fillWidth: true
+            visible: text.length > 0
+            wrapMode: Text.Wrap
+            text: TruehdEncodeController.optionErrors[cell.optionName] || ""
+            font.pixelSize: Theme.fontSmall
+            color: Theme.bad
+        }
+    }
+
+    // A control-enabled bit: default (left at zero), on or off.
+    component MeaningSwitch: ColumnLayout {
+        id: flag
+        property string optionName
+        Layout.fillWidth: true
+        Layout.preferredWidth: 1
+        Layout.alignment: Qt.AlignTop
+        spacing: 2
+        ComboBox {
+            objectName: "truehdEncodeOption_" + flag.optionName
+            Layout.fillWidth: true
+            model: [qsTr("default"), "on", "off"]
+            enabled: !TruehdEncodeController.busy
+            currentIndex: {
+                const text = TruehdEncodeController.options[flag.optionName]
+                return text === "on" ? 1 : (text === "off" ? 2 : 0)
+            }
+            onActivated: TruehdEncodeController.setOption(flag.optionName,
+                                                          currentIndex === 0 ? "" : (currentIndex === 1 ? "on" : "off"))
+        }
+    }
+
     contentItem: ColumnLayout {
         spacing: Theme.space4
 
@@ -259,6 +311,71 @@ Dialog {
                 text: qsTr("Back to the defaults")
                 enabled: !TruehdEncodeController.busy
                 onClicked: TruehdEncodeController.resetOptions()
+            }
+        }
+
+        Button {
+            objectName: "truehdEncodeMeaningToggle"
+            text: meaningPanel.visible ? qsTr("Hide channel meaning") : qsTr("Channel meaning…")
+            onClicked: meaningPanel.visible = !meaningPanel.visible
+        }
+
+        ColumnLayout {
+            id: meaningPanel
+            objectName: "truehdEncodeMeaningPanel"
+            Layout.fillWidth: true
+            visible: false
+            spacing: Theme.space2
+
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("The channel meaning of each presentation (TH spec §14.1), written into every major sync of the stream. Provisional: no decoder here applies it and what the values mean is not settled, so there is no oracle until the DEE set. A field left empty is written as zero.")
+                font.pixelSize: Theme.fontSmall
+                color: Theme.neutral700
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 5
+                columnSpacing: Theme.space2
+                rowSpacing: Theme.space2
+
+                Item { Layout.preferredWidth: 80 }
+                Text { Layout.fillWidth: true; Layout.preferredWidth: 1; text: qsTr("Dialogue norm"); font.pixelSize: Theme.fontSmall; font.weight: Font.Bold; color: Theme.text }
+                Text { Layout.fillWidth: true; Layout.preferredWidth: 1; text: qsTr("Mix level"); font.pixelSize: Theme.fontSmall; font.weight: Font.Bold; color: Theme.text }
+                Text { Layout.fillWidth: true; Layout.preferredWidth: 1; text: qsTr("Source format"); font.pixelSize: Theme.fontSmall; font.weight: Font.Bold; color: Theme.text }
+                Text { Layout.fillWidth: true; Layout.preferredWidth: 1; text: qsTr("Control"); font.pixelSize: Theme.fontSmall; font.weight: Font.Bold; color: Theme.text }
+
+                Text { Layout.preferredWidth: 80; Layout.alignment: Qt.AlignTop; text: qsTr("2 channel"); font.pixelSize: Theme.fontSmall; color: Theme.text }
+                MeaningNumber { optionName: "dialnorm-2ch"; hint: "0–63" }
+                MeaningNumber { optionName: "mix-level-2ch"; hint: "0–63" }
+                Item { Layout.fillWidth: true; Layout.preferredWidth: 1 }
+                MeaningSwitch { optionName: "control-2ch" }
+
+                Text { Layout.preferredWidth: 80; Layout.alignment: Qt.AlignTop; text: qsTr("6 channel"); font.pixelSize: Theme.fontSmall; color: Theme.text }
+                MeaningNumber { optionName: "dialnorm-6ch"; hint: "0–31" }
+                MeaningNumber { optionName: "mix-level-6ch"; hint: "0–63" }
+                MeaningNumber { optionName: "source-format-6ch"; hint: "0–31" }
+                MeaningSwitch { optionName: "control-6ch" }
+
+                Text { Layout.preferredWidth: 80; Layout.alignment: Qt.AlignTop; text: qsTr("8 channel"); font.pixelSize: Theme.fontSmall; color: Theme.text }
+                MeaningNumber { optionName: "dialnorm-8ch"; hint: "0–31" }
+                MeaningNumber { optionName: "mix-level-8ch"; hint: "0–63" }
+                MeaningNumber { optionName: "source-format-8ch"; hint: "0–63" }
+                MeaningSwitch { optionName: "control-8ch" }
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 4
+                columnSpacing: Theme.space2
+                rowSpacing: Theme.space2
+
+                Text { Layout.preferredWidth: 160; Layout.alignment: Qt.AlignTop; text: qsTr("Heavy DRC start-up gain"); font.pixelSize: Theme.fontSmall; color: Theme.text; wrapMode: Text.WordWrap }
+                MeaningNumber { optionName: "heavy-drc-start-up-gain"; hint: "-32–31" }
+                Text { Layout.preferredWidth: 160; Layout.alignment: Qt.AlignTop; text: qsTr("DRC start-up gain"); font.pixelSize: Theme.fontSmall; color: Theme.text; wrapMode: Text.WordWrap }
+                MeaningNumber { optionName: "drc-start-up-gain"; hint: "-64–63" }
             }
         }
 

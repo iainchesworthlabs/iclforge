@@ -14,6 +14,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 
 // The encode that `forge truehd-encode` and the Forge window's TrueHD encode share: a WAV's PCM,
 // coded losslessly by iclforge::truehd::Encoder into a bare stream (apps/forge/cli/src/commands/
@@ -82,10 +83,11 @@ void pad_leading(iclforge::ac3::io::WavData& wav, std::size_t samples);
 
 // ---- the encoder's settings ----------------------------------------------------------------------
 //
-// The `truehd-*` options of `forge truehd-encode` that shape the stream (not the channel meaning, and
-// not the Atmos-only ones), and the Forge window's Encode TrueHD options: one place for what each
-// value may be and the sentence that says so, so that the window refuses what the command line does.
-// The command line's own parser (apps/forge/cli/src/support.cpp) shares the limits below.
+// The `truehd-*` options of `forge truehd-encode` that shape the stream (not the Atmos-only ones),
+// and the Forge window's Encode TrueHD options: one place for what each value may be and the
+// sentence that says so, so that the window refuses what the command line does. The command line's
+// own parser (apps/forge/cli/src/support.cpp) shares the limits below and the channel meaning
+// options (set_meaning_option).
 
 inline constexpr int kRestartMaxUnits = 4096;
 inline constexpr std::uint32_t kPeakRateMaxKbps = 100000;
@@ -107,16 +109,44 @@ struct Settings {
     bool matrix = true;                                  // truehd-matrix=
     unsigned stereo_mode = 0;                            // truehd-stereo-mode=: stereo, ltrt, headphone
     bool verify = false;                                 // verify
+    // The channel meaning (TH spec §14.1): the fields the options name, the rest left as the
+    // encoder has them (zero, as FFmpeg's streams have them). Provisional, no oracle until the DEE
+    // set (libs/truehd/ERRATA.md, questions 51 to 55).
+    iclforge::truehd::ChannelMeaningEdit meaning;
 };
 
+// ---- the channel meaning -------------------------------------------------------------------------
+//
+// One option for each field of each presentation (2, 6 and 8 channels), named after it, as `forge
+// truehd-encode`, `truehd-atmos` and `metadata` take them: truehd-dialnorm-2ch=, -6ch=, -8ch=;
+// truehd-mix-level-*; truehd-source-format-6ch=, -8ch=; truehd-control-* (on or off); and the two DRC
+// start-up gains truehd-heavy-drc-start-up-gain= and truehd-drc-start-up-gain=. The ranges are the
+// widths of the fields (iclforge::truehd::channel_meaning_problem). Provisional: the specification
+// gives no units for most of them.
+
+// The options' names after "truehd-", in the order the command line writes them.
+[[nodiscard]] std::span<const std::string_view> meaning_option_names() noexcept;
+
+// Whether `name` (after "truehd-") is one of them.
+[[nodiscard]] bool is_meaning_option(std::string_view name) noexcept;
+
+// Sets the field the option `name` names to `value`, as the command line reads it. The error is the
+// sentence that says what the option takes, without the value it was given.
+[[nodiscard]] std::expected<void, std::string> set_meaning_option(
+    iclforge::truehd::ChannelMeaningEdit& edit, std::string_view name, std::string_view value);
+
 // Sets the option `name` (the part after "truehd-", such as "restart") to `value`, as the command line
-// reads it. The error is the sentence that says what the option takes, without the value it was
-// given: the caller adds that. A name that is not one of these is an error too.
+// reads it; the channel meaning options too. The error is the sentence that says what the option
+// takes, without the value it was given: the caller adds that. A name that is not one of these is an
+// error too.
 [[nodiscard]] std::expected<void, std::string> set_option(Settings& settings, std::string_view name,
                                                           std::string_view value);
 
-// The settings into `config`; the fields they leave alone keep what the caller set.
-void apply(const Settings& settings, iclforge::truehd::EncoderConfig& config);
+// The settings into `config`; the fields they leave alone keep what the caller set. A channel meaning
+// the encoder cannot hold comes back as the sentence that names the field (set_option has refused
+// those, so this is for a Settings filled in by hand); `config` is then complete but for the meaning.
+[[nodiscard]] std::expected<void, std::string> apply(const Settings& settings,
+                                                     iclforge::truehd::EncoderConfig& config);
 
 struct Outcome {
     std::vector<std::byte> stream;

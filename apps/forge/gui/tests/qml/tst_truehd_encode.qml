@@ -193,6 +193,125 @@ TestCase {
         return found ? parseInt(found[1]) : -1;
     }
 
+    // The channel meaning: the options of the command line that name a field of a presentation go
+    // into the command the dialog shows, a value the command line would refuse is refused with its
+    // sentence and stops the encode, and an empty field is not on the line.
+    function test_theChannelMeaningIsInTheCommandLineAndABadValueIsRefused() {
+        TruehdEncodeController.chooseSource(speakers51Url);
+        TruehdEncodeController.chooseOutput(outputUrl);
+        TruehdEncodeController.setOption("dialnorm-6ch", " 27 ");
+        TruehdEncodeController.setOption("control-6ch", "on");
+        TruehdEncodeController.setOption("drc-start-up-gain", "-12");
+        TruehdEncodeController.setOption("restart", "64");
+        const line = TruehdEncodeController.cliLine;
+        verify(line.indexOf(" truehd-restart=64 truehd-dialnorm-6ch=27 truehd-control-6ch=on truehd-drc-start-up-gain=-12") > 0, line);
+        compare(TruehdEncodeController.options["dialnorm-6ch"], "27");
+        compare(TruehdEncodeController.canEncode, true);
+        verify(TruehdEncodeController.optionNames.indexOf("source-format-8ch") >= 0);
+        compare(TruehdEncodeController.optionNames.length, 9 + 13);
+
+        TruehdEncodeController.setOption("dialnorm-6ch", "32");
+        compare(TruehdEncodeController.optionErrors["dialnorm-6ch"],
+                "truehd-dialnorm-6ch is a whole number from 0 to 31 (got '32')");
+        compare(TruehdEncodeController.canEncode, false);
+        TruehdEncodeController.setOption("control-6ch", "yes");
+        compare(TruehdEncodeController.optionErrors["control-6ch"],
+                "truehd-control-6ch is on or off (got 'yes')");
+        TruehdEncodeController.setOption("heavy-drc-start-up-gain", "-33");
+        verify(TruehdEncodeController.optionErrors["heavy-drc-start-up-gain"].indexOf("from -32 to 31") > 0);
+        TruehdEncodeController.encode();  // refused: nothing runs
+        compare(TruehdEncodeController.busy, false);
+
+        TruehdEncodeController.setOption("dialnorm-6ch", "");
+        TruehdEncodeController.setOption("control-6ch", "");
+        TruehdEncodeController.setOption("heavy-drc-start-up-gain", "");
+        compare(Object.keys(TruehdEncodeController.optionErrors).length, 0);
+        compare(TruehdEncodeController.canEncode, true);
+        compare(TruehdEncodeController.cliLine.indexOf("dialnorm"), -1);
+        TruehdEncodeController.resetOptions();
+        compare(TruehdEncodeController.cliLine.indexOf("truehd-drc-start-up-gain"), -1);
+    }
+
+    // The channel meaning reaches the stream: QC reads back the dialogue norm each presentation
+    // stores, and the summary says the meaning was written and that it is provisional.
+    function test_theChannelMeaningIsWrittenIntoTheStream() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        encodeAndWait(speakers51Url);
+        compare(TruehdEncodeController.summary.indexOf("channel meaning"), -1);
+
+        TruehdEncodeController.setOption("dialnorm-2ch", "20");
+        TruehdEncodeController.setOption("dialnorm-6ch", "27");
+        encodeAndWait(speakers51Url);
+        compare(TruehdEncodeController.error, "");
+        verify(TruehdEncodeController.summary.indexOf("channel meaning written (provisional") > 0,
+               TruehdEncodeController.summary);
+
+        QcController.measureFile(outputUrl);
+        tryCompare(QcController, "busy", false, 30000);
+        compare(QcController.error, "");
+        const programmes = QcController.programmes;
+        compare(programmes.length, 2);
+        compare(programmes[0].dialnorm, 20);
+        compare(programmes[1].dialnorm, 27);
+    }
+
+    // The channel meaning panel: collapsed until asked for; the fields show the controller's values,
+    // a refused value is refused under its field with the sentence of the command line, and the
+    // control box sets on, off or back to the default.
+    function test_theChannelMeaningPanelShowsAndSetsTheFields() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        const dialog = findChild(win.contentItem, "truehdEncodeDialog");
+        verify(dialog !== null);
+        dialog.open();
+        tryCompare(dialog, "visible", true, 5000);
+        const toggle = findChild(dialog.contentItem, "truehdEncodeMeaningToggle");
+        const panel = findChild(dialog.contentItem, "truehdEncodeMeaningPanel");
+        verify(toggle !== null && panel !== null);
+        compare(panel.visible, false);
+        toggle.clicked();
+        compare(panel.visible, true);
+
+        const field = findChild(dialog.contentItem, "truehdEncodeOption_dialnorm-8ch");
+        verify(field !== null);
+        field.insert(0, "40");
+        field.textEdited();
+        compare(TruehdEncodeController.options["dialnorm-8ch"], "40");
+        const error = findChild(dialog.contentItem, "truehdEncodeOptionError_dialnorm-8ch");
+        tryCompare(error, "visible", true, 2000);
+        verify(error.text.indexOf("truehd-dialnorm-8ch is a whole number from 0 to 31") === 0, error.text);
+        compare(TruehdEncodeController.canEncode, false);
+        field.remove(0, field.length);
+        field.textEdited();
+        tryCompare(error, "visible", false, 2000);
+
+        const control = findChild(dialog.contentItem, "truehdEncodeOption_control-2ch");
+        verify(control !== null);
+        control.currentIndex = 1;
+        control.activated(1);
+        compare(TruehdEncodeController.options["control-2ch"], "on");
+        control.currentIndex = 2;
+        control.activated(2);
+        compare(TruehdEncodeController.options["control-2ch"], "off");
+        control.currentIndex = 0;
+        control.activated(0);
+        compare(TruehdEncodeController.options["control-2ch"], "");
+
+        // Source format is a field of the 6 and 8 channel presentations only.
+        verify(findChild(dialog.contentItem, "truehdEncodeOption_source-format-6ch") !== null);
+        verify(findChild(dialog.contentItem, "truehdEncodeOption_source-format-8ch") !== null);
+        compare(findChild(dialog.contentItem, "truehdEncodeOption_source-format-2ch"), null);
+
+        TruehdEncodeController.setOption("drc-start-up-gain", "5");
+        findChild(dialog.contentItem, "truehdEncodeResetOptions").clicked();
+        compare(TruehdEncodeController.options["drc-start-up-gain"], "");
+        compare(findChild(dialog.contentItem, "truehdEncodeOption_drc-start-up-gain").text, "");
+        toggle.clicked();
+        compare(panel.visible, false);
+        dialog.close();
+    }
+
     // The panel: its fields show the controller's values, and typing into one sets the option.
     function test_thePanelShowsAndSetsTheOptions() {
         const win = createTemporaryObject(mainWindowComponent, testCase);
