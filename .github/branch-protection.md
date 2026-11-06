@@ -95,10 +95,10 @@ Two rules still hold:
   until an admin edits the rule.
 - `Compare` (`_compare.yml`) runs in the queue for an entry that changes
   `src/`: the encoder's speed and heap churn at the commit the entry is queued
-  on and at its head. Its measuring jobs (`Performance vs base`, `Memory vs
-  base`) are informational and carry `continue-on-error`, so a build that
-  flakes blocks nothing, and they must not be made required in their own right:
-  that would turn hosted-runner timing noise into a merge blocker. Their
+  on and at its head. Its measuring job (`Performance and memory vs
+  base`) is informational and carries `continue-on-error`, so a build that
+  flakes blocks nothing, and it must not be made required in its own right:
+  that would turn hosted-runner timing noise into a merge blocker. Its
   verdicts reach `CI Status` through `Performance gate` and `Memory gate`, which
   fail an entry whose workload takes twice as long or whose heap churn at least
   doubles, unless its pull request carries `perf-regression-approved` or

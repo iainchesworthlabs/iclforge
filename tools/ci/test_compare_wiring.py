@@ -106,32 +106,52 @@ class TheGateConfiguresTheEsp32Profiles(unittest.TestCase):
 
 
 class TheReusableWorkflow(unittest.TestCase):
-    def test_it_is_a_workflow_call_with_the_four_jobs(self):
+    def test_it_is_a_workflow_call_with_the_measuring_job_and_the_two_gates(self):
         compare = text("_compare.yml")
         self.assertRegex(compare, r"(?m)^on:\n  workflow_call:")
-        for name in ("performance-compare", "performance-gate", "memory-compare", "memory-gate"):
+        for name in ("compare", "performance-gate", "memory-gate"):
             with self.subTest(job=name):
                 self.assertIsNotNone(job("_compare.yml", name))
-
-    def test_the_measuring_jobs_do_not_block_and_do_not_wait_for_a_pull_request_event(self):
+        # One job measures both; the two jobs it replaced do not come back.
         for name in ("performance-compare", "memory-compare"):
-            with self.subTest(job=name):
-                body = job("_compare.yml", name)
-                self.assertIn("continue-on-error: true", body)
-                self.assertIn("timeout-minutes:", body)
-                self.assertNotIn("github.event_name", body)
-                self.assertNotIn("github.event.pull_request", body)
-                self.assertIn("inputs.base_sha", body)
+            with self.subTest(gone=name):
+                self.assertNotIn(f"\n  {name}:", compare)
+
+    def test_the_measuring_job_does_not_block_and_does_not_wait_for_a_pull_request_event(self):
+        body = job("_compare.yml", "compare")
+        self.assertIn("continue-on-error: true", body)
+        self.assertIn("timeout-minutes:", body)
+        self.assertNotIn("github.event_name", body)
+        self.assertNotIn("github.event.pull_request", body)
+        self.assertIn("inputs.base_sha", body)
+
+    def test_the_two_verdicts_are_independent_steps_with_their_own_output(self):
+        # They were two jobs so that a flake timing the speed benchmarks could not take the
+        # memory verdict with it. Sharing one job keeps that only if each measurement is its
+        # own step that may fail alone and exports its own output.
+        body = job("_compare.yml", "compare")
+        for step_id, output in (("perf", "performance_hard"), ("mem", "memory_hard")):
+            with self.subTest(step=step_id):
+                self.assertIn(f"{output}: ${{{{ steps.{step_id}.outputs.hard_regression }}}}", body)
+                step = re.search(rf"id: {step_id}\n(.*?)(?=\n      - |\Z)", body, re.S)
+                self.assertIsNotNone(step)
+                self.assertIn("continue-on-error: true", step.group(1))
+        for step_id in ("base_perf", "run_perf", "run_mem"):
+            with self.subTest(step=step_id):
+                step = re.search(rf"id: {step_id}\n(.*?)(?=\n      - |\Z)", body, re.S)
+                self.assertIsNotNone(step)
+                self.assertIn("continue-on-error: true", step.group(1))
 
     def test_the_gates_decide_through_the_script_and_read_labels_of_the_named_pull_request(self):
         for name, verdict, kind in (
-            ("performance-gate", "performance-compare", "performance"),
-            ("memory-gate", "memory-compare", "memory"),
+            ("performance-gate", "performance_hard", "performance"),
+            ("memory-gate", "memory_hard", "memory"),
         ):
             with self.subTest(job=name):
                 body = job("_compare.yml", name)
                 self.assertIn("if: always()", body)
-                self.assertIn(f"needs.{verdict}.outputs.hard_regression", body)
+                self.assertIn("needs: [compare]", body)
+                self.assertIn(f"needs.compare.outputs.{verdict}", body)
                 self.assertIn(f"tools/ci/compare_gate.py --kind {kind}", body)
                 self.assertIn("PR_NUMBER: ${{ inputs.pr_number }}", body)
                 self.assertRegex(body, r"permissions:\n\s+contents: read\n\s+pull-requests: read")

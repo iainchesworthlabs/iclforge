@@ -128,10 +128,10 @@ entry's head. A workload that takes twice as long, or whose heap churn at least 
 entry, unless its pull request carries the `perf-regression-approved` or
 `memory-regression-approved` label. The gate reads the label when it runs, so add it before the
 entry gets there, or after a failure and queue the pull request again. A comparison that cannot
-measure, such as a build that flaked, blocks nothing. The comparisons run beside the Windows job and
+measure, such as a build that flaked, blocks nothing. The comparison runs beside the Windows job and
 take less time than it, so a queue entry waits no longer for them. They took 5 to 10 minutes each on
-the fleet before the gate replaced `ci.yml` on pull requests. Their tables are in the summary of
-each job, and the trend jobs after a merge fail at the same +100% thresholds, after the fact.
+the fleet before the gate replaced `ci.yml` on pull requests. Its tables are in the summary of
+the job, and the trend jobs after a merge fail at the same +100% thresholds, after the fact.
 
 ## After the merge
 
