@@ -5301,57 +5301,72 @@
         <translation>TrueHD-Stream (*.thd)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="54"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
+        <source>Matroska (*.mkv)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
+        <source>MP4 (*.mp4)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="44"/>
+        <source>Blu-ray transport stream (*.m2ts *.ts)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="55"/>
         <source>Encode TrueHD</source>
         <translation>TrueHD kodieren</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="62"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="63"/>
         <source>Close</source>
         <translation>Schließen</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="70"/>
-        <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.</source>
-        <translation>Kodiert eine WAV-Datei verlustfrei als TrueHD: Der Stream wird zu genau den Samples dekodiert, die hineingegangen sind. Die Kanalmaske der WAV-Datei benennt die Lautsprecher; eine Datei ohne Maske wird in der Reihenfolge gelesen, in der forge decode schreibt. Das Ergebnis ist ein reiner .thd-Stream; forge truehd-encode schreibt auch Matroska, MP4 und einen Blu-ray-Transportstrom.</translation>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="71"/>
+        <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="79"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="80"/>
         <source>Choose WAV…</source>
         <translation>WAV wählen…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="88"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="89"/>
         <source>No file chosen</source>
         <translation>Keine Datei gewählt</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="98"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="99"/>
         <source>Save as…</source>
         <translation>Speichern unter…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="107"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="108"/>
         <source>Not chosen yet</source>
         <translation>Noch nicht gewählt</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="115"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="116"/>
         <source>Verify: decode every access unit and compare it with the input</source>
         <translation>Prüfen: jede Zugriffseinheit dekodieren und mit der Eingabe vergleichen</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="123"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="124"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
         <translation>Die 2- und 6-Kanal-Darstellungen als heruntergemischte Mischungen schreiben (truehd-downmix=standard)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="134"/>
         <source>Encode</source>
         <translation>Kodieren</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="139"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="140"/>
         <source>Stop</source>
         <translation>Stoppen</translation>
     </message>

@@ -5301,57 +5301,72 @@
         <translation>זרם TrueHD (*.thd)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="54"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
+        <source>Matroska (*.mkv)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
+        <source>MP4 (*.mp4)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="44"/>
+        <source>Blu-ray transport stream (*.m2ts *.ts)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="55"/>
         <source>Encode TrueHD</source>
         <translation>קידוד TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="62"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="63"/>
         <source>Close</source>
         <translation>סגירה</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="70"/>
-        <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.</source>
-        <translation>מקודד קובץ WAV ללא אובדן ל-TrueHD: הזרם מפוענח בדיוק לדגימות שנכנסו. מסכת הערוצים של ה-WAV נותנת שמות לרמקולים; קובץ ללא מסכה נלקח בסדר שבו forge decode כותב. התוצאה היא זרם .thd חשוף; forge truehd-encode כותב גם Matroska, MP4 וזרם תעבורה של Blu-ray.</translation>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="71"/>
+        <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="79"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="80"/>
         <source>Choose WAV…</source>
         <translation>בחרו WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="88"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="89"/>
         <source>No file chosen</source>
         <translation>לא נבחר קובץ</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="98"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="99"/>
         <source>Save as…</source>
         <translation>שמור בשם…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="107"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="108"/>
         <source>Not chosen yet</source>
         <translation>טרם נבחר</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="115"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="116"/>
         <source>Verify: decode every access unit and compare it with the input</source>
         <translation>אימות: פענוח כל יחידת גישה והשוואתה לקלט</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="123"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="124"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
         <translation>כתיבת התצוגות של 2 ו-6 ערוצים כמיקסים מקופלים (truehd-downmix=standard)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="134"/>
         <source>Encode</source>
         <translation>קידוד</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="139"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="140"/>
         <source>Stop</source>
         <translation>עצרו</translation>
     </message>
