@@ -131,11 +131,17 @@ output has no display EDID to read in the first place. `play` falls back to the 
 
 ### TrueHD (MAT)
 
-!!! warning "Not run, and not offered"
-    The backend refuses TrueHD (MAT) with `kUnsupportedFormat` and never reports `supports_mat_passthrough`. No Core Audio format ID is known
-    to it for TrueHD, and the session that wrote this had no Mac and no SDK to look in. A Mac may offer eight channels of 192 kHz linear PCM on an
-    HDMI output, in which a MAT burst could be sent as data; whether it does, and whether a receiver then names the stream TrueHD, is for the owner to
-    try before any code is written, and macOS is the last of the platforms. The list is `apps/hearth/engine/src/mat_status.hpp`.
+!!! warning "Written without a Mac, never run"
+    Core Audio has no format ID for TrueHD, and Apple documents no path for it; the reports found while writing this say macOS decodes TrueHD
+    and sends PCM. The backend tries the one way left: it looks, among an output stream's available physical formats, for **eight channels of
+    packed, signed, little-endian 16-bit linear PCM at 192 kHz (176.4 kHz for the 44.1 kHz family)**, retunes the device to it under hog mode with
+    mixing off (as for AC-3), and writes the MAT bursts into it as data, 16 bytes to a link frame. `supports_mat_passthrough` is true when a device
+    offers that shape, and means only that. What has not been found out is the rest: whether a Mac publishes the shape on HDMI, whether it passes
+    the words through untouched, and whether it marks the link as non-audio so that a receiver names the stream TrueHD rather than reading
+    eight-channel PCM. **If it does not, the receiver plays the burst as audio, which is loud noise: try it with the receiver's volume at its
+    lowest.** The CI macOS leg compiles it and tests the format matching (`libs/audio/tests/backend/macos/test_macos_support.cpp`), and the
+    GitHub-hosted Mac has no HDMI output, so nothing there opens a link. The status list is `apps/hearth/engine/src/mat_status.hpp`; it stays "not run"
+    until a receiver names the stream.
 
 ## Per-application capture: the Core Audio process tap
 

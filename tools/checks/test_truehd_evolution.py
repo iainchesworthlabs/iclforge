@@ -88,7 +88,7 @@ class ExtraData(unittest.TestCase):
 
     def test_parity_matches_the_worked_example(self):
         # seed 0xA9 ^ length 2 = 0xAB, then the two bytes; the fold of a byte-sized value is itself
-        self.assertEqual(E.parity(0, 2, b"\xab\xcd"), 0xAB ^ 0xAB ^ 0xCD)
+        self.assertEqual(E.parity(0, 2, b"\xab\xcd"), (0xA9 ^ 2) ^ 0xAB ^ 0xCD)
         # a 12-bit length folds its high nibble in
         self.assertEqual(E.parity(0, 0x123, b""), ((0x123 ^ 0xA9) >> 8 ^ (0x123 ^ 0xA9)) & 0xFF)
         # the reserved nibble is the top of the 16-bit word (section 16.4): 0x5000 ^ 0xA9 = 0x50A9,

@@ -81,6 +81,21 @@
 // digital output on every Mac carries Dolby Digital Plus.
 //
 // ---------------------------------------------------------------------------
+// TrueHD (MAT): written without a Mac, never run
+// ---------------------------------------------------------------------------
+// There is no Core Audio format ID for MAT, and Apple documents no path for it: the reports found
+// while writing this (Apple's coreaudio-api list, forum threads) say macOS decodes TrueHD and
+// sends PCM. The one way left is the one the other backends take, a burst written as data into
+// an eight-channel link: here a physical format of eight channels of packed 16-bit integer
+// linear PCM at 192 kHz (176.4 kHz for the 44.1 kHz family), which an HDMI output may publish
+// among its available physical formats (coreaudio_names.hpp's find_mat_link_format). The device
+// is retuned to it exactly as for AC-3, under hog mode with mixing off, so that nothing converts
+// the words on the way. Whether a given Mac publishes that shape, sends it through untouched, and
+// flags it as non-audio so that a receiver reads TrueHD rather than eight-channel PCM is the part
+// that has not been found out: supports_mat_passthrough here means only the first of those, and
+// nothing has been played to a receiver from a Mac (apps/hearth/engine/src/mat_status.hpp).
+//
+// ---------------------------------------------------------------------------
 // No worker thread
 // ---------------------------------------------------------------------------
 // See coreaudio_support.hpp's own header comment: AudioDeviceCreateIOProcID
@@ -139,14 +154,26 @@ std::optional<Candidate> find_stream(AudioObjectID device, AudioFormatID format_
     return std::nullopt;
 }
 
-// Whether `device` has an output stream offering `format` for `sample_rate`
-// of content: never for AC-4, which has no format ID (physical_format_id()).
+// The first output stream on `device` that can carry `format` at `carrier_hz`: one offering its
+// format ID (AC-3, E-AC-3) or, for MAT, eight 16-bit linear PCM channels (find_link_format()).
+// Never for AC-4, which has neither.
+std::optional<Candidate> find_link_stream(AudioObjectID device, BitstreamFormat format,
+                                          Float64 carrier_hz) {
+    for (const auto stream : coreaudio::device_streams(device, kAudioDevicePropertyScopeOutput)) {
+        const auto formats = coreaudio::available_physical_formats(stream);
+        if (const auto match = coreaudio::find_link_format(formats, format, carrier_hz)) {
+            return Candidate{.device = device, .stream = stream, .format = *match};
+        }
+    }
+    return std::nullopt;
+}
+
+// Whether `device` has an output stream offering `format` for `sample_rate` of content. For MAT
+// this is only that the shape is offered, not that anything downstream reads it as TrueHD.
 bool offers(AudioObjectID device, BitstreamFormat format, std::uint32_t sample_rate) {
-    const std::optional<AudioFormatID> format_id = coreaudio::physical_format_id(format);
-    return format_id.has_value() &&
-           find_stream(device, *format_id,
-                       static_cast<Float64>(coreaudio::carrier_rate(format, sample_rate)))
-               .has_value();
+    return find_link_stream(device, format,
+                            static_cast<Float64>(coreaudio::carrier_rate(format, sample_rate)))
+        .has_value();
 }
 
 }  // namespace
@@ -174,8 +201,7 @@ std::string_view describe(PassthroughError error) {
         case PassthroughError::kNotRunning: return "passthrough is not running";
         case PassthroughError::kUnsupportedFormat:
             return "Core Audio defines no AC-4 format ID (CoreAudioBaseTypes.h), so no stream "
-                   "can offer AC-4 or be retuned to it, and this backend knows no format ID for "
-                   "TrueHD (MAT) either: it is not offered, and nothing is opened for it";
+                   "can offer AC-4 or be retuned to it, and nothing is opened for it";
     }
     return "unknown passthrough error";
 }
@@ -202,6 +228,9 @@ std::expected<std::vector<RenderDeviceInfo>, PassthroughError> enumerate_render_
             .supports_ac3_passthrough = offers(device, BitstreamFormat::kAc3, sample_rate),
             .supports_eac3_passthrough = offers(device, BitstreamFormat::kEac3, sample_rate),
             .supports_ac4_passthrough = false,
+            // Only that the device offers eight 16-bit channels at the MAT link rate: Apple
+            // documents no MAT path, so this is not a claim that a receiver reads the stream.
+            .supports_mat_passthrough = offers(device, BitstreamFormat::kMat, sample_rate),
             // Every real output device publishes ordinary linear PCM among
             // its available physical formats - the control probe playing
             // the same role ALSA's own supports_exclusive_pcm does: "this
@@ -237,6 +266,8 @@ struct PassthroughSink::Impl {
     // second, for position() and the IOProc's timestamps.
     std::uint32_t ratio = 1;
     std::uint32_t carrier_rate = 0;
+    // Bytes of one link frame: 4 for the two-channel links, 16 for MAT's eight.
+    std::size_t link_frame_bytes = kLinkFrameBytes;
     // Raised by start(). Lowered by stop(), or by `alive` when the device
     // dies under the stream, as MonitorSink's Core Audio backend has it.
     std::atomic_bool running{false};
@@ -284,7 +315,7 @@ std::optional<MonitorPosition> PassthroughSink::position() const {
     if (!running() || !impl_->queue) {
         return std::nullopt;
     }
-    const std::uint64_t queued_here = impl_->queue->available() / kLinkFrameBytes;
+    const std::uint64_t queued_here = impl_->queue->available() / impl_->link_frame_bytes;
     return per_content_frame(
         impl_->counter.position(queued_here, impl_->latency.load(std::memory_order_relaxed)),
         impl_->ratio);
@@ -418,8 +449,8 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (running()) {
         return std::unexpected(PassthroughError::kAlreadyRunning);
     }
-    const std::optional<AudioFormatID> physical = coreaudio::physical_format_id(format_kind);
-    if (!physical) {
+    // MAT has no format ID, and is looked for by shape (find_mat_link_format); AC-4 has neither.
+    if (format_kind != BitstreamFormat::kMat && !coreaudio::physical_format_id(format_kind)) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
     // A stream whose device died still holds its IOProc, its watch, and the
@@ -427,7 +458,6 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     // started it does nothing.
     stop();
 
-    const AudioFormatID format_id = *physical;
     const auto carrier = static_cast<Float64>(coreaudio::carrier_rate(format_kind, sample_rate));
 
     // Pick the device before touching anything, mirroring
@@ -438,7 +468,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     std::optional<Candidate> candidate;
     if (device_id.empty()) {
         for (const auto device : coreaudio::device_list()) {
-            candidate = find_stream(device, format_id, carrier);
+            candidate = find_link_stream(device, format_kind, carrier);
             if (candidate) {
                 break;
             }
@@ -451,7 +481,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         if (device == kAudioObjectUnknown) {
             return std::unexpected(PassthroughError::kDeviceNotFound);
         }
-        candidate = find_stream(device, format_id, carrier);
+        candidate = find_link_stream(device, format_kind, carrier);
         if (!candidate) {
             return std::unexpected(PassthroughError::kFormatRejected);
         }
@@ -473,7 +503,12 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
                                  candidate->format) ||
         !coreaudio::wait_for_physical_format(candidate->stream, candidate->format.mFormatID,
                                              candidate->format.mSampleRate,
-                                             kFormatChangeTimeout)) {
+                                             kFormatChangeTimeout,
+                                             // Only MAT's shape is in the channel count; the
+                                             // other links are named by their format ID alone.
+                                             format_kind == BitstreamFormat::kMat
+                                                 ? candidate->format.mChannelsPerFrame
+                                                 : 0U)) {
         // Best-effort revert before giving the device back - see this
         // failure path mirrored (and waited on) in stop() for the normal
         // shutdown case.
@@ -498,8 +533,11 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     impl_->submitted.store(0, std::memory_order_relaxed);
     impl_->rendered.store(0, std::memory_order_relaxed);
     impl_->underruns.store(0, std::memory_order_relaxed);
-    impl_->ratio = carrier_ratio(format_kind);
+    // Rate-aware: MAT's link runs at 192 or 176.4 kHz whatever the content rate (4, 2 or 1 link
+    // frames to a content frame), and for the other formats this is carrier_ratio(format_kind).
+    impl_->ratio = carrier_ratio(format_kind, sample_rate);
     impl_->carrier_rate = static_cast<std::uint32_t>(carrier);
+    impl_->link_frame_bytes = carrier_frame_bytes(format_kind);
     impl_->counter.restart();
     impl_->paused.store(false, std::memory_order_relaxed);
     impl_->flushing.store(false, std::memory_order_relaxed);
@@ -561,7 +599,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         // queue only ever holds whole bursts, so a shortfall falls between two
         // of them. Filling only whole bursts per buffer would send nothing at
         // all through the usual 512-frame buffer, which is shorter than one.
-        const std::size_t wanted = size / kLinkFrameBytes * kLinkFrameBytes;
+        const std::size_t wanted = size / impl->link_frame_bytes * impl->link_frame_bytes;
         const auto got = impl->queue->read(std::span(dest, wanted));
         if (got < size) {
             std::fill(dest + got, dest + size, std::byte{0});
@@ -581,7 +619,7 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
         // it: what it still holds is this buffer plus the lead between now
         // and when the buffer's first frame is heard, where both timestamps
         // carry a sample time and the lead is under a second.
-        const std::uint64_t frames = wanted / kLinkFrameBytes;
+        const std::uint64_t frames = wanted / impl->link_frame_bytes;
         std::uint64_t lead = 0;
         if (now != nullptr && output_time != nullptr &&
             (now->mFlags & kAudioTimeStampSampleTimeValid) != 0 &&

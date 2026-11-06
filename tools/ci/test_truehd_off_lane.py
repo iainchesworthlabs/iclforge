@@ -68,7 +68,7 @@ class Presets(unittest.TestCase):
 class TheJob(unittest.TestCase):
     def job(self) -> str:
         core = text(".github/workflows/_ci-core.yml")
-        found = re.search(r"(?ms)^  truehd-off:\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)", core)
+        found = re.search(r"(?ms)^  truehd-off:\n(.*?)(?=(?:^  [A-Za-z0-9_-]+:\n)|\Z)", core)
         self.assertIsNotNone(found)
         return found.group(1)
 

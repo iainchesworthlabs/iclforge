@@ -996,7 +996,7 @@ the word length (MLP sends two; a TrueHD decode delivers 24-bit words and the st
 
 restart spacing, the distance in units between one major sync and the next (`restart_spacing`). `detail=checks` decodes the stream,
 
-the samples discarded, for the lossless check of every restart interval (`lossless` under `truehd`; null otherwise) and exits 1
+the samples discarded, for the lossless check of every restart interval (`lossless` under `truehd`, with `lossless.terminators`, the stream's ending as `qc` judges it; null otherwise) and exits 1
 
 when an interval fails: that is the cost of a decode, and the plain report stays a read of the headers. The `truehd` member keeps
 
@@ -1647,6 +1647,7 @@ integrity (TH spec 6.2 parity and CRC, 7.3 lossless check, 18 data rate):
   checks               0 failed (check nibble, major sync, restart header, parity, segment CRC)  PASS
   lossless check       36 interval(s) ok, 0 failed  PASS
   data rate            18.00 Mbit/s declared (field 6000, ...), largest unit 3.30 Mbit/s, 0 unit(s) start before the unit ahead has arrived (worst 0.00 ms short)  PASS
+  stream end           1 terminator word(s) at most in a substream, 0 not in the last unit, 0 illegal word(s) after the last block, 0 zero_samples count(s) of 4096 or more  PASS
   integrity verdict: PASS
 ```
 
@@ -1654,7 +1655,13 @@ It fails on a unit or a byte the reader does not take for an access unit, on any
 whose lossless check fails (two streams joined end to end fail at the join: `libs/truehd/ERRATA.md`, question 20), and on a stream that
 cannot be sent within the peak rate it declares and TH spec section 18's 75 ms, by the model the encoder keeps itself to. The declared
 rate is the peak-rate field in bits per second, `(raw x sample rate + 8) >> 4` (TH spec v3.9 section 4.4, ERRATA question 12); **the rate
-check is provisional** all the same, since the model is the encoder's own and no player has been asked. Then, for each presentation the stream has (2, 6 and 8 channels for one,
+check is provisional** all the same, since the model is the encoder's own and no player has been asked. It also fails on a stream's ending
+that a player refuses (TH spec section 16.5; the DEE findings report spec-answers-2026-11-04, D10, which holds each rule as verified against a licensed
+player): a terminator word (terminatorA with its `zero_samples` count, or `0xD234D234`) in an access unit that is not the last, anything but zero bits
+after the last block of the last unit that is not one of those words, and a `zero_samples` of 4096 or more. A stream with no word at its end is as
+good as one with it. The decoder is as lenient as it was and takes all of these; `qc` only counts them. A word in the last unit that begins `0xD234`
+and is neither form is the 'illegal word' of the line; a word right after the last block, with zeros after it, counts as a word, and the object
+substream's `0x1234` is not looked at. Then, for each presentation the stream has (2, 6 and 8 channels for one,
 two and three substreams), the integrated loudness, loudness range and true peak with the BS.1770-5 Annex 3 weights `loudness` uses, and
 the dialogue norm the stream carries beside the measurement (as E-AC-3's `qc` does: the claim, the difference, and the norm the
 measurement implies, noting a presentation whose control-enabled bit is off). `preset=` judges the largest presentation, or the one

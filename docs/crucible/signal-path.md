@@ -103,12 +103,20 @@ nearest 24-bit value (a tie goes to the even one), and the stream decodes to exa
 and no further back. The mode also needs an audio backend that can carry MAT, which is eight
 channels at 192 kHz: ALSA's can, PipeWire's can, on a sink whose codec list names TrueHD, and
 WASAPI's can, on an endpoint that accepts Microsoft's MAT 1.0 format in exclusive mode; Core
-Audio's cannot. So on macOS no endpoint reads as taking TrueHD, and a pin on a mode no endpoint
-carries falls back to the automatic choice with the reason line saying so. The engine side is
+Audio's is written but unproven: it reads as taking TrueHD where an output offers eight channels
+of 16-bit linear PCM at that rate, which Apple documents no use of for this, so a receiver may
+read the link as eight-channel PCM and play the burst as loud noise: pin it with the volume
+down. A pin on a mode no endpoint carries falls back to the automatic
+choice with the reason line saying so. The engine side is
 tested over scripted devices, bit for bit, and the library's backends have been built and tested
 without a receiver: nothing has been played into one, so whether an endpoint accepts the stream or
 a receiver locks on it is not known.
-Its LFE channel is empty, because Crucible's mix has no LFE source: a tap's LFE is dropped.
+Its LFE channel is the sum of the LFE channels of the 5.1 and 7.1 applications that are in the bed,
+at unity: the engine hands the encoder that sum beside its fifteen objects (`AtmosEncoder::encode_frame`'s
+`lfe` span), and the leg reads the encoder's bed. It is silent when no bed application renders a
+surround signal, since an object's LFE is dropped, as a downmix drops it, and a stereo
+application has none. The bed's LFE is not bass-managed or level-shifted on the way (planning/
+truehd-parity-crucible.md, question 14).
 
 **What the TrueHD leg costs.** The encoder holds a restart interval (128 access units, 107 ms of
 audio), and a further 90 access units (75 ms) whose arrival times wait for the units after them, and

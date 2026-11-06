@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
@@ -73,6 +74,30 @@ class RateModel {
     std::uint64_t units_ = 0;
 };
 
+// The end of a stream (TH spec §3.5 and §16.5). The DEE findings report spec-answers-2026-11-04 D10
+// holds the rules below as verified against a licensed player; the library's decoder stays lenient and
+// takes what it can, and these are counted, not refused. A segment of substreams 0 to 2 may end, in
+// the last access unit of a stream and nowhere else, in a 32 bit word: terminatorA 0xD234E with the
+// count of padding samples after it (zero_samples, 13 bits, 0xD234E000 | zero_samples) or the
+// end-of-stream marker 0xD234D234. The word may be absent. The player refuses
+//   * a word in an access unit that is not the last (its status 0xE5),
+//   * anything but zero bits after the last block of the last unit that is not a word of those forms
+//     (0xBF), and
+//   * a zero_samples of 4096 or more, bit 12 of the word set (0x98).
+// Read from a decode's counters (DecoderCounters::tails), so it needs the decode that the lossless
+// check and the QC integrity gate already make. A word right after the last block, which the decoder
+// also takes, is counted as a word. The object substream's terminatorB (0x1234) is not looked at.
+struct TerminatorReport {
+    std::uint64_t words = 0;                   // the most words any one substream (0 to 2) carries
+    std::uint64_t in_non_last_unit = 0;        // of them, those in a unit that is not the last
+    std::uint64_t illegal_words = 0;           // 1 if the last unit's tail holds anything else but zeros
+    std::uint64_t zero_samples_too_large = 0;  // 1 if that is a terminator with a count of 4096 or more
+    [[nodiscard]] std::uint64_t violations() const noexcept {
+        return in_non_last_unit + illegal_words + zero_samples_too_large;
+    }
+};
+[[nodiscard]] TerminatorReport terminator_report(const truehd::DecoderCounters& counters) noexcept;
+
 // One of the stream's presentations: substream 0 is the 2 channel one, 1 the 6 channel one and 2
 // the 8 channel one (ERRATA.md question 51).
 struct Presentation {
@@ -90,6 +115,7 @@ struct LosslessResult {
     std::uint64_t other_check_failures = 0;  // access unit, CRC and parity checks inside the decode
     std::uint64_t units_waiting = 0;         // units that waited for a restart header
     std::uint64_t decode_errors = 0;         // units the decoder could not read
+    TerminatorReport terminators{};          // the stream's ending
 };
 
 // One access unit, for detail=frames.

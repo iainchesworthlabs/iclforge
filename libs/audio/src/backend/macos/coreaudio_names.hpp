@@ -87,11 +87,14 @@ namespace iclforge::coreaudio {
 // one to, and start() refuses AC-4 with kUnsupportedFormat.
 //
 // Nothing for TrueHD (MAT) either, and for a different reason: it is not that the header was
-// read and has none, but that no format ID for it is known to this backend and the session that
-// wrote this had no Mac and no SDK to look in. A Mac may offer eight channels of 192 kHz linear PCM
-// on an HDMI output, in which a MAT burst could be sent as data; whether it does, and whether a
-// receiver then names the stream TrueHD, is the owner's to try, and until it is tried the backend
-// refuses MAT (apps/hearth/engine/src/mat_status.hpp). Core Audio is the last of the platforms.
+// read and has none, but that no format ID for it is known to this backend, and none is needed
+// to try it. A Mac may offer eight channels of 192 kHz (176.4 kHz) linear PCM on an HDMI output,
+// in which a MAT burst can be sent as data; find_mat_link_format() below looks for that shape.
+// Whether the Mac offers it, whether it sends the stream through untouched, and whether a
+// receiver then names it TrueHD is not known: Apple documents no MAT or TrueHD path, and the
+// reports found while writing this say macOS decodes TrueHD to PCM instead. The backend tries it
+// when asked and reports what the device offers; it has never been opened on a Mac with a
+// receiver (apps/hearth/engine/src/mat_status.hpp).
 [[nodiscard]] constexpr std::optional<AudioFormatID> physical_format_id(
     audio::BitstreamFormat format) {
     switch (format) {
@@ -141,6 +144,65 @@ namespace iclforge::coreaudio {
         }
     }
     return std::nullopt;
+}
+
+// The shape a MAT link would have as a Core Audio physical format: eight channels of packed,
+// signed, little-endian 16-bit integer linear PCM, which is what the IEC 61937 burst's 16-bit
+// words are on the wire (audio::carrier_channels() and carrier_frame_bytes()). Float, 24 or
+// 32-bit, big-endian and non-interleaved formats are not it, whatever rate they are offered at:
+// a burst written into them would be converted, and converted data is not a bitstream.
+[[nodiscard]] constexpr bool is_mat_link_format(const AudioStreamBasicDescription& format) {
+    constexpr AudioFormatFlags kRequired = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+    constexpr AudioFormatFlags kForbidden = kAudioFormatFlagIsFloat | kAudioFormatFlagIsBigEndian |
+                                            kAudioFormatFlagIsNonInterleaved;
+    return format.mFormatID == kAudioFormatLinearPCM &&
+           format.mChannelsPerFrame == audio::carrier_channels(audio::BitstreamFormat::kMat) &&
+           format.mBitsPerChannel == 16 && (format.mFormatFlags & kRequired) == kRequired &&
+           (format.mFormatFlags & kForbidden) == 0;
+}
+
+// The first of `formats` that is a MAT link (is_mat_link_format) at `carrier_hz`, as the
+// descriptor to commit: the driver's own, with the rate set to the one asked for (a ranged entry
+// covers many) and the fields a driver may leave at 0 for a linear PCM format filled in from the
+// eight 16-bit channels, since an AudioStreamBasicDescription that says 0 bytes a frame is not
+// one a device can be retuned to.
+[[nodiscard]] inline std::optional<AudioStreamBasicDescription> find_mat_link_format(
+    std::span<const AudioStreamRangedDescription> formats, Float64 carrier_hz) {
+    constexpr Float64 kTolerance = 1.0;
+    constexpr UInt32 kFrameBytes =
+        static_cast<UInt32>(audio::carrier_frame_bytes(audio::BitstreamFormat::kMat));
+    for (const auto& candidate : formats) {
+        if (!is_mat_link_format(candidate.mFormat) ||
+            carrier_hz < candidate.mSampleRateRange.mMinimum - kTolerance ||
+            carrier_hz > candidate.mSampleRateRange.mMaximum + kTolerance) {
+            continue;
+        }
+        AudioStreamBasicDescription chosen = candidate.mFormat;
+        chosen.mSampleRate = carrier_hz;
+        if (chosen.mBytesPerFrame == 0) {
+            chosen.mBytesPerFrame = kFrameBytes;
+        }
+        if (chosen.mFramesPerPacket == 0) {
+            chosen.mFramesPerPacket = 1;
+        }
+        if (chosen.mBytesPerPacket == 0) {
+            chosen.mBytesPerPacket = chosen.mBytesPerFrame * chosen.mFramesPerPacket;
+        }
+        return chosen;
+    }
+    return std::nullopt;
+}
+
+// What a sink for `format` looks for among a stream's physical formats: the format ID's own
+// entry at the carrier rate for AC-3 and E-AC-3, a MAT link for MAT, and nothing for the rest.
+[[nodiscard]] inline std::optional<AudioStreamBasicDescription> find_link_format(
+    std::span<const AudioStreamRangedDescription> formats, audio::BitstreamFormat format,
+    Float64 carrier_hz) {
+    if (format == audio::BitstreamFormat::kMat) {
+        return find_mat_link_format(formats, carrier_hz);
+    }
+    const std::optional<AudioFormatID> id = physical_format_id(format);
+    return id ? find_physical_format(formats, *id, carrier_hz) : std::nullopt;
 }
 
 // A display name that is never empty, matching the Windows/ALSA backends'
