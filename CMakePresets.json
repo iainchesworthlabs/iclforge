@@ -417,10 +417,12 @@
       "name": "config-linux-gcc-coverage-qt",
       "inherits": "config-linux-gcc-coverage",
       "displayName": "Linux GCC Coverage, with the Qt applications",
-      "description": "config-linux-gcc-coverage plus forge-gui, Crucible and Hearth's window, built against the Qt kit CI pins (.github/toolchain-versions.json, installed by aqtinstall; tools/dev/qt-sandbox-setup.sh does the same by hand). The kit is found the way cmake/FindQt6.cmake finds any other: QT_ROOT_DIR, ICLFORGE_QT_ROOT or -DICLFORGE_QT_ROOT. tools/checks/coverage_report.sh -q gates the C++ of apps/forge/gui, apps/crucible/ui and apps/hearth/ui from the tests labelled gui, forge-gui, crucible, crucible-ui, hearth and hearth-ui (the _ci-core.yml job coverage-qt). The Qt Quick suites are the only thing that drives those trees' controllers; QML itself has no gcov line coverage, so the suites stay the check on it.",
+      "description": "config-linux-gcc-coverage plus forge-gui, Crucible and Hearth's window (on PipeWire, not ALSA: Crucible's Linux arm refuses to configure on ALSA, which iclforge_audio prefers when libasound2-dev is installed, as it is in this job's container), built against the Qt kit CI pins (.github/toolchain-versions.json, installed by aqtinstall; tools/dev/qt-sandbox-setup.sh does the same by hand). The kit is found the way cmake/FindQt6.cmake finds any other: QT_ROOT_DIR, ICLFORGE_QT_ROOT or -DICLFORGE_QT_ROOT. tools/checks/coverage_report.sh -q gates the C++ of apps/forge/gui, apps/crucible/ui and apps/hearth/ui from the tests labelled gui, forge-gui, crucible, crucible-ui, hearth and hearth-ui (the _ci-core.yml job coverage-qt). The Qt Quick suites are the only thing that drives those trees' controllers; QML itself has no gcov line coverage, so the suites stay the check on it.",
       "cacheVariables": {
         "ICLFORGE_BUILD_GUI": "ON",
-        "ICLFORGE_BUILD_CRUCIBLE": "ON"
+        "ICLFORGE_BUILD_CRUCIBLE": "ON",
+        "ICLFORGE_WITH_ALSA": "OFF",
+        "ICLFORGE_WITH_PIPEWIRE": "ON"
       }
     },
     {
