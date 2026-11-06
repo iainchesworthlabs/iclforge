@@ -29,6 +29,7 @@
 #include "iclforge/base/speaker.hpp"
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
@@ -2257,6 +2258,111 @@ TEST_CASE("qc of a TrueHD stream fails, exit 6, on a damaged stream, a join, and
         const int status = run_cli("qc " + cli_arg(empty), log);
         CHECK(status != 0);
         CHECK(status != 6);
+    }
+}
+
+TEST_CASE("qc of a TrueHD stream holds the word that ends it to the rules of the player",
+          "[forge-cli][truehd][qc][terminators]") {
+    // TH spec 16.5 and the DEE findings report spec-answers-2026-11-04 D10: a stream may end in
+    // terminatorA and a count (0xD234E000 | zero_samples) or in 0xD234D234, or in neither; the word
+    // belongs in the last access unit only; nothing else may follow the last block; the count is
+    // below 4096. The decoder takes all of it; qc counts it.
+    namespace th = iclforge::truehd;
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "qc_end.log";
+    // 47,987 frames are not a whole number of access units, so the encoder ends the stream with
+    // terminatorA and the count of the samples that pad the last unit.
+    std::vector<std::int32_t> samples = tone_samples();
+    samples.resize(47987 * 6);
+    const fs::path wav = tone.dir / "qc_end.wav";
+    const fs::path stream = tone.dir / "qc_end.thd";
+    write_wav(wav, 48000, 6, 0x60F, samples);
+    REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(stream), log) == 0);
+    const std::vector<std::byte> good = read_bytes(stream);
+    const auto write = [&tone](const std::string& name, const std::vector<std::byte>& bytes) {
+        const fs::path path = tone.dir / name;
+        std::ofstream out{path, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        return path;
+    };
+    // The stream with `word` as the last 32 bits of the payload of every substream of its last
+    // unit, and the parity and CRC bytes that cover them made again, so that nothing else is wrong.
+    const auto with_word = [&good](std::uint32_t word) {
+        std::vector<std::byte> bytes = good;
+        const auto info = th::probe_stream(bytes);
+        REQUIRE(info.has_value());
+        th::ElementaryReader reader{std::span<const std::byte>{bytes}};
+        std::span<const std::byte> last;
+        while (const auto unit = reader.next()) {
+            last = *unit;
+        }
+        const auto parsed = th::parse_access_unit(last, info->num_substreams, true);
+        REQUIRE(parsed.has_value());
+        for (int i = 0; i < parsed->num_substreams; ++i) {
+            const auto index = static_cast<std::size_t>(i);
+            const auto segment = parsed->segments[index];
+            REQUIRE(parsed->entries[index].crc_present);
+            std::byte* base = bytes.data() + (segment.data() - bytes.data());
+            const std::size_t payload = segment.size() - 2;
+            for (unsigned b = 0; b < 4; ++b) {
+                base[payload - 4 + b] = static_cast<std::byte>((word >> (24U - (8U * b))) & 0xFFU);
+            }
+            const std::span<const std::byte> covered{base, payload};
+            base[payload] = static_cast<std::byte>(th::substream_parity(covered));
+            base[payload + 1] = static_cast<std::byte>(th::substream_crc(covered));
+        }
+        return bytes;
+    };
+
+    SECTION("a stream with no word, and one that ends on one, pass") {
+        CHECK(run_cli("qc " + cli_arg(tone.thd), log) == 0);
+        CHECK(read_text(log).find(
+                  "stream end           0 terminator word(s) at most in a substream, 0 not in the "
+                  "last unit, 0 illegal word(s) after the last block, 0 zero_samples count(s) of "
+                  "4096 or more  PASS") != std::string::npos);
+        CHECK(run_cli("qc " + cli_arg(stream), log) == 0);
+        CHECK(read_text(log).find(
+                  "stream end           1 terminator word(s) at most in a substream, 0 not in the "
+                  "last unit, 0 illegal word(s) after the last block, 0 zero_samples count(s) of "
+                  "4096 or more  PASS") != std::string::npos);
+    }
+    SECTION("the end-of-stream marker, and a count of none or of a few samples, pass") {
+        // A count above the unit's samples is a unit the decoder cannot read, not a word to judge.
+        for (const std::uint32_t word : {0xD234D234U, 0xD234E000U, 0xD234E01CU}) {
+            CHECK(run_cli("qc " + cli_arg(write("qc_end_legal.thd", with_word(word))), log) == 0);
+            CHECK(read_text(log).find("0 zero_samples count(s) of 4096 or more  PASS") !=
+                  std::string::npos);
+        }
+    }
+    SECTION("the word in a unit that is not the last fails") {
+        std::vector<std::byte> twice = good;
+        twice.insert(twice.end(), good.begin(), good.end());
+        CHECK(run_cli("qc " + cli_arg(write("qc_end_twice.thd", twice)), log) == 6);
+        const std::string text = read_text(log);
+        CHECK(text.find("2 terminator word(s) at most in a substream, 1 not in the last unit") !=
+              std::string::npos);
+        CHECK(text.find("of 4096 or more  FAIL") != std::string::npos);
+        CHECK(text.find("integrity verdict: FAIL") != std::string::npos);
+    }
+    SECTION("a word that begins 0xD234 and is neither form fails") {
+        for (const std::uint32_t word : {0xD234A000U, 0xD234D233U, 0xD2340000U}) {
+            CHECK(run_cli("qc " + cli_arg(write("qc_end_illegal.thd", with_word(word))), log) == 6);
+            const std::string text = read_text(log);
+            CHECK(text.find("0 not in the last unit, 1 illegal word(s) after the last block, 0 "
+                            "zero_samples count(s) of 4096 or more  FAIL") != std::string::npos);
+            // Everything else about the stream is sound: the checks were made again.
+            CHECK(text.find("restart header, parity, segment CRC)  PASS") != std::string::npos);
+            CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
+        }
+    }
+    SECTION("a zero_samples of 4096 or more fails, by itself") {
+        for (const std::uint32_t count : {0x1000U, 0x100DU, 0x1FFFU}) {
+            CHECK(run_cli("qc " + cli_arg(write("qc_end_big.thd", with_word(0xD234E000U | count))),
+                          log) == 6);
+            CHECK(read_text(log).find("0 illegal word(s) after the last block, 1 zero_samples "
+                                      "count(s) of 4096 or more  FAIL") != std::string::npos);
+        }
     }
 }
 

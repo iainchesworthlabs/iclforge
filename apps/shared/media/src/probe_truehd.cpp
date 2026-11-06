@@ -93,6 +93,35 @@ void RateModel::add_unit(std::size_t unit_bytes, std::uint16_t input_timing,
     ++units_;
 }
 
+TerminatorReport terminator_report(const th::DecoderCounters& counters) noexcept {
+    TerminatorReport report;
+    const std::uint64_t last = counters.units;
+    for (std::size_t i = 0; i < 3; ++i) {
+        const th::SegmentTailCounters& tail = counters.tails[i];
+        const std::uint64_t words = tail.terminator_a + tail.end_marker;
+        if (words > 0) {
+            const std::uint64_t in_last = tail.last_word_unit == last ? 1U : 0U;
+            report.words = std::max(report.words, words);
+            report.in_non_last_unit = std::max(report.in_non_last_unit, words - in_last);
+        }
+        if (tail.other > 0 && tail.last_other_unit == last) {
+            if (tail.last_other_word == 0xD234D234U) {
+                // The end-of-stream marker, a legal word that the decoder does not name (it counts it
+                // as other data): in the last unit, as it has to be.
+                report.words = std::max<std::uint64_t>(report.words, 1);
+                continue;
+            }
+            // 0xD234E000 | zero_samples with bit 12 of the word set: the 13 bit count is 4096 or more.
+            if ((tail.last_other_word >> 13U) == 0x691A7U && (tail.last_other_word & 0x1000U) != 0U) {
+                report.zero_samples_too_large = 1;
+            } else {
+                report.illegal_words = 1;
+            }
+        }
+    }
+    return report;
+}
+
 const char* codec_label(const th::MajorSync& major_sync) noexcept {
     return major_sync.kind == th::StreamKind::kTrueHd ? "TrueHD" : "MLP";
 }
@@ -147,6 +176,7 @@ LosslessResult lossless_check(std::span<const std::byte> stream) {
     result.intervals_failed = counters.lossless_check_failures;
     result.other_check_failures = counters.check_failures;
     result.units_waiting = counters.units_waiting;
+    result.terminators = terminator_report(counters);
     return result;
 }
 
@@ -391,6 +421,13 @@ void write_json(JsonSink& json, const Report& report, std::size_t ac3_core_frame
         json.member("other_check_failures", report.lossless->other_check_failures);
         json.member("units_waiting", report.lossless->units_waiting);
         json.member("decode_errors", report.lossless->decode_errors);
+        json.key("terminators");
+        json.begin_object();
+        json.member("words", report.lossless->terminators.words);
+        json.member("in_non_last_unit", report.lossless->terminators.in_non_last_unit);
+        json.member("illegal_words", report.lossless->terminators.illegal_words);
+        json.member("zero_samples_too_large", report.lossless->terminators.zero_samples_too_large);
+        json.end_object();
         json.end_object();
     } else {
         json.value_null();
@@ -478,6 +515,13 @@ std::vector<TextLine> text_tail(const Report& report, std::size_t ac3_core_frame
                                                        report.lossless->intervals_failed,
                                                        report.lossless->other_check_failures,
                                                        report.lossless->units_waiting)});
+        const TerminatorReport& ending = report.lossless->terminators;
+        lines.push_back({"stream end",
+                         fmt::format("{} terminator word(s) at most in a substream, {} not in the last unit, {} "
+                                     "illegal word(s) after the last block, {} zero_samples count(s) of 4096 or "
+                                     "more (TH spec section 16.5)",
+                                     ending.words, ending.in_non_last_unit, ending.illegal_words,
+                                     ending.zero_samples_too_large)});
     }
     return lines;
 }

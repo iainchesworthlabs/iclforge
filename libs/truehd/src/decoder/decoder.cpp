@@ -469,6 +469,7 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
     }
     if (left >= 20 && is_terminator_a(reader.peek(20))) {
         ++tail.terminator_a;
+        tail.last_word_unit = counters.units;
         return;
     }
     if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
@@ -476,9 +477,11 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
         marker.skip(left - static_cast<std::size_t>(kEndMarkerBits));
         if (is_terminator_a(marker.read(kTerminatorABits))) {
             ++tail.end_marker;
+            tail.last_word_unit = counters.units;
             return;
         }
     }
+    const BitReader reader_at_start = reader;
     bool zero = true;
     for (std::size_t remaining = left; remaining > 0 && zero;) {
         const auto chunk = static_cast<int>(std::min<std::size_t>(32, remaining));
@@ -486,6 +489,15 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
         remaining -= static_cast<std::size_t>(chunk);
     }
     ++(zero ? tail.zero : tail.other);
+    if (!zero) {
+        tail.last_other_unit = counters.units;
+        tail.last_other_word = 0;
+        if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
+            BitReader end_word = reader_at_start;
+            end_word.skip(left - static_cast<std::size_t>(kEndMarkerBits));
+            tail.last_other_word = end_word.read(kEndMarkerBits);
+        }
+    }
 }
 
 std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& state,
