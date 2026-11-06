@@ -5137,7 +5137,7 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="49"/>
         <source>TrueHD in a container (*.mkv *.mp4 *.m4a *.m2ts *.ts)</source>
-        <translation type="unfinished"></translation>
+        <translation>TrueHD dans un conteneur (*.mkv *.mp4 *.m4a *.m2ts *.ts)</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="50"/>
