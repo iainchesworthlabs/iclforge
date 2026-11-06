@@ -297,6 +297,20 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     (5.1) and 182,077 (7.1) values whatever the DRC profile; `thd-last-2ch-steps-48k24` with no option, with `--optimize-data-rate 0` and with the loudness measurement skipped each differ in the
     same 52,022 values, so it is not the profile, the data-rate option or the loudness path. `thd-chn-70-8ch-48k24-wavlist` had no sound in its seventh source channel because its slot list
     omitted it (six of seven channels equal the source to -472 dB); the slot list is corrected in `gen_dee_gold.py`.
+    **Third reader and later measurements (2026-11-06).** *The receiver.* The Raspberry Pi test session played the two impulse streams to an Onkyo TX-RZ740 on 2026-11-04 (MAT over HDMI).
+    The 48 kHz stream was named TrueHD 48 kHz 2.0 and the owner heard 20 clicks (24 less the seconds the receiver takes to lock). The 96 kHz stream was named TrueHD 96 kHz 2.0 and the
+    owner heard static, not clicks. A 96 kHz stereo sine encoded by forge and sent the same way was clean, so the Pi path, the 96 kHz MAT carrier and the receiver's 96 kHz decode work. The
+    receiver therefore agrees with forge and FFmpeg 8.0.1 in kind: the stream decodes to something dense, not to eight samples. Not shown: that its output equals the dense pattern sample
+    for sample (it was heard, for the first seconds, at a low volume). No DRP decode of these streams is recorded. *The other 96 kHz legs.* DEE's job files for them set `<apodise>true` (reported by the
+    investigator, spec-answers-2026-11-04 D9), and the decode of `thd-2ch-noise-96k24` is its source low-passed: decode over source is 0.0 dB to 24 kHz, then -1.0, -2.6, -5.1, -8.6, -15.3,
+    -29.7, -54.3 and -94.7 dB in the bands 24-26, 26-28, 28-30, 30-32, 32-36, 36-40, 40-44 and 44-47 kHz (measured here with forge's decode; the investigator's table agrees to within
+    0.2 dB up to 32 kHz and reads 1 to 11 dB lower above it, the stop band of another leg and method). That accounts for the music, noise, sweep and tone legs at 96 kHz. A low-pass does not give an impulse stream a decode of full-amplitude samples at 44 per cent density,
+    so the impulse streams stay **open**. *The stepped tones.* There are 21 such legs (6 + 6 + 6 + the 3 `thd-last-2ch-steps` legs), not 18. The investigator decoded all 21 with FFmpeg 6.1.1 and 8.0.1
+    and found no differing sample; forge equals both. Every difference from the source is one least-significant bit (equal numbers of +1 and -1) and all of them lie in the last twelfth of each
+    file (samples 1,656,010 to 1,727,629 of 1,728,000), where the source is near full scale; none is earlier, and none is in the LFE channel. DRP cannot resolve it: it applies its own gain
+    (-24.0 dB on `thd-last-2ch-steps-48k24`, -4.0 dB on its `-skip` leg) and writes 16 bits. The mechanism is still unknown (requantisation, noise shaping or the core limiter are the candidates).
+    *Open: the 192 kHz latency window.* The per-unit rate law's lead window is 40 to 3,600 samples at 48 kHz and 80 to 7,200 at 96 kHz (spec-answers-2026-11-04 D10); that report gives no
+    window for 192 kHz. `forge qc` applies the same rule there, from one access unit's nominal length to 75 ms (14,400 samples), and no 192 kHz figure is measured or invented. A measured window is owed.
 51. **Dialogue normalisation (TH spec §12.5, §14.1; `forge truehd-encode`, `metadata`, `normalize`, `probe`).** The channel meaning has one
     dialogue-norm field for each presentation: 6 bits for the 2 channel presentation (§12.5 gives the range 0 to 63 and no unit) and 5
     bits for the 6 and 8 channel ones ("0 to 31 -> 0 to -31 dBFS"). Open: (a) is the 2 channel field -n dBFS as well, and what do 32 to 63
