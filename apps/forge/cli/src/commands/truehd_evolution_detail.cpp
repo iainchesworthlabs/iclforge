@@ -357,7 +357,8 @@ void EvolutionDetail::add(std::uint64_t unit_index, const th::ExtraData& extra,
         created.secondary_code = record.secondary_code;
         created.first_unit = unit_index;
         created.example = payloads;
-        for (std::size_t i = 0; i < payloads.size(); ++i) {
+        // `payloads` is filled only from `frame`, so it is empty when there is none.
+        for (std::size_t i = 0; frame != nullptr && i < payloads.size(); ++i) {
             created.size_min.push_back(payloads[i].bytes);
             created.size_max.push_back(payloads[i].bytes);
             if (payloads[i].id != th::kEvolutionPayloadOamd) {
