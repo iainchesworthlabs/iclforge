@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cstdio>  // IWYU pragma: keep (stderr: libc++/MSVC want it, libstdc++ finds it elsewhere)
 #include <filesystem>
+#include <fstream>
+#include <ios>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -100,6 +102,15 @@ int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_
     // The decode goes to a WAV that the encode command reads back; nothing of it is printed, since
     // the output may be stdout.
     const fs::path wav = scratch_wav_path();
+    {
+        // Created here with noreplace, so that a link another user planted at the name in the shared
+        // temporary directory is refused and not written through (audio_io.cpp's claim_temp_path).
+        std::ofstream claim(wav, std::ios::binary | std::ios::noreplace);
+        if (!claim) {
+            fmt::println(stderr, "error: could not claim the scratch file {}", wav.string());
+            return kExitRuntime;
+        }
+    }
     const bool was_quiet = quiet_mode();
     const bool was_verbose = verbose_mode();
     set_verbosity(true, false);
