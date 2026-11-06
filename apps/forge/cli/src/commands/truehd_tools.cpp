@@ -161,7 +161,7 @@ int run_metadata_truehd(std::vector<std::byte>&& bytes, std::string_view in_path
         if (!edited) {
             return report_edit_error(edited.error(), in_path);
         }
-        summary = std::move(*edited);
+        summary = *edited;
     }
     const auto status = status_stream(out_path);
     if (tags_before > 0 && summary && summary->changed > 0 && !meta.sign_objects) {

@@ -1,5 +1,6 @@
 #include "iclforge/truehd/core/syntax.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>

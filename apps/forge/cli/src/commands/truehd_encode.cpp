@@ -4,9 +4,11 @@
 // use.
 
 #include <fmt/base.h>
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -26,7 +28,9 @@
 #include "../support.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/base/wav.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
+#include "iclforge/truehd/encoder/ratectl.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
 #include "truehd_encode.hpp"

@@ -3,9 +3,17 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <limits>
 #include <numeric>
+#include <span>
+#include <string>
 #include <utility>
+#include "encoder/render_bed.hpp"
+#include "encoder/render_plan.hpp"
+#include <vector>
 
 namespace iclforge::truehd::detail {
 

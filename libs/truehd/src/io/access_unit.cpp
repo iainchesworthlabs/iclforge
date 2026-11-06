@@ -16,6 +16,7 @@
 #include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {

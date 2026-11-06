@@ -4,16 +4,23 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
-#include <iterator>
+#include <expected>
 #include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "core/noise.hpp"
+#include "decoder/kernels.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
 
 namespace iclforge::truehd::detail {
 
@@ -256,7 +263,8 @@ ObjectState apply_object_section(const ObjectState& before, const MatrixSet& sec
     }
     if (form.change && form.headers) {
         // New headers keep the widths and scales of the matrix at the same place
-        after.matrices.assign(section.items.begin(), section.items.begin() + count);
+        after.matrices.assign(section.items.begin(),
+                              section.items.begin() + static_cast<std::ptrdiff_t>(count));
         for (std::size_t m = 0; m < count; ++m) {
             after.matrices[m].coeff = {};
             after.matrices[m].ext_value = {};
@@ -1238,6 +1246,7 @@ std::expected<ChainResult, std::string_view> design_chain(const std::vector<Form
                     quantised.push_back(x);
                 }
                 std::vector<std::pair<int, double>> wanted;
+                wanted.reserve(members.size());
                 for (std::size_t i = 0; i < members.size(); ++i) {
                     wanted.emplace_back(members[i], quantised[i]);
                 }
