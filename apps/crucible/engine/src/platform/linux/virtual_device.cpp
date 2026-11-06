@@ -123,11 +123,19 @@ public:
         // The daemon's own adapter factory, so the node is a real global.
         // object.linger=false ties it to this connection: it goes when the
         // application does, which is the behaviour worth keeping.
+        //
+        // audio.channels as well as audio.position: the sink enumeration reads a device's width
+        // from audio.channels, so a node with positions alone reads as no channels wide and the
+        // engine's taps stay at their stereo default, which folds a 5.1 or 7.1 application's
+        // channels away before the bed mixer sees them. Measured on a Raspberry Pi 4B with a
+        // private PipeWire graph: without it the taps are 2 wide and a 60 Hz LFE-only 5.1 file
+        // reaches the engine at -120 dBFS; with it the taps are 8 wide and the tone arrives.
         pw_properties* props = pw_properties_new(
             "factory.name", "support.null-audio-sink", PW_KEY_NODE_NAME, kNodeName,
             PW_KEY_NODE_DESCRIPTION, "Crucible (silent)", PW_KEY_MEDIA_CLASS, "Audio/Sink",
-            "object.linger", "false", "audio.position", "[FL,FR,FC,LFE,SL,SR,RL,RR]",
-            "audio.rate", "48000", "monitor.channel-volumes", "true", nullptr);
+            "object.linger", "false", "audio.channels", "8", "audio.position",
+            "[FL,FR,FC,LFE,SL,SR,RL,RR]", "audio.rate", "48000", "monitor.channel-volumes", "true",
+            nullptr);
         node_ = static_cast<pw_proxy*>(pw_core_create_object(
             core_.get(), "adapter", PW_TYPE_INTERFACE_Node, PW_VERSION_NODE, &props->dict, 0));
         pw_properties_free(props);
