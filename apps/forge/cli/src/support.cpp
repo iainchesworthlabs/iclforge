@@ -77,6 +77,7 @@
 #include "platform/stdio_binary.hpp"
 #include "recording_sink.hpp"
 #include "stream_playback.hpp"
+#include "truehd_encode_core.hpp"
 #include "usage.hpp"
 
 namespace forge_cli {
@@ -2509,7 +2510,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             if (name == "restart") {
                 const auto units = parse_u32_or(value, 0);
-                if (units == 0 || units > 4096) {
+                if (units == 0 || units > iclforge::apps::truehd_encode::kRestartMaxUnits) {
                     fmt::println(
                         stderr,
                         "error: truehd-restart is the access units between restart headers, "
@@ -2522,7 +2523,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             if (name == "peak-rate") {
                 const auto kbps = parse_u32_or(value, 0);
-                if (kbps == 0 || kbps > 100000) {
+                if (kbps == 0 || kbps > iclforge::apps::truehd_encode::kPeakRateMaxKbps) {
                     fmt::println(
                         stderr,
                         "error: truehd-peak-rate is a rate in kbit/s, 1 to 100000 (got '{}')",
@@ -2543,7 +2544,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             if (name == "bitrate") {
                 const auto kbps = parse_u32_or(value, 0);
-                if (kbps < 1000 || kbps > 100000) {
+                if (kbps < iclforge::apps::truehd_encode::kBitrateMinKbps ||
+                    kbps > iclforge::apps::truehd_encode::kBitrateMaxKbps) {
                     fmt::println(
                         stderr, "error: truehd-bitrate is a rate in kbit/s, 1000 to 100000 (got '{}')",
                         token);
@@ -2578,7 +2580,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             if (name == "major-sync") {
                 const auto units = parse_u32_or(value, 70000);
-                if (units > 65536) {
+                if (units > iclforge::apps::truehd_encode::kMajorSyncMaxUnits) {
                     fmt::println(stderr,
                                  "error: truehd-major-sync is the access units between major "
                                  "syncs, 0 (one at every restart header) or a multiple of "
@@ -2610,7 +2612,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 continue;
             }
             if (name == "fir-order") {
-                if (value.size() != 1 || value[0] < '0' || value[0] > '8') {
+                if (value.size() != 1 || value[0] < '0' ||
+                    value[0] > '0' + iclforge::apps::truehd_encode::kFirOrderMax) {
                     fmt::println(stderr, "error: truehd-fir-order is 0 to 8 (got '{}')", token);
                     return false;
                 }
@@ -2651,7 +2654,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     if (part == "off") {
                         gains[i] = 0.0;
                     } else if (parse_double(part, db) && std::isfinite(db) && db <= 0.0 &&
-                               db >= -60.0) {
+                               db >= iclforge::apps::truehd_encode::kDownmixGainFloorDb) {
                         gains[i] = std::pow(10.0, db / 20.0);
                     } else {
                         good = false;

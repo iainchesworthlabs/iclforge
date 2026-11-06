@@ -45,6 +45,68 @@ Dialog {
         onAccepted: TruehdEncodeController.chooseOutput(selectedFile)
     }
 
+    // One option of the command line that takes a number or a list: the text as `forge` reads it,
+    // empty for the encoder's own default, and the sentence that says what it takes when it is not.
+    component TextOption: ColumnLayout {
+        id: field
+        property string optionName
+        property string label
+        property string hint
+        Layout.fillWidth: true
+        spacing: 2
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                Layout.preferredWidth: 220
+                text: field.label
+                font.pixelSize: Theme.fontSmall
+                color: Theme.text
+            }
+            TextField {
+                objectName: "truehdEncodeOption_" + field.optionName
+                Layout.fillWidth: true
+                text: TruehdEncodeController.options[field.optionName]
+                placeholderText: field.hint
+                enabled: !TruehdEncodeController.busy
+                font.pixelSize: Theme.fontSmall
+                onTextEdited: TruehdEncodeController.setOption(field.optionName, text)
+            }
+        }
+        Text {
+            objectName: "truehdEncodeOptionError_" + field.optionName
+            Layout.fillWidth: true
+            visible: text.length > 0
+            wrapMode: Text.WordWrap
+            text: TruehdEncodeController.optionErrors[field.optionName] || ""
+            font.pixelSize: Theme.fontSmall
+            color: Theme.bad
+        }
+    }
+
+    // One option that is one of a few words: the first entry is the encoder's own default.
+    component ChoiceOption: RowLayout {
+        id: choice
+        property string optionName
+        property string label
+        property var choices: []
+        Layout.fillWidth: true
+        Text {
+            Layout.preferredWidth: 220
+            text: choice.label
+            font.pixelSize: Theme.fontSmall
+            color: Theme.text
+        }
+        ComboBox {
+            objectName: "truehdEncodeOption_" + choice.optionName
+            Layout.fillWidth: true
+            model: [qsTr("default")].concat(choice.choices)
+            enabled: !TruehdEncodeController.busy
+            currentIndex: Math.max(0, choice.choices.indexOf(TruehdEncodeController.options[choice.optionName]) + 1)
+            onActivated: TruehdEncodeController.setOption(choice.optionName,
+                                                          currentIndex === 0 ? "" : choice.choices[currentIndex - 1])
+        }
+    }
+
     contentItem: ColumnLayout {
         spacing: Theme.space4
 
@@ -125,6 +187,79 @@ Dialog {
             checked: TruehdEncodeController.standardDownmix
             enabled: !TruehdEncodeController.busy
             onToggled: TruehdEncodeController.standardDownmix = checked
+        }
+
+        Button {
+            objectName: "truehdEncodeMoreOptions"
+            text: optionsPanel.visible ? qsTr("Fewer options") : qsTr("More options…")
+            onClicked: optionsPanel.visible = !optionsPanel.visible
+        }
+
+        ColumnLayout {
+            id: optionsPanel
+            objectName: "truehdEncodeOptionsPanel"
+            Layout.fillWidth: true
+            visible: false
+            spacing: Theme.space2
+
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("These are the truehd- options of forge truehd-encode. Leave one empty for the encoder's own choice.")
+                font.pixelSize: Theme.fontSmall
+                color: Theme.neutral700
+            }
+            TextOption {
+                optionName: "restart"
+                label: qsTr("Access units between restarts")
+                hint: qsTr("1 or 8 to 4096")
+            }
+            TextOption {
+                optionName: "major-sync"
+                label: qsTr("Access units between major syncs")
+                hint: qsTr("0 or a multiple of the restart, up to 65536")
+            }
+            TextOption {
+                optionName: "peak-rate"
+                label: qsTr("Peak data rate (kbit/s)")
+                hint: qsTr("1 to 100000")
+            }
+            TextOption {
+                optionName: "bitrate"
+                label: qsTr("Hold the rate to (kbit/s)")
+                hint: qsTr("1000 to 100000")
+            }
+            TextOption {
+                optionName: "fir-order"
+                label: qsTr("Highest prediction filter order")
+                hint: qsTr("0 to 8")
+            }
+            TextOption {
+                optionName: "downmix-gains"
+                label: qsTr("Downmix gains in dB")
+                hint: qsTr("C, Ls and Rs, LFE, Lrs and Rrs: -3,-3,off,-3")
+            }
+            ChoiceOption {
+                optionName: "rate-check"
+                label: qsTr("Peak rate check")
+                choices: ["strict", "lenient"]
+            }
+            ChoiceOption {
+                optionName: "matrix"
+                label: qsTr("Matrix search")
+                choices: ["on", "off"]
+            }
+            ChoiceOption {
+                optionName: "stereo-mode"
+                label: qsTr("Stereo presentation")
+                choices: ["stereo", "ltrt", "headphone"]
+            }
+            Button {
+                objectName: "truehdEncodeResetOptions"
+                text: qsTr("Back to the defaults")
+                enabled: !TruehdEncodeController.busy
+                onClicked: TruehdEncodeController.resetOptions()
+            }
         }
 
         RowLayout {

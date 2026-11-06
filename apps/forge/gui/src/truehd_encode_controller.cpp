@@ -45,12 +45,18 @@ QString container_label(wrap::Container container) {
     return {};
 }
 
+// The options the window takes besides verify and the downmix box, in the order the command line
+// is written.
+const QStringList kOptionNames{
+    QStringLiteral("restart"),     QStringLiteral("peak-rate"),   QStringLiteral("rate-check"),
+    QStringLiteral("bitrate"),     QStringLiteral("major-sync"),  QStringLiteral("fir-order"),
+    QStringLiteral("matrix"),      QStringLiteral("stereo-mode"), QStringLiteral("downmix-gains")};
+
 // Everything one run needs, copied out so the job holds nothing of the controller's.
 struct Job {
     QString source;
     QString output;
-    bool verify = false;
-    bool downmix = false;
+    core::Settings settings;
 };
 
 struct Result {
@@ -77,8 +83,7 @@ Result run(const Job& job, const std::atomic<bool>& stop,
         return result;
     }
     th::EncoderConfig config;
-    config.downmix = job.downmix ? th::DownmixMode::kStandard : th::DownmixMode::kNone;
-    config.verify = job.verify;
+    core::apply(job.settings, config);
 
     auto last_report = std::chrono::steady_clock::now();
     const auto outcome = core::encode_wav(
@@ -145,8 +150,9 @@ Result run(const Job& job, const std::atomic<bool>& stop,
             .arg(bytes.size())
             .arg(100.0 * static_cast<double>(outcome->stream.size()) / pcm_bytes, 0, 'f', 1)
             .arg(container_name.isEmpty() ? QString() : QStringLiteral(" · in %1").arg(container_name))
-            .arg(job.verify ? QStringLiteral(" · verified: every access unit decodes to the input")
-                            : QString());
+            .arg(job.settings.verify
+                     ? QStringLiteral(" · verified: every access unit decodes to the input")
+                     : QString());
     return result;
 }
 
@@ -166,10 +172,73 @@ QString TruehdEncodeController::cliLine() const {
     if (downmix_) {
         line += QStringLiteral(" truehd-downmix=standard");
     }
+    for (const QString& name : kOptionNames) {
+        const auto found = option_text_.constFind(name);
+        if (found != option_text_.cend()) {
+            line += QStringLiteral(" truehd-%1=%2").arg(name, *found);
+        }
+    }
     if (verify_) {
         line += QStringLiteral(" verify");
     }
     return line;
+}
+
+QVariantMap TruehdEncodeController::options() const {
+    QVariantMap map;
+    for (const QString& name : kOptionNames) {
+        map.insert(name, option_text_.value(name));
+    }
+    return map;
+}
+
+QStringList TruehdEncodeController::optionNames() {
+    return kOptionNames;
+}
+
+void TruehdEncodeController::setOption(const QString& name, const QString& text) {
+    if (busy_ || !kOptionNames.contains(name)) {
+        return;
+    }
+    const QString trimmed = text.trimmed();
+    QString sentence;
+    if (!trimmed.isEmpty()) {
+        core::Settings probe;
+        const auto set =
+            core::set_option(probe, name.toStdString(), trimmed.toStdString());
+        if (!set) {
+            sentence = QStringLiteral("%1 (got '%2')").arg(to_qstring(set.error()), trimmed);
+        }
+    }
+    const QString before = option_text_.value(name);
+    const bool had_error = option_errors_.contains(name);
+    if (trimmed.isEmpty()) {
+        option_text_.remove(name);
+    } else {
+        option_text_.insert(name, trimmed);
+    }
+    if (sentence.isEmpty()) {
+        option_errors_.remove(name);
+    } else {
+        option_errors_.insert(name, sentence);
+    }
+    if (before == trimmed && had_error == !sentence.isEmpty()) {
+        return;
+    }
+    emit optionsChanged();
+    emit stateChanged();
+    emit cliLineChanged();
+}
+
+void TruehdEncodeController::resetOptions() {
+    if (busy_ || (option_text_.isEmpty() && option_errors_.isEmpty())) {
+        return;
+    }
+    option_text_.clear();
+    option_errors_.clear();
+    emit optionsChanged();
+    emit stateChanged();
+    emit cliLineChanged();
 }
 
 void TruehdEncodeController::setVerify(bool on) {
@@ -248,7 +317,13 @@ void TruehdEncodeController::encode() {
     emit stateChanged();
     emit progressChanged();
     emit resultChanged();
-    const Job job{.source = source_, .output = output_, .verify = verify_, .downmix = downmix_};
+    Job job{.source = source_, .output = output_, .settings = {}};
+    job.settings.standard_downmix = downmix_;
+    job.settings.verify = verify_;
+    for (auto it = option_text_.cbegin(); it != option_text_.cend(); ++it) {
+        // Each text was accepted by setOption, or canEncode would be false.
+        (void)core::set_option(job.settings, it.key().toStdString(), it.value().toStdString());
+    }
     jobs_.run([this, job] {
         const Result result = run(job, stop_, [this](double fraction) {
             QMetaObject::invokeMethod(this, [this, fraction] {
