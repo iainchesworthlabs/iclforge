@@ -1,11 +1,19 @@
 #include "truehd_render.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <optional>
+#include <span>
+#include <vector>
 
 #include "iclforge/base/layout.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/render/layout.hpp"
 #include "iclforge/truehd/encoder/bed_pan.hpp"
+#include "truehd_objects.hpp"
 
 namespace forge_cli::commands {
 

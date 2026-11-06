@@ -8,7 +8,9 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "core/huffman.hpp"
@@ -1002,9 +1004,11 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                             text += " " + std::to_string(state.context.object_previous->items[m].ext_width);
                         }
                     }
-                    counters.object_error_context = text + ", error \"" +
-                                                    std::string(header.error().detail) +
-                                                    "\"; blocks of the segment: " + segment_trace;
+                    text += ", error \"";
+                    text.append(header.error().detail);
+                    text += "\"; blocks of the segment: ";
+                    text += segment_trace;
+                    counters.object_error_context = std::move(text);
                 }
                 state.running = false;
                 return std::unexpected(header.error());

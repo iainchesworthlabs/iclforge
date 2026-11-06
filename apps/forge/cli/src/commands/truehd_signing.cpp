@@ -2,7 +2,6 @@
 
 #include <fmt/base.h>
 #include <fmt/format.h>
-#include <array>
 #include <cstddef>
 #include <cstdio>
 #include <optional>
@@ -12,7 +11,9 @@
 #include <utility>
 #include <vector>
 
+#include "../support.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
+#include "iclforge/truehd/signing/evolution_signer.hpp"
 
 namespace forge_cli::commands {
 

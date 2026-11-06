@@ -415,7 +415,7 @@ int main(int argc, char** argv) {
 
     std::size_t bed_count = 0;
     for (const auto slot : slots) {
-        bed_count += bridged->is_bed[slot] ? 1 : 0;
+        bed_count += bridged->is_bed[slot] ? 1U : 0U;
     }
     fmt::printf(
         "%zu bytes of DD+ JOC E-AC-3 from %zu IAB-authored frame(s): %zu bed channel(s) + "

@@ -10,18 +10,22 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <numbers>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "../adm/atmos_adm.hpp"
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/base/wav.hpp"
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/objects/motion.hpp"
@@ -31,9 +35,10 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/encoder/layout.hpp"
+#include "iclforge/truehd/encoder/ratectl.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 #include "truehd.hpp"
 #include "truehd_encode.hpp"
-#include "truehd_meaning.hpp"
 #include "truehd_objects.hpp"
 #include "truehd_rate.hpp"
 #include "truehd_signing.hpp"

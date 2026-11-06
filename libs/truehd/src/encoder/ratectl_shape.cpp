@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstdint>
+#include <span>
+#include <vector>
 
 namespace iclforge::truehd::detail {
 

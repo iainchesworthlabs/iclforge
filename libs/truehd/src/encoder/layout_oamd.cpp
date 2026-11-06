@@ -1,9 +1,14 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <span>
+#include <utility>
+#include <vector>
 
 #include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/encoder/layout.hpp"
 
 namespace iclforge::truehd {

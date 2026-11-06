@@ -26,6 +26,7 @@
 #include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/encoder/layout.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
 #include "iclforge/truehd/encoder/ratectl.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"

@@ -28,7 +28,6 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/version.hpp"
 #include "iclforge/render/layout.hpp"
-#include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"

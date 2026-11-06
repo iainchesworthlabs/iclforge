@@ -25,6 +25,7 @@
 #include "iclforge/base/crypto/chain.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/credentials.hpp"
+#include "iclforge/base/crypto/ecdsa_p256.hpp"
 #include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/version.hpp"
 
