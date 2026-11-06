@@ -20,6 +20,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/layout.hpp"
+#include "container_input.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "ac4_channels.hpp"
@@ -90,15 +91,23 @@ struct DecodeOutcome {
     std::shared_ptr<RawResult> result;
 };
 
-// Whether the file opens as a TrueHD or MLP stream: the head of it holds an access unit with a major
-// sync. The stream is put back at its start.
-bool is_truehd_head(std::ifstream& in) {
-    std::vector<std::byte> head(iclforge::truehd::kMaxLeadingBytes + 4096);
+// What the head of the file says it is, as far as the TrueHD path goes: a bare TrueHD or MLP stream (an
+// access unit with a major sync), a Matroska, MP4 or transport stream that may hold a TrueHD track,
+// or neither. The stream is put back at its start.
+enum class HeadKind { kOther, kBareTruehd, kContainer };
+
+HeadKind head_kind(std::ifstream& in) {
+    std::vector<std::byte> head(std::max<std::size_t>(iclforge::truehd::kMaxLeadingBytes + 4096, 64 * 1024));
     in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
     head.resize(static_cast<std::size_t>(std::max<std::streamsize>(in.gcount(), 0)));
     in.clear();
     in.seekg(0);
-    return head.size() >= 8 && iclforge::truehd::find_stream_start(head).has_value();
+    if (head.size() >= 8 && iclforge::truehd::find_stream_start(head).has_value()) {
+        return HeadKind::kBareTruehd;
+    }
+    return iclforge::apps::sniff_container(head) != iclforge::apps::ContainerKind::kUnknown
+               ? HeadKind::kContainer
+               : HeadKind::kOther;
 }
 
 iclforge::base::Location location_of(iclforge::truehd::Channel channel) {
@@ -149,10 +158,28 @@ iclforge::base::Location location_of(iclforge::truehd::Channel channel) {
     return L::kLeft;
 }
 
-// TrueHD or MLP, opened for the player: the index of its restarts and its format, no audio.
-DecodeOutcome open_truehd(const QString& path) {
+// The container a TrueHD stream was read from, as the summary line names it; empty for a bare stream.
+QString container_name(iclforge::apps::ContainerKind kind) {
+    switch (kind) {
+        case iclforge::apps::ContainerKind::kMatroska:
+            return QStringLiteral("Matroska");
+        case iclforge::apps::ContainerKind::kMp4:
+            return QStringLiteral("MP4");
+        case iclforge::apps::ContainerKind::kMpegTs:
+            return QStringLiteral("MPEG-TS");
+        case iclforge::apps::ContainerKind::kUnknown:
+            break;
+    }
+    return {};
+}
+
+// TrueHD or MLP, opened for the player: the index of its restarts and its format, no audio. The file
+// is a bare stream or a container with a TrueHD track; `no_truehd_track` is set when it is a sound
+// container with none.
+DecodeOutcome open_truehd(const QString& path, bool* no_truehd_track = nullptr) {
     DecodeOutcome outcome;
-    auto source = forge_gui::TruehdPcmSource::open(path.toStdString());
+    auto source = forge_gui::TruehdPcmSource::open(path.toStdString(),
+                                                   iclforge::truehd::Presentation::kBest, no_truehd_track);
     if (!source) {
         outcome.error = QString::fromStdString(source.error());
         return outcome;
@@ -179,6 +206,15 @@ DecodeOutcome open_truehd(const QString& path) {
     result->unit_count = info.units;
     result->duration_seconds =
         static_cast<double>(info.frames) / static_cast<double>(info.sample_rate);
+    // A container's file says so, and an edit list the player does not apply says why.
+    QStringList notes;
+    if (const QString name = container_name(info.container); !name.isEmpty()) {
+        notes << QStringLiteral("in %1").arg(name);
+    }
+    if (!info.trim_note.empty()) {
+        notes << to_qstring(info.trim_note);
+    }
+    result->programme_note = notes.join(QStringLiteral(" · "));
     result->truehd = std::shared_ptr<forge_gui::TruehdPcmSource>(std::move(*source));
     outcome.result = std::move(result);
     return outcome;
@@ -344,9 +380,19 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
     }
     // TrueHD and MLP are not decoded into memory: a film's decode would not fit. The file is
     // indexed and read a window at a time by the player (truehd_pcm_source.hpp).
-    if (is_truehd_head(in)) {
+    const HeadKind head = head_kind(in);
+    if (head == HeadKind::kBareTruehd) {
         in.close();
         return open_truehd(path);
+    }
+    // A Matroska, MP4 or transport stream with a TrueHD track plays that track the same way, read
+    // where it lies in the file. One with none is read as it always was below.
+    if (head == HeadKind::kContainer) {
+        bool no_truehd_track = false;
+        auto opened = open_truehd(path, &no_truehd_track);
+        if (!no_truehd_track) {
+            return opened;
+        }
     }
     const std::vector<char> raw{std::istreambuf_iterator<char>(in),
                                 std::istreambuf_iterator<char>()};
