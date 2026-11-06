@@ -674,10 +674,13 @@ jobs:
         if: runner.os == 'Windows' && matrix.preset != 'windows-msvc-arm64'
         uses: ./.github/actions/setup-embeddable-python
 
+      # `dir` is fixed so the cache key is the same on every runner: see
+      # pr-gate.yml's Windows MSVC job for why.
       - name: Install Qt (prebuilt)
         if: runner.os == 'Windows' && matrix.preset != 'windows-msvc-arm64'
         uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
+          dir: C:\iclforge-ci
           version: ${{ inputs.qt_version }}
           aqtsource: ${{ inputs.aqt_source }}
           modules: qtquick3d qtshadertools qttasktree
