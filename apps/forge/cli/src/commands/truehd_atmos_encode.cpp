@@ -434,6 +434,10 @@ int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
 
     // The bed, frame by frame with the encoding, from the renderer when no WAV gave it.
     const auto layout = iclforge::render::OutputLayout::parse(kBedLayout);
+    if (!layout) {
+        fmt::println(stderr, "error: truehd-atmos: the bed layout {} does not parse", kBedLayout);
+        return kExitRuntime;
+    }
     std::optional<TrueHdObjectRenderer> renderer;
     if (!bed_wav) {
         renderer.emplace(*layout, config.sample_rate, true);

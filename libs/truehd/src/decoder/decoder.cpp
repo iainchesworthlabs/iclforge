@@ -426,7 +426,7 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
             fresh->channels[c].iir_history = state.channels[c].iir_history;
         }
     }
-    state = std::move(*fresh);
+    state = *fresh;
     state.running = true;
     state.restart = *header;
     state.output_source = output_source;

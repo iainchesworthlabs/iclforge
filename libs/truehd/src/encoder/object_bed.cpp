@@ -1197,9 +1197,12 @@ std::expected<ChainResult, std::string_view> design_chain(const std::vector<Form
         }
         if (singles.size() >= 2) {
             for (const int r : singles) {
-                const double c = *single_gain(target[static_cast<std::size_t>(r)],
-                                              element_at[static_cast<std::size_t>(r)]);
-                if (!design.emit(r, {{design.spare(), overlap_gain(c)}})) {
+                const auto c = single_gain(target[static_cast<std::size_t>(r)],
+                                           element_at[static_cast<std::size_t>(r)]);
+                if (!c) {
+                    continue;  // not reached: `singles` holds the rows that have one
+                }
+                if (!design.emit(r, {{design.spare(), overlap_gain(*c)}})) {
                     return std::unexpected(design.problem);
                 }
             }
