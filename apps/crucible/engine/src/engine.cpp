@@ -815,7 +815,11 @@ struct Engine::Impl {
 
             const auto encode_start = std::chrono::steady_clock::now();
             ICLFORGE_ZONE_BEGIN(encode_zone, "encode");
-            auto unit = encoder->encode_frame(views, placements);
+            // The bed's own LFE rides beside the fifteen objects, not in them:
+            // an object cannot reach the LFE alone (lfe_send scales by the
+            // object's gain, which also pans it), and a tap's LFE is not an
+            // object. bed.lfe is sized to the frame, as encode_frame requires.
+            auto unit = encoder->encode_frame(views, placements, bed.lfe);
             ICLFORGE_ZONE_END(encode_zone);
             const double encode_ms = std::chrono::duration<double, std::milli>(
                                          std::chrono::steady_clock::now() - encode_start)

@@ -52,6 +52,18 @@ Setup setup_from_fixture() {
     return setup;
 }
 
+// The same stream's major sync read at another rate: TrueHD rate bits 1 (96 kHz) and 2 (192 kHz) in
+// the top nibble of format_info (TH spec section 5.1), and the access unit that rate has.
+Setup setup_at(unsigned ratebits, int nominal) {
+    Setup setup = setup_from_fixture();
+    setup.sync.format_info = (setup.sync.format_info & 0x0FFFFFFFU) | (ratebits << 28U);
+    setup.rate = setup.sync.sample_rate();
+    setup.nominal = th::nominal_samples_per_access_unit(setup.sync.ratebits());
+    setup.declared_bps = setup.sync.peak_data_rate_bps();
+    REQUIRE(setup.nominal == nominal);
+    return setup;
+}
+
 // The samples a unit of `bytes` takes to arrive at the declared rate, as the law has it.
 std::int64_t duration_of(const Setup& setup, std::size_t bytes) {
     const std::uint64_t bits = static_cast<std::uint64_t>(bytes) * 8U * setup.rate;
@@ -179,4 +191,83 @@ TEST_CASE("the lead is held between a slot and 75 ms", "[gui][truehd][rate]") {
     // The overrun is the miss in milliseconds.
     CHECK(run_led(setup, 1, ceiling + 48).report().worst_overrun_ms > 0.99);
     CHECK(run_led(setup, 1, ceiling + 48).report().worst_overrun_ms < 1.01);
+}
+
+namespace {
+
+// The lead of `run_led` for a setup of any rate: `count` small units a slot apart.
+RateModel run_led_at(const Setup& setup, std::size_t count, std::int64_t lead,
+                     std::int64_t step, std::uint16_t first_timing = 1000) {
+    RateModel model;
+    std::uint16_t timing = first_timing;
+    for (std::size_t n = 0; n < count; ++n) {
+        const std::optional<std::uint16_t> out =
+            n == 0 ? std::optional<std::uint16_t>(static_cast<std::uint16_t>(timing + lead))
+                   : std::nullopt;
+        model.add_unit(8, timing, out, n == 0 ? std::optional<th::MajorSync>{setup.sync} : std::nullopt);
+        timing = static_cast<std::uint16_t>(timing + step);
+    }
+    return model;
+}
+
+}  // namespace
+
+TEST_CASE("at 96 kHz the lead window is 80 to 7200 samples", "[gui][truehd][rate]") {
+    // The slot and 75 ms both double: 40 to 3600 samples at 48 kHz, 80 to 7200 at 96 kHz.
+    const Setup setup = setup_at(1, 80);
+    REQUIRE(setup.rate == 96000);
+    CHECK(run_led_at(setup, 20, 80, 80).report().violations == 0);
+    CHECK(run_led_at(setup, 20, 7200, 80).report().violations == 0);
+    CHECK(run_led_at(setup, 20, 79, 80).report().violations == 20);
+    CHECK(run_led_at(setup, 20, 7201, 80).report().violations == 20);
+    // The window of 48 kHz is not this one: a lead of 40 was inside it there and is short here.
+    CHECK(run_led_at(setup, 20, 40, 80).report().violations == 20);
+}
+
+TEST_CASE("the quarter-slot floor between starts is 10, 20 and 40 samples at 48, 96 and 192 kHz",
+          "[gui][truehd][rate]") {
+    // A quarter of the slot (TH spec section 18). The steps alternate the floor (or one under it) and
+    // two slots less that, so the lead is the same every second unit and only the floor is tested.
+    const struct {
+        unsigned ratebits;
+        int nominal;
+        std::int64_t floor;
+    } cases[] = {{0, 40, 10}, {1, 80, 20}, {2, 160, 40}};
+    for (const auto& c : cases) {
+        const Setup setup = setup_at(c.ratebits, c.nominal);
+        auto run_steps = [&](std::int64_t small) {
+            RateModel model;
+            std::uint16_t timing = 0;
+            for (std::size_t n = 0; n < 50; ++n) {
+                model.add_unit(8, timing, n == 0 ? std::optional<std::uint16_t>(static_cast<std::uint16_t>(c.nominal))
+                                                  : std::nullopt,
+                               n == 0 ? std::optional<th::MajorSync>{setup.sync} : std::nullopt);
+                timing = static_cast<std::uint16_t>(timing + (n % 2 == 0 ? small : 2 * c.nominal - small));
+            }
+            return model.report().violations;
+        };
+        INFO("rate " << setup.rate << " floor " << c.floor);
+        CHECK(run_steps(c.floor) == 0);
+        CHECK(run_steps(c.floor - 1) == 25);
+    }
+}
+
+TEST_CASE("a declared peak rate one step under what the stream needs is a violation", "[gui][truehd][rate]") {
+    // The smallest peak_data_rate that carries the stream is the largest of ceil(bytes x 128 / step)
+    // (TH spec section 4.4: raw 6000 is 18 Mbit/s at 48 kHz). The units here are 100 bytes a
+    // 40-sample step, so the raw value that carries them is 320.
+    const Setup base = setup_from_fixture();
+    auto violations = [&](std::uint16_t raw) {
+        th::MajorSync sync = base.sync;
+        sync.peak_data_rate = raw;
+        RateModel model;
+        std::uint16_t timing = 0;
+        for (std::size_t n = 0; n < 100; ++n) {
+            model.add(unit_with(100, timing), n == 0 ? std::optional<th::MajorSync>{sync} : std::nullopt);
+            timing = static_cast<std::uint16_t>(timing + 40);
+        }
+        return model.report().violations;
+    };
+    CHECK(violations(320) == 0);
+    CHECK(violations(319) > 0);
 }
