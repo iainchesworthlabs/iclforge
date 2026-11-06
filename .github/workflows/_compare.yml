@@ -41,7 +41,7 @@ jobs:
   # This was two jobs, one per measurement, each with its own container, apt bootstrap,
   # checkout, GCC install and vcpkg setup before it built anything: about three of the
   # eight minutes each took, paid twice, and one more fleet slot held for every entry that
-  # changes src/. The builds share almost all of their objects (the three benchmarks link the
+  # changes the encoder. The builds share almost all of their objects (the three benchmarks link the
   # same library), so building them together costs little more than building one. Measured
   # on the queue entries of 2026-11-06: 14 runner-minutes for the pair, against about 8 for
   # this one. The two verdicts are still independent - see "Independence" below.
