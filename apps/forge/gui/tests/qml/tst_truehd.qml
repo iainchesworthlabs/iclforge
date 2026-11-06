@@ -24,6 +24,13 @@ TestCase {
     readonly property url streamUrl: Qt.resolvedUrl("../fixtures/truehd_m51_s24.thd")
     readonly property url mlpUrl: Qt.resolvedUrl("../fixtures/mlp_st48_s24.mlp")
     readonly property url joinedUrl: Qt.resolvedUrl("../fixtures/truehd_cat_st48_s24.thd")
+    // The 5.1 stream above in a Matroska file, an MP4 and a Blu-ray transport stream, made by
+    // `forge mkv`, `forge mp4` and `forge ts`.
+    readonly property var containerUrls: [
+        {name: "Matroska", url: Qt.resolvedUrl("../fixtures/truehd_m51_s24.mkv")},
+        {name: "MP4", url: Qt.resolvedUrl("../fixtures/truehd_m51_s24.mp4")},
+        {name: "MPEG-TS", url: Qt.resolvedUrl("../fixtures/truehd_m51_s24.m2ts")}
+    ]
     readonly property url exportUrl: Qt.resolvedUrl("_test_output/tst_truehd.wav")
 
     function init() {
@@ -55,6 +62,31 @@ TestCase {
         compare(meta[0].name, "L");
         compare(meta[3].name, "LFE");
         compare(meta[5].name, "Rs");
+    }
+
+    // A TrueHD track in a container opens the same way: the same summary line (naming the
+    // container), speakers and length, and the same export.
+    function test_aTrueHdTrackInAContainerOpensInThePlayer() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        for (let i = 0; i < containerUrls.length; ++i) {
+            const item = containerUrls[i];
+            open(item.url);
+            compare(StreamPlayerController.error, "", item.name);
+            compare(StreamPlayerController.hasResult, true, item.name);
+            const line = StreamPlayerController.summaryLine;
+            verify(line.indexOf("TrueHD") === 0, item.name + ": " + line);
+            verify(line.indexOf("L R C LFE Ls Rs") > 0, item.name + ": " + line);
+            verify(line.indexOf("48000 Hz") > 0, item.name + ": " + line);
+            verify(line.indexOf("in " + item.name) > 0, item.name + ": " + line);
+            fuzzyCompare(StreamPlayerController.durationSeconds, 0.25, 0.001);
+            const meta = StreamPlayerController.channelMeta;
+            compare(meta.length, 6, item.name);
+            compare(meta[3].name, "LFE", item.name);
+            StreamPlayerController.exportDecodedWav(exportUrl);
+            tryCompare(StreamPlayerController, "exporting", false, 15000);
+            compare(StreamPlayerController.exportError, "", item.name);
+        }
     }
 
     function test_anMlpStreamSaysSo() {

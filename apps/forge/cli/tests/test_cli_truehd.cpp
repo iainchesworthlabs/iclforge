@@ -2569,6 +2569,17 @@ TEST_CASE("silence and sine with a .thd output make TrueHD streams", "[forge-cli
     }
 }
 
+namespace {
+
+// A build with no audio backend (the ALSA-less and ADM legs) refuses monitor, record and live
+// before their handlers run (main.cpp's Needs check), with this sentence and kExitUnavailable. The
+// option refusals the cases below look for come from the handlers, so there they are not reachable.
+bool refused_for_want_of_audio(const std::string& text) {
+    return text.find("is unavailable on this platform") != std::string::npos;
+}
+
+}  // namespace
+
 TEST_CASE("monitor reads a TrueHD stream: it plays it, or says why the output cannot",
           "[forge-cli][truehd][monitor]") {
     // On a machine with speakers this plays the second of tone; with none (a CI leg, this one) the
@@ -2590,6 +2601,9 @@ TEST_CASE("monitor reads a TrueHD stream: it plays it, or says why the output ca
     }
     SECTION("the presentation is chosen as decode chooses it, and what monitor does not apply is refused") {
         CHECK(run_cli("monitor " + in + "truehd-presentation=2ch", log) != kExitUsage);
+        if (refused_for_want_of_audio(read_text(log))) {
+            return;
+        }
         CHECK(run_cli("monitor " + in + "dialnorm=27", log) == kExitUsage);
         CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
         CHECK(run_cli("monitor " + in + "truehd-presentation=7ch", log) == kExitUsage);
@@ -2617,6 +2631,10 @@ TEST_CASE("record codec=truehd takes a lossless stream, or says why the device c
         }
     }
     SECTION("what it does not do is refused by name") {
+        run_cli("record " + cli_arg(stream) + "1 192 0 codec=truehd", log);
+        if (refused_for_want_of_audio(read_text(log))) {
+            return;
+        }
         CHECK(run_cli("record " + cli_arg(tone.dir / "recorded.ac3") + "1 192 0 codec=truehd", log) ==
               kExitUsage);
         CHECK(read_text(log).find("name the output .thd") != std::string::npos);
@@ -2812,7 +2830,7 @@ TEST_CASE("monitor takes eight channels and the high rates, or names the one the
             CHECK(text.find("(TrueHD, " + std::to_string(channels) + " channels (" + layout_names + "), " +
                             std::to_string(rate) + " Hz)") != std::string::npos);
             CHECK(text.find("sent in the stream's order") == std::string::npos);
-        } else {
+        } else if (!refused_for_want_of_audio(text)) {
             CHECK(text.find("(" + std::to_string(channels) + " channel(s) at " + std::to_string(rate) +
                             " Hz)") != std::string::npos);
         }

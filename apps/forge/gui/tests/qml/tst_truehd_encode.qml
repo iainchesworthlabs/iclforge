@@ -95,16 +95,16 @@ TestCase {
                TruehdEncodeController.outputPath);
     }
 
-    // Each container is written, and the summary names it. That the file holds the stream that
-    // was coded, access unit for access unit, is held by test_truehd_wrap.cpp (the player does not
-    // open a TrueHD track in a container yet, so it cannot be the proof here).
+    // Each container is written, the summary names it, and the file opens in the player as TrueHD
+    // in that container with the duration and speakers that were coded. That the file holds the
+    // stream that was coded, access unit for access unit, is held by test_truehd_wrap.cpp.
     function test_eachContainerIsWrittenAndNamedInTheSummary() {
         const win = createTemporaryObject(mainWindowComponent, testCase);
         verify(win !== null);
         const containers = [
-            {file: "tst_truehd_encode.mkv", label: " · in Matroska"},
-            {file: "tst_truehd_encode.mp4", label: " · in MP4"},
-            {file: "tst_truehd_encode.m2ts", label: " · in a Blu-ray transport stream"}
+            {file: "tst_truehd_encode.mkv", label: " · in Matroska", player: " · in Matroska"},
+            {file: "tst_truehd_encode.mp4", label: " · in MP4", player: " · in MP4"},
+            {file: "tst_truehd_encode.m2ts", label: " · in a Blu-ray transport stream", player: " · in MPEG-TS"}
         ];
         for (const entry of containers) {
             const url = Qt.resolvedUrl("_test_output/" + entry.file);
@@ -119,6 +119,15 @@ TestCase {
                    TruehdEncodeController.summary);
             verify(TruehdEncodeController.summary.indexOf(entry.label) > 0,
                    TruehdEncodeController.summary);
+            // The player reads the same file back.
+            StreamPlayerController.openFile(url);
+            tryCompare(StreamPlayerController, "busy", false, 15000);
+            compare(StreamPlayerController.error, "", entry.file);
+            verify(StreamPlayerController.summaryLine.indexOf("TrueHD") === 0,
+                   StreamPlayerController.summaryLine);
+            verify(StreamPlayerController.summaryLine.indexOf(entry.player) > 0,
+                   StreamPlayerController.summaryLine);
+            verify(StreamPlayerController.durationSeconds > 0);
         }
         // A bare stream names no container.
         TruehdEncodeController.chooseOutput(outputUrl);
