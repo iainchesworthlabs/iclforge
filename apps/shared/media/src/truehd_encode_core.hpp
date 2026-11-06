@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -78,6 +79,44 @@ struct Assembled {
 // `samples` samples of silence ahead of every channel.
 void pad_leading(iclforge::ac3::io::WavData& wav, std::size_t samples);
 
+
+// ---- the encoder's settings ----------------------------------------------------------------------
+//
+// The `truehd-*` options of `forge truehd-encode` that shape the stream (not the channel meaning, and
+// not the Atmos-only ones), and the Forge window's Encode TrueHD options: one place for what each
+// value may be and the sentence that says so, so that the window refuses what the command line does.
+// The command line's own parser (apps/forge/cli/src/support.cpp) shares the limits below.
+
+inline constexpr int kRestartMaxUnits = 4096;
+inline constexpr std::uint32_t kPeakRateMaxKbps = 100000;
+inline constexpr std::uint32_t kBitrateMinKbps = 1000;
+inline constexpr std::uint32_t kBitrateMaxKbps = 100000;
+inline constexpr int kMajorSyncMaxUnits = 65536;
+inline constexpr int kFirOrderMax = 8;
+inline constexpr double kDownmixGainFloorDb = -60.0;
+
+struct Settings {
+    bool standard_downmix = false;                       // truehd-downmix=standard
+    std::optional<std::array<double, 4>> downmix_gains;  // linear: C, Ls/Rs, LFE, Lrs/Rrs
+    std::optional<int> restart_units;                    // truehd-restart=
+    std::optional<std::uint32_t> peak_rate_kbps;         // truehd-peak-rate=
+    bool rate_lenient = false;                           // truehd-rate-check=lenient
+    std::optional<std::uint32_t> bitrate_kbps;           // truehd-bitrate=
+    std::optional<int> major_sync_units;                 // truehd-major-sync=
+    std::optional<int> fir_order;                        // truehd-fir-order=
+    bool matrix = true;                                  // truehd-matrix=
+    unsigned stereo_mode = 0;                            // truehd-stereo-mode=: stereo, ltrt, headphone
+    bool verify = false;                                 // verify
+};
+
+// Sets the option `name` (the part after "truehd-", such as "restart") to `value`, as the command line
+// reads it. The error is the sentence that says what the option takes, without the value it was
+// given: the caller adds that. A name that is not one of these is an error too.
+[[nodiscard]] std::expected<void, std::string> set_option(Settings& settings, std::string_view name,
+                                                          std::string_view value);
+
+// The settings into `config`; the fields they leave alone keep what the caller set.
+void apply(const Settings& settings, iclforge::truehd::EncoderConfig& config);
 
 struct Outcome {
     std::vector<std::byte> stream;

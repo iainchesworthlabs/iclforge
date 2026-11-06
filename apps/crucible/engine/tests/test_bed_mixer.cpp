@@ -48,7 +48,7 @@ TEST_CASE("bed contributions accumulate and take the gain", "[crucible]") {
     CHECK(bed(mix, BedChannel::kL, 0) == 0.0F);
 }
 
-TEST_CASE("7.1 maps by channel, folds the rear pairs at -3 dB and drops the LFE", "[crucible]") {
+TEST_CASE("7.1 maps by channel, folds the rear pairs at -3 dB and sends the LFE to the bed's LFE", "[crucible]") {
     // L R C LFE Lss Rss Lrs Rrs
     const std::vector<float> frame = {0.1F, 0.2F, 0.3F, 0.9F, 0.4F, 0.5F, 0.4F, 0.5F};
     BedMix mix;
@@ -59,13 +59,14 @@ TEST_CASE("7.1 maps by channel, folds the rear pairs at -3 dB and drops the LFE"
     CHECK(bed(mix, BedChannel::kC, 0) == Approx(0.3F));
     CHECK(bed(mix, BedChannel::kLs, 0) == Approx(0.70710678F * 0.8F));
     CHECK(bed(mix, BedChannel::kRs, 0) == Approx(0.70710678F * 1.0F));
-    // Nothing of the 0.9 LFE reached any slot.
+    // None of the 0.9 LFE reached any slot: it is the bed's own LFE, at unity.
     float total = 0.0F;
     for (const auto& slot : mix.slots) total += slot[0];
     CHECK(total == Approx(0.1F + 0.2F + 0.3F + 0.70710678F * 1.8F));
+    CHECK(mix.lfe[0] == Approx(0.9F));
 }
 
-TEST_CASE("5.1 maps by channel and drops the LFE", "[crucible]") {
+TEST_CASE("5.1 maps by channel and sends the LFE to the bed's LFE, not to a slot", "[crucible]") {
     const std::vector<float> frame = {0.1F, 0.2F, 0.3F, 0.9F, 0.4F, 0.5F};
     BedMix mix;
     mix.resize(1);
@@ -73,6 +74,29 @@ TEST_CASE("5.1 maps by channel and drops the LFE", "[crucible]") {
     CHECK(bed(mix, BedChannel::kLs, 0) == Approx(0.4F));
     CHECK(bed(mix, BedChannel::kRs, 0) == Approx(0.5F));
     CHECK(bed(mix, BedChannel::kC, 0) == Approx(0.3F));
+    CHECK(mix.lfe[0] == Approx(0.9F));
+}
+
+TEST_CASE("the bed's LFE sums the taps, takes the gain, clears, and stays empty for stereo", "[crucible]") {
+    // Two 5.1 frames each; the LFE is channel 3.
+    const std::vector<float> a = {0.0F, 0.0F, 0.0F, 0.5F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, -0.25F, 0.0F, 0.0F};
+    const std::vector<float> b = {0.0F, 0.0F, 0.0F, 0.25F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.25F, 0.0F, 0.0F};
+    BedMix mix;
+    mix.resize(2);
+    add_to_bed(a, 6, 1.0F, mix);
+    add_to_bed(b, 6, 0.5F, mix);
+    CHECK(mix.lfe[0] == Approx(0.5F + 0.125F));
+    CHECK(mix.lfe[1] == Approx(-0.25F + 0.125F));
+    mix.clear();
+    CHECK(mix.lfe[0] == 0.0F);
+    CHECK(mix.lfe[1] == 0.0F);
+    // Stereo, mono and quad have no LFE to give.
+    const std::vector<float> stereo = {1.0F, 1.0F, 1.0F, 1.0F};
+    add_to_bed(stereo, 2, 1.0F, mix);
+    const std::vector<float> quad(8, 1.0F);
+    add_to_bed(quad, 4, 1.0F, mix);
+    CHECK(mix.lfe[0] == 0.0F);
+    CHECK(mix.lfe[1] == 0.0F);
 }
 
 TEST_CASE("a mono fold of a fully driven surround signal does not clip", "[crucible]") {

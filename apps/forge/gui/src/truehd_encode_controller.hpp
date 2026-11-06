@@ -1,8 +1,11 @@
 #pragma once
 
+#include <QMap>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtQmlIntegration>
 
 #include <atomic>
@@ -32,6 +35,13 @@ class TruehdEncodeController : public QObject {
     Q_PROPERTY(bool verify READ verify WRITE setVerify NOTIFY optionsChanged)
     Q_PROPERTY(bool standardDownmix READ standardDownmix WRITE setStandardDownmix NOTIFY
                    optionsChanged)
+    // The other `truehd-*` options of the command line, by name (restart, peak-rate, rate-check,
+    // bitrate, major-sync, fir-order, matrix, stereo-mode, downmix-gains), each as the text the command
+    // line takes; empty is the encoder's own default. optionErrors holds, for each text that is not a
+    // value, the sentence that says what the option takes.
+    Q_PROPERTY(QVariantMap options READ options NOTIFY optionsChanged)
+    Q_PROPERTY(QVariantMap optionErrors READ optionErrors NOTIFY optionsChanged)
+    Q_PROPERTY(QStringList optionNames READ optionNames CONSTANT)
     Q_PROPERTY(bool canEncode READ canEncode NOTIFY stateChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
     // 0 to 1 while a run is going.
@@ -51,7 +61,12 @@ class TruehdEncodeController : public QObject {
     [[nodiscard]] QString outputPath() const { return output_; }
     [[nodiscard]] bool verify() const { return verify_; }
     [[nodiscard]] bool standardDownmix() const { return downmix_; }
-    [[nodiscard]] bool canEncode() const { return !busy_ && !source_.isEmpty() && !output_.isEmpty(); }
+    [[nodiscard]] QVariantMap options() const;
+    [[nodiscard]] QVariantMap optionErrors() const { return option_errors_; }
+    [[nodiscard]] static QStringList optionNames();
+    [[nodiscard]] bool canEncode() const {
+        return !busy_ && !source_.isEmpty() && !output_.isEmpty() && option_errors_.isEmpty();
+    }
     [[nodiscard]] bool busy() const { return busy_; }
     [[nodiscard]] double progress() const { return progress_; }
     [[nodiscard]] QString summary() const { return summary_; }
@@ -61,6 +76,11 @@ class TruehdEncodeController : public QObject {
     void setVerify(bool on);
     void setStandardDownmix(bool on);
 
+    // Sets one of the options above; the text is kept as typed, trimmed, and checked by the rules of
+    // the command line (apps/shared/media/src/truehd_encode_core.hpp). Back to the defaults with
+    // resetOptions.
+    Q_INVOKABLE void setOption(const QString& name, const QString& text);
+    Q_INVOKABLE void resetOptions();
     // The WAV to code. An output beside it, named for it with .thd, is proposed when none is chosen.
     Q_INVOKABLE void chooseSource(const QUrl& url);
     Q_INVOKABLE void chooseOutput(const QUrl& url);
@@ -84,6 +104,8 @@ class TruehdEncodeController : public QObject {
     QString output_;
     bool verify_ = false;
     bool downmix_ = false;
+    QMap<QString, QString> option_text_;  // by name, only the ones with a text
+    QVariantMap option_errors_;           // by name, the sentence for each text that is refused
     bool busy_ = false;
     double progress_ = 0.0;
     QString summary_;

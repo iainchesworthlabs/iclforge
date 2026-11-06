@@ -2,6 +2,7 @@
 
 #include <fmt/format.h>
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cctype>
 #include <charconv>
@@ -338,6 +339,174 @@ void pad_leading(iclforge::ac3::io::WavData& wav, std::size_t samples) {
     for (auto& channel : wav.channels) {
         channel.insert(channel.begin(), samples, 0.0F);
     }
+}
+
+namespace {
+
+std::optional<std::uint32_t> parse_unsigned(std::string_view text) {
+    std::uint32_t value = 0;
+    const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || end != text.data() + text.size() || text.empty()) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::optional<double> parse_real(std::string_view text) {
+    double value = 0.0;
+    const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || end != text.data() + text.size() || text.empty()) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::unexpected<std::string> refuse(std::string sentence) {
+    return std::unexpected(std::move(sentence));
+}
+
+}  // namespace
+
+std::expected<void, std::string> set_option(Settings& settings, std::string_view name,
+                                            std::string_view value) {
+    if (name == "downmix") {
+        if (value != "none" && value != "standard") {
+            return refuse("truehd-downmix is none or standard");
+        }
+        settings.standard_downmix = value == "standard";
+        return {};
+    }
+    if (name == "restart") {
+        const auto units = parse_unsigned(value);
+        if (!units || *units == 0 || *units > static_cast<std::uint32_t>(kRestartMaxUnits)) {
+            return refuse(fmt::format(
+                "truehd-restart is the access units between restart headers, 1 or 8 to {}",
+                kRestartMaxUnits));
+        }
+        settings.restart_units = static_cast<int>(*units);
+        return {};
+    }
+    if (name == "peak-rate") {
+        const auto kbps = parse_unsigned(value);
+        if (!kbps || *kbps == 0 || *kbps > kPeakRateMaxKbps) {
+            return refuse(
+                fmt::format("truehd-peak-rate is a rate in kbit/s, 1 to {}", kPeakRateMaxKbps));
+        }
+        settings.peak_rate_kbps = *kbps;
+        return {};
+    }
+    if (name == "rate-check") {
+        if (value != "strict" && value != "lenient") {
+            return refuse("truehd-rate-check is strict or lenient");
+        }
+        settings.rate_lenient = value == "lenient";
+        return {};
+    }
+    if (name == "bitrate") {
+        const auto kbps = parse_unsigned(value);
+        if (!kbps || *kbps < kBitrateMinKbps || *kbps > kBitrateMaxKbps) {
+            return refuse(fmt::format("truehd-bitrate is a rate in kbit/s, {} to {}", kBitrateMinKbps,
+                                      kBitrateMaxKbps));
+        }
+        settings.bitrate_kbps = *kbps;
+        return {};
+    }
+    if (name == "major-sync") {
+        const auto units = parse_unsigned(value);
+        if (!units || *units > static_cast<std::uint32_t>(kMajorSyncMaxUnits)) {
+            return refuse(fmt::format(
+                "truehd-major-sync is the access units between major syncs, 0 (one at every "
+                "restart header) or a multiple of truehd-restart= up to {}",
+                kMajorSyncMaxUnits));
+        }
+        settings.major_sync_units = static_cast<int>(*units);
+        return {};
+    }
+    if (name == "fir-order") {
+        if (value.size() != 1 || value[0] < '0' || value[0] > '0' + kFirOrderMax) {
+            return refuse(fmt::format("truehd-fir-order is 0 to {}", kFirOrderMax));
+        }
+        settings.fir_order = value[0] - '0';
+        return {};
+    }
+    if (name == "matrix") {
+        if (value != "on" && value != "off") {
+            return refuse("truehd-matrix is on or off");
+        }
+        settings.matrix = value == "on";
+        return {};
+    }
+    if (name == "stereo-mode") {
+        if (value == "stereo") {
+            settings.stereo_mode = 0;
+        } else if (value == "ltrt") {
+            settings.stereo_mode = 1;
+        } else if (value == "headphone") {
+            settings.stereo_mode = 2;
+        } else {
+            return refuse("truehd-stereo-mode is stereo, ltrt or headphone");
+        }
+        return {};
+    }
+    if (name == "downmix-gains") {
+        std::array<double, 4> gains{};
+        std::string_view rest = value;
+        bool good = true;
+        for (std::size_t i = 0; i < gains.size() && good; ++i) {
+            const std::size_t comma = rest.find(',');
+            const std::string_view part = rest.substr(0, comma);
+            if (part == "off") {
+                gains[i] = 0.0;
+            } else if (const auto db = parse_real(part);
+                       db && std::isfinite(*db) && *db <= 0.0 && *db >= kDownmixGainFloorDb) {
+                gains[i] = std::pow(10.0, *db / 20.0);
+            } else {
+                good = false;
+            }
+            if (i + 1 < gains.size()) {
+                good = good && comma != std::string_view::npos;
+                rest = comma == std::string_view::npos ? std::string_view{} : rest.substr(comma + 1);
+            } else {
+                good = good && comma == std::string_view::npos;
+            }
+        }
+        if (!good) {
+            return refuse(
+                "truehd-downmix-gains is four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, "
+                "and Lrs and Rrs, e.g. -3,-3,off,-3");
+        }
+        settings.downmix_gains = gains;
+        return {};
+    }
+    return refuse(fmt::format("truehd-{} is not an option of the TrueHD encode", name));
+}
+
+void apply(const Settings& settings, th::EncoderConfig& config) {
+    config.downmix = settings.standard_downmix ? th::DownmixMode::kStandard : th::DownmixMode::kNone;
+    if (settings.downmix_gains) {
+        const std::array<double, 4>& g = *settings.downmix_gains;
+        config.downmix_gains = th::DownmixGains{
+            .centre = g[0], .surround = g[1], .lfe = g[2], .rear_to_surround = g[3]};
+    }
+    if (settings.restart_units) {
+        config.restart_interval_units = *settings.restart_units;
+    }
+    if (settings.peak_rate_kbps) {
+        config.peak_data_rate_bps = *settings.peak_rate_kbps * 1000U;
+    }
+    config.allow_rate_violations = settings.rate_lenient;
+    if (settings.bitrate_kbps) {
+        config.rate_control.target_bitrate_bps = *settings.bitrate_kbps * 1000U;
+    }
+    if (settings.major_sync_units) {
+        config.major_sync_interval_units = *settings.major_sync_units;
+    }
+    if (settings.fir_order) {
+        config.max_fir_order = *settings.fir_order;
+    }
+    config.matrix_search = settings.matrix;
+    config.stereo_mode = settings.stereo_mode;
+    config.verify = settings.verify;
 }
 
 std::expected<Outcome, Failure> encode_wav(const iclforge::ac3::io::WavData& wav,

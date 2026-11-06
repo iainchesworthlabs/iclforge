@@ -208,7 +208,9 @@ the UI says so.
 Bed applications are mixed by the app, not by Windows, because the taps are per process and
 there is no "everything except these" tap (the exclude mode takes one process tree, not a
 list). A stereo bed application goes to the L and R bed slots; a 5.1 render maps one-to-one
-onto the five plus the LFE send; a 7.1 render folds the side and rear pairs into Ls and Rs.
+onto the five, and its LFE channel is summed with the other bed applications' into the encoder's
+own LFE (the `lfe` span of `encode_frame`, not an object slot); a 7.1 render folds the side and
+rear pairs into Ls and Rs and sends its LFE the same way. A positioned application's LFE is dropped.
 Total bed contributors are unbounded; total taps are one per playing session, and S1 ran
 sixteen at once without strain.
 

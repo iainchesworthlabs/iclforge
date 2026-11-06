@@ -24,6 +24,7 @@ TestCase {
     readonly property url notAWavUrl: Qt.resolvedUrl("../fixtures/truehd_m51_s24.thd")
 
     function init() {
+        TruehdEncodeController.resetOptions();
         TruehdEncodeController.verify = false;
         TruehdEncodeController.standardDownmix = false;
     }
@@ -132,6 +133,99 @@ TestCase {
         tryCompare(TruehdEncodeController, "busy", false, 60000);
         compare(TruehdEncodeController.error, "");
         compare(TruehdEncodeController.summary.indexOf(" · in "), -1);
+    }
+
+    // The options of the "More options" panel are the truehd- options of the command line: each
+    // value goes into the command the dialog shows, in the order `forge` is written, and a value the
+    // command line would refuse is refused with its sentence and stops the encode.
+    function test_theOptionsAreInTheCommandLineAndABadOneIsRefused() {
+        TruehdEncodeController.chooseSource(speakers51Url);
+        TruehdEncodeController.chooseOutput(outputUrl);
+        compare(TruehdEncodeController.canEncode, true);
+        TruehdEncodeController.setOption("restart", " 64 ");
+        TruehdEncodeController.setOption("stereo-mode", "ltrt");
+        TruehdEncodeController.setOption("peak-rate", "12000");
+        const line = TruehdEncodeController.cliLine;
+        verify(line.indexOf(" truehd-restart=64 truehd-peak-rate=12000 truehd-stereo-mode=ltrt") > 0, line);
+        compare(TruehdEncodeController.options["restart"], "64");
+        compare(TruehdEncodeController.canEncode, true);
+
+        TruehdEncodeController.setOption("restart", "0");
+        verify(TruehdEncodeController.optionErrors["restart"].indexOf("truehd-restart is") === 0,
+               TruehdEncodeController.optionErrors["restart"]);
+        verify(TruehdEncodeController.optionErrors["restart"].indexOf("(got '0')") > 0);
+        compare(TruehdEncodeController.canEncode, false);
+        TruehdEncodeController.setOption("downmix-gains", "-3,-3,off");
+        verify(TruehdEncodeController.optionErrors["downmix-gains"].indexOf("-3,-3,off,-3") > 0);
+
+        TruehdEncodeController.setOption("restart", "");
+        TruehdEncodeController.setOption("downmix-gains", "");
+        compare(Object.keys(TruehdEncodeController.optionErrors).length, 0);
+        compare(TruehdEncodeController.canEncode, true);
+        TruehdEncodeController.setOption("not-an-option", "1");
+        compare(TruehdEncodeController.cliLine.indexOf("not-an-option"), -1);
+        TruehdEncodeController.resetOptions();
+        compare(TruehdEncodeController.cliLine.indexOf("truehd-restart"), -1);
+        compare(TruehdEncodeController.options["peak-rate"], "");
+    }
+
+    // The options reach the encoder: a shorter restart interval makes more restart intervals in the
+    // same audio, and the stream still verifies.
+    function test_anOptionChangesWhatTheEncoderWrites() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        TruehdEncodeController.verify = true;
+        encodeAndWait(speakers51Url);
+        compare(TruehdEncodeController.error, "");
+        const base = restartIntervalsOf(TruehdEncodeController.summary);
+        verify(base > 0, TruehdEncodeController.summary);
+
+        TruehdEncodeController.setOption("restart", "8");
+        encodeAndWait(speakers51Url);
+        compare(TruehdEncodeController.error, "");
+        verify(TruehdEncodeController.summary.indexOf("verified") > 0);
+        verify(restartIntervalsOf(TruehdEncodeController.summary) > base,
+               TruehdEncodeController.summary);
+    }
+
+    function restartIntervalsOf(summary) {
+        const found = /([0-9]+) restart intervals/.exec(summary);
+        return found ? parseInt(found[1]) : -1;
+    }
+
+    // The panel: its fields show the controller's values, and typing into one sets the option.
+    function test_thePanelShowsAndSetsTheOptions() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        const dialog = findChild(win.contentItem, "truehdEncodeDialog");
+        verify(dialog !== null);
+        dialog.open();
+        tryCompare(dialog, "visible", true, 5000);
+        const more = findChild(dialog.contentItem, "truehdEncodeMoreOptions");
+        const panel = findChild(dialog.contentItem, "truehdEncodeOptionsPanel");
+        compare(panel.visible, false);
+        more.clicked();
+        compare(panel.visible, true);
+
+        const field = findChild(dialog.contentItem, "truehdEncodeOption_fir-order");
+        verify(field !== null);
+        field.insert(0, "9");  // an edit like typing, which keeps the field bound to the controller
+        field.textEdited();
+        compare(TruehdEncodeController.options["fir-order"], "9");
+        const error = findChild(dialog.contentItem, "truehdEncodeOptionError_fir-order");
+        tryCompare(error, "visible", true, 2000);
+        verify(error.text.indexOf("truehd-fir-order is 0 to 8") === 0, error.text);
+
+        const choice = findChild(dialog.contentItem, "truehdEncodeOption_stereo-mode");
+        verify(choice !== null);
+        choice.currentIndex = 2;
+        choice.activated(2);
+        compare(TruehdEncodeController.options["stereo-mode"], "ltrt");
+
+        findChild(dialog.contentItem, "truehdEncodeResetOptions").clicked();
+        compare(TruehdEncodeController.options["stereo-mode"], "");
+        compare(field.text, "");
+        dialog.close();
     }
 
     // A WAV with a channel mask is coded, with verify on, and the stream it writes is TrueHD that

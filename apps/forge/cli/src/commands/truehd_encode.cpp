@@ -261,31 +261,20 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
     config.sample_rate = wav->sample_rate;
     config.channels = static_cast<int>(wav->channels.size());
     config.bits = 24;
-    config.downmix =
-        opts.downmix == "standard" ? th::DownmixMode::kStandard : th::DownmixMode::kNone;
-    if (opts.downmix_gains) {
-        const std::array<double, 4>& g = *opts.downmix_gains;
-        config.downmix_gains = th::DownmixGains{
-            .centre = g[0], .surround = g[1], .lfe = g[2], .rear_to_surround = g[3]};
-    }
-    if (opts.restart_units) {
-        config.restart_interval_units = *opts.restart_units;
-    }
-    if (opts.peak_rate_kbps) {
-        config.peak_data_rate_bps = *opts.peak_rate_kbps * 1000U;
-    }
-    config.allow_rate_violations = opts.rate_lenient;
-    if (opts.bitrate_kbps) {
-        config.rate_control.target_bitrate_bps = *opts.bitrate_kbps * 1000U;
-    }
-    if (opts.major_sync_units) {
-        config.major_sync_interval_units = *opts.major_sync_units;
-    }
-    if (opts.fir_order) {
-        config.max_fir_order = *opts.fir_order;
-    }
-    config.matrix_search = opts.matrix;
-    config.stereo_mode = opts.stereo_mode;
+    // The settings the window's Encode TrueHD options share (truehd_encode_core.hpp).
+    iclforge::apps::truehd_encode::apply(
+        iclforge::apps::truehd_encode::Settings{.standard_downmix = opts.downmix == "standard",
+                                                .downmix_gains = opts.downmix_gains,
+                                                .restart_units = opts.restart_units,
+                                                .peak_rate_kbps = opts.peak_rate_kbps,
+                                                .rate_lenient = opts.rate_lenient,
+                                                .bitrate_kbps = opts.bitrate_kbps,
+                                                .major_sync_units = opts.major_sync_units,
+                                                .fir_order = opts.fir_order,
+                                                .matrix = opts.matrix,
+                                                .stereo_mode = opts.stereo_mode,
+                                                .verify = meta.verify},
+        config);
     // The channel meaning (TH spec §14.1): the fields the line names, the rest zero as FFmpeg's
     // streams have them. Provisional, no oracle until the DEE set (ERRATA.md, questions 51 to 55).
     if (const std::string_view field = th::apply_edit(meta.thd_meaning, config.channel_meaning);
@@ -293,7 +282,6 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
         fmt::println(stderr, "error: truehd-encode: {}", field);
         return kExitUsage;
     }
-    config.verify = meta.verify;
 
     auto outcome = iclforge::apps::truehd_encode::encode_wav(*wav, *layout, config);
     if (!outcome) {
