@@ -128,6 +128,15 @@ updates:
       # come through. Remove this when compileSdk can move to 37.
       - dependency-name: "androidx.core:core-ktx"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # A move of the Android Gradle Plugin changes the Unified Test Platform tooling it resolves
+      # (9.4.1 -> 9.5.0 wanted gradle-work-action 32.5.0, the lockfile holds 32.4.1), and those
+      # configurations are only resolved by connectedDebugAndroidTest on a device, so a bump that
+      # is merged on green PR checks leaves the emulator leg of main red until someone runs
+      # `./gradlew :app:connectedDebugAndroidTest --write-locks` against an emulator (see the
+      # comment in app/build.gradle.kts). Patch releases still come through; a minor or major
+      # move is made by hand, with that command, in the same change.
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   # Hearth for Android (planning/hearth-android.md): its own Gradle project and lockfile, which
   # carries the plugin and the build tooling and no library of its own.
@@ -142,3 +151,13 @@ updates:
     rebase-strategy: "auto"
     commit-message:
       prefix: "build"
+    ignore:
+      # A move of the Android Gradle Plugin changes the Unified Test Platform tooling it resolves
+      # (9.4.1 -> 9.5.0 wanted gradle-work-action 32.5.0, the lockfile holds 32.4.1), and those
+      # configurations are only resolved by connectedDebugAndroidTest on a device, so a bump that
+      # is merged on green PR checks leaves the emulator leg of main red until someone runs
+      # `./gradlew :app:connectedDebugAndroidTest --write-locks` against an emulator (see the
+      # comment in app/build.gradle.kts). Patch releases still come through; a minor or major
+      # move is made by hand, with that command, in the same change.
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]

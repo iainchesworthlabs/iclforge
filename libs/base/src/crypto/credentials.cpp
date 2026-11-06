@@ -5,14 +5,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <expected>
-#include <filesystem>
 #include <fstream>
 #include <ios>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -250,9 +248,14 @@ std::expected<std::vector<std::byte>, CredentialError> read_file(const std::stri
     // stream buffer holds a copy of it, and a vector reserved at the file's size is never regrown,
     // which would leave the smaller block freed with the key in it. (A source of unknown size, a
     // pipe, can still regrow.)
-    std::error_code size_error;
-    const auto file_size = std::filesystem::file_size(path, size_error);
-    if (!size_error && file_size <= kMaxCredentialFileBytes) {
+    // The size comes from the stream, not std::filesystem: the Intel macOS wheels' deployment
+    // target (10.9 to 10.13) does not have std::filesystem::file_size, and a pipe has no size.
+    in.seekg(0, std::ios::end);
+    const std::streamoff file_size = in ? static_cast<std::streamoff>(in.tellg()) : -1;
+    in.clear();
+    in.seekg(0, std::ios::beg);
+    in.clear();
+    if (file_size >= 0 && static_cast<std::size_t>(file_size) <= kMaxCredentialFileBytes) {
         bytes.reserve(static_cast<std::size_t>(file_size) + 1);
     }
     constexpr std::size_t kChunk = 4096;

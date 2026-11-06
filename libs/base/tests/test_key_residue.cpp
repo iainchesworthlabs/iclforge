@@ -202,16 +202,19 @@ TEST_CASE("the instrument sees a key left in a freed block", "[crypto][credentia
     // would pass whatever the hook did.
     auto needles = needles_for_the_key();
     const Watch watch{needles};
-    auto* block = new unsigned char[96];
+    // ::operator new and ::operator delete are called as functions, not through a new- and a
+    // delete-expression: clang (-O2) may drop the pair of expressions as an unobserved
+    // allocation, and then no block is ever freed for the hook to look at.
+    auto* block = static_cast<unsigned char*>(::operator new(96));
     std::memset(block, 0x5A, 96);
     std::memcpy(block + 17, needles.front().bytes.data(), needles.front().bytes.size());
-    delete[] block;
+    ::operator delete(block);
     CHECK(Watch::hits() == 1);
 
     // A wiped block is not.
-    block = new unsigned char[96];
+    block = static_cast<unsigned char*>(::operator new(96));
     std::memset(block, 0x5A, 96);
-    delete[] block;
+    ::operator delete(block);
     CHECK(Watch::hits() == 1);
 }
 
