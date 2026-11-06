@@ -158,9 +158,12 @@ jobs:
           # it absent from the hash-pinned lock, and fail `--require-hashes`.
           python-version: "3.14"
 
+      # --no-deps: the lock is complete and hashed, and holds pillow and filelock at newer versions
+      # than esphome's own metadata pins (requirements/requirements-esphome.overrides.txt), which
+      # pip's resolver would refuse.
       - name: Install ESPHome
         run: |
-          pip install --disable-pip-version-check --require-hashes \
+          pip install --disable-pip-version-check --require-hashes --no-deps \
             -r requirements/requirements-esphome.txt
 
       # The test config uses a LOCAL source pointing at the working tree, not
