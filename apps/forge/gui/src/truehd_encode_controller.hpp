@@ -36,8 +36,11 @@ class TruehdEncodeController : public QObject {
     Q_PROPERTY(bool standardDownmix READ standardDownmix WRITE setStandardDownmix NOTIFY
                    optionsChanged)
     // The other `truehd-*` options of the command line, by name (restart, peak-rate, rate-check,
-    // bitrate, major-sync, fir-order, matrix, stereo-mode, downmix-gains), each as the text the command
-    // line takes; empty is the encoder's own default. optionErrors holds, for each text that is not a
+    // bitrate, major-sync, fir-order, matrix, stereo-mode, downmix-gains) and the channel meaning of
+    // TH spec §14.1 (dialnorm-2ch, mix-level-6ch, source-format-8ch, control-2ch, drc-start-up-gain,
+    // ...: core::meaning_option_names), each as the text the command line takes; empty is the
+    // encoder's own default (zero for the channel meaning). The channel meaning is provisional, no
+    // oracle until the DEE set (libs/truehd/ERRATA.md, questions 51 to 55). optionErrors holds, for each text that is not a
     // value, the sentence that says what the option takes.
     Q_PROPERTY(QVariantMap options READ options NOTIFY optionsChanged)
     Q_PROPERTY(QVariantMap optionErrors READ optionErrors NOTIFY optionsChanged)

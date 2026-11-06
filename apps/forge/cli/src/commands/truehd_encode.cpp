@@ -261,25 +261,25 @@ int run_truehd_encode(std::string_view in_path, std::string_view out_path, const
     config.sample_rate = wav->sample_rate;
     config.channels = static_cast<int>(wav->channels.size());
     config.bits = 24;
-    // The settings the window's Encode TrueHD options share (truehd_encode_core.hpp).
-    iclforge::apps::truehd_encode::apply(
-        iclforge::apps::truehd_encode::Settings{.standard_downmix = opts.downmix == "standard",
-                                                .downmix_gains = opts.downmix_gains,
-                                                .restart_units = opts.restart_units,
-                                                .peak_rate_kbps = opts.peak_rate_kbps,
-                                                .rate_lenient = opts.rate_lenient,
-                                                .bitrate_kbps = opts.bitrate_kbps,
-                                                .major_sync_units = opts.major_sync_units,
-                                                .fir_order = opts.fir_order,
-                                                .matrix = opts.matrix,
-                                                .stereo_mode = opts.stereo_mode,
-                                                .verify = meta.verify},
-        config);
-    // The channel meaning (TH spec §14.1): the fields the line names, the rest zero as FFmpeg's
+    // The settings the window's Encode TrueHD options share (truehd_encode_core.hpp), the channel
+    // meaning (TH spec §14.1) among them: the fields the line names, the rest zero as FFmpeg's
     // streams have them. Provisional, no oracle until the DEE set (ERRATA.md, questions 51 to 55).
-    if (const std::string_view field = th::apply_edit(meta.thd_meaning, config.channel_meaning);
-        !field.empty()) {
-        fmt::println(stderr, "error: truehd-encode: {}", field);
+    if (const auto applied = iclforge::apps::truehd_encode::apply(
+            iclforge::apps::truehd_encode::Settings{.standard_downmix = opts.downmix == "standard",
+                                                    .downmix_gains = opts.downmix_gains,
+                                                    .restart_units = opts.restart_units,
+                                                    .peak_rate_kbps = opts.peak_rate_kbps,
+                                                    .rate_lenient = opts.rate_lenient,
+                                                    .bitrate_kbps = opts.bitrate_kbps,
+                                                    .major_sync_units = opts.major_sync_units,
+                                                    .fir_order = opts.fir_order,
+                                                    .matrix = opts.matrix,
+                                                    .stereo_mode = opts.stereo_mode,
+                                                    .verify = meta.verify,
+                                                    .meaning = meta.thd_meaning},
+            config);
+        !applied) {
+        fmt::println(stderr, "error: truehd-encode: {}", applied.error());
         return kExitUsage;
     }
 
