@@ -61,6 +61,7 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
     ../../ui/tests/test_translations.cpp
     test_engine.cpp
     test_engine_commands.cpp
+    test_engine_lfe.cpp
     test_output_stage_edges.cpp
     platform_services_stub.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/slots.cpp"

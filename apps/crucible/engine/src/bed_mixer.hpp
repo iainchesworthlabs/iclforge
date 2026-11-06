@@ -23,10 +23,13 @@
 // Lss Rss Lrs Rrs. Anything else is summed to mono and spread front left and
 // right, which keeps it audible without pretending to know where it goes.
 //
-// The LFE of a surround tap is dropped, as ITU-R BS.775's downmixes drop it:
-// an object cannot carry someone else's LFE (lfe_send routes the object's own
-// signal), and folding it into the fronts would put bass where a bass-managed
-// receiver has already decided it does not belong.
+// The LFE of a surround tap that is in the bed goes to the bed's own LFE
+// (BedMix::lfe), which the engine hands to the encoder as its `lfe` span:
+// unpanned, at unity, and not one of the fifteen object slots. The LFE of a
+// tap that is a positioned object is dropped, as ITU-R BS.775's downmixes
+// drop it: an object cannot carry someone else's LFE (lfe_send routes the
+// object's own signal), and folding it into the fronts would put bass where a
+// bass-managed receiver has already decided it does not belong.
 
 namespace iclforge::crucible {
 
@@ -34,6 +37,10 @@ namespace iclforge::crucible {
 struct BedMix {
     // One mono buffer per bed slot, BedChannel order, `frames` long.
     std::array<std::vector<float>, kBedSlots> slots;
+    // The bed's LFE: the sum of the LFE channel of every 5.1 or 7.1 tap that
+    // is in the bed. Not a slot (the encoder takes it apart from the objects),
+    // so it is not in BedChannel order and has no placement.
+    std::vector<float> lfe;
     void resize(std::size_t frames);
     void clear();
 };
@@ -57,7 +64,8 @@ void fold_to_pair(std::span<const float> interleaved, std::uint16_t channels,
                   std::span<float> left, std::span<float> right);
 
 // Adds one tap into the bed slots, scaled by `gain`. Stereo lands on L and
-// R; 5.1/7.1 map by channel with the rear pairs folded at -3 dB into Ls/Rs.
+// R; 5.1/7.1 map by channel with the rear pairs folded at -3 dB into Ls/Rs and
+// the LFE channel added, scaled by `gain`, to bed.lfe.
 void add_to_bed(std::span<const float> interleaved, std::uint16_t channels, float gain,
                 BedMix& bed);
 

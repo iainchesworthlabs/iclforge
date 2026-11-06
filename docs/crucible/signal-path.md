@@ -108,7 +108,12 @@ carries falls back to the automatic choice with the reason line saying so. The e
 tested over scripted devices, bit for bit, and the library's backends have been built and tested
 without a receiver: nothing has been played into one, so whether an endpoint accepts the stream or
 a receiver locks on it is not known.
-Its LFE channel is empty, because Crucible's mix has no LFE source: a tap's LFE is dropped.
+Its LFE channel is the sum of the LFE channels of the 5.1 and 7.1 applications that are in the bed,
+at unity: the engine hands the encoder that sum beside its fifteen objects (`AtmosEncoder::encode_frame`'s
+`lfe` span), and the leg reads the encoder's bed. It is silent when no bed application renders a
+surround signal, since an object's LFE is dropped, as a downmix drops it, and a stereo
+application has none. The bed's LFE is not bass-managed or level-shifted on the way (planning/
+truehd-parity-crucible.md, question 14).
 
 **What the TrueHD leg costs.** The encoder holds a restart interval (128 access units, 107 ms of
 audio), and a further 90 access units (75 ms) whose arrival times wait for the units after them, and
