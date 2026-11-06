@@ -5303,17 +5303,17 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>Matroska (*.mkv)</source>
-        <translation type="unfinished"></translation>
+        <translation>Matroska (*.mkv)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>MP4 (*.mp4)</source>
-        <translation type="unfinished"></translation>
+        <translation>MP4 (*.mp4)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="44"/>
         <source>Blu-ray transport stream (*.m2ts *.ts)</source>
-        <translation type="unfinished"></translation>
+        <translation>دفق نقل Blu-ray (*.m2ts *.ts)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="55"/>
@@ -5328,7 +5328,7 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="71"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
-        <translation type="unfinished"></translation>
+        <translation>يشفّر ملف WAV دون فقدان إلى TrueHD: يُفكّ ترميز الدفق إلى العيّنات نفسها تمامًا التي أُدخلت. يسمّي قناع القنوات في ملف WAV مكبّرات الصوت؛ وإذا لم يكن في الملف قناع فتؤخذ القنوات بالترتيب الذي يكتبه forge decode. الناتج دفق .thd خام، أو Matroska (.mkv) أو MP4 (.mp4) أو دفق نقل Blu-ray (.m2ts، .ts)، بحسب ما يطلبه اسمه.</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="80"/>

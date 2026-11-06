@@ -5303,17 +5303,17 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>Matroska (*.mkv)</source>
-        <translation type="unfinished"></translation>
+        <translation>Matroska (*.mkv)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
         <source>MP4 (*.mp4)</source>
-        <translation type="unfinished"></translation>
+        <translation>MP4 (*.mp4)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="44"/>
         <source>Blu-ray transport stream (*.m2ts *.ts)</source>
-        <translation type="unfinished"></translation>
+        <translation>Blu-ray-Transportstrom (*.m2ts *.ts)</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="55"/>
@@ -5328,7 +5328,7 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="71"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
-        <translation type="unfinished"></translation>
+        <translation>Kodiert eine WAV-Datei verlustfrei als TrueHD: Der Stream wird zu genau den Samples dekodiert, die hineingegangen sind. Die Kanalmaske der WAV-Datei benennt die Lautsprecher; eine Datei ohne Maske wird in der Reihenfolge gelesen, in der forge decode schreibt. Die Ausgabe ist ein reiner .thd-Stream oder Matroska (.mkv), MP4 (.mp4) bzw. ein Blu-ray-Transportstrom (.m2ts, .ts), je nachdem, was der Name verlangt.</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="80"/>
