@@ -355,6 +355,11 @@ recommendation says, provisionally.
     there, which in Crucible is nothing: a tap's LFE is dropped, as for DD+ 5.1 (`bed_mixer.cpp`), and `encode_frame` has an
     overload that takes a source's own LFE that the engine does not call. *Recommendation:* feed it, for both modes, in one
     change of its own; a lossless 5.1 stream with an empty LFE is the first thing a listener with a subwoofer will notice.
+    **Decided 2026-11-06 by the owner: build it. Built:** the bed mixer sums the LFE channel of every 5.1 and 7.1 application in
+    the bed into `BedMix::lfe`, and the engine passes it to `encode_frame` as the `lfe` span, so DD+ 5.1, Atmos and TrueHD
+    all carry it (an engine case decodes the TrueHD bursts and finds the LFE channel loud, and fails without the change). A
+    positioned application's LFE is still dropped, and no gain is applied to it: whether the bed's LFE wants the +10 dB
+    convention some players add is not decided here.
 15. **How is the first reading to be taken?** Phase 4 needs, on the Pi 4B over PipeWire, a build with phase 1 (question 6,
     unanswered), the restart interval at 128 and then at 8 (question 8), and the front-panel word. *Recommendation:* the owner
     answers question 6 first; the carrier is then one backend and one reading, and every other question here waits for that
