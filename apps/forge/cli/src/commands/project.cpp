@@ -17,6 +17,7 @@
 #include "../exit_codes.hpp"
 #include "project_command.hpp"
 #include "project_document.hpp"
+#include "truehd_encode_core.hpp"
 
 namespace forge_cli::commands {
 
@@ -68,6 +69,21 @@ std::string sentence(const project::Message& m) {
     if (m.code == "truehd-no-options") {
         return "the AC-3 family's metadata options do not apply to a TrueHD encode; the project's "
                "'options' must be empty (the TrueHD options are in encode.truehd)";
+    }
+    if (m.code == "truehd-unknown-key") {
+        return fmt::format(
+            "encode.truehd has no '{}': it takes verify, downmix, restart, peakRate, rateCheck, "
+            "bitrate, majorSync, firOrder, matrix, stereoMode and downmixGains, and this one was "
+            "left out",
+            arg(0));
+    }
+    if (m.code == "truehd-bad-option") {
+        return fmt::format("encode.truehd.{} must be text or a number, as the command line takes "
+                           "the option",
+                           arg(0));
+    }
+    if (m.code == "truehd-option") {
+        return fmt::format("{} (got '{}')", arg(0), arg(1));
     }
     if (m.code == "unknown-container") {
         return fmt::format(
@@ -148,6 +164,26 @@ int run_project(std::string_view project_path, std::string_view out, bool print,
     if (!plan) {
         fmt::println(stderr, "error: {}", sentence(plan.error()));
         return plan.error().code == "source-missing" ? kExitInput : kExitUsage;
+    }
+    // The TrueHD options are the command's own, and its rules are checked here, so that a line that
+    // is printed is one the command takes (the other codecs' options are the command's to refuse).
+    if (!plan->steps.empty() && plan->steps.front().argv.front() == "truehd-encode") {
+        for (const std::string& token : plan->steps.front().argv) {
+            const std::size_t equals = token.find('=');
+            if (equals == std::string::npos || !token.starts_with("truehd-")) {
+                continue;
+            }
+            iclforge::apps::truehd_encode::Settings probe;
+            const auto set = iclforge::apps::truehd_encode::set_option(
+                probe, std::string_view{token}.substr(7, equals - 7),
+                std::string_view{token}.substr(equals + 1));
+            if (!set) {
+                fmt::println(stderr, "error: {}",
+                             sentence(project::Message{"truehd-option",
+                                                       {set.error(), token.substr(equals + 1)}}));
+                return kExitUsage;
+            }
+        }
     }
     for (const auto& note : plan->notes) {
         fmt::println(stderr, "note: {}", sentence(note));

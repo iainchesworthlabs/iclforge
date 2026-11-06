@@ -92,6 +92,23 @@ public:
     Q_INVOKABLE QVariantList applyEncode(QObject* controller, const QVariantMap& encode,
                                          int phase) const;
 
+    // The Encode TrueHD dialog (a TruehdEncodeController) as the parts of a project of codec truehd, as
+    // JSON text: `sources` (the first WAV, then the others, each with the start offset in seconds
+    // the dialog holds for it), `assignments` (the dialog's map= text as rows) and `truehd`
+    // (verify, downmix and the `truehd-` options the dialog holds, by the keys of
+    // `encode.truehd`). What `forge project` runs to the same bytes as the dialog's line.
+    Q_INVOKABLE QString captureTruehd(QObject* controller) const;
+
+    // The keys of `encode.truehd` that captureTruehd writes whole (the options by the keys of
+    // project_document.hpp's kTruehdOptionKeys); any other key there is another version's.
+    Q_INVOKABLE QStringList truehdKeys() const;
+
+    // Puts a TrueHD project read by read() into `controller`: it forgets what it held, then takes
+    // the project's WAV files, map, offsets, verify, downmix and options. Returns a message for
+    // each source that is not there; the dialog says for itself what it will not encode (an option
+    // or a map the command line would refuse).
+    Q_INVOKABLE QVariantList applyTruehd(QObject* controller, const QVariantMap& project) const;
+
     // The objects of an object (Atmos) session as `objects` holds them, as JSON text: how many
     // there are and their placements and motion, as the scene file `forge atmos-encode` reads
     // (iclforge::objects::oba::to_json). Empty text when `controller` is not in object mode.

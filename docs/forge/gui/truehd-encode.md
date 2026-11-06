@@ -21,4 +21,4 @@ list belongs to the AC-3 library. Like **QC a stream…** and **Open stream…**
 The result is a bare `.thd` stream, which **Open stream…** plays and **QC a stream…** checks. What the window does not do, the
 command line does: Matroska, MP4 and a Blu-ray transport stream (`forge truehd-encode in.wav out.mkv`, or `forge mkv`, `mp4` and `ts` of
 the stream), the metadata options of the channel meaning (`truehd-dialnorm-6ch=` and the others), the rate options, and several
-sources. The project file does not name TrueHD yet, so a session is not saved with it.
+sources. The session (the WAV files, their offsets and map, verify, the downmix and the options) is saved as a project of codec `truehd` ([the format](projects.md)), and `forge project` runs it.

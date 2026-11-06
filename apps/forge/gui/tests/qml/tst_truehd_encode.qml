@@ -278,6 +278,82 @@ TestCase {
         compare(EncoderController.sourceModel.length, 0);
     }
 
+    // The whole of the dialog goes into the project and comes back: the second WAV with its offset,
+    // the map as assignments, and verify, the downmix and the options. The line is the same after.
+    function test_severalSourcesTheirOffsetsAndTheOptionsAreSavedAndComeBack() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        TruehdEncodeController.clear();
+        TruehdEncodeController.resetOptions();
+        TruehdEncodeController.verify = false;
+        TruehdEncodeController.standardDownmix = false;
+        TruehdEncodeController.chooseSource(speakers51Url);
+        TruehdEncodeController.addSource(moreSourceUrl);
+        TruehdEncodeController.setMap("0.0:L,0.1:R,1.0:C");
+        TruehdEncodeController.setOffset(1, "0.25");
+        TruehdEncodeController.setOption("restart", "16");
+        TruehdEncodeController.setOption("major-sync", "32");
+        TruehdEncodeController.setOption("matrix", "off");
+        TruehdEncodeController.setOption("stereo-mode", "ltrt");
+        TruehdEncodeController.setOption("downmix-gains", "-3,-3,off,-3");
+        TruehdEncodeController.verify = true;
+        TruehdEncodeController.standardDownmix = true;
+        const line = TruehdEncodeController.cliLine;
+        const file = Qt.resolvedUrl("_test_output/tst_truehd_project_several.forgeproj");
+        verify(win.saveProjectFile(file), "the project could not be saved");
+
+        const project = win.captureProject();
+        compare(project.encode.codec, "truehd");
+        compare(project.sources.length, 2);
+        compare(project.sources[0].offsetSeconds, undefined);
+        compare(project.sources[1].offsetSeconds, 0.25);
+        compare(project.assignments.length, 3);
+        compare(project.assignments[1].channel, 1);
+        compare(project.assignments[1].to, "R");
+        compare(project.assignments[2].source, 1);
+        compare(project.assignments[2].to, "C");
+        compare(project.encode.truehd.restart, "16");
+        compare(project.encode.truehd.majorSync, "32");
+        compare(project.encode.truehd.matrix, "off");
+        compare(project.encode.truehd.stereoMode, "ltrt");
+        compare(project.encode.truehd.downmixGains, "-3,-3,off,-3");
+        compare(project.encode.truehd.peakRate, undefined);  // at its default: not written
+
+        TruehdEncodeController.clear();
+        TruehdEncodeController.resetOptions();
+        TruehdEncodeController.verify = false;
+        TruehdEncodeController.standardDownmix = false;
+        verify(win.openProjectFile(file));
+        compare(TruehdEncodeController.extraSources.length, 1);
+        compare(TruehdEncodeController.mapText, "0.0:L,0.1:R,1.0:C");
+        compare(TruehdEncodeController.offsetTexts[1], "0.25");
+        compare(TruehdEncodeController.options["restart"], "16");
+        compare(TruehdEncodeController.options["downmix-gains"], "-3,-3,off,-3");
+        compare(TruehdEncodeController.verify, true);
+        compare(TruehdEncodeController.standardDownmix, true);
+        compare(TruehdEncodeController.canEncode, true);
+        compare(TruehdEncodeController.cliLine, line);
+        compare(EncoderController.sourceModel.length, 0);
+
+        // A project with fewer settings clears the ones the last one set, and a key it holds that
+        // this window does not is carried through a save.
+        const sparse = Qt.resolvedUrl("_test_output/tst_truehd_project_sparse.forgeproj");
+        verify(ProjectFile.write(sparse, JSON.stringify(
+            { sources: [{ path: speakers51Url.toString() }],
+              encode: { codec: "truehd", truehd: { peakRate: 20000, futureKey: "kept" } } })).ok);
+        verify(win.openProjectFile(sparse));
+        compare(TruehdEncodeController.extraSources.length, 0);
+        compare(TruehdEncodeController.mapText, "");
+        compare(TruehdEncodeController.options["restart"], "");
+        compare(TruehdEncodeController.options["peak-rate"], "20000");
+        compare(TruehdEncodeController.verify, false);
+        compare(TruehdEncodeController.standardDownmix, false);
+        const again = win.captureProject();
+        compare(again.encode.truehd.futureKey, "kept");
+        compare(again.encode.truehd.peakRate, "20000");
+        compare(again.assignments, undefined);
+    }
+
     // Several sources: a second WAV needs a map to say where its channels go, a map the command line
     // would refuse and an offset it would refuse are refused with a sentence, and the command line
     // shown carries src=, map= and offset=.

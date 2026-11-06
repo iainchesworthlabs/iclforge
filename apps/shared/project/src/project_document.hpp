@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -47,6 +48,27 @@ inline constexpr std::string_view kFormat = "iclforge-project";
 inline constexpr int kVersion = 1;
 // "forgeproj", without the dot.
 inline constexpr std::string_view kSuffix = "forgeproj";
+
+// The `encode.truehd` options of a TrueHD project besides `verify` and `downmix`: the project's key
+// and the `truehd-<option>=` of `forge truehd-encode` it stands for, in the order the command line
+// and the Forge window's Encode TrueHD dialog write them. A value is the text the command takes
+// (a number is read as its text); the rules for each are the command's own
+// (apps/shared/media/src/truehd_encode_core.hpp), not repeated here.
+struct TruehdOptionKey {
+    std::string_view key;
+    std::string_view option;
+};
+inline constexpr std::array<TruehdOptionKey, 9> kTruehdOptionKeys{{
+    {"restart", "restart"},
+    {"peakRate", "peak-rate"},
+    {"rateCheck", "rate-check"},
+    {"bitrate", "bitrate"},
+    {"majorSync", "major-sync"},
+    {"firOrder", "fir-order"},
+    {"matrix", "matrix"},
+    {"stereoMode", "stereo-mode"},
+    {"downmixGains", "downmix-gains"},
+}};
 
 struct Message {
     // cannot-open (name), not-json (name), not-a-project (name), no-version (name),
