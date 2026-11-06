@@ -103,8 +103,11 @@ nearest 24-bit value (a tie goes to the even one), and the stream decodes to exa
 and no further back. The mode also needs an audio backend that can carry MAT, which is eight
 channels at 192 kHz: ALSA's can, PipeWire's can, on a sink whose codec list names TrueHD, and
 WASAPI's can, on an endpoint that accepts Microsoft's MAT 1.0 format in exclusive mode; Core
-Audio's cannot. So on macOS no endpoint reads as taking TrueHD, and a pin on a mode no endpoint
-carries falls back to the automatic choice with the reason line saying so. The engine side is
+Audio's is written but unproven: it reads as taking TrueHD where an output offers eight channels
+of 16-bit linear PCM at that rate, which Apple documents no use of for this, so a receiver may
+read the link as eight-channel PCM and play the burst as loud noise: pin it with the volume
+down. A pin on a mode no endpoint carries falls back to the automatic
+choice with the reason line saying so. The engine side is
 tested over scripted devices, bit for bit, and the library's backends have been built and tested
 without a receiver: nothing has been played into one, so whether an endpoint accepts the stream or
 a receiver locks on it is not known.

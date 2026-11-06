@@ -60,7 +60,10 @@ struct MatPlatformStatus {
                     "exclusive mode, and has never been opened on a device"};
         case PassthroughBackend::kCoreAudio:
             return {backend, MatRun::kNotRun,
-                    "no Core Audio format is known for it, so the backend refuses it"};
+                    "it looks for eight 16-bit channels of linear PCM at 192 kHz (176.4 kHz) "
+                    "among a stream's physical formats and writes the bursts into it; Apple "
+                    "documents no MAT path, it was written without a Mac, and it has never "
+                    "been opened on a device"};
         case PassthroughBackend::kAndroid:
             return {backend, MatRun::kRun,
                     "an Onkyo TX-RZ740 reported TrueHD for this library's sink through Hearth "
