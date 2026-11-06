@@ -309,6 +309,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     and found no differing sample; forge equals both. Every difference from the source is one least-significant bit (equal numbers of +1 and -1) and all of them lie in the last twelfth of each
     file (samples 1,656,010 to 1,727,629 of 1,728,000), where the source is near full scale; none is earlier, and none is in the LFE channel. DRP cannot resolve it: it applies its own gain
     (-24.0 dB on `thd-last-2ch-steps-48k24`, -4.0 dB on its `-skip` leg) and writes 16 bits. The mechanism is still unknown (requantisation, noise shaping or the core limiter are the candidates).
+    *Open: the 192 kHz latency window.* The per-unit rate law's lead window is 40 to 3,600 samples at 48 kHz and 80 to 7,200 at 96 kHz (spec-answers-2026-11-04 D10); that report gives no
+    window for 192 kHz. `forge qc` applies the same rule there, from one access unit's nominal length to 75 ms (14,400 samples), and no 192 kHz figure is measured or invented. A measured window is owed.
 51. **Dialogue normalisation (TH spec §12.5, §14.1; `forge truehd-encode`, `metadata`, `normalize`, `probe`).** The channel meaning has one
     dialogue-norm field for each presentation: 6 bits for the 2 channel presentation (§12.5 gives the range 0 to 63 and no unit) and 5
     bits for the 6 and 8 channel ones ("0 to 31 -> 0 to -31 dBFS"). Open: (a) is the 2 channel field -n dBFS as well, and what do 32 to 63
