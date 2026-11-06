@@ -178,7 +178,8 @@ class QtOnlyMode(unittest.TestCase):
 class TheJob(unittest.TestCase):
     def test_the_job_runs_the_qt_presets_and_the_qt_gate(self):
         core = text(".github/workflows/_ci-core.yml")
-        job = re.search(r"(?ms)^  coverage-qt:\n(.*?)(?=(?:^  [A-Za-z0-9_-]+:\n)|\Z)", core).group(1)
+        next_job = r"(?:^  [A-Za-z0-9_-]+:\n)|\Z"
+        job = re.search(r"(?ms)^  coverage-qt:\n(.*?)(?=" + next_job + ")", core).group(1)
         for needle in (
             "cmake --preset config-linux-gcc-coverage-qt",
             "cmake --build --preset build-linux-gcc-coverage-qt",
