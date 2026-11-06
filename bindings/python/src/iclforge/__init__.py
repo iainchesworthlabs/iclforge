@@ -97,7 +97,7 @@ else:
 # `iclforge.truehd` is an AttributeError.
 try:
     from ._iclforge import TruehdError, truehd
-except ImportError:
+except ImportError:  # pragma: no cover - a trimmed build; every wheel has the submodule
     _HAS_TRUEHD = False
 else:
     _HAS_TRUEHD = True
@@ -189,6 +189,6 @@ __all__ = [
 ]
 if not _HAS_LYRICS:
     __all__.remove("lyrics")
-if not _HAS_TRUEHD:
+if not _HAS_TRUEHD:  # pragma: no cover - the same trimmed build
     __all__.remove("truehd")
     __all__.remove("TruehdError")

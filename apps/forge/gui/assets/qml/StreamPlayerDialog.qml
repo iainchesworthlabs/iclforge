@@ -46,6 +46,7 @@ Dialog {
         title: qsTr("Choose an AC-3, E-AC-3, AC-4 or TrueHD stream")
         nameFilters: [qsTr("AC-3 / E-AC-3 (*.ac3 *.ec3)"), qsTr("AC-4 (*.ac4)"),
                       qsTr("TrueHD / MLP (*.thd *.mlp)"),
+                      qsTr("TrueHD in a container (*.mkv *.mp4 *.m4a *.m2ts *.ts)"),
                       qsTr("All files (*)")]
         onAccepted: StreamPlayerController.openFile(selectedFile)
     }

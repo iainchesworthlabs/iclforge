@@ -9,10 +9,20 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <optional>
+#include <span>
+#include <system_error>
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/base/crypto/sha256.hpp"
+#include "iclforge/containers/matroska/matroska.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
+#include "iclforge/containers/mpegts/mpegts.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
+#include "container_input.hpp"
 #include "truehd_pcm_source.hpp"
 
 // The Forge window's TrueHD and MLP player reads the file a window at a time
@@ -237,4 +247,193 @@ TEST_CASE("the exported WAV is the 24-bit WAV forge decode writes", "[gui][trueh
         }
     }
     CHECK(hex(iclforge::base::crypto::sha256(s32le)) == kFixtures[0].sha256);
+}
+
+// --- a TrueHD track in a container ---------------------------------------------------------------
+//
+// The player opens a Matroska, MP4 or Blu-ray transport stream whose first track is TrueHD, and
+// delivers the samples the bare stream does: the files are made here from the fixture's own access
+// units by the project's muxers, and the SHA-256 is the one FFmpeg's decode of the bare stream gives.
+
+namespace {
+
+namespace th = iclforge::truehd;
+namespace mkv = iclforge::containers::matroska;
+namespace mp4 = iclforge::containers::mp4;
+namespace ts = iclforge::containers::mpegts;
+
+enum class Wrap { kMatroska, kMp4, kBluRayTs };
+
+std::vector<std::byte> read_all(const fs::path& path) {
+    std::ifstream in{path, std::ios::binary};
+    std::vector<char> raw{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    std::vector<std::byte> out(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        out[i] = static_cast<std::byte>(static_cast<unsigned char>(raw[i]));
+    }
+    return out;
+}
+
+void write_all(const fs::path& path, std::span<const std::byte> bytes) {
+    std::ofstream out{path, std::ios::binary | std::ios::trunc};
+    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    out.close();
+    REQUIRE(!out.fail());
+}
+
+// The fixture's access units muxed into a container, written to a temporary file that the caller
+// removes. `edit` is an MP4's edit list: the priming skipped and the samples played.
+fs::path write_wrapped(const std::string& fixture_file, Wrap wrap, const std::string& name,
+                       std::optional<mp4::MuxOptions::Edit> edit = std::nullopt) {
+    const std::vector<std::byte> stream = read_all(fixture(fixture_file));
+    const auto info = th::probe_stream(stream);
+    REQUIRE(info.has_value());
+    std::vector<std::span<const std::byte>> units;
+    std::vector<bool> major;
+    th::ElementaryReader reader(stream);
+    th::Decoder decoder(th::DecoderConfig{.strictness = th::Strictness::kLenient});
+    int channels = 0;
+    while (const auto unit = reader.next()) {
+        units.push_back(*unit);
+        major.push_back(th::starts_with_major_sync(unit->subspan(4)));
+        const auto decoded = decoder.decode(*unit);
+        if (decoded && *decoded) {
+            channels = (*decoded)->channels;
+        }
+    }
+    REQUIRE(!units.empty());
+    REQUIRE(channels > 0);
+    const auto per_unit = static_cast<std::uint32_t>(info->samples_per_access_unit);
+    std::vector<std::byte> file;
+    if (wrap == Wrap::kMatroska) {
+        mkv::MuxOptions options;
+        options.key_frames = major;
+        auto made = mkv::mux(mkv::AudioTrack{.codec_id = std::string{mkv::kCodecTruehd},
+                                             .sample_rate = info->sample_rate,
+                                             .channels = channels,
+                                             .samples_per_frame = per_unit},
+                             units, options);
+        REQUIRE(made.has_value());
+        file = std::move(*made);
+    } else if (wrap == Wrap::kMp4) {
+        mp4::MuxOptions options;
+        options.sync_samples = major;
+        options.edit = edit;
+        auto made = mp4::mux(
+            mp4::AudioTrack{
+                .codec_id = std::string{mp4::kCodecTruehd},
+                .sample_rate = info->sample_rate,
+                .channels = channels,
+                .samples_per_frame = per_unit,
+                .codec_config = mp4::build_dmlp_payload({.format_info = info->major_sync.format_info,
+                                                         .peak_data_rate = info->major_sync.peak_data_rate}),
+            },
+            units, options);
+        REQUIRE(made.has_value());
+        file = std::move(*made);
+    } else {
+        auto made = ts::mux(ts::AudioTrack{.codec = ts::AudioCodec::kTruehd,
+                                           .sample_rate = info->sample_rate,
+                                           .channels = channels,
+                                           .samples_per_frame = per_unit},
+                            units, ts::MuxOptions{.profile = ts::BroadcastProfile::kBluray});
+        REQUIRE(made.has_value());
+        file = std::move(*made);
+    }
+    const fs::path path = fs::temp_directory_path() / ("forge-gui-truehd-wrapped-" + name);
+    write_all(path, file);
+    return path;
+}
+
+}  // namespace
+
+TEST_CASE("a TrueHD track in Matroska, MP4 or a Blu-ray transport stream plays as the bare stream does",
+          "[gui][truehd][container]") {
+    struct Case {
+        Wrap wrap;
+        const char* name;
+        iclforge::apps::ContainerKind kind;
+    };
+    const std::array<Case, 3> cases{{{Wrap::kMatroska, "m51.mkv", iclforge::apps::ContainerKind::kMatroska},
+                                     {Wrap::kMp4, "m51.mp4", iclforge::apps::ContainerKind::kMp4},
+                                     {Wrap::kBluRayTs, "m51.m2ts", iclforge::apps::ContainerKind::kMpegTs}}};
+    for (const Case& item : cases) {
+        DYNAMIC_SECTION(item.name) {
+            const fs::path path = write_wrapped("truehd_m51_s24.thd", item.wrap, item.name);
+            bool no_truehd_track = true;
+            auto source = forge_gui::TruehdPcmSource::open(path, th::Presentation::kBest, &no_truehd_track);
+            REQUIRE(source.has_value());
+            CHECK_FALSE(no_truehd_track);
+            const forge_gui::TruehdPcmInfo& info = (*source)->info();
+            CHECK(info.container == item.kind);
+            CHECK(info.channels == 6);
+            CHECK(info.sample_rate == 48000);
+            CHECK(info.frames == 12000);
+            CHECK(info.skipped_frames == 0);
+            REQUIRE(info.layout.size() == 6);
+            CHECK(info.layout.front() == th::Channel::kL);
+            CHECK(info.layout[3] == th::Channel::kLfe);
+            for (const std::size_t window : {std::size_t{4096}, std::size_t{999}}) {
+                const std::vector<std::byte> pcm = decode_all(**source, window);
+                CHECK(pcm.size() == std::size_t{12000} * 6 * 4);
+                CHECK(hex(iclforge::base::crypto::sha256(pcm)) == kFixtures[0].sha256);
+            }
+            // A seek lands on the sample asked for, as it does in the bare stream.
+            auto bare = forge_gui::TruehdPcmSource::open(fixture("truehd_m51_s24.thd"));
+            REQUIRE(bare.has_value());
+            std::vector<std::vector<float>> from_container;
+            std::vector<std::vector<float>> from_bare;
+            REQUIRE((*source)->read(7321, 500, from_container) == 500);
+            REQUIRE((*bare)->read(7321, 500, from_bare) == 500);
+            CHECK(from_container == from_bare);
+            CHECK((*source)->decode_errors() == 0);
+            std::error_code ignored;
+            fs::remove(path, ignored);
+        }
+    }
+}
+
+TEST_CASE("an MP4 edit list's priming is not delivered and its end is cut", "[gui][truehd][container]") {
+    // 100 samples in and 5,000 played: the player starts 100 samples into the stream and ends at
+    // 5,100, and what it delivers is those samples of the bare stream.
+    const fs::path path = write_wrapped("truehd_m51_s24.thd", Wrap::kMp4, "trimmed.mp4",
+                                        mp4::MuxOptions::Edit{.start_samples = 100, .duration_samples = 5000});
+    auto source = forge_gui::TruehdPcmSource::open(path);
+    REQUIRE(source.has_value());
+    CHECK((*source)->info().frames == 5000);
+    CHECK((*source)->info().skipped_frames == 100);
+    auto bare = forge_gui::TruehdPcmSource::open(fixture("truehd_m51_s24.thd"));
+    REQUIRE(bare.has_value());
+    std::vector<std::vector<float>> trimmed;
+    std::vector<std::vector<float>> whole;
+    REQUIRE((*source)->read(0, 5000, trimmed) == 5000);
+    REQUIRE((*bare)->read(100, 5000, whole) == 5000);
+    CHECK(trimmed == whole);
+    // Past the end of the edit nothing is delivered, though the stream goes on.
+    CHECK((*source)->read(5000, 100, trimmed) == 0);
+    // A seek into the trimmed stream counts from its start.
+    REQUIRE((*source)->read(2500, 300, trimmed) == 300);
+    REQUIRE((*bare)->read(2600, 300, whole) == 300);
+    CHECK(trimmed == whole);
+    std::error_code ignored;
+    fs::remove(path, ignored);
+}
+
+TEST_CASE("a container with no TrueHD track is left to the readers of the other codecs",
+          "[gui][truehd][container]") {
+    const std::vector<std::byte> ec3 = read_all(fixture("two-programmes.ec3"));
+    const auto scanned = iclforge::ac3::io::scan(ec3);
+    REQUIRE(scanned.has_value());
+    REQUIRE_FALSE(scanned->access_units.empty());
+    const auto file = mkv::mux(mkv::AudioTrack{.codec_id = std::string{mkv::kCodecEac3}, .channels = 6},
+                               scanned->access_units, {});
+    REQUIRE(file.has_value());
+    const fs::path path = fs::temp_directory_path() / "forge-gui-truehd-wrapped-eac3.mkv";
+    write_all(path, *file);
+    bool no_truehd_track = false;
+    const auto source = forge_gui::TruehdPcmSource::open(path, th::Presentation::kBest, &no_truehd_track);
+    REQUIRE_FALSE(source.has_value());
+    CHECK(no_truehd_track);
+    std::error_code ignored;
+    fs::remove(path, ignored);
 }

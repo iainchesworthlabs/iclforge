@@ -186,8 +186,9 @@ TEST_CASE("a last MAT frame that is not full is padded, and its empty slots read
 TEST_CASE("the MAT packer refuses what is not an access unit or does not fit", "[truehd][mat]") {
     mat::MatPacker packer;
     CHECK(packer.push(make({0x12, 0x34})).error() == mat::MatError::kNotAnAccessUnit);
-    // Four bytes whose length field (0x002 words) says eight.
-    CHECK(packer.push(make({0x00, 0x02, 0, 0})).error() == mat::MatError::kNotAnAccessUnit);
+    // Four bytes whose length field (0x004 words) says eight. (0x002 words is four bytes, a unit
+    // the packer takes: push() then holds a value, and .error() of that is undefined.)
+    CHECK(packer.push(make({0x00, 0x04, 0, 0})).error() == mat::MatError::kNotAnAccessUnit);
     // A length of 2,000 words is 4,000 bytes, which no slot holds.
     std::vector<std::byte> big(4000, std::byte{0});
     big[0] = std::byte{0x07};
