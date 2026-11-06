@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "iclforge/base/crypto/hmac_sha256.hpp"
+#include "iclforge/base/crypto/signing_key.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
+#include "iclforge/truehd/io/evolution.hpp"
 
 // The tag construction is specified in the header; this file is the unit walk and the placement. No
 // key is held, derived or searched for here: every key arrives as a SigningKey from the caller.
@@ -61,7 +63,7 @@ struct Located {
     Located out;
     auto unit_read = parse_access_unit(unit, inherited_substreams, true);
     if (unit_read) {
-        out.parsed = std::move(*unit_read);
+        out.parsed = *unit_read;
     }
     if (!out.parsed || !out.parsed->extra_data || out.parsed->extra_data->padding_only ||
         !out.parsed->extra_data->framing_ok) {
@@ -108,6 +110,9 @@ void clear_bits(std::span<std::byte> bytes, std::size_t first_bit, std::size_t c
 [[nodiscard]] std::vector<std::byte> message_of(std::span<const std::byte> unit,
                                                 const Located& at) {
     std::vector<std::byte> message(unit.begin(), unit.end());
+    if (!at.parsed || !at.parsed->extra_data) {
+        return message;  // not reached: a located frame has its extra data (sign and verify check)
+    }
     const std::size_t base = at.payload_bit0();
     clear_bits(message, base + at.prim_off, at.np_bits + at.ms_bits);
     const std::size_t payload_bytes = at.parsed->extra_data->evo_frame_byte_length;
@@ -228,7 +233,8 @@ bool sign_evolution_unit(std::span<std::byte> unit, const SigningKey& key, int i
         return false;
     }
     const Located at = locate(unit, inherited_substreams, reading);
-    if (at.state != Located::State::kFrame || !at.has_field || !at.sole) {
+    if (at.state != Located::State::kFrame || !at.has_field || !at.sole || !at.parsed ||
+        !at.parsed->extra_data) {
         return false;
     }
     const std::vector<std::byte> tag = tag_of(message_of(unit, at), key, at.np_bits);

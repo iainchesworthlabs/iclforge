@@ -696,7 +696,8 @@ void DecodingBurstOutput::place_truehd(const iclforge::truehd::DecodedAccessUnit
                                      .substreams = decoded.substream + 1,
                                      .objects = 0,
                                      .objects_placed = false,
-                                     .dialnorm = 0.0};
+                                     .dialnorm = 0.0,
+                                     .channels = static_cast<std::int32_t>(channels)};
     }
 }
 

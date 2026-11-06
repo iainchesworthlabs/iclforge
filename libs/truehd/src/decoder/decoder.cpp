@@ -8,7 +8,9 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "core/huffman.hpp"
@@ -413,15 +415,18 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // residuals of its IIR filter across it, so a stream whose first block after a restart is
     // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
     // not running (the first restart, or the first after an error) starts from zero.
-    const auto previous = state.channels;
+    // The new state is built on the heap, with the histories copied across, and moved in: a
+    // SubstreamState on the stack, and a copy of the old channels beside it, took 31 KB of it
+    // (PREfast's C6262, alerts 9861 and 9862).
     const bool carry_history = state.running && !config.readings.zero_histories_at_restart;
-    state = SubstreamState{};
+    auto fresh = std::make_unique<SubstreamState>();
     if (carry_history) {
         for (std::size_t c = 0; c < kMaxChannels; ++c) {
-            state.channels[c].fir_history = previous[c].fir_history;
-            state.channels[c].iir_history = previous[c].iir_history;
+            fresh->channels[c].fir_history = state.channels[c].fir_history;
+            fresh->channels[c].iir_history = state.channels[c].iir_history;
         }
     }
+    state = *fresh;
     state.running = true;
     state.restart = *header;
     state.output_source = output_source;
@@ -1002,9 +1007,11 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                             text += " " + std::to_string(state.context.object_previous->items[m].ext_width);
                         }
                     }
-                    counters.object_error_context = text + ", error \"" +
-                                                    std::string(header.error().detail) +
-                                                    "\"; blocks of the segment: " + segment_trace;
+                    text += ", error \"";
+                    text.append(header.error().detail);
+                    text += "\"; blocks of the segment: ";
+                    text += segment_trace;
+                    counters.object_error_context = std::move(text);
                 }
                 state.running = false;
                 return std::unexpected(header.error());

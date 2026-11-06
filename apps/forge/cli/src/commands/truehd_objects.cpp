@@ -5,15 +5,23 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <system_error>
-#include <utility>
 #include <vector>
 
-#include "../adm/atmos_adm.hpp"
+#include "../adm/decode_adm.hpp"
 #include "../exit_codes.hpp"
+#include "../support.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/render/layout.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
 #include "truehd_render.hpp"

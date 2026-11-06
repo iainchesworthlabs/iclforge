@@ -178,6 +178,36 @@ BoardInfo read_board_info() {
     return info;
 }
 
+namespace {
+// The bitrate of what was played, smoothed (a PCM stream has no coded bytes and no figure). One meter serves every
+// reader, since only one view shows at a time and they all watch the same stream.
+int measured_kbps(const SendspinPlaying& playing) {
+    static iclforge::nowview::BitrateMeter meter;
+    static bool metered = false;
+    if (playing.facts.codec == iclforge::nowview::Codec::kPcm) {
+        meter.reset();
+        metered = false;
+    } else {
+        if (!metered) {
+            meter.reset();
+            metered = true;
+        }
+        meter.observe(playing.coded_bytes, static_cast<std::uint32_t>(time_us() / 1000));
+    }
+    return meter.kbps();
+}
+}  // namespace
+
+bool read_now_stream(NowStream& out) {
+    const SendspinPlaying playing = sendspin_now_playing();
+    if (!playing.active) {
+        return false;
+    }
+    out.facts = playing.facts;
+    out.kbps = measured_kbps(playing);
+    return true;
+}
+
 bool read_now_playing(NowPlaying& out) {
     const SendspinPlaying playing = sendspin_now_playing();
     if (!playing.active) {
@@ -205,21 +235,8 @@ bool read_now_playing(NowPlaying& out) {
         out.heading.assign(heading.data(), heading.size());
     }
     first = false;
-    // The bitrate of what was played, smoothed (a PCM stream has no coded bytes and no figure).
-    static iclforge::nowview::BitrateMeter meter;
-    static bool metered = false;
-    if (playing.facts.codec == iclforge::nowview::Codec::kPcm) {
-        meter.reset();
-        metered = false;
-    } else {
-        if (!metered) {
-            meter.reset();
-            metered = true;
-        }
-        meter.observe(playing.coded_bytes, static_cast<std::uint32_t>(time_us() / 1000));
-    }
     out.facts = playing.facts;
-    out.kbps = meter.kbps();
+    out.kbps = measured_kbps(playing);
     if (playing.have_levels) {
         out.peak_db.assign(playing.peak_db.begin(), playing.peak_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
         out.rms_db.assign(playing.rms_db.begin(), playing.rms_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));

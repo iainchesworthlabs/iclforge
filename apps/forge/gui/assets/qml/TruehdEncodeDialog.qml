@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 import ForgeGui
 
-// "Encode TrueHD" - a WAV coded losslessly into a bare .thd stream, the window's twin of
+// "Encode TrueHD" - a WAV coded losslessly into a .thd stream or a container, the window's twin of
 // `forge truehd-encode`. It is its own dialog, reached from the header like Open stream and QC a
 // stream, and not a fourth entry of the encoder workbench's codec list: the workbench plans an
 // AC-3 family encode (bit rate, coding mode, metadata, the operator's channel layout), none of
@@ -40,7 +40,8 @@ Dialog {
         objectName: "truehdEncodeOutputDialog"
         title: qsTr("Save the TrueHD stream as")
         fileMode: FileDialog.SaveFile
-        nameFilters: [qsTr("TrueHD stream (*.thd)")]
+        nameFilters: [qsTr("TrueHD stream (*.thd)"), qsTr("Matroska (*.mkv)"), qsTr("MP4 (*.mp4)"),
+                      qsTr("Blu-ray transport stream (*.m2ts *.ts)")]
         onAccepted: TruehdEncodeController.chooseOutput(selectedFile)
     }
 
@@ -67,7 +68,7 @@ Dialog {
         Text {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV's channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.")
+            text: qsTr("Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV's channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.")
             font.pixelSize: Theme.fontSmall
             color: Theme.neutral700
         }

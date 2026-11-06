@@ -667,6 +667,9 @@ void say_no_title() {
     g_title_position.reset();
 }
 
+// A TrueHD 7.1 stream as the sink reports it: the A/52 mode it derives (3/2, with the LFE), and the eight channels it counted.
+const iclforge::nowview::StreamFacts kTrueHdSevenOne = {.codec = iclforge::nowview::Codec::kTruehd, .have_decoder = true, .acmod = 7,
+                                                        .lfe = true, .channels = 8};
 const std::vector<Level> kStereo = {{-9, -19}, {-11, -21}};
 const std::vector<Level> kFiveOne = {{-10, -19}, {-14, -24}, {-11, -20}, {-28, -37}, {-26, -35}, {-16, -27}};
 const std::vector<Level> kFiveOneNoCentre = {{-10, -19}, {-120, -120}, {-11, -20}, {-27, -36}, {-26, -35}, {-16, -27}};
@@ -2202,6 +2205,29 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         expect(shows_text(player::panel::screen_footer_object(), "Delay +0 ms"), "and the lyric delay");
     }
 
+    // The same song with a TrueHD stream behind it: where the chips leave room the footer names the stream, and where they leave
+    // none (the kit's width) it says nothing of it and the lyric chips are as they were. Never a name cut off.
+    play_room("5.1", kTrueHdSevenOne, kFiveOne, 5200, "Music Assistant (d5369777-music-assistant)");
+    hold(lrc, 5'750);
+    g_now_us += 1'000'000;
+    pump(6);
+    write_bmp(out / ("footer-stream-" + size + ".bmp"));
+    failures += audit(player::panel::screen_footer_object(), "footer with a stream " + size);
+    const bool named = shows_text(player::panel::screen_footer_object(), "Dolby TrueHD", true);
+    if (width >= 960) {
+        expect(!named, "the kit's footer has no room for the stream's name under lyrics, and does not cut it off");
+        expect(shows_text(player::panel::screen_footer_object(), "Line ", true) &&
+                   shows_text(player::panel::screen_footer_object(), "Delay +0 ms"),
+               "and its lyric chips are where they were");
+    } else if (width >= 800) {
+        expect(named && shows_text(player::panel::screen_footer_object(), "Dolby TrueHD 7.1", true),
+               "an 800 px footer has room after the board's name and names the stream, 7.1 as the decoder counted it");
+    }
+    g_now_playing = false;
+    hold(lrc, 5'750);
+    g_now_us += 1'000'000;
+    pump(6);
+
     // Adjust: the lyric delay and the text size, and nothing else.
     expect(tap_button("Adjust"), "the footer has an Adjust button");
     pump(6);
@@ -2638,6 +2664,15 @@ bool read_now_playing(NowPlaying& out) {
         return false;
     }
     out = g_now;
+    return true;
+}
+
+bool read_now_stream(NowStream& out) {
+    if (!g_now_playing) {
+        return false;
+    }
+    out.facts = g_now.facts;
+    out.kbps = g_now.kbps;
     return true;
 }
 
@@ -3377,6 +3412,39 @@ int main(int argc, char** argv) {
                        kSevenOneFour, 768);
          }, 10'000'000},
         {"s19-meters-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix, 640); }, 10'000'000},
+        // The footer names the stream under every view (planning/p4x-now-playing.md, "The stream is named"): TrueHD 7.1 from Music
+        // Assistant at 5.2 Mb/s under the speakers with no title said, the title card, the Meters view and the lyrics, and PCM under lyrics.
+        {"s20-footer-speakers-truehd", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("7.1.4", kTrueHdSevenOne, kSevenOneFour, 5200, "Music Assistant (d5369777-music-assistant)");
+             say_no_title();
+         }, 10'000'000},
+        {"s20-footer-title-truehd", [&] {
+             g_settings.view = iclforge::nowview::View::kTitle;
+             say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
+         }},
+        {"s20-footer-meters-truehd", [&] {
+             g_settings.view = iclforge::nowview::View::kMeters;
+             say_no_title();
+         }, 10'000'000},
+        {"s20-footer-lyrics-truehd", [&] {
+             play_room("7.1.4", kTrueHdSevenOne, kSevenOneFour, 5200, "Music Assistant (d5369777-music-assistant)");
+             hold(auld, 1'750);
+         }},
+        {"s20-footer-lyrics-pcm", [&] {
+             play_room("2.0", {.codec = iclforge::nowview::Codec::kPcm}, kStereo, 0, "Music Assistant (d5369777-music-assistant)");
+             hold(auld, 1'750);
+         }},
+        {"s20-footer-lyrics-eac3-no-server", [&] {
+             play_room("5.1", kDolbyFiveOne, kFiveOne, 640);
+             hold(auld, 1'750);
+         }},
+        // A stream before its first unit has decoded is only "Coded audio"; and the sentence view (nothing chosen to draw) names the stream too.
+        {"s20-footer-coded-not-yet-decoded", [&] {
+             play_room("7.1.4", {.codec = iclforge::nowview::Codec::kUnknown}, kSevenOneFour, 0, "Music Assistant (d5369777-music-assistant)");
+             g_settings.view = iclforge::nowview::View::kOff;
+             g_held = false;
+         }},
     };
 
     int number = 0;

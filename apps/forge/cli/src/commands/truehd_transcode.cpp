@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>  // IWYU pragma: keep (stderr: libc++/MSVC want it, libstdc++ finds it elsewhere)
 #include <filesystem>
 #include <optional>
 #include <span>

@@ -2,8 +2,13 @@
 
 #include <fmt/base.h>
 #include <fmt/format.h>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <span>
+#include <string>
 
+#include "iclforge/truehd/encoder/ratectl.hpp"
 #include "json_sink.hpp"
 
 namespace forge_cli::commands {

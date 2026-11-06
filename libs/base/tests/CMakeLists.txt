@@ -35,7 +35,10 @@ target_compile_definitions(iclforge-base-number-parse-libc-tests PRIVATE ICLFORG
 
 # What a private key leaves in freed memory (test_key_residue.cpp). A binary of its own: it replaces
 # the global allocation functions to look at each block as it is freed, and no other test should run
-# under that.
-iclforge_add_test_binary(iclforge-base-key-residue-tests PROJECT base SOURCES
-    test_key_residue.cpp)
-target_link_libraries(iclforge-base-key-residue-tests PRIVATE iclforge::base)
+# under that. Not under ThreadSanitizer: its runtime defines the same allocation functions, and the
+# link fails on the duplicate symbols (operator new and delete).
+if(NOT ICLFORGE_SANITIZERS MATCHES "thread")
+    iclforge_add_test_binary(iclforge-base-key-residue-tests PROJECT base SOURCES
+        test_key_residue.cpp)
+    target_link_libraries(iclforge-base-key-residue-tests PRIVATE iclforge::base)
+endif()

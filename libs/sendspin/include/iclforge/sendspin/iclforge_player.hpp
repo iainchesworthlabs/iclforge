@@ -220,6 +220,10 @@ struct DecoderReport {
     std::int32_t objects = 0;
     bool objects_placed = false;
     double dialnorm = 0.0;
+    // The channels the decoder produced, the LFE among them; 0 where the sink does not say. For a stream whose layout A/52's
+    // acmod cannot name (TrueHD 7.1: eight channels, which acmod would call 5.1) the board's own screen names the layout from this.
+    // A local fact: it is not part of the state message, and a report read from one has 0.
+    std::int32_t channels = 0;
 
     friend bool operator==(const DecoderReport&, const DecoderReport&) = default;
 };

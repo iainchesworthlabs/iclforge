@@ -33,6 +33,7 @@ Exit status 0; the report says what each decoder did and makes no claim. Needs f
 """
 
 import argparse
+import functools
 import json
 import pathlib
 import random
@@ -257,13 +258,13 @@ def damage_rows(forge, scratch):
         broken.write_bytes(changed)
         row = {"damage": kind}
         runners = (
-            ("forge", run_forge, (forge, broken, scratch, False)),
-            ("forge_lenient", run_forge, (forge, broken, scratch, True)),
-            ("ffmpeg", run_ffmpeg, (broken, channels, False)),
-            ("ffmpeg_strict", run_ffmpeg, (broken, channels, True)),
+            ("forge", functools.partial(run_forge, forge, broken, scratch, False)),
+            ("forge_lenient", functools.partial(run_forge, forge, broken, scratch, True)),
+            ("ffmpeg", functools.partial(run_ffmpeg, broken, channels, False)),
+            ("ffmpeg_strict", functools.partial(run_ffmpeg, broken, channels, True)),
         )
-        for label, runner, arguments in runners:
-            status, pcm = runner(*arguments)
+        for label, runner in runners:
+            status, pcm = runner()
             row[label] = {"exit": status, **judge(pcm, source)}
         rows.append(row)
     return {"stream": name, "frames": len(source), "rows": rows}

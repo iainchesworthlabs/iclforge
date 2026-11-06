@@ -1,9 +1,18 @@
 #include "encoder/render_bed.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <numbers>
+#include <span>
 #include <utility>
+#include "encoder/render_plan.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/encoder/bed_pan.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
+#include <vector>
 
 namespace iclforge::truehd::detail {
 

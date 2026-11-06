@@ -1,7 +1,14 @@
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/encoder/ratectl.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <limits>
+#include <optional>
+#include <span>
 
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
@@ -142,7 +149,7 @@ std::expected<RateReport, Error> analyse_rate(std::span<const std::byte> stream,
                 meter.emplace(report.sample_rate, report.samples_per_unit);
             }
         }
-        if (!model) {
+        if (!model || !meter) {
             continue;
         }
         // An interval is the units from one restart header of the first substream to the next.

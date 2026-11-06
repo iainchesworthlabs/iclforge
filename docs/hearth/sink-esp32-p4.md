@@ -453,13 +453,19 @@ cost it 1.5 to 2 ms a burst in those rooms (`ICLFORGE_EXAMPLE_PANEL_YIELD`, defa
 protocol that measures it, are in
 ([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
 
-**The stream, in the footer.** While the speakers or the card show, the footer says what the stream is
-and who sends it, in the most that fits: *Decoded on this board - 768 kb/s - from Music Assistant*, then
-*Decoded here - 768 kb/s - from Music Assistant*, then the same without the server, then the figure alone. With
-**Preferences** and **Adjust** both in the footer there are 386 px for it on the kit's panel (it was 558 with Adjust
-alone), which holds *Decoded on this board - 768 kb/s* and not the server's name: the developer view has that.
-A coded stream (E-AC-3, AC-3, AC-4) is sent undecoded and decoded on the board, which the wording says; a
-PCM one was decoded by the server, and the footer says *PCM from Music Assistant*. The bitrate is what was
+**The stream, in the footer.** While the speakers, the card or the meters show (and under the "no lyrics for
+this item" sentence, where there is room), the footer names the stream, its bitrate and who sends it, in the
+most that fits: *Dolby TrueHD 7.1 - 5200 kb/s - from Music Assistant*, then the same without the server, then
+the name alone (*Dolby TrueHD 7.1*), then the codec alone (*Dolby TrueHD*). The name is the one the header
+over the speakers uses (codec, coded layout, objects: *Dolby Digital Plus 5.1 + 15 objects*), and it is in the
+footer because the header is the song once a server has said one. With **Preferences** and **Adjust** both in
+the footer there are 369 px for it on the kit's panel, which holds *Dolby TrueHD 7.1 - 5200 kb/s* and not the
+server's name: the developer view has that. **Under lyrics** the footer's line and delay chips hold their
+columns, and on the kit's 1024 px panel the buttons leave nothing after them, so the line is not shown there; a
+panel 800 px wide, whose footer has no chips, shows it after the board's name. The line says the codec and no
+longer says that the board decoded it (a coded stream is decoded on the board, a PCM one by the server, and *PCM
+from Music Assistant* still says the second). A layout A/52's coding mode cannot name, TrueHD 7.1, is said from
+the decoder's channel count. The Meters view's status line carries the same name and follows the decoder. The bitrate is what was
 played: the coded bytes of the chunks played over the time they took, over windows of a second and
 smoothed, not a figure from a header (it is absent until the first second has played). The server is the
 name in `/status` `server` without the id in brackets (`Music Assistant (d5369777-music-assistant)` is

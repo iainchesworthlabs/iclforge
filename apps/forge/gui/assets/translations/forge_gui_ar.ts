@@ -5306,57 +5306,72 @@
         <translation>دفق TrueHD (*.thd)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="54"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
+        <source>Matroska (*.mkv)</source>
+        <translation>Matroska (*.mkv)</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="43"/>
+        <source>MP4 (*.mp4)</source>
+        <translation>MP4 (*.mp4)</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="44"/>
+        <source>Blu-ray transport stream (*.m2ts *.ts)</source>
+        <translation>دفق نقل Blu-ray (*.m2ts *.ts)</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="55"/>
         <source>Encode TrueHD</source>
         <translation>ترميز TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="62"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="63"/>
         <source>Close</source>
         <translation>إغلاق</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="70"/>
-        <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The result is a bare .thd stream; forge truehd-encode also writes Matroska, MP4 and a Blu-ray transport stream.</source>
-        <translation>يشفّر ملف WAV دون فقدان إلى TrueHD: يُفكّ ترميز الدفق إلى العيّنات نفسها تمامًا التي أُدخلت. يسمّي قناع القنوات في ملف WAV مكبّرات الصوت؛ وإذا لم يكن في الملف قناع فتؤخذ القنوات بالترتيب الذي يكتبه forge decode. الناتج دفق .thd خام؛ ويكتب forge truehd-encode أيضًا Matroska وMP4 ودفق نقل Blu-ray.</translation>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="71"/>
+        <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
+        <translation>يشفّر ملف WAV دون فقدان إلى TrueHD: يُفكّ ترميز الدفق إلى العيّنات نفسها تمامًا التي أُدخلت. يسمّي قناع القنوات في ملف WAV مكبّرات الصوت؛ وإذا لم يكن في الملف قناع فتؤخذ القنوات بالترتيب الذي يكتبه forge decode. الناتج دفق .thd خام، أو Matroska (.mkv) أو MP4 (.mp4) أو دفق نقل Blu-ray (.m2ts، .ts)، بحسب ما يطلبه اسمه.</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="79"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="80"/>
         <source>Choose WAV…</source>
         <translation>اختر WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="88"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="89"/>
         <source>No file chosen</source>
         <translation>لم يُختر أي ملف</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="98"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="99"/>
         <source>Save as…</source>
         <translation>حفظ باسم…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="107"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="108"/>
         <source>Not chosen yet</source>
         <translation>لم يُختر بعد</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="115"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="116"/>
         <source>Verify: decode every access unit and compare it with the input</source>
         <translation>تحقّق: فكّ ترميز كل وحدة وصول ومقارنتها بالمدخل</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="123"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="124"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
         <translation>كتابة عروض القناتين وست القنوات كمزائج مخفَّضة (truehd-downmix=standard)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="134"/>
         <source>Encode</source>
         <translation>ترميز</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="139"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="140"/>
         <source>Stop</source>
         <translation>أوقف</translation>
     </message>

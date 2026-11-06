@@ -1,8 +1,11 @@
 #include "iclforge/truehd/encoder/bed_pan.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <numbers>
+#include <span>
 #include <vector>
 
 namespace iclforge::truehd {

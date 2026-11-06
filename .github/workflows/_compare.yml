@@ -3,9 +3,9 @@
 # `compare` job; docs/ci-agentic.md, "The merge queue"). They moved here from
 # _ci-core.yml, where they ran on pull requests until the gate replaced ci.yml there.
 #
-# Four jobs, two measurements. performance-compare and memory-compare build the
-# benchmarks at the entry's head and at its base and write the tables to the job
-# summary. performance-gate and memory-gate turn a HARD regression (twice as slow, or
+# Three jobs, two measurements. `compare` builds the benchmarks at the entry's head and at
+# its base, measures speed and heap churn, and writes the tables to the job summary.
+# performance-gate and memory-gate turn a HARD regression (twice as slow, or
 # twice the heap churn) into a failing job, unless the pull request carries the
 # matching approval label. The base is `base_sha`: the commit the merge group was
 # built on, which is main, or the entry queued ahead of this one.
@@ -35,7 +35,16 @@ permissions:
   contents: read
 
 jobs:
-  # Encoder throughput, this entry against the commit it is queued on, on one runner.
+  # Encoder throughput and heap churn, this entry against the commit it is queued on, on
+  # one runner.
+  #
+  # This was two jobs, one per measurement, each with its own container, apt bootstrap,
+  # checkout, GCC install and vcpkg setup before it built anything: about three of the
+  # eight minutes each took, paid twice, and one more fleet slot held for every entry that
+  # changes the encoder. The builds share almost all of their objects (the three benchmarks link the
+  # same library), so building them together costs little more than building one. Measured
+  # on the queue entries of 2026-11-06: 14 runner-minutes for the pair, against about 8 for
+  # this one. The two verdicts are still independent - see "Independence" below.
   #
   # The gap this closes: persist-performance-trend (in ci.yml) only runs on pushes to
   # main, so the relative "is this slower than it was" question is not
@@ -44,44 +53,49 @@ jobs:
   # build-and-test leg - but its real-time budget carries enough headroom that
   # a change could double ms/frame and still pass it comfortably. A PR that
   # halved the encoder's speed would therefore go green everywhere and only
-  # surface on the trend chart afterwards.
+  # surface on the trend chart afterwards. Heap churn had no gate at all: E-AC-3 encode
+  # churn stepped 67 -> 199 allocs/frame at PR #352 and the trend gate fired only on
+  # main, after the merge (issue #544).
   #
-  # Its INFRASTRUCTURE is non-blocking; its HARD VERDICT is not. The split
+  # Its INFRASTRUCTURE is non-blocking; its HARD VERDICTS are not. The split
   # matters, so it is worth being precise about which is which:
   #
   #   - continue-on-error stays. This job builds twice, and a container
   #     bootstrap flake or a vcpkg hiccup in a job nobody asked for must not
   #     block a PR. Everything mechanical here stays advisory.
-  #   - The hard tier (100% - the workload takes at least twice as long) now
-  #     fails a check, via the hard_regression output and the one-step
-  #     performance-gate job below. continue-on-error would swallow an exit
-  #     code, which is exactly why the verdict travels as an output instead.
+  #   - The hard tier (100% - the workload takes at least twice as long, or at least
+  #     twice the allocations per frame) fails a check, via the performance_hard and
+  #     memory_hard outputs and the one-step performance-gate and memory-gate jobs
+  #     below. continue-on-error would swallow an exit code, which is exactly why the
+  #     verdicts travel as outputs instead.
   #   - The soft tier (20%) is unchanged and still advisory. That is where the
   #     runner-noise argument genuinely bites.
   #
-  # Why the hard tier is safe to block on, when the soft tier is not: this
-  # comparison is PAIRED - same runner, same job, both sides built from the
-  # same checkout, timed interleaved with the order alternating, each side
-  # reduced by minimum-of-N. Measured run-to-run spread is single-digit
-  # percent. A doubling is an order of magnitude outside that.
+  # Why the speed hard tier is safe to block on, when the soft tier is not: the comparison
+  # is PAIRED - same runner, same job, both sides built from the same checkout, timed
+  # interleaved with the order alternating, each side reduced by minimum-of-N. Measured
+  # run-to-run spread is single-digit percent. A doubling is an order of magnitude outside
+  # that. That pairing is why the base is BUILT here for every entry and its timings are not
+  # cached from another run: a baseline timed on another machine at another time is exactly
+  # the drift the interleaving removes. Heap churn needs none of it: for a fixed workload
+  # and a fixed binary iclforge-membench's counts are the same every run, so one run per
+  # side is the whole measurement (compare_memory.py's module docstring).
   #
-  # And it already blocked, just later and worse: the identical 100% threshold
-  # fails append_performance_history.py on the push to main. The old behaviour
-  # was not "a doubling does not fail CI", it was "a doubling fails CI on main
-  # after it has merged, for whoever pushes next".
+  # Independence. The speed and memory verdicts must not take each other down, which is
+  # why they were separate jobs. They are separate STEPS now, each with its own
+  # continue-on-error and its own output, so a flake while timing the speed benches
+  # cannot take the memory verdict with it, nor a base that predates iclforge-membench
+  # the speed one. What the pair now shares is the setup and the head build, whose failure
+  # is a real break that the Linux GCC job reports as well. A step that failed is named
+  # in a warning at the end, since a step-level continue-on-error hides it from the
+  # job's colour.
   #
-  # Escape hatch is a label, not an admin merge - see performance-gate.
-  #
-  # Runner budget. This is a new job rather than an addition to an existing
-  # leg, and it builds twice, so it is kept as narrow as it can be and still
-  # answer the question:
-  #   - `--target iclforge-bench iclforge-kernelbench` only. Not the library's tests, not
-  #     the CLI, not the GUI - the same two binaries persist-performance-trend
-  #     builds, and nothing else.
-  #   - One container, one GCC install, one vcpkg setup, two builds inside
-  #     them. The second configure reuses the first's vcpkg binary cache, so
-  #     it costs a compile of this repository's own sources and not of its
-  #     dependencies.
+  # Runner budget:
+  #   - `--target iclforge-bench iclforge-kernelbench iclforge-membench` only. Not the
+  #     library's tests, not the CLI, not the GUI.
+  #   - One container, one GCC install, one vcpkg setup, two builds inside them. The
+  #     second configure reuses the first's vcpkg binary cache, so it costs a compile of
+  #     this repository's own sources and not of its dependencies.
   #   - The caller runs it only for a queue entry that changes src/, so a
   #     documentation-only entry never starts it.
   #   - PERF_RUNS repetitions per side. Three is the smallest number that
@@ -89,18 +103,19 @@ jobs:
   #     which is what lets a reader tell a real 25% move from a noisy one;
   #     iclforge-bench is 200 frames per workload and takes seconds, so the
   #     repetitions are a rounding error next to the two builds.
-  performance-compare:
-    name: Performance vs base
+  compare:
+    name: Performance and memory vs base
     runs-on: ${{ fromJSON(inputs.runner) }}
     container: ubuntu:26.04
-    # Two Release builds of two targets and about ten seconds of timing: the fleet took 5 to
+    # Two Release builds of three targets and about two minutes of timing: the fleet took 8 to
     # 10 minutes for it. A backstop against a hang, not a budget.
     timeout-minutes: 45
     continue-on-error: true
     outputs:
-      # Read by performance-gate below. Empty when this job was skipped or died
-      # before the compare step, both of which that job treats as "no verdict".
-      hard_regression: ${{ steps.compare.outputs.hard_regression }}
+      # Read by performance-gate and memory-gate below. Empty when this job was skipped or
+      # died before the matching compare step, both of which those jobs treat as "no verdict".
+      performance_hard: ${{ steps.perf.outputs.hard_regression }}
+      memory_hard: ${{ steps.mem.outputs.hard_regression }}
     env:
       PERF_RUNS: 3
     steps:
@@ -157,25 +172,47 @@ jobs:
         run: |
           set -euo pipefail
           cmake --preset config-linux-gcc
-          cmake --build --preset build-linux-gcc --target iclforge-bench iclforge-kernelbench -- -k 0
+          cmake --build --preset build-linux-gcc --target iclforge-bench iclforge-kernelbench iclforge-membench -- -k 0
 
       # A worktree rather than `git checkout <sha>`: it leaves this checkout
-      # (and its build tree, and tools/ci/compare_performance.py, which the
-      # base commit may not even have) exactly where they are, and gives the
+      # (and its build tree, and tools/ci/compare_performance.py and compare_memory.py,
+      # which the base commit may not even have) exactly where they are, and gives the
       # base its own source dir - so CMakePresets.json's
       # ${sourceDir}/build/${presetName} puts the two builds in separate
       # directories with no cache to invalidate between them.
-      - name: Build the benchmarks at the base
+      - name: Add a worktree at the base
         shell: bash
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: git worktree add --detach ../base "$BASE_SHA"
+
+      # Two build commands, not one with three targets: a base that predates
+      # iclforge-membench has no such target, and ninja refuses a whole command that names
+      # an unknown one. Each is its own step with its own continue-on-error, so the base
+      # lacking one side's binary leaves the other side's verdict standing. The second
+      # command finds the library already built.
+      - name: Build the speed benchmarks at the base
+        id: base_perf
+        continue-on-error: true
+        shell: bash
         run: |
           set -euo pipefail
-          git worktree add --detach ../base-perf "$BASE_SHA"
-          pushd ../base-perf >/dev/null
+          cd ../base
           cmake --preset config-linux-gcc
           cmake --build --preset build-linux-gcc --target iclforge-bench iclforge-kernelbench -- -k 0
-          popd >/dev/null
+
+      # A base that cannot build the target is reported rather than fatal. A base
+      # predating iclforge-membench is a comparison with nothing to say, not a broken job -
+      # compare_memory.py sees one empty side and prints its skip warning.
+      - name: Build iclforge-membench at the base
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../base
+          cmake --preset config-linux-gcc
+          if ! cmake --build --preset build-linux-gcc --target iclforge-membench -- -k 0; then
+            echo "::warning title=Memory comparison baseline unavailable::the base does not build iclforge-membench; the comparison will report a skip."
+          fi
 
       # BOTH builds finish before EITHER is timed, and the two are then
       # INTERLEAVED rather than run one block each. That ordering IS the
@@ -194,14 +231,17 @@ jobs:
       #     other left in cache.
       #
       # Same shape as the manual A/B measurements docs/performance-trend.md
-      # describes, for the same reason.
+      # describes, for the same reason. The memory run is after it, not among it:
+      # iclforge-membench counts allocations and its machine state does not matter.
       - name: Run both benchmark sets, interleaved
+        id: run_perf
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p perf-results/head perf-results/base
           head_bin=build/config-linux-gcc/bin
-          base_bin=../base-perf/build/config-linux-gcc/bin
+          base_bin=../base/build/config-linux-gcc/bin
           for i in $(seq 1 "$PERF_RUNS"); do
             if [ $((i % 2)) -eq 1 ]; then order="head base"; else order="base head"; fi
             for side in $order; do
@@ -211,8 +251,9 @@ jobs:
             done
           done
 
-      - name: Compare and publish the job summary
-        id: compare
+      - name: Compare speed and publish the job summary
+        id: perf
+        continue-on-error: true
         shell: bash
         env:
           BASE_SHORT: ${{ steps.base.outputs.short }}
@@ -223,6 +264,61 @@ jobs:
             --head-dir perf-results/head \
             --base-ref "queue base $BASE_SHORT"
 
+      # One run per side, no interleaving and no repetitions - the whole point
+      # of gating on this metric rather than on time. See compare_memory.py's
+      # module docstring.
+      #
+      # The memory-<leg> subdirectory layout, and the leg name `linux-gcc`, are
+      # append_memory_history.py's - the two gates share that reader, so the
+      # workload names in this entry's table read identically to the ones on
+      # docs/performance-trend.md's memory tables.
+      - name: Run iclforge-membench on both sides
+        id: run_mem
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mem-results/head/memory-linux-gcc mem-results/base/memory-linux-gcc
+          build/config-linux-gcc/bin/iclforge-membench \
+            --json-out mem-results/head/memory-linux-gcc/membench.json
+          base_bin=../base/build/config-linux-gcc/bin/iclforge-membench
+          if [ -x "$base_bin" ]; then
+            "$base_bin" --json-out mem-results/base/memory-linux-gcc/membench.json
+          fi
+
+      - name: Compare heap churn and publish the job summary
+        id: mem
+        continue-on-error: true
+        shell: bash
+        env:
+          BASE_SHORT: ${{ steps.base.outputs.short }}
+        run: |
+          set -euo pipefail
+          python3 tools/ci/compare_memory.py \
+            --base-dir mem-results/base \
+            --head-dir mem-results/head \
+            --base-ref "queue base $BASE_SHORT"
+
+      # Step-level continue-on-error keeps one measurement from taking the other down, but
+      # it also makes a step that failed look green. Say which did not run.
+      - name: Name any measurement that did not run
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          BASE_PERF: ${{ steps.base_perf.outcome }}
+          RUN_PERF: ${{ steps.run_perf.outcome }}
+          PERF: ${{ steps.perf.outcome }}
+          RUN_MEM: ${{ steps.run_mem.outcome }}
+          MEM: ${{ steps.mem.outcome }}
+        run: |
+          for pair in "base speed build:$BASE_PERF" "speed run:$RUN_PERF" "speed compare:$PERF" \
+                      "memory run:$RUN_MEM" "memory compare:$MEM"; do
+            name="${pair%%:*}"; outcome="${pair##*:}"
+            if [ "$outcome" != success ]; then
+              echo "::warning title=Comparison step did not succeed::${name}: ${outcome}. The matching gate sees no verdict and passes."
+            fi
+          done
+
       # Saved even when a step above failed, so the packages vcpkg had already
       # built survive for the next attempt (actions/cache's own post-job save
       # runs only on success). continue-on-error: a cache that cannot be saved
@@ -232,7 +328,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/save-vcpkg-cache
 
-  # The blocking half of performance-compare, split out so that job can keep
+  # The blocking half of the speed comparison, split out so the compare job can keep
   # continue-on-error for its builds while its VERDICT still fails the entry.
   # It builds nothing and runs one script (tools/ci/compare_gate.py, which reads
   # the pull request's labels), so there is next to no infrastructure here to
@@ -240,7 +336,7 @@ jobs:
   #
   # `always()` so a verdict is still enforced when some unrelated job failed;
   # the script is what decides, and it passes on anything that is not an
-  # explicit `true`. That covers a cancelled performance-compare and one that
+  # explicit `true`. That covers a cancelled compare and one that
   # died before the compare step ran - a job that produced no measurement must
   # not fail an entry on a measurement it does not have.
   #
@@ -252,7 +348,7 @@ jobs:
   # after a failure and queue the pull request again.
   performance-gate:
     name: Performance gate
-    needs: [performance-compare]
+    needs: [compare]
     if: always()
     runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 5
@@ -272,200 +368,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ inputs.pr_number }}
-          VERDICT: ${{ needs.performance-compare.outputs.hard_regression }}
+          VERDICT: ${{ needs.compare.outputs.performance_hard }}
         run: |
           python3 tools/ci/compare_gate.py --kind performance \
             --verdict "${VERDICT:-}" --repo "$REPO" --pr "${PR_NUMBER:-}"
-  # Heap churn, this entry against the commit it is queued on, on one runner. The
-  # memory counterpart to performance-compare above, closing the identical hole one
-  # resource over.
-  #
-  # The gap this closes: persist-performance-trend is the ONLY job that builds
-  # or runs iclforge-membench, and it is gated to pushes on main. So the relative
-  # "does this allocate more than it did" question was not asked until after a
-  # PR had merged - and unlike throughput, there is no absolute per-PR gate
-  # underneath it at all. tests/performance/test_performance.cpp's iclforge-perf
-  # keeps a real-time budget on every PR; nothing anywhere kept an allocation
-  # budget.
-  #
-  # That has already cost this repository a regression. E-AC-3 encode churn
-  # stepped 67 -> 199 allocs/frame and Atmos 106 -> 219 at PR #352's
-  # per-channel exponent-run planner. The trend gate fired correctly, and late:
-  #
-  #   ##[error] linux-gcc/eac3_51_encode: 199.1 allocs/frame is 197% above the
-  #            trailing 10-run mean (67.0)
-  #
-  # on run 32823518403, event `push`, branch `main`, 2026-08-25 - a red check
-  # on a commit that had already merged, blocking nothing and belonging to
-  # whoever pushed next. The regression is still in the tree as issue #544.
-  #
-  # WHY MEMORY MAKES AN EASIER PRE-MERGE GATE THAN SPEED. performance-compare
-  # needs PERF_RUNS repetitions per side, an interleaved run order and a
-  # minimum-of-N reduction, all of it to see past a shared runner's timing
-  # noise. iclforge-membench's counts carry no such noise: for a fixed workload and a
-  # fixed binary they are the same every run. One run per side is the whole
-  # measurement, which makes this job cheaper than the speed comparison at the
-  # same two builds, and leaves its hard tier with no noise argument to answer.
-  #
-  # Its INFRASTRUCTURE is non-blocking; its HARD VERDICT is not. Same split as
-  # performance-compare, for the same reasons: continue-on-error stays, because
-  # this builds twice and a container or vcpkg flake in a job nobody asked for
-  # must not block a PR; and because continue-on-error swallows exit codes, the
-  # hard verdict travels as an output to the one-step memory-gate job below.
-  #
-  # Runner budget. Kept as narrow as it can be and still answer the question:
-  #   - `--target iclforge-membench` only. Not the tests, not the CLI, not the other
-  #     two benchmarks.
-  #   - One container, one GCC install, one vcpkg setup, two builds inside
-  #     them. The second configure reuses the first's vcpkg binary cache, so it
-  #     costs a compile of this repository's own sources and not of its
-  #     dependencies.
-  #   - One benchmark run per side, for the determinism reason above.
-  #   - The caller runs it only for a queue entry that changes src/, so a
-  #     documentation-only entry never starts it.
-  # This is deliberately a separate job from performance-compare rather than
-  # two more steps inside it, matching how every other gate here is shaped: the
-  # two verdicts stay independent, so a flake while timing the speed benches
-  # cannot take the memory verdict with it. The cost of that independence is a
-  # second container bootstrap and vcpkg setup on each entry that changes libs/.
-  memory-compare:
-    name: Memory vs base
-    runs-on: ${{ fromJSON(inputs.runner) }}
-    container: ubuntu:26.04
-    # Two builds of one target and one run of each; the fleet took 5 to 8 minutes.
-    # A backstop against a hang, not a budget.
-    timeout-minutes: 45
-    continue-on-error: true
-    outputs:
-      # Read by memory-gate below. Empty when this job was skipped or died
-      # before the compare step, both of which that job treats as "no verdict".
-      hard_regression: ${{ steps.compare.outputs.hard_regression }}
-    steps:
-      - name: Bootstrap container
-        run: |
-          set -eu
-          export DEBIAN_FRONTEND=noninteractive
-          attempt=1
-          until apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-            build-essential ca-certificates cmake curl git gnupg lsb-release \
-            ninja-build pkg-config software-properties-common tar unzip wget zip
-          do
-            echo "::warning title=apt-get::attempt $attempt of 3 failed"
-            [ "$attempt" -lt 3 ] || exit 1
-            attempt=$((attempt + 1))
-            sleep 30
-          done
 
-      # fetch-depth: 0 so the base commit and its history are in the object
-      # store for `git merge-base` and the worktree below - the default shallow
-      # clone has neither.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Install GCC 16
-        run: bash .github/toolchain/02-gcc-toolchain.sh
-
-      - uses: ./.github/actions/setup-vcpkg
-        with:
-          vcpkg-commit: ${{ inputs.vcpkg_commit }}
-
-      # Same step as performance-compare's: see the comment there.
-      - name: Resolve the base
-        id: base
-        shell: bash
-        env:
-          BASE_SHA: ${{ inputs.base_sha }}
-        run: |
-          set -euo pipefail
-          git config --global --add safe.directory '*'
-          merge_base="$(git merge-base "${BASE_SHA:-origin/main}" HEAD)"
-          echo "sha=$merge_base" >> "$GITHUB_OUTPUT"
-          echo "short=$(git rev-parse --short "$merge_base")" >> "$GITHUB_OUTPUT"
-          echo "Base: $merge_base"
-
-      - name: Build iclforge-membench at this entry's head
-        shell: bash
-        run: |
-          set -euo pipefail
-          cmake --preset config-linux-gcc
-          cmake --build --preset build-linux-gcc --target iclforge-membench -- -k 0
-
-      # A worktree rather than `git checkout <sha>`: it leaves this checkout
-      # (and its build tree, and tools/ci/compare_memory.py, which the base
-      # commit may not even have) exactly where they are, and gives the base
-      # its own source dir - so CMakePresets.json's
-      # ${sourceDir}/build/${presetName} puts the two builds in separate
-      # directories with no cache to invalidate between them.
-      #
-      # A base that cannot build the target is reported rather than fatal. A
-      # base predating iclforge-membench has no such target to build, and that is a
-      # comparison with nothing to say, not a broken job - compare_memory.py
-      # sees one empty side and prints its skip warning.
-      - name: Build iclforge-membench at the base
-        shell: bash
-        env:
-          BASE_SHA: ${{ steps.base.outputs.sha }}
-        run: |
-          set -euo pipefail
-          git worktree add --detach ../base-mem "$BASE_SHA"
-          pushd ../base-mem >/dev/null
-          cmake --preset config-linux-gcc
-          if ! cmake --build --preset build-linux-gcc --target iclforge-membench -- -k 0; then
-            echo "::warning title=Memory comparison baseline unavailable::the base does not build iclforge-membench; the comparison will report a skip."
-          fi
-          popd >/dev/null
-
-      # One run per side, no interleaving and no repetitions - the whole point
-      # of gating on this metric rather than on time. See compare_memory.py's
-      # module docstring.
-      #
-      # The memory-<leg> subdirectory layout, and the leg name `linux-gcc`, are
-      # append_memory_history.py's - the two gates share that reader, so the
-      # workload names in this entry's table read identically to the ones on
-      # docs/performance-trend.md's memory tables.
-      - name: Run iclforge-membench on both sides
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p mem-results/head/memory-linux-gcc mem-results/base/memory-linux-gcc
-          build/config-linux-gcc/bin/iclforge-membench \
-            --json-out mem-results/head/memory-linux-gcc/membench.json
-          base_bin=../base-mem/build/config-linux-gcc/bin/iclforge-membench
-          if [ -x "$base_bin" ]; then
-            "$base_bin" --json-out mem-results/base/memory-linux-gcc/membench.json
-          fi
-
-      - name: Compare and publish the job summary
-        id: compare
-        shell: bash
-        env:
-          BASE_SHORT: ${{ steps.base.outputs.short }}
-        run: |
-          set -euo pipefail
-          python3 tools/ci/compare_memory.py \
-            --base-dir mem-results/base \
-            --head-dir mem-results/head \
-            --base-ref "queue base $BASE_SHORT"
-
-      # Saved even when a step above failed, so the packages vcpkg had already
-      # built survive for the next attempt (actions/cache's own post-job save
-      # runs only on success). continue-on-error: a cache that cannot be saved
-      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
-      - name: Save vcpkg caches
-        if: always()
-        continue-on-error: true
-        uses: ./.github/actions/save-vcpkg-cache
-
-  # The blocking half of memory-compare, split out so that job can keep
+  # The blocking half of the memory comparison, split out so the compare job can keep
   # continue-on-error for its builds while its VERDICT still fails the entry.
   # Same shape as performance-gate above: it builds nothing and runs one script
   # (tools/ci/compare_gate.py).
   #
   # `always()` so a verdict is still enforced when some unrelated job failed;
   # the script is what decides, and it passes on anything that is not an
-  # explicit `true`. That covers a cancelled memory-compare and one that died
+  # explicit `true`. That covers a cancelled compare and one that died
   # before the compare step ran - a job that produced no measurement must not
   # fail an entry on a measurement it does not have.
   #
@@ -480,7 +395,7 @@ jobs:
   # after a failure and queue the pull request again.
   memory-gate:
     name: Memory gate
-    needs: [memory-compare]
+    needs: [compare]
     if: always()
     runs-on: ${{ fromJSON(inputs.runner) }}
     timeout-minutes: 5
@@ -500,7 +415,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ inputs.pr_number }}
-          VERDICT: ${{ needs.memory-compare.outputs.hard_regression }}
+          VERDICT: ${{ needs.compare.outputs.memory_hard }}
         run: |
           python3 tools/ci/compare_gate.py --kind memory \
             --verdict "${VERDICT:-}" --repo "$REPO" --pr "${PR_NUMBER:-}"

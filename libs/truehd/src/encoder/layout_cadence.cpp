@@ -1,8 +1,16 @@
 #include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <span>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/encoder/layout.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {
@@ -81,7 +89,7 @@ LayoutAudit audit_layout(std::span<const std::byte> stream) {
         }
         const auto parsed = parse_access_unit(rest.first(length), substreams, true);
         if (!parsed) {
-            return fail(unit_text(number, to_string(parsed.error().kind).data()));
+            return fail(unit_text(number, std::string(to_string(parsed.error().kind)).c_str()));
         }
         if (parsed->length_bytes() != length) {
             return fail(unit_text(number, "the header's length is not the unit's"));
