@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <fstream>
 #include <ios>
@@ -55,6 +56,9 @@ const QStringList kOptionNames{
 // Everything one run needs, copied out so the job holds nothing of the controller's.
 struct Job {
     QString source;
+    QStringList extra_sources;
+    QString map;                    // empty: the first WAV alone, its channel mask naming the speakers
+    std::vector<double> offsets_s;  // by source, the first WAV being 0
     QString output;
     core::Settings settings;
 };
@@ -67,19 +71,60 @@ struct Result {
 Result run(const Job& job, const std::atomic<bool>& stop,
            const std::function<void(double)>& report_progress) {
     Result result;
-    auto wav = iclforge::ac3::io::read_wav(job.source.toStdString());
-    if (!wav) {
-        result.error = QStringLiteral("%1: %2").arg(
-            job.source, to_qstring(iclforge::ac3::io::describe(wav.error())));
-        return result;
+    std::vector<iclforge::ac3::io::WavData> sources;
+    for (const QString& path : QStringList{job.source} + job.extra_sources) {
+        auto more = iclforge::ac3::io::read_wav(path.toStdString());
+        if (!more) {
+            result.error = QStringLiteral("%1: %2").arg(
+                path, to_qstring(iclforge::ac3::io::describe(more.error())));
+            return result;
+        }
+        sources.push_back(std::move(*more));
     }
-    if (wav->frame_count() == 0) {
+    // A start offset is seconds at the first WAV's sample rate, as the command line takes it.
+    std::vector<std::size_t> offset_samples(sources.size());
+    for (std::size_t i = 0; i < sources.size(); ++i) {
+        const double seconds = i < job.offsets_s.size() ? job.offsets_s[i] : 0.0;
+        offset_samples[i] = static_cast<std::size_t>(
+            std::llround(seconds * static_cast<double>(sources.front().sample_rate)));
+    }
+    iclforge::ac3::io::WavData wav;
+    core::Layout layout;
+    QString placed;  // map: where each channel of the stream came from
+    if (!job.map.isEmpty()) {
+        const auto placements = core::parse_map(job.map.toStdString());
+        if (!placements) {
+            result.error = QString::fromStdString(placements.error());
+            return result;
+        }
+        auto joined = core::assemble(sources, offset_samples, *placements);
+        if (!joined) {
+            result.error = QString::fromStdString(joined.error());
+            return result;
+        }
+        for (const core::Placement& p : *placements) {
+            placed += QStringLiteral("%1%2 <- %3.%4")
+                          .arg(placed.isEmpty() ? QString() : QStringLiteral(", "),
+                               to_qstring(th::channel_name(p.place)))
+                          .arg(p.source)
+                          .arg(p.channel);
+        }
+        wav = std::move(joined->wav);
+        layout = std::move(joined->layout);
+    } else {
+        wav = std::move(sources.front());
+        if (offset_samples.front() != 0) {
+            core::pad_leading(wav, offset_samples.front());
+        }
+        auto named = core::layout_of(wav);
+        if (!named) {
+            result.error = QStringLiteral("%1: %2").arg(job.source, QString::fromStdString(named.error()));
+            return result;
+        }
+        layout = std::move(*named);
+    }
+    if (wav.frame_count() == 0) {
         result.error = QStringLiteral("%1 has no samples to encode.").arg(job.source);
-        return result;
-    }
-    const auto layout = core::layout_of(*wav);
-    if (!layout) {
-        result.error = QStringLiteral("%1: %2").arg(job.source, QString::fromStdString(layout.error()));
         return result;
     }
     th::EncoderConfig config;
@@ -87,7 +132,7 @@ Result run(const Job& job, const std::atomic<bool>& stop,
 
     auto last_report = std::chrono::steady_clock::now();
     const auto outcome = core::encode_wav(
-        *wav, *layout, config, [&](std::uint64_t done, std::uint64_t total) {
+        wav, layout, config, [&](std::uint64_t done, std::uint64_t total) {
             const auto now = std::chrono::steady_clock::now();
             if (now - last_report > std::chrono::milliseconds(50) || done == total) {
                 last_report = now;
@@ -140,7 +185,7 @@ Result run(const Job& job, const std::atomic<bool>& stop,
     const double pcm_bytes = static_cast<double>(outcome->frames) * outcome->channels * 3.0;
     result.summary =
         QStringLiteral("Wrote %1: %2 channel(s) at %3 Hz, %4 s, %5 access units, %6 restart "
-                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10")
+                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10%11")
             .arg(job.output)
             .arg(outcome->channels)
             .arg(outcome->sample_rate)
@@ -150,6 +195,7 @@ Result run(const Job& job, const std::atomic<bool>& stop,
             .arg(bytes.size())
             .arg(100.0 * static_cast<double>(outcome->stream.size()) / pcm_bytes, 0, 'f', 1)
             .arg(container_name.isEmpty() ? QString() : QStringLiteral(" · in %1").arg(container_name))
+            .arg(placed.isEmpty() ? QString() : QStringLiteral(" · placed: %1").arg(placed))
             .arg(job.settings.verify
                      ? QStringLiteral(" · verified: every access unit decodes to the input")
                      : QString());
@@ -169,6 +215,17 @@ QString TruehdEncodeController::cliLine() const {
     QString line = QStringLiteral("forge truehd-encode %1 %2")
                        .arg(source_.isEmpty() ? QStringLiteral("<in.wav>") : quoted(source_),
                             output_.isEmpty() ? QStringLiteral("<out.thd>") : quoted(output_));
+    for (const QString& extra : extra_sources_) {
+        line += QStringLiteral(" src=%1").arg(quoted(extra));
+    }
+    if (!map_text_.isEmpty()) {
+        line += QStringLiteral(" map=%1").arg(map_text_.contains(' ') ? quoted(map_text_) : map_text_);
+    }
+    for (qsizetype i = 0; i < offset_text_.size(); ++i) {
+        if (!offset_text_[i].isEmpty() && offset_error_[i].isEmpty()) {
+            line += QStringLiteral(" offset=%1:%2").arg(i).arg(offset_text_[i]);
+        }
+    }
     if (downmix_) {
         line += QStringLiteral(" truehd-downmix=standard");
     }
@@ -299,6 +356,98 @@ void TruehdEncodeController::chooseOutput(const QUrl& url) {
     emit cliLineChanged();
 }
 
+bool TruehdEncodeController::has_offset_error() const {
+    return std::any_of(offset_error_.cbegin(), offset_error_.cend(),
+                       [](const QString& sentence) { return !sentence.isEmpty(); });
+}
+
+void TruehdEncodeController::sources_changed() {
+    check_map();
+    summary_.clear();
+    error_.clear();
+    emit sourcesChanged();
+    emit resultChanged();
+    emit stateChanged();
+    emit cliLineChanged();
+}
+
+// A map the command line would refuse, or sources with no map to say where their channels go.
+void TruehdEncodeController::check_map() {
+    map_error_.clear();
+    if (!map_text_.isEmpty()) {
+        const auto placements = core::parse_map(map_text_.toStdString());
+        if (!placements) {
+            map_error_ = QString::fromStdString(placements.error());
+        }
+    } else if (!extra_sources_.isEmpty()) {
+        map_error_ = QStringLiteral(
+            "More than one source needs a map saying where each channel of each source goes, as in "
+            "0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs");
+    }
+}
+
+void TruehdEncodeController::addSource(const QUrl& url) {
+    const QString path = url.toLocalFile();
+    if (busy_ || path.isEmpty()) {
+        return;
+    }
+    while (offset_text_.size() < extra_sources_.size() + 1) {  // one per source so far
+        offset_text_.append(QString());
+        offset_error_.append(QString());
+    }
+    extra_sources_.append(path);
+    offset_text_.append(QString());
+    offset_error_.append(QString());
+    sources_changed();
+}
+
+void TruehdEncodeController::removeSource(int extraIndex) {
+    if (busy_ || extraIndex < 0 || extraIndex >= extra_sources_.size()) {
+        return;
+    }
+    extra_sources_.removeAt(extraIndex);
+    // Offsets are by source, the first WAV being 0: the removed source's goes with it.
+    if (extraIndex + 1 < offset_text_.size()) {
+        offset_text_.removeAt(extraIndex + 1);
+        offset_error_.removeAt(extraIndex + 1);
+    }
+    sources_changed();
+}
+
+void TruehdEncodeController::setMap(const QString& text) {
+    const QString trimmed = text.trimmed();
+    if (busy_ || trimmed == map_text_) {
+        return;
+    }
+    map_text_ = trimmed;
+    sources_changed();
+}
+
+void TruehdEncodeController::setOffset(int sourceIndex, const QString& text) {
+    if (busy_ || sourceIndex < 0 || sourceIndex > extra_sources_.size()) {
+        return;
+    }
+    while (offset_text_.size() <= sourceIndex) {
+        offset_text_.append(QString());
+        offset_error_.append(QString());
+    }
+    const QString trimmed = text.trimmed();
+    QString sentence;
+    if (!trimmed.isEmpty()) {
+        bool ok = false;
+        const double seconds = trimmed.toDouble(&ok);
+        if (!ok || !std::isfinite(seconds) || seconds < 0.0) {
+            sentence = QStringLiteral("A start offset is seconds, 0 or more (got '%1')").arg(trimmed);
+        }
+    }
+    if (offset_text_[sourceIndex] == trimmed && offset_error_[sourceIndex] == sentence) {
+        return;
+    }
+    offset_text_[sourceIndex] = trimmed;
+    offset_error_[sourceIndex] = sentence;
+    sources_changed();
+}
+
 void TruehdEncodeController::encode() {
     if (!canEncode()) {
         return;
@@ -317,7 +466,15 @@ void TruehdEncodeController::encode() {
     emit stateChanged();
     emit progressChanged();
     emit resultChanged();
-    Job job{.source = source_, .output = output_, .settings = {}};
+    Job job{.source = source_,
+            .extra_sources = extra_sources_,
+            .map = map_text_,
+            .offsets_s = {},
+            .output = output_,
+            .settings = {}};
+    for (const QString& text : offset_text_) {
+        job.offsets_s.push_back(text.isEmpty() ? 0.0 : text.toDouble());  // checked by setOffset
+    }
     job.settings.standard_downmix = downmix_;
     job.settings.verify = verify_;
     for (auto it = option_text_.cbegin(); it != option_text_.cend(); ++it) {
@@ -355,10 +512,16 @@ void TruehdEncodeController::clear() {
     }
     source_.clear();
     output_.clear();
+    extra_sources_.clear();
+    map_text_.clear();
+    map_error_.clear();
+    offset_text_.clear();
+    offset_error_.clear();
     summary_.clear();
     error_.clear();
     progress_ = 0.0;
     emit sourceChanged();
+    emit sourcesChanged();
     emit outputChanged();
     emit resultChanged();
     emit progressChanged();
