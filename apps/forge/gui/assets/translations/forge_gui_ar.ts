@@ -5401,7 +5401,7 @@
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="313"/>
         <source>Remove</source>
-        <translation type="unfinished">أزل</translation>
+        <translation>أزل</translation>
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="331"/>
