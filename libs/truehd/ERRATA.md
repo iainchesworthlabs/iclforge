@@ -56,6 +56,12 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
    FFmpeg-made streams agree; a terminator right after the last block is counted and refused in strict mode), and the width of
    `zero_samples`. A disc's stream settles it: `forge probe DISC detail=structure` counts what follows the last block of every
    substream's segments (section H).
+   **The player's rules for the ending (2026-11-06).** The DEE findings report spec-answers-2026-11-04 D10 holds, verified against a licensed player,
+   that the word is legal only as `0xD234E000 | zero_samples` or `0xD234D234`, may be absent, may not be in an access unit that is not the last (status
+   0xE5), and that anything else after the last block of the last unit is refused (0xBF) and so is a count of 4096 or more (0x98). `forge qc` and the
+   Forge window's QC fail a stream on these three and the decoder is unchanged (`forge probe detail=checks` prints the counts). All 147 streams of the
+   gold set pass. Not looked at: terminatorB (`0x1234`, substream 3), and `0xD234D234` in a unit that is not the last. The report does not list the
+   shifted pattern `0x348D3` that the decoder takes as terminatorA, and `qc` counts it as the decoder does.
 4. **Which presentation `forge decode` gives for a stream with the sixteen-channel substream.** The library's
    default (`Presentation::kBest`) is the highest of substreams 0 to 2, the 7.1 bed; `kAll` reads substream 3.
 5. **Noise generator 1 (§17.3, §17.4).** Answered by TH spec v3.7 §17.4 (2026-10-29), which supplies the 256-entry table. The decoder

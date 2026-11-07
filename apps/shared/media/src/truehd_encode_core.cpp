@@ -367,8 +367,102 @@ std::unexpected<std::string> refuse(std::string sentence) {
 
 }  // namespace
 
+namespace {
+
+using MeaningEdit = th::ChannelMeaningEdit;
+
+struct MeaningNumber {
+    std::string_view name;
+    int low;
+    int high;
+    std::optional<int> MeaningEdit::*field;
+};
+
+constexpr std::array<MeaningNumber, 10> kMeaningNumbers{{
+    {"dialnorm-2ch", 0, 63, &MeaningEdit::twoch_dialogue_norm},
+    {"dialnorm-6ch", 0, 31, &MeaningEdit::sixch_dialogue_norm},
+    {"dialnorm-8ch", 0, 31, &MeaningEdit::eightch_dialogue_norm},
+    {"mix-level-2ch", 0, 63, &MeaningEdit::twoch_mix_level},
+    {"mix-level-6ch", 0, 63, &MeaningEdit::sixch_mix_level},
+    {"mix-level-8ch", 0, 63, &MeaningEdit::eightch_mix_level},
+    {"source-format-6ch", 0, 31, &MeaningEdit::sixch_source_format},
+    {"source-format-8ch", 0, 63, &MeaningEdit::eightch_source_format},
+    {"heavy-drc-start-up-gain", -32, 31, &MeaningEdit::heavy_drc_start_up_gain},
+    {"drc-start-up-gain", -64, 63, &MeaningEdit::drc_start_up_gain},
+}};
+
+struct MeaningFlag {
+    std::string_view name;
+    std::optional<bool> MeaningEdit::*field;
+};
+
+constexpr std::array<MeaningFlag, 3> kMeaningFlags{{
+    {"control-2ch", &MeaningEdit::twoch_control_enabled},
+    {"control-6ch", &MeaningEdit::sixch_control_enabled},
+    {"control-8ch", &MeaningEdit::eightch_control_enabled},
+}};
+
+// The order the options are written in: the dialogue norms, the mix levels, the source formats, the
+// control bits, the two gains.
+constexpr std::array<std::string_view, 13> kMeaningNames{
+    "dialnorm-2ch",      "dialnorm-6ch",      "dialnorm-8ch",
+    "mix-level-2ch",     "mix-level-6ch",     "mix-level-8ch",
+    "source-format-6ch", "source-format-8ch", "control-2ch",
+    "control-6ch",       "control-8ch",       "heavy-drc-start-up-gain",
+    "drc-start-up-gain"};
+
+// A whole number with nothing else in the text; a minus sign is allowed, a plus sign is not.
+std::optional<int> parse_whole(std::string_view text) {
+    int value = 0;
+    const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (ec != std::errc{} || end != text.data() + text.size() || text.empty()) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+}  // namespace
+
+std::span<const std::string_view> meaning_option_names() noexcept {
+    return kMeaningNames;
+}
+
+bool is_meaning_option(std::string_view name) noexcept {
+    return std::ranges::find(kMeaningNames, name) != kMeaningNames.end();
+}
+
+std::expected<void, std::string> set_meaning_option(th::ChannelMeaningEdit& edit,
+                                                    std::string_view name, std::string_view value) {
+    for (const MeaningNumber& number : kMeaningNumbers) {
+        if (name != number.name) {
+            continue;
+        }
+        const auto parsed = parse_whole(value);
+        if (!parsed || *parsed < number.low || *parsed > number.high) {
+            return refuse(fmt::format("truehd-{} is a whole number from {} to {}", name, number.low,
+                                      number.high));
+        }
+        edit.*number.field = *parsed;
+        return {};
+    }
+    for (const MeaningFlag& flag : kMeaningFlags) {
+        if (name != flag.name) {
+            continue;
+        }
+        if (value != "on" && value != "off") {
+            return refuse(fmt::format("truehd-{} is on or off", name));
+        }
+        edit.*flag.field = value == "on";
+        return {};
+    }
+    return refuse(fmt::format("truehd-{} is not a channel meaning option", name));
+}
+
 std::expected<void, std::string> set_option(Settings& settings, std::string_view name,
                                             std::string_view value) {
+    if (is_meaning_option(name)) {
+        return set_meaning_option(settings.meaning, name, value);
+    }
     if (name == "downmix") {
         if (value != "none" && value != "standard") {
             return refuse("truehd-downmix is none or standard");
@@ -481,7 +575,7 @@ std::expected<void, std::string> set_option(Settings& settings, std::string_view
     return refuse(fmt::format("truehd-{} is not an option of the TrueHD encode", name));
 }
 
-void apply(const Settings& settings, th::EncoderConfig& config) {
+std::expected<void, std::string> apply(const Settings& settings, th::EncoderConfig& config) {
     config.downmix = settings.standard_downmix ? th::DownmixMode::kStandard : th::DownmixMode::kNone;
     if (settings.downmix_gains) {
         const std::array<double, 4>& g = *settings.downmix_gains;
@@ -507,6 +601,13 @@ void apply(const Settings& settings, th::EncoderConfig& config) {
     config.matrix_search = settings.matrix;
     config.stereo_mode = settings.stereo_mode;
     config.verify = settings.verify;
+    // The channel meaning (TH spec §14.1): the fields named, the rest zero as FFmpeg's streams have
+    // them.
+    if (const std::string_view field = th::apply_edit(settings.meaning, config.channel_meaning);
+        !field.empty()) {
+        return refuse(std::string{field});
+    }
+    return {};
 }
 
 std::expected<Outcome, Failure> encode_wav(const iclforge::ac3::io::WavData& wav,

@@ -138,6 +138,13 @@ struct SegmentTailCounters {
     std::uint64_t terminator_b_at_end = 0;  // the segment ends with 0x1234 (substream 3)
     std::uint64_t end_marker = 0;           // the segment ends with terminatorA and a 12-bit count
     std::uint64_t other = 0;                // anything else
+    // Where the last of each was, for a check of the stream's ending (apps/shared/media/src/
+    // probe_truehd.hpp): the number of the unit, counted from 1 as DecoderCounters::units counts
+    // them, 0 if there was none. A terminator word (terminatorA at once, or at the end of the
+    // segment) and anything else that is not zero bits.
+    std::uint64_t last_word_unit = 0;
+    std::uint64_t last_other_unit = 0;
+    std::uint32_t last_other_word = 0;  // the last 32 bits of that tail; 0 if it was shorter
     std::uint64_t bits_min = 0;
     std::uint64_t bits_max = 0;
 };

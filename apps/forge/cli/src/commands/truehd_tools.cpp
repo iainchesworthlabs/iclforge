@@ -456,7 +456,10 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
     const bool checks_ok = counters.check_failures == 0;
     const bool lossless_ok = counters.lossless_check_failures == 0;
     const bool rate_ok = rate_report.violations == 0;
-    const bool integrity = units_ok && checks_ok && lossless_ok && rate_ok;
+    const iclforge::apps::truehd_probe::TerminatorReport ending =
+        iclforge::apps::truehd_probe::terminator_report(counters);
+    const bool ending_ok = ending.violations() == 0;
+    const bool integrity = units_ok && checks_ok && lossless_ok && rate_ok && ending_ok;
     fmt::println("integrity (TH spec 6.2 parity and CRC, 7.3 lossless check, 18 data rate):");
     fmt::println("  access units         {} read, {} byte(s) skipped, {} unreadable  {}",
                  measured->units, measured->skipped_bytes, measured->decode_errors,
@@ -481,6 +484,11 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path,
             "  data rate            the peak data rate field is 0: nothing to hold the stream to  "
             "PASS");
     }
+    fmt::println(
+        "  stream end           {} terminator word(s) at most in a substream, {} not in the last "
+        "unit, {} illegal word(s) after the last block, {} zero_samples count(s) of 4096 or more  {}",
+        ending.words, ending.in_non_last_unit, ending.illegal_words,
+        ending.zero_samples_too_large, ending_ok ? "PASS" : "FAIL");
     fmt::println("  integrity verdict: {}", integrity ? "PASS" : "FAIL");
 
     // --- loudness, the embedded metadata and the preset gates

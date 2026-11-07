@@ -539,15 +539,18 @@ std::optional<RawResult> measure_truehd(const QString& path, QString& error) {
     }
     const auto counters = (*all)->counters();
     const auto& rate = (*all)->info().rate;
+    const auto ending = iclforge::apps::truehd_probe::terminator_report(counters);
     const std::uint64_t errors = (*all)->decode_errors();
     result.integrity_checked = true;
     result.integrity_ok = counters.lossless_check_failures == 0 && counters.check_failures == 0 &&
-                          errors == 0 && rate.violations == 0;
+                          errors == 0 && rate.violations == 0 && ending.violations() == 0;
     result.integrity_text =
         QStringLiteral("lossless check: %1 restart interval(s) ok, %2 failed · other checks (access "
                        "unit, CRC, parity) failed: %3 · %4 unit(s) could not be decoded · data "
                        "rate: declared peak %5 Mbit/s, largest unit %6 Mbit/s, %7 unit(s) start "
-                       "before the unit ahead has arrived (TH spec section 18, worst %8 ms short)")
+                       "before the unit ahead has arrived (TH spec section 18, worst %8 ms short) · "
+                       "stream end (TH spec section 16.5): %9 terminator word(s) at most in a substream, "
+                       "%10 out of place")
             .arg(counters.lossless_checks_ok)
             .arg(counters.lossless_check_failures)
             .arg(counters.check_failures)
@@ -555,7 +558,9 @@ std::optional<RawResult> measure_truehd(const QString& path, QString& error) {
             .arg(static_cast<double>(rate.declared_bps) / 1e6, 0, 'f', 2)
             .arg(static_cast<double>(rate.max_unit_rate_bps) / 1e6, 0, 'f', 2)
             .arg(rate.violations)
-            .arg(rate.worst_overrun_ms, 0, 'f', 2);
+            .arg(rate.worst_overrun_ms, 0, 'f', 2)
+            .arg(ending.words)
+            .arg(ending.violations());
     if (result.programmes.empty()) {
         error = QStringLiteral("%1 has no presentation to measure.").arg(path);
         return std::nullopt;
