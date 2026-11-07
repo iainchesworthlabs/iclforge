@@ -47,11 +47,20 @@ QString container_label(wrap::Container container) {
 }
 
 // The options the window takes besides verify and the downmix box, in the order the command line
-// is written.
-const QStringList kOptionNames{
-    QStringLiteral("restart"),     QStringLiteral("peak-rate"),   QStringLiteral("rate-check"),
-    QStringLiteral("bitrate"),     QStringLiteral("major-sync"),  QStringLiteral("fir-order"),
-    QStringLiteral("matrix"),      QStringLiteral("stereo-mode"), QStringLiteral("downmix-gains")};
+// is written: the ones that shape the stream, then the channel meaning (the names the command line
+// takes, core::meaning_option_names).
+QStringList make_option_names() {
+    QStringList names{
+        QStringLiteral("restart"),     QStringLiteral("peak-rate"),   QStringLiteral("rate-check"),
+        QStringLiteral("bitrate"),     QStringLiteral("major-sync"),  QStringLiteral("fir-order"),
+        QStringLiteral("matrix"),      QStringLiteral("stereo-mode"), QStringLiteral("downmix-gains")};
+    for (const std::string_view name : core::meaning_option_names()) {
+        names.append(to_qstring(name));
+    }
+    return names;
+}
+
+const QStringList kOptionNames = make_option_names();
 
 // Everything one run needs, copied out so the job holds nothing of the controller's.
 struct Job {
@@ -128,7 +137,10 @@ Result run(const Job& job, const std::atomic<bool>& stop,
         return result;
     }
     th::EncoderConfig config;
-    core::apply(job.settings, config);
+    if (const auto applied = core::apply(job.settings, config); !applied) {
+        result.error = to_qstring(applied.error());
+        return result;
+    }
 
     auto last_report = std::chrono::steady_clock::now();
     const auto outcome = core::encode_wav(
@@ -185,7 +197,7 @@ Result run(const Job& job, const std::atomic<bool>& stop,
     const double pcm_bytes = static_cast<double>(outcome->frames) * outcome->channels * 3.0;
     result.summary =
         QStringLiteral("Wrote %1: %2 channel(s) at %3 Hz, %4 s, %5 access units, %6 restart "
-                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10%11")
+                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10%11%12")
             .arg(job.output)
             .arg(outcome->channels)
             .arg(outcome->sample_rate)
@@ -198,7 +210,11 @@ Result run(const Job& job, const std::atomic<bool>& stop,
             .arg(placed.isEmpty() ? QString() : QStringLiteral(" · placed: %1").arg(placed))
             .arg(job.settings.verify
                      ? QStringLiteral(" · verified: every access unit decodes to the input")
-                     : QString());
+                     : QString())
+            .arg(job.settings.meaning.empty()
+                     ? QString()
+                     : QStringLiteral(" · channel meaning written (provisional, no oracle until the "
+                                      "DEE set)"));
     return result;
 }
 

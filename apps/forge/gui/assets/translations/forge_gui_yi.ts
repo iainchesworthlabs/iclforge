@@ -5329,196 +5329,257 @@
     </message>
     <message>
         <location filename="../qml/TruehdEncodeDialog.qml" line="110"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="159"/>
         <source>default</source>
         <translation>ברירת־מחדל</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="125"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="177"/>
         <source>Encode TrueHD</source>
         <translation>קאָדירן TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="133"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="185"/>
         <source>Close</source>
         <translation>פֿאַרמאַכן</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="141"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="193"/>
         <source>Codes a WAV file losslessly as TrueHD: the stream decodes to exactly the samples that went in. The WAV&apos;s channel mask names the speakers; a file with none is taken in the order forge decode writes. The output is a bare .thd stream, or Matroska (.mkv), MP4 (.mp4) or a Blu-ray transport stream (.m2ts, .ts), whichever its name asks for.</source>
         <translation>קאָדירט אַ WAV טעקע אָן פֿאַרלוסט ווי TrueHD: דער שטראָם דעקאָדירט זיך צו גענוי די סאַמפּלס וואָס זענען אַרײַנגעגאַנגען. די קאַנאַל־מאַסקע פֿון דער WAV נעמט די הויכרעדער; אַ טעקע אָן מאַסקע ווערט גענומען אין דער סדר ווי forge decode שרײַבט. דער רעזולטאַט איז אַ בלויזער .thd שטראָם, אָדער Matroska (.mkv), MP4 (.mp4) אָדער אַ Blu-ray טראַנספּאָרט־שטראָם (.m2ts, .ts), לויט וואָס זײַן נאָמען פֿאָדערט.</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="150"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="202"/>
         <source>Choose WAV…</source>
         <translation>אויסקלײַבן WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="159"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="211"/>
         <source>No file chosen</source>
         <translation>קיין טעקע נישט אויסגעקליבן</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="169"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="221"/>
         <source>Save as…</source>
         <translation>ראַטעווע אַלס…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="178"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="230"/>
         <source>Not chosen yet</source>
         <translation>נאָך נישט אויסגעקליבן</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="186"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="238"/>
         <source>Verify: decode every access unit and compare it with the input</source>
         <translation>אָפּשטימען: דעקאָדירן יעדע צוטריטס־איינהייט און פֿאַרגלײַכן מיט דעם אינפּוט</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="194"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="246"/>
         <source>Write the 2 and 6 channel presentations as folded-down mixes (truehd-downmix=standard)</source>
         <translation>שרײַב די 2- און 6־קאַנאַל פּרעזענטאַציעס ווי אַראָפּגעמישטע מישונגען (truehd-downmix=standard)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="202"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="254"/>
         <source>Hide the sources</source>
         <translation>באַהאַלט די קוועלן</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="202"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="254"/>
         <source>Several sources…</source>
         <translation>עטלעכע קוועלן…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="216"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="268"/>
         <source>Each WAV is a source; the one chosen above is source 0. The map says where each channel of each source goes, as source.channel:place with the places named as TrueHD names them, separated by commas. A source can start some seconds in; a shorter one is padded with silence.</source>
         <translation>יעדע WAV טעקע איז אַ קוואַל; די אויבן אויסגעקליבענע איז קוואַל 0. די מאַפּע זאָגט וווהין יעדער קאַנאַל פֿון יעדער קוואַל גייט, ווי קוואַל.קאַנאַל:אָרט מיט די ערטער אַזוי ווי TrueHD רופֿט זיי, צעטיילט מיט קאָמאַס. אַ קוואַל קאָן אָנהייבן עטלעכע סעקונדעס שפּעטער; אַ קירצערע ווערט אָנגעפֿילט מיט שטילקייט.</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="231"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="283"/>
         <source>Source %1</source>
         <translation>קוואַל %1</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="245"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="297"/>
         <source>Starts at (s)</source>
         <translation>הייבט אָן ביי (סעק)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="261"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="313"/>
         <source>Remove</source>
         <translation>אַוועקנעמען</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="279"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="331"/>
         <source>Add a WAV…</source>
         <translation>צולייגן אַ WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="287"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="339"/>
         <source>Where each channel goes</source>
         <translation>וווהין יעדער קאַנאַל גייט</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="314"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="366"/>
         <source>Fewer options</source>
         <translation>ווייניקער אָפּציעס</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="314"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="366"/>
         <source>More options…</source>
         <translation>מער אָפּציעס…</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="328"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="380"/>
         <source>These are the truehd- options of forge truehd-encode. Leave one empty for the encoder&apos;s own choice.</source>
         <translation>דאָס זענען די truehd- אָפּציעס פֿון forge truehd-encode. לאָזט איינע ליידיק, כּדי דער קאָדירער זאָל אַליין קלײַבן.</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="334"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="386"/>
         <source>Access units between restarts</source>
         <translation>אַקסעס־איינהייטן צווישן ריסטאַרטס</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="335"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="387"/>
         <source>1 or 8 to 4096</source>
         <translation>1 אָדער 8 ביז 4096</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="339"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="391"/>
         <source>Access units between major syncs</source>
         <translation>אַקסעס־איינהייטן צווישן הויפּט־סינכראָנען</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="340"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="392"/>
         <source>0 or a multiple of the restart, up to 65536</source>
         <translation>0 אָדער אַ מערפֿאַכיקער פֿון דער ריסטאַרט, ביז 65536</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="344"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="396"/>
         <source>Peak data rate (kbit/s)</source>
         <translation>שפּיץ דאַטן־ראַטע (kbit/s)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="345"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="397"/>
         <source>1 to 100000</source>
         <translation>1 ביז 100000</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="349"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="401"/>
         <source>Hold the rate to (kbit/s)</source>
         <translation>האַלטן די ראַטע אויף (kbit/s)</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="350"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="402"/>
         <source>1000 to 100000</source>
         <translation>1000 ביז 100000</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="354"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="406"/>
         <source>Highest prediction filter order</source>
         <translation>העכסטע אָרדענונג פֿון דער פּרעדיקציע־פֿילטער</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="355"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="407"/>
         <source>0 to 8</source>
         <translation>0 ביז 8</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="359"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="411"/>
         <source>Downmix gains in dB</source>
         <translation>דאַונמיקס־געווינס אין dB</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="360"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="412"/>
         <source>C, Ls and Rs, LFE, Lrs and Rrs: -3,-3,off,-3</source>
         <translation>C, Ls און Rs, LFE, Lrs און Rrs: -3,-3,off,-3</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="364"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="416"/>
         <source>Peak rate check</source>
         <translation>פּרוּוו פֿון שפּיץ־ראַטע</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="369"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="421"/>
         <source>Matrix search</source>
         <translation>מאַטריץ־זוך</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="374"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="426"/>
         <source>Stereo presentation</source>
         <translation>סטערעא־פּרעזענטאַציע</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="379"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="431"/>
         <source>Back to the defaults</source>
         <translation>צוריק צו די ברירת־מחדלן</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="389"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="439"/>
+        <source>Hide channel meaning</source>
+        <translation>באַהאַלטן קאַנאַל־באַטײַטונג</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="439"/>
+        <source>Channel meaning…</source>
+        <translation>קאַנאַל־באַטײַטונג…</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="453"/>
+        <source>The channel meaning of each presentation (TH spec §14.1), written into every major sync of the stream. Provisional: no decoder here applies it and what the values mean is not settled, so there is no oracle until the DEE set. A field left empty is written as zero.</source>
+        <translation>די קאַנאַל־באַטײַטונג פֿון יעדער פּרעזענטאַציע (TH־ספּעציפֿיקאַציע §14.1), געשריבן אין יעדן הויפּט־סינק פֿון דעם סטרים. פּראָווויזאָריש: קיין דעקאָדער דאָ ווענדט עס נישט אָן און וואָס די ווערטן מיינען איז נישט באַשטימט, דעריבער איז פֿאַראַן קיין אָראַקל ביז דער DEE־סעט. אַ פֿעלד וואָס בלײַבט ליידיק ווערט געשריבן ווי נול.</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="465"/>
+        <source>Dialogue norm</source>
+        <translation>דיאַלאָג־נאָרם</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="466"/>
+        <source>Mix level</source>
+        <translation>מיקס־ניוואָ</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="467"/>
+        <source>Source format</source>
+        <translation>קוואַלער־פֿאָרמאַט</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="468"/>
+        <source>Control</source>
+        <translation>קאָנטראָל</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="470"/>
+        <source>2 channel</source>
+        <translation>2 קאַנאַלן</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="476"/>
+        <source>6 channel</source>
+        <translation>6 קאַנאַלן</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="482"/>
+        <source>8 channel</source>
+        <translation>8 קאַנאַלן</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="495"/>
+        <source>Heavy DRC start-up gain</source>
+        <translation>שווערע DRC־אָנהייב־פֿאַרשטאַרקונג</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="497"/>
+        <source>DRC start-up gain</source>
+        <translation>DRC־אָנהייב־פֿאַרשטאַרקונג</translation>
+    </message>
+    <message>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="506"/>
         <source>Encode</source>
         <translation>קאָדירן</translation>
     </message>
     <message>
-        <location filename="../qml/TruehdEncodeDialog.qml" line="395"/>
+        <location filename="../qml/TruehdEncodeDialog.qml" line="512"/>
         <source>Stop</source>
         <translation>אָפּשטעלן</translation>
     </message>

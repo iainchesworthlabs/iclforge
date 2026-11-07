@@ -55,10 +55,117 @@ TEST_CASE("the physical format id matches the bitstream kind") {
     CHECK_FALSE(physical_format_id(BitstreamFormat::kAc4).has_value());
     CHECK_FALSE(physical_format_id(BitstreamFormat::kAc4Hbr4).has_value());
     CHECK_FALSE(physical_format_id(BitstreamFormat::kAc4Hbr16).has_value());
-    // Nor is one known for TrueHD (MAT): the backend refuses it rather than open a guess.
+    // Nor is one known for TrueHD (MAT): it is looked for by shape instead (find_mat_link_format).
     CHECK_FALSE(physical_format_id(BitstreamFormat::kMat).has_value());
     CHECK(carrier_rate(BitstreamFormat::kMat, 48000) == 192000);
     CHECK(carrier_rate(BitstreamFormat::kMat, 44100) == 176400);
+}
+
+namespace {
+
+// A linear PCM format as a driver would publish it: `channels` of `bits`-bit packed samples.
+AudioStreamBasicDescription pcm_format(UInt32 channels, UInt32 bits, AudioFormatFlags flags,
+                                       Float64 rate = 192000.0) {
+    AudioStreamBasicDescription format{};
+    format.mFormatID = kAudioFormatLinearPCM;
+    format.mFormatFlags = flags;
+    format.mChannelsPerFrame = channels;
+    format.mBitsPerChannel = bits;
+    format.mSampleRate = rate;
+    format.mFramesPerPacket = 1;
+    format.mBytesPerFrame = channels * bits / 8;
+    format.mBytesPerPacket = format.mBytesPerFrame;
+    return format;
+}
+
+constexpr AudioFormatFlags kPackedInt = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+
+AudioStreamRangedDescription offered(const AudioStreamBasicDescription& format, Float64 low,
+                                     Float64 high) {
+    AudioStreamRangedDescription ranged{};
+    ranged.mFormat = format;
+    ranged.mSampleRateRange = {low, high};
+    return ranged;
+}
+
+}  // namespace
+
+TEST_CASE("only eight packed signed 16-bit little-endian channels are a MAT link") {
+    using iclforge::coreaudio::is_mat_link_format;
+    CHECK(is_mat_link_format(pcm_format(8, 16, kPackedInt)));
+    // The wrong width, depth, sample type, byte order or layout, each on its own.
+    CHECK_FALSE(is_mat_link_format(pcm_format(2, 16, kPackedInt)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(6, 16, kPackedInt)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 24, kPackedInt)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 32, kPackedInt)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 32, kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 16, kPackedInt | kAudioFormatFlagIsBigEndian)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 16, kPackedInt | kAudioFormatFlagIsNonInterleaved)));
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 16, kAudioFormatFlagIsSignedInteger)));  // not packed
+    CHECK_FALSE(is_mat_link_format(pcm_format(8, 16, kAudioFormatFlagIsPacked)));         // unsigned
+    // Not linear PCM at all, however many channels.
+    AudioStreamBasicDescription ac3 = pcm_format(8, 16, kPackedInt);
+    ac3.mFormatID = kAudioFormat60958AC3;
+    CHECK_FALSE(is_mat_link_format(ac3));
+}
+
+TEST_CASE("a MAT link is found among a stream's formats at the link rate, and not at another") {
+    using iclforge::coreaudio::find_link_format;
+    using iclforge::coreaudio::find_mat_link_format;
+    const std::array<AudioStreamRangedDescription, 4> formats{
+        offered(pcm_format(2, 16, kPackedInt, 48000.0), 44100.0, 192000.0),
+        offered(pcm_format(8, 32, kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked), 48000.0, 192000.0),
+        offered(pcm_format(8, 16, kPackedInt, 96000.0), 96000.0, 96000.0),
+        offered(pcm_format(8, 16, kPackedInt, 176400.0), 176400.0, 192000.0)};
+
+    // 192 kHz sits inside the last entry's range, and the entry comes back tuned to it.
+    const auto at_192 = find_mat_link_format(formats, 192000.0);
+    REQUIRE(at_192.has_value());
+    CHECK(at_192->mSampleRate == 192000.0);
+    CHECK(at_192->mChannelsPerFrame == 8);
+    CHECK(at_192->mBitsPerChannel == 16);
+    CHECK(at_192->mBytesPerFrame == 16);
+    // 176.4 kHz is the range's other end, and 96 kHz is its own entry's.
+    CHECK(find_mat_link_format(formats, 176400.0).has_value());
+    CHECK(find_mat_link_format(formats, 96000.0).has_value());
+    CHECK_FALSE(find_mat_link_format(formats, 48000.0).has_value());
+    CHECK_FALSE(find_mat_link_format(formats, 0.0).has_value());  // carrier_rate()'s "no link"
+
+    // find_link_format sends MAT here and AC-3 and E-AC-3 to their format IDs, and nothing else anywhere.
+    CHECK(find_link_format(formats, BitstreamFormat::kMat, 192000.0).has_value());
+    CHECK_FALSE(find_link_format(formats, BitstreamFormat::kAc3, 48000.0).has_value());
+    CHECK_FALSE(find_link_format(formats, BitstreamFormat::kEac3, 192000.0).has_value());
+    CHECK_FALSE(find_link_format(formats, BitstreamFormat::kAc4, 48000.0).has_value());
+}
+
+TEST_CASE("a driver that leaves the frame sizes at zero gets them filled in for the MAT link") {
+    using iclforge::coreaudio::find_mat_link_format;
+    AudioStreamBasicDescription bare = pcm_format(8, 16, kPackedInt);
+    bare.mBytesPerFrame = 0;
+    bare.mBytesPerPacket = 0;
+    bare.mFramesPerPacket = 0;
+    const std::array<AudioStreamRangedDescription, 1> formats{offered(bare, 176400.0, 192000.0)};
+    const auto found = find_mat_link_format(formats, 192000.0);
+    REQUIRE(found.has_value());
+    CHECK(found->mBytesPerFrame == 16);
+    CHECK(found->mFramesPerPacket == 1);
+    CHECK(found->mBytesPerPacket == 16);
+}
+
+TEST_CASE("the AC-3 path is unchanged: find_link_format finds a format ID's own entry") {
+    using iclforge::coreaudio::find_link_format;
+    AudioStreamRangedDescription ac3{};
+    ac3.mFormat.mFormatID = kAudioFormat60958AC3;
+    ac3.mFormat.mChannelsPerFrame = 2;
+    ac3.mFormat.mBitsPerChannel = 16;
+    ac3.mFormat.mSampleRate = 48000.0;
+    ac3.mSampleRateRange = {48000.0, 48000.0};
+    const std::array<AudioStreamRangedDescription, 1> formats{ac3};
+    const auto found = find_link_format(formats, BitstreamFormat::kAc3, 48000.0);
+    REQUIRE(found.has_value());
+    CHECK(found->mFormatID == kAudioFormat60958AC3);
+    // E-AC-3 wants 'ec-3', which this stream does not offer.
+    CHECK_FALSE(find_link_format(formats, BitstreamFormat::kEac3, 192000.0).has_value());
 }
 
 TEST_CASE("a stream's available formats are searched for a matching id and rate") {

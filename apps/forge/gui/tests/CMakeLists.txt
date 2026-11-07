@@ -15,6 +15,7 @@ iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     test_lfe_pins.cpp
     test_truehd_pcm_source.cpp
     test_truehd_rate_model.cpp
+    test_truehd_stream_end.cpp
     test_truehd_encode_settings.cpp
     test_truehd_wrap.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/gui_diagnostics.cpp"
