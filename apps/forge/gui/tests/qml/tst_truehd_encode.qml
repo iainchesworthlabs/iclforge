@@ -20,10 +20,12 @@ TestCase {
     }
 
     readonly property url speakers51Url: Qt.resolvedUrl("../fixtures/speakers-3-0-lfe.wav")
+    readonly property url moreSourceUrl: Qt.resolvedUrl("../fixtures/speakers-none-3ch.wav")
     readonly property url outputUrl: Qt.resolvedUrl("_test_output/tst_truehd_encode.thd")
     readonly property url notAWavUrl: Qt.resolvedUrl("../fixtures/truehd_m51_s24.thd")
 
     function init() {
+        TruehdEncodeController.clear();
         TruehdEncodeController.resetOptions();
         TruehdEncodeController.verify = false;
         TruehdEncodeController.standardDownmix = false;
@@ -402,6 +404,133 @@ TestCase {
         compare(TruehdEncodeController.verify, true);
         compare(TruehdEncodeController.standardDownmix, true);
         compare(EncoderController.sourceModel.length, 0);
+    }
+
+    // Several sources: a second WAV needs a map to say where its channels go, a map the command line
+    // would refuse and an offset it would refuse are refused with a sentence, and the command line
+    // shown carries src=, map= and offset=.
+    function test_severalSourcesNeedAMapAndTheCommandLineCarriesThem() {
+        TruehdEncodeController.chooseSource(speakers51Url);
+        TruehdEncodeController.chooseOutput(outputUrl);
+        compare(TruehdEncodeController.canEncode, true);
+        TruehdEncodeController.addSource(moreSourceUrl);
+        compare(TruehdEncodeController.extraSources.length, 1);
+        verify(TruehdEncodeController.mapError.indexOf("needs a map") > 0, TruehdEncodeController.mapError);
+        compare(TruehdEncodeController.canEncode, false);
+
+        TruehdEncodeController.setMap("0.0:Q");
+        verify(TruehdEncodeController.mapError.length > 0);
+        compare(TruehdEncodeController.canEncode, false);
+        TruehdEncodeController.setMap(" 0.0:L,0.1:R,1.0:C ");
+        compare(TruehdEncodeController.mapText, "0.0:L,0.1:R,1.0:C");
+        compare(TruehdEncodeController.mapError, "");
+        compare(TruehdEncodeController.canEncode, true);
+
+        TruehdEncodeController.setOffset(1, "0.25");
+        const line = TruehdEncodeController.cliLine;
+        verify(line.indexOf(" src=\"") > 0, line);
+        verify(line.indexOf("speakers-none-3ch.wav\" map=0.0:L,0.1:R,1.0:C offset=1:0.25") > 0, line);
+        TruehdEncodeController.setOffset(1, "-1");
+        verify(TruehdEncodeController.offsetErrors[1].indexOf("seconds, 0 or more") > 0);
+        verify(TruehdEncodeController.cliLine.indexOf("offset=") < 0);
+        compare(TruehdEncodeController.canEncode, false);
+        TruehdEncodeController.setOffset(1, "soon");
+        compare(TruehdEncodeController.canEncode, false);
+        TruehdEncodeController.setOffset(1, "0.25");
+        compare(TruehdEncodeController.canEncode, true);
+
+        // Removing the source takes its offset with it and leaves the map as it was typed.
+        TruehdEncodeController.removeSource(0);
+        compare(TruehdEncodeController.extraSources.length, 0);
+        compare(TruehdEncodeController.cliLine.indexOf("offset="), -1);
+        compare(TruehdEncodeController.cliLine.indexOf("src="), -1);
+        verify(TruehdEncodeController.cliLine.indexOf(" map=0.0:L,0.1:R,1.0:C") > 0);
+        TruehdEncodeController.clear();
+        compare(TruehdEncodeController.mapText, "");
+        compare(TruehdEncodeController.offsetTexts.length, 0);
+    }
+
+    // Two WAVs are coded as one stream: the channels are put where the map says, the summary says
+    // where each came from, and a start offset makes the stream longer.
+    function test_twoWavsAreCodedAsOneStreamAndAnOffsetLengthensIt() {
+        TruehdEncodeController.verify = true;
+        TruehdEncodeController.chooseSource(speakers51Url);
+        TruehdEncodeController.chooseOutput(outputUrl);
+        TruehdEncodeController.addSource(moreSourceUrl);
+        TruehdEncodeController.setMap("0.0:L,0.1:R,1.0:C");
+        compare(TruehdEncodeController.canEncode, true);
+        TruehdEncodeController.encode();
+        compare(TruehdEncodeController.busy, true);
+        tryCompare(TruehdEncodeController, "busy", false, 60000);
+        compare(TruehdEncodeController.error, "");
+        const summary = TruehdEncodeController.summary;
+        verify(summary.indexOf("3 channel(s)") > 0, summary);
+        verify(summary.indexOf("placed: L <- 0.0, R <- 0.1, C <- 1.0") > 0, summary);
+        verify(summary.indexOf("verified") > 0, summary);
+        const base = secondsOf(summary);
+        verify(base > 0, summary);
+
+        TruehdEncodeController.setOffset(1, "1");
+        TruehdEncodeController.encode();
+        tryCompare(TruehdEncodeController, "busy", false, 60000);
+        compare(TruehdEncodeController.error, "");
+        verify(secondsOf(TruehdEncodeController.summary) > base, TruehdEncodeController.summary);
+
+        // A place that makes no channel assignment is refused when the files are read.
+        TruehdEncodeController.setMap("0.0:L,1.0:Cs");
+        TruehdEncodeController.encode();
+        tryCompare(TruehdEncodeController, "busy", false, 60000);
+        verify(TruehdEncodeController.error.length > 0);
+        compare(TruehdEncodeController.summary, "");
+    }
+
+    function secondsOf(summary) {
+        const found = /([0-9.]+) s,/.exec(summary);
+        return found ? parseFloat(found[1]) : -1;
+    }
+
+    // The panel: its rows follow the sources, typing into the map and an offset sets them, and Remove
+    // takes a source away.
+    function test_theSourcesPanelShowsAndSetsTheSources() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        TruehdEncodeController.chooseSource(speakers51Url);
+        const dialog = findChild(win.contentItem, "truehdEncodeDialog");
+        verify(dialog !== null);
+        dialog.open();
+        tryCompare(dialog, "visible", true, 5000);
+        const more = findChild(dialog.contentItem, "truehdEncodeMoreSources");
+        const panel = findChild(dialog.contentItem, "truehdEncodeSourcesPanel");
+        compare(panel.visible, false);
+        more.clicked();
+        compare(panel.visible, true);
+        verify(findChild(dialog.contentItem, "truehdEncodeSourceName_0") !== null);
+        compare(findChild(dialog.contentItem, "truehdEncodeSourceName_1"), null);
+
+        TruehdEncodeController.addSource(moreSourceUrl);
+        tryVerify(() => findChild(dialog.contentItem, "truehdEncodeSourceName_1") !== null, 2000);
+        const name = findChild(dialog.contentItem, "truehdEncodeSourceName_1");
+        verify(name.text.indexOf("speakers-none-3ch.wav") >= 0, name.text);
+
+        const map = findChild(dialog.contentItem, "truehdEncodeMap");
+        map.insert(0, "0");
+        map.textEdited();
+        compare(TruehdEncodeController.mapText, "0");
+        const mapError = findChild(dialog.contentItem, "truehdEncodeMapError");
+        tryCompare(mapError, "visible", true, 2000);
+
+        const offset = findChild(dialog.contentItem, "truehdEncodeOffset_1");
+        verify(offset !== null);
+        offset.insert(0, "x");
+        offset.textEdited();
+        compare(TruehdEncodeController.offsetTexts[1], "x");
+        const offsetError = findChild(dialog.contentItem, "truehdEncodeOffsetError_1");
+        tryCompare(offsetError, "visible", true, 2000);
+
+        findChild(dialog.contentItem, "truehdEncodeRemoveSource_1").clicked();
+        compare(TruehdEncodeController.extraSources.length, 0);
+        tryVerify(() => findChild(dialog.contentItem, "truehdEncodeSourceName_1") === null, 2000);
+        dialog.close();
     }
 
     // What is not a WAV is refused with the reader's sentence, and nothing is written.

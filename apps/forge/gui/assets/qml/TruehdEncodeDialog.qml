@@ -36,6 +36,14 @@ Dialog {
     }
 
     FileDialog {
+        id: extraSourceDialog
+        objectName: "truehdEncodeExtraSourceDialog"
+        title: qsTr("Choose another WAV file")
+        nameFilters: [qsTr("WAV audio (*.wav)"), qsTr("All files (*)")]
+        onAccepted: TruehdEncodeController.addSource(selectedFile)
+    }
+
+    FileDialog {
         id: outputDialog
         objectName: "truehdEncodeOutputDialog"
         title: qsTr("Save the TrueHD stream as")
@@ -239,6 +247,118 @@ Dialog {
             checked: TruehdEncodeController.standardDownmix
             enabled: !TruehdEncodeController.busy
             onToggled: TruehdEncodeController.standardDownmix = checked
+        }
+
+        Button {
+            objectName: "truehdEncodeMoreSources"
+            text: sourcesPanel.visible ? qsTr("Hide the sources") : qsTr("Several sources…")
+            onClicked: sourcesPanel.visible = !sourcesPanel.visible
+        }
+
+        ColumnLayout {
+            id: sourcesPanel
+            objectName: "truehdEncodeSourcesPanel"
+            Layout.fillWidth: true
+            visible: false
+            spacing: Theme.space2
+
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Each WAV is a source; the one chosen above is source 0. The map says where each channel of each source goes, as source.channel:place with the places named as TrueHD names them, separated by commas. A source can start some seconds in; a shorter one is padded with silence.")
+                font.pixelSize: Theme.fontSmall
+                color: Theme.neutral700
+            }
+            Repeater {
+                model: 1 + TruehdEncodeController.extraSources.length
+                delegate: ColumnLayout {
+                    id: sourceRow
+                    required property int index
+                    Layout.fillWidth: true
+                    spacing: 2
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            Layout.preferredWidth: 90
+                            text: qsTr("Source %1").arg(sourceRow.index)
+                            font.pixelSize: Theme.fontSmall
+                            color: Theme.text
+                        }
+                        Text {
+                            objectName: "truehdEncodeSourceName_" + sourceRow.index
+                            Layout.fillWidth: true
+                            elide: Text.ElideMiddle
+                            text: sourceRow.index === 0 ? TruehdEncodeController.sourcePath
+                                                        : TruehdEncodeController.extraSources[sourceRow.index - 1]
+                            font.pixelSize: Theme.fontSmall
+                            color: Theme.text
+                        }
+                        Text {
+                            text: qsTr("Starts at (s)")
+                            font.pixelSize: Theme.fontSmall
+                            color: Theme.text
+                        }
+                        TextField {
+                            objectName: "truehdEncodeOffset_" + sourceRow.index
+                            Layout.preferredWidth: 80
+                            text: TruehdEncodeController.offsetTexts[sourceRow.index] || ""
+                            placeholderText: "0"
+                            enabled: !TruehdEncodeController.busy
+                            font.pixelSize: Theme.fontSmall
+                            onTextEdited: TruehdEncodeController.setOffset(sourceRow.index, text)
+                        }
+                        Button {
+                            objectName: "truehdEncodeRemoveSource_" + sourceRow.index
+                            visible: sourceRow.index > 0
+                            text: qsTr("Remove")
+                            enabled: !TruehdEncodeController.busy
+                            onClicked: TruehdEncodeController.removeSource(sourceRow.index - 1)
+                        }
+                    }
+                    Text {
+                        objectName: "truehdEncodeOffsetError_" + sourceRow.index
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        wrapMode: Text.WordWrap
+                        text: TruehdEncodeController.offsetErrors[sourceRow.index] || ""
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.bad
+                    }
+                }
+            }
+            Button {
+                objectName: "truehdEncodeAddSource"
+                text: qsTr("Add a WAV…")
+                enabled: !TruehdEncodeController.busy
+                onClicked: extraSourceDialog.open()
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    Layout.preferredWidth: 220
+                    text: qsTr("Where each channel goes")
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.text
+                }
+                TextField {
+                    objectName: "truehdEncodeMap"
+                    Layout.fillWidth: true
+                    text: TruehdEncodeController.mapText
+                    placeholderText: "0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs"
+                    enabled: !TruehdEncodeController.busy
+                    font.pixelSize: Theme.fontSmall
+                    onTextEdited: TruehdEncodeController.setMap(text)
+                }
+            }
+            Text {
+                objectName: "truehdEncodeMapError"
+                Layout.fillWidth: true
+                visible: text.length > 0
+                wrapMode: Text.WordWrap
+                text: TruehdEncodeController.mapError
+                font.pixelSize: Theme.fontSmall
+                color: Theme.bad
+            }
         }
 
         Button {
