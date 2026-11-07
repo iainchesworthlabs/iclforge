@@ -197,7 +197,7 @@ Result run(const Job& job, const std::atomic<bool>& stop,
     const double pcm_bytes = static_cast<double>(outcome->frames) * outcome->channels * 3.0;
     result.summary =
         QStringLiteral("Wrote %1: %2 channel(s) at %3 Hz, %4 s, %5 access units, %6 restart "
-                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10%11")
+                       "intervals, %7 bytes (%8% of the 24-bit PCM)%9%10%11%12")
             .arg(job.output)
             .arg(outcome->channels)
             .arg(outcome->sample_rate)
