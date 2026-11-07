@@ -5,6 +5,7 @@
 #include <QLocale>
 #include <QMetaObject>
 #include <QMetaType>
+#include <QRegularExpression>
 #include <QTemporaryFile>
 #include <QVariant>
 
@@ -847,6 +848,153 @@ QVariantList ProjectFile::applyObjects(QObject* controller, const QString& objec
         }
         QMetaObject::invokeMethod(controller, "setObjectPathKeyframes", Q_ARG(int, i),
                                   Q_ARG(QVariantList, keyframes), Q_ARG(QString, QString()));
+    }
+    return problems;
+}
+
+QString ProjectFile::captureTruehd(QObject* controller) const {
+    Json out = Json::object();
+    if (controller == nullptr) {
+        return dump(out);
+    }
+    const Draft d{controller};
+    const QString first = d.get("sourcePath").toString();
+    const QStringList extra = d.names("extraSources");
+    const QStringList offsets = d.names("offsetTexts");
+    const QStringList offset_errors = d.names("offsetErrors");
+    Json sources = Json::array();
+    QStringList all{first};
+    all.append(extra);
+    for (qsizetype i = 0; i < all.size(); ++i) {
+        Json source = Json::object();
+        source["path"] = all[i].toStdString();
+        // The dialog keeps the text as typed; a project holds the number, which the command line's
+        // offset= reads back as the same. A source that starts at 0 says nothing.
+        if (i < offsets.size() && !offsets[i].isEmpty() &&
+            (i >= offset_errors.size() || offset_errors[i].isEmpty())) {
+            bool ok = false;
+            if (const double seconds = offsets[i].toDouble(&ok); ok && seconds > 0.0) {
+                source["offsetSeconds"] = seconds;
+            }
+        }
+        sources.push_back(std::move(source));
+    }
+    out["sources"] = std::move(sources);
+
+    // The map as rows. A piece that is not `<source>.<channel>:<place>` is not a row (the dialog
+    // refuses such a map and says so), so a map the window cannot encode is saved as far as it
+    // can be read.
+    Json rows = Json::array();
+    static const QRegularExpression piece{QStringLiteral(R"(^(\d+)\.(\d+):(\S+)$)")};
+    for (const QString& text : d.get("mapText").toString().split(QLatin1Char(','))) {
+        const auto match = piece.match(text.trimmed());
+        if (!match.hasMatch()) {
+            continue;
+        }
+        Json row = Json::object();
+        row["source"] = match.captured(1).toInt();
+        row["channel"] = match.captured(2).toInt();
+        row["to"] = match.captured(3).toStdString();
+        rows.push_back(std::move(row));
+    }
+    if (!rows.empty()) {
+        out["assignments"] = std::move(rows);
+    }
+
+    Json thd = Json::object();
+    thd["verify"] = d.get_bool("verify");
+    thd["downmix"] = d.get_bool("standardDownmix") ? "standard" : "none";
+    const QVariantMap options = d.get("options").toMap();
+    for (const auto& row : project::kTruehdOptionKeys) {
+        const QString text = options.value(q(std::string{row.option})).toString();
+        if (!text.isEmpty()) {
+            thd[std::string{row.key}] = text.toStdString();
+        }
+    }
+    out["truehd"] = std::move(thd);
+    return dump(out);
+}
+
+QStringList ProjectFile::truehdKeys() const {
+    QStringList keys{QStringLiteral("verify"), QStringLiteral("downmix")};
+    for (const auto& row : project::kTruehdOptionKeys) {
+        keys.append(q(std::string{row.key}));
+    }
+    return keys;
+}
+
+QVariantList ProjectFile::applyTruehd(QObject* controller, const QVariantMap& project) const {
+    QVariantList problems;
+    if (controller == nullptr) {
+        return problems;
+    }
+    QMetaObject::invokeMethod(controller, "clear");
+    QMetaObject::invokeMethod(controller, "resetOptions");
+    const Draft d{controller};
+
+    // The sources in the project's order: a map= and an offset= count them from 0, so they are
+    // applied only when every one of them was found.
+    const QVariantList given = project.value(QStringLiteral("sources")).toList();
+    bool all_found = true;
+    bool first_taken = false;
+    QVariantList found;  // the sources that were taken, as the project has them
+    for (const QVariant& entry : given) {
+        const QVariantMap source = entry.toMap();
+        if (source.value(QStringLiteral("exists")).typeId() == QMetaType::Bool &&
+            !source.value(QStringLiteral("exists")).toBool()) {
+            all_found = false;
+            problems.append(message(QStringLiteral("source-missing"),
+                                    {source.value(QStringLiteral("path")).toString()}));
+            continue;
+        }
+        const QUrl url{source.value(QStringLiteral("url")).toString()};
+        if (!first_taken) {
+            QMetaObject::invokeMethod(controller, "chooseSource", Q_ARG(QUrl, url));
+            first_taken = true;
+        } else {
+            QMetaObject::invokeMethod(controller, "addSource", Q_ARG(QUrl, url));
+        }
+        found.append(source);
+    }
+    if (all_found) {
+        QStringList map;
+        for (const QVariant& row : project.value(QStringLiteral("assignments")).toList()) {
+            const QVariantMap r = row.toMap();
+            map.append(QStringLiteral("%1.%2:%3")
+                           .arg(r.value(QStringLiteral("source")).toInt())
+                           .arg(r.value(QStringLiteral("channel")).toInt())
+                           .arg(r.value(QStringLiteral("to")).toString()));
+        }
+        if (!map.isEmpty()) {
+            QMetaObject::invokeMethod(controller, "setMap",
+                                      Q_ARG(QString, map.join(QLatin1Char(','))));
+        }
+        for (qsizetype i = 0; i < found.size(); ++i) {
+            const auto seconds = as_number(found[i].toMap().value(QStringLiteral("offsetSeconds")));
+            if (seconds && *seconds > 0.0) {
+                QMetaObject::invokeMethod(
+                    controller, "setOffset", Q_ARG(int, static_cast<int>(i)),
+                    Q_ARG(QString, QString::number(*seconds, 'g', QLocale::FloatingPointShortest)));
+            }
+        }
+    }
+
+    const QVariantMap thd = project.value(QStringLiteral("encode"))
+                                .toMap()
+                                .value(QStringLiteral("truehd"))
+                                .toMap();
+    d.set("verify", as_flag(thd.value(QStringLiteral("verify"))).value_or(false));
+    d.set("standardDownmix",
+          thd.value(QStringLiteral("downmix")).toString() == QLatin1String("standard"));
+    for (const auto& row : project::kTruehdOptionKeys) {
+        const QVariant value = thd.value(q(std::string{row.key}));
+        const auto type = value.typeId();
+        if (!value.isValid() || type == QMetaType::QVariantMap || type == QMetaType::QVariantList) {
+            continue;  // the command line has no spelling for it
+        }
+        QMetaObject::invokeMethod(controller, "setOption",
+                                  Q_ARG(QString, q(std::string{row.option})),
+                                  Q_ARG(QString, word_of(value)));
     }
     return problems;
 }
