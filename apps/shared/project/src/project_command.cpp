@@ -199,10 +199,10 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
     // `forge truehd-encode <source> <stream>` [src=...] [map=...] [offset=...]
     // [truehd-downmix=standard] [verify], and then the container command like any other stream's.
     // The other sources, the assignment rows (`<source>.<channel>:<place>`, the places TrueHD's
-    // channel names) and the offsets are the command line's own. A lossless encode has no bit rate,
-    // tools, layout or metadata of the AC-3 family, so a project that names them for it is
-    // refused, not run with them dropped; the bit rate the window always writes is the one thing
-    // left out.
+    // channel names) and the offsets are the command line's own, and so are the `truehd-` options
+    // of `encode.truehd`. A lossless encode has no bit rate, tools, layout or metadata of the AC-3
+    // family, so a project that names them for it is refused, not run with them dropped; the bit
+    // rate the window always writes is the one thing left out.
     if (codec == "truehd") {
         if (atmos) {
             return std::unexpected(Message{"truehd-no-atmos", {}});
@@ -237,8 +237,40 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
             }
         }
         if (const Json* thd = member(encode, "truehd"); thd != nullptr && thd->is_object()) {
+            // A key this reader does not know is the document's to keep (project_document.hpp), but a
+            // misspelt option must not vanish: it is said.
+            for (auto it = thd->begin(); it != thd->end(); ++it) {
+                const std::string& key = it.key();
+                const bool listed = std::any_of(
+                    kTruehdOptionKeys.begin(), kTruehdOptionKeys.end(),
+                    [&key](const TruehdOptionKey& row) { return row.key == key; });
+                if (!listed && key != "verify" && key != "downmix") {
+                    out.notes.push_back(Message{"truehd-unknown-key", {key}});
+                }
+            }
             if (string_of(*thd, "downmix", "none") == "standard") {
                 first.argv.emplace_back("truehd-downmix=standard");
+            }
+            // The rest in the order the window's line writes them. A value is the command's text;
+            // whether the command takes it is for the command to say.
+            for (const TruehdOptionKey& row : kTruehdOptionKeys) {
+                const Json* value = member(*thd, row.key);
+                if (value == nullptr || value->is_null()) {
+                    continue;
+                }
+                std::string text;
+                if (value->is_string()) {
+                    text = value->get<std::string>();
+                } else if (value->is_number()) {
+                    text = number_text(*value);
+                } else if (value->is_boolean()) {
+                    text = value->get<bool>() ? "on" : "off";
+                } else {
+                    return std::unexpected(Message{"truehd-bad-option", {std::string{row.key}}});
+                }
+                if (!text.empty()) {  // empty is the encoder's own default
+                    first.argv.push_back("truehd-" + std::string{row.option} + "=" + text);
+                }
             }
             if (bool_of(*thd, "verify")) {
                 first.argv.emplace_back("verify");

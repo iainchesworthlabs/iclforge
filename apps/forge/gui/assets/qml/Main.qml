@@ -1205,8 +1205,6 @@ ApplicationWindow {
             return qsTr("Source %1 has no path and was left out.").arg(a[0]);
         case "source-missing":
             return qsTr("%1 was not found, so it was not loaded.").arg(a[0]);
-        case "truehd-one-source":
-            return qsTr("A TrueHD project codes one WAV, and this one has %1, so none was loaded.").arg(a[0]);
         case "source-not-loaded":
             return qsTr("%1 could not be loaded: %2").arg(a[0]).arg(a[1]);
         case "setting-unknown-choice":
@@ -1242,18 +1240,28 @@ ApplicationWindow {
         const project = JSON.parse(JSON.stringify(window.projectBase));
         project.flow = window.tier;
 
-        // A TrueHD encode is a project of its own kind (codec "truehd"): the WAV of the Encode TrueHD
-        // dialog and its two options, when the workbench holds no source of its own.
+        // A TrueHD encode is a project of its own kind (codec "truehd"), when the workbench holds no
+        // source of its own: the Encode TrueHD dialog's WAV files with their offsets, its map as
+        // assignments, and verify, the downmix and the options it holds, as `forge project` runs them.
         if (EncoderController.sourceModel.length === 0 && TruehdEncodeController.sourcePath.length > 0) {
-            project.sources = [{ path: TruehdEncodeController.sourcePath }];
+            const held = JSON.parse(ProjectFile.captureTruehd(TruehdEncodeController));
+            project.sources = held.sources;
             const encode = Object.assign({}, project.encode || {});
             encode.codec = "truehd";
             encode.container = "elementary";
             encode.options = {};
-            encode.truehd = { verify: TruehdEncodeController.verify,
-                              downmix: TruehdEncodeController.standardDownmix ? "standard" : "none" };
+            // A key of another version's, in the project before, goes back as it came.
+            encode.truehd = Object.assign({}, encode.truehd || {}, held.truehd);
+            for (const key of Object.keys(encode.truehd)) {
+                if (ProjectFile.truehdKeys().indexOf(key) >= 0 && held.truehd[key] === undefined) {
+                    delete encode.truehd[key];  // the dialog holds it, and it is at its default now
+                }
+            }
             project.encode = encode;
             delete project.assignments;
+            if (held.assignments !== undefined) {
+                project.assignments = held.assignments;
+            }
             delete project.atmos;
             delete project.objects;
             return project;
@@ -1364,18 +1372,7 @@ ApplicationWindow {
         const encode = project.encode || {};
         // A TrueHD project is the Encode TrueHD dialog's, and leaves the workbench as it is.
         if (encode.codec === "truehd") {
-            const given = project.sources || [];
-            TruehdEncodeController.clear();
-            if (given.length !== 1) {
-                notes.push({ code: "truehd-one-source", args: [given.length] });
-            } else if (given[0].exists === false) {
-                notes.push({ code: "source-missing", args: [given[0].path] });
-            } else {
-                TruehdEncodeController.chooseSource(given[0].url);
-            }
-            const thd = encode.truehd || {};
-            TruehdEncodeController.verify = thd.verify === true;
-            TruehdEncodeController.standardDownmix = thd.downmix === "standard";
+            notes.push.apply(notes, ProjectFile.applyTruehd(TruehdEncodeController, project));
             truehdEncodeDialog.open();
             return notes;
         }

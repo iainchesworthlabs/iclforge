@@ -531,4 +531,56 @@ TEST_CASE("project command: TrueHD is truehd-encode with its own two options, an
               std::vector<std::string>{"truehd-encode", g(folder.path() / "a.wav"),
                                        g(folder.path() / "song.thd"), "map=0.1:R,0.0:L"});
     }
+    SECTION("the dialog's options are the command's truehd- options, in the dialog's order") {
+        folder.touch("b.wav");
+        // Written out of order, with numbers, text and a flag: the line is the dialog's.
+        const auto plan = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav", "offsetSeconds": 1.5}],
+                            "assignments": [{"source": 0, "channel": 0, "to": "L"},
+                                            {"source": 1, "channel": 0, "to": "R"}],
+                            "encode": {"codec": "truehd",
+                                       "truehd": {"verify": true,
+                                                  "downmixGains": "-3,-3,off,-3",
+                                                  "stereoMode": "ltrt",
+                                                  "matrix": false,
+                                                  "firOrder": 4,
+                                                  "majorSync": "16",
+                                                  "bitrate": 9000,
+                                                  "rateCheck": "lenient",
+                                                  "peakRate": 20000,
+                                                  "restart": 8,
+                                                  "downmix": "standard"}}})"),
+            request(folder));
+        REQUIRE(plan.has_value());
+        const auto& argv = plan->steps[0].argv;
+        CHECK(std::vector<std::string>(argv.begin() + 3, argv.end()) ==
+              std::vector<std::string>{"src=" + g(folder.path() / "b.wav"), "map=0.0:L,1.0:R",
+                                       "offset=1:1.5", "truehd-downmix=standard",
+                                       "truehd-restart=8", "truehd-peak-rate=20000",
+                                       "truehd-rate-check=lenient", "truehd-bitrate=9000",
+                                       "truehd-major-sync=16", "truehd-fir-order=4",
+                                       "truehd-matrix=off", "truehd-stereo-mode=ltrt",
+                                       "truehd-downmix-gains=-3,-3,off,-3", "verify"});
+        CHECK(plan->notes.empty());
+    }
+    SECTION("an option left empty is the encoder's default, and a key of no option is said") {
+        const auto plan = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}],
+                            "encode": {"codec": "truehd",
+                                       "truehd": {"restart": "", "peakRate": null, "peak-rate": 5}}})"),
+            request(folder));
+        REQUIRE(plan.has_value());
+        CHECK(plan->steps[0].argv.size() == 3);
+        REQUIRE(plan->notes.size() == 1);
+        CHECK(plan->notes[0].code == "truehd-unknown-key");
+        CHECK(plan->notes[0].args == std::vector<std::string>{"peak-rate"});
+        // A value the command line has no spelling for is refused.
+        const auto bad = project::command_plan(
+            Json::parse(R"({"sources": [{"path": "a.wav"}],
+                            "encode": {"codec": "truehd", "truehd": {"restart": [8]}}})"),
+            request(folder));
+        REQUIRE_FALSE(bad.has_value());
+        CHECK(bad.error().code == "truehd-bad-option");
+        CHECK(bad.error().args == std::vector<std::string>{"restart"});
+    }
 }

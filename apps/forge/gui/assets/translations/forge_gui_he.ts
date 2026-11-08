@@ -2008,7 +2008,7 @@
     </message>
     <message>
         <location filename="../qml/Main.qml" line="473"/>
-        <location filename="../qml/Main.qml" line="7604"/>
+        <location filename="../qml/Main.qml" line="7601"/>
         <source>Format</source>
         <translation>פורמט</translation>
     </message>
@@ -2029,19 +2029,19 @@
     </message>
     <message>
         <location filename="../qml/Main.qml" line="499"/>
-        <location filename="../qml/Main.qml" line="7683"/>
+        <location filename="../qml/Main.qml" line="7680"/>
         <source>on</source>
         <translation>פעיל</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="505"/>
-        <location filename="../qml/Main.qml" line="6671"/>
+        <location filename="../qml/Main.qml" line="6668"/>
         <source>Live session</source>
         <translation>שיח חי</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="506"/>
-        <location filename="../qml/Main.qml" line="2745"/>
+        <location filename="../qml/Main.qml" line="2742"/>
         <source>live</source>
         <translation>חי</translation>
     </message>
@@ -2062,8 +2062,8 @@
     </message>
     <message>
         <location filename="../qml/Main.qml" line="585"/>
-        <location filename="../qml/Main.qml" line="3493"/>
-        <location filename="../qml/Main.qml" line="3497"/>
+        <location filename="../qml/Main.qml" line="3490"/>
+        <location filename="../qml/Main.qml" line="3494"/>
         <source>%1 kbps</source>
         <translation>%1 קילוסיביות לשנייה</translation>
     </message>
@@ -2168,8 +2168,8 @@
         <location filename="../qml/Main.qml" line="886"/>
         <location filename="../qml/Main.qml" line="896"/>
         <location filename="../qml/Main.qml" line="1039"/>
-        <location filename="../qml/Main.qml" line="1535"/>
-        <location filename="../qml/Main.qml" line="1536"/>
+        <location filename="../qml/Main.qml" line="1532"/>
+        <location filename="../qml/Main.qml" line="1533"/>
         <source>All files (*)</source>
         <translation>כל הקבצים (*)</translation>
     </message>
@@ -2219,218 +2219,218 @@
         <translation>סצנת אובייקטים (*.json)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1535"/>
+        <location filename="../qml/Main.qml" line="1532"/>
         <source>%1 file (*.%2)</source>
         <translation>קובץ %1 (*.%2)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1746"/>
+        <location filename="../qml/Main.qml" line="1743"/>
         <source>This moves the stream to Dolby Digital Plus</source>
         <translation>זה מעביר את הזרם ל-Dolby Digital Plus</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1753"/>
+        <location filename="../qml/Main.qml" line="1750"/>
         <source>Anything past a bed and its LFE needs Dolby Digital Plus, so the codec follows the channels — the file becomes .ec3 rather than .ac3. Every modern receiver reads it; a DVD player will not.</source>
         <translation>כל מה שמעבר לשכבת בסיס ול-LFE שלה דורש Dolby Digital Plus, ולכן הקודק עוקב אחרי הערוצים — הקובץ הופך ל-.ec3 ולא ל-.ac3. כל מקלט מודרני קורא אותו; נגן DVD לא.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1762"/>
-        <location filename="../qml/Main.qml" line="7875"/>
+        <location filename="../qml/Main.qml" line="1759"/>
+        <location filename="../qml/Main.qml" line="7872"/>
         <source>Cancel</source>
         <translation>ביטול</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1770"/>
+        <location filename="../qml/Main.qml" line="1767"/>
         <source>Continue</source>
         <translation>המשיכו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1815"/>
+        <location filename="../qml/Main.qml" line="1812"/>
         <source>Run %1 — %2</source>
         <translation>הרצה %1 — %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1829"/>
+        <location filename="../qml/Main.qml" line="1826"/>
         <source>Status</source>
         <translation>סטטוס</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1835"/>
+        <location filename="../qml/Main.qml" line="1832"/>
         <source>Rate</source>
         <translation>קצב</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1841"/>
+        <location filename="../qml/Main.qml" line="1838"/>
         <source>Duration</source>
         <translation>משך</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1849"/>
+        <location filename="../qml/Main.qml" line="1846"/>
         <source>Size</source>
         <translation>גודל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1861"/>
+        <location filename="../qml/Main.qml" line="1858"/>
         <source>Frames</source>
         <translation>מסגרות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1873"/>
-        <location filename="../qml/Main.qml" line="5809"/>
+        <location filename="../qml/Main.qml" line="1870"/>
+        <location filename="../qml/Main.qml" line="5806"/>
         <source>Path</source>
         <translation>נתיב</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1902"/>
+        <location filename="../qml/Main.qml" line="1899"/>
         <source>COMMAND LINE AT START</source>
         <translation>שורת הפקודה בהתחלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1920"/>
+        <location filename="../qml/Main.qml" line="1917"/>
         <source>(not recorded)</source>
         <translation>(לא נרשמה)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1933"/>
+        <location filename="../qml/Main.qml" line="1930"/>
         <source>Copy command line</source>
         <translation>העתקת שורת הפקודה</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="946"/>
-        <location filename="../qml/Main.qml" line="1939"/>
+        <location filename="../qml/Main.qml" line="1936"/>
         <source>Close</source>
         <translation>סגירה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2032"/>
+        <location filename="../qml/Main.qml" line="2029"/>
         <source>Forge</source>
         <translation>Forge</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2041"/>
+        <location filename="../qml/Main.qml" line="2038"/>
         <source>Clean-room AC-3 / E-AC-3 encoder — ATSC A/52, ETSI TS 103 420</source>
         <translation>מקודד AC-3 / E-AC-3 בפיתוח נקי — ATSC A/52, ETSI TS 103 420</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2048"/>
+        <location filename="../qml/Main.qml" line="2045"/>
         <source>CONTROLS</source>
         <translation>פקדים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2058"/>
+        <location filename="../qml/Main.qml" line="2055"/>
         <source>Guided</source>
         <translation>מודרך</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2059"/>
+        <location filename="../qml/Main.qml" line="2056"/>
         <source>Advanced</source>
         <translation>מתקדם</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2060"/>
+        <location filename="../qml/Main.qml" line="2057"/>
         <source>Expert</source>
         <translation>מומחה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2070"/>
+        <location filename="../qml/Main.qml" line="2067"/>
         <source>QC a stream…</source>
         <translation>בדיקת איכות זרם…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2075"/>
+        <location filename="../qml/Main.qml" line="2072"/>
         <source>Inspect objects…</source>
         <translation>בדיקת אובייקטים…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2080"/>
+        <location filename="../qml/Main.qml" line="2077"/>
         <source>Open stream…</source>
         <translation>פתיחת זרם…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2090"/>
+        <location filename="../qml/Main.qml" line="2087"/>
         <source>About</source>
         <translation>אודות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2135"/>
+        <location filename="../qml/Main.qml" line="2132"/>
         <source>INPUT</source>
         <translation>קלט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2146"/>
+        <location filename="../qml/Main.qml" line="2143"/>
         <source>File</source>
         <translation>קובץ</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2147"/>
+        <location filename="../qml/Main.qml" line="2144"/>
         <source>Live capture</source>
         <translation>לכידה חיה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2197"/>
+        <location filename="../qml/Main.qml" line="2194"/>
         <source>%1 ch · %2</source>
         <translation>%1 ערוצים · %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2249"/>
-        <location filename="../qml/Main.qml" line="2480"/>
+        <location filename="../qml/Main.qml" line="2246"/>
+        <location filename="../qml/Main.qml" line="2477"/>
         <source>Remove</source>
         <translation>הסירו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2266"/>
+        <location filename="../qml/Main.qml" line="2263"/>
         <source>Start offset</source>
         <translation>היסט התחלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2304"/>
+        <location filename="../qml/Main.qml" line="2301"/>
         <source>No source loaded yet.</source>
         <translation>עדיין לא נטען מקור.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2317"/>
+        <location filename="../qml/Main.qml" line="2314"/>
         <source>Choose WAV…</source>
         <translation>בחרו WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2317"/>
+        <location filename="../qml/Main.qml" line="2314"/>
         <source>+ Add files…</source>
         <translation>+ הוסיפו קבצים…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2328"/>
-        <location filename="../qml/Main.qml" line="2333"/>
+        <location filename="../qml/Main.qml" line="2325"/>
+        <location filename="../qml/Main.qml" line="2330"/>
         <source>Assign</source>
         <translation>שייכו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2374"/>
+        <location filename="../qml/Main.qml" line="2371"/>
         <source>RATE</source>
         <translation>קצב</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2375"/>
+        <location filename="../qml/Main.qml" line="2372"/>
         <source>SOURCES</source>
         <translation>מקורות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2375"/>
+        <location filename="../qml/Main.qml" line="2372"/>
         <source>%1 · %2 ch</source>
         <translation>%1 · %2 ערוצים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2376"/>
+        <location filename="../qml/Main.qml" line="2373"/>
         <source>LENGTH</source>
         <translation>אורך</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2456"/>
+        <location filename="../qml/Main.qml" line="2453"/>
         <source>%1 — slave</source>
         <translation>%1 — משני</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2258"/>
-        <location filename="../qml/Main.qml" line="2487"/>
+        <location filename="../qml/Main.qml" line="2255"/>
+        <location filename="../qml/Main.qml" line="2484"/>
         <source>Remove %1</source>
         <translation>הסירו %1</translation>
     </message>
@@ -2496,1670 +2496,1665 @@
         <translation>%1 לא נמצא, ולכן לא נטען.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1211"/>
+        <location filename="../qml/Main.qml" line="1209"/>
         <source>%1 could not be loaded: %2</source>
         <translation>לא ניתן היה לטעון את %1: %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1213"/>
+        <location filename="../qml/Main.qml" line="1211"/>
         <source>%1 &quot;%2&quot; is not one this Forge knows. It was left as it was.</source>
         <translation>%1 &quot;%2&quot; אינו מוכר ל-Forge הזה. הוא הושאר כפי שהיה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1215"/>
+        <location filename="../qml/Main.qml" line="1213"/>
         <source>%1 %2 is out of range. It was left as it was.</source>
         <translation>%1 %2 מחוץ לטווח. הוא הושאר כפי שהיה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1217"/>
+        <location filename="../qml/Main.qml" line="1215"/>
         <source>%1 kbps is not a rate this codec offers. It was left as it was.</source>
         <translation>%1 kbps אינו קצב שהקודק הזה מציע. הוא הושאר כפי שהיה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1219"/>
+        <location filename="../qml/Main.qml" line="1217"/>
         <source>%1 could not be set.</source>
         <translation>לא ניתן היה להגדיר את %1.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1227"/>
+        <location filename="../qml/Main.qml" line="1225"/>
         <source>The channel layout &quot;%1&quot; is not one this Forge knows. It was left as it was.</source>
         <translation>פריסת הערוצים &quot;%1&quot; אינה מוכרת ל-Forge הזה. היא הושארה כפי שהייתה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1229"/>
+        <location filename="../qml/Main.qml" line="1227"/>
         <source>An encode is running. Open the project when it has finished.</source>
         <translation>קידוד פועל כעת. פתחו את הפרויקט כשיסתיים.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1473"/>
-        <location filename="../qml/Main.qml" line="1478"/>
+        <location filename="../qml/Main.qml" line="1470"/>
+        <location filename="../qml/Main.qml" line="1475"/>
         <source>The project was not opened</source>
         <translation>הפרויקט לא נפתח</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1487"/>
+        <location filename="../qml/Main.qml" line="1484"/>
         <source>The project was opened with notes</source>
         <translation>הפרויקט נפתח עם הערות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1496"/>
+        <location filename="../qml/Main.qml" line="1493"/>
         <source>The project was not saved</source>
         <translation>הפרויקט לא נשמר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2056"/>
+        <location filename="../qml/Main.qml" line="2053"/>
         <source>Controls</source>
         <extracomment>Accessible name of the Guided / Advanced / Expert switch</extracomment>
         <translation>בקרות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2063"/>
+        <location filename="../qml/Main.qml" line="2060"/>
         <source>Karaoke</source>
         <translation>קריוקי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1983"/>
+        <location filename="../qml/Main.qml" line="1980"/>
         <source>Project…</source>
         <translation>פרויקט…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1209"/>
-        <source>A TrueHD project codes one WAV, and this one has %1, so none was loaded.</source>
-        <translation>פרויקט TrueHD מקודד קובץ WAV אחד, ולפרויקט הזה יש %1, ולכן לא נטען אף קובץ.</translation>
-    </message>
-    <message>
-        <location filename="../qml/Main.qml" line="1221"/>
+        <location filename="../qml/Main.qml" line="1219"/>
         <source>%1 is in the project and `forge` uses it, but this window has no control for it, so its own encode does not.</source>
         <translation>%1 נמצא בפרויקט ו־`forge` משתמש בו, אך אין לחלון הזה פקד עבורו, ולכן הקידוד שלו אינו משתמש בו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1223"/>
+        <location filename="../qml/Main.qml" line="1221"/>
         <source>The project has %1 objects and the window has %2: the rest were left out.</source>
         <translation>בפרויקט יש %1 אובייקטים ובחלון %2: השאר הושמטו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1225"/>
+        <location filename="../qml/Main.qml" line="1223"/>
         <source>The objects&apos; placements and motion in the project could not be read.</source>
         <translation>לא ניתן היה לקרוא את מיקומי האובייקטים ותנועתם בפרויקט.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1993"/>
+        <location filename="../qml/Main.qml" line="1990"/>
         <source>Open project…</source>
         <translation>פתיחת פרויקט…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="1998"/>
+        <location filename="../qml/Main.qml" line="1995"/>
         <source>Save project…</source>
         <translation>שמירת פרויקט…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2085"/>
+        <location filename="../qml/Main.qml" line="2082"/>
         <source>Settings</source>
         <translation>הגדרות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2144"/>
+        <location filename="../qml/Main.qml" line="2141"/>
         <source>Where the sound comes from</source>
         <extracomment>Accessible name of the File / Live capture switch above the source list</extracomment>
         <translation>מאיפה מגיע הצליל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2288"/>
+        <location filename="../qml/Main.qml" line="2285"/>
         <source>Start offset for %1</source>
         <translation>היסט התחלה עבור %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2289"/>
+        <location filename="../qml/Main.qml" line="2286"/>
         <source>Seconds before this source begins, in tenths.</source>
         <translation>שניות לפני שהמקור הזה מתחיל, בעשיריות.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2322"/>
+        <location filename="../qml/Main.qml" line="2319"/>
         <source>Opens a file picker. WAV files can also be dropped anywhere on the window.</source>
         <translation>פותח בורר קבצים. אפשר גם לגרור קובצי WAV אל כל מקום בחלון.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2524"/>
-        <location filename="../qml/Main.qml" line="2667"/>
+        <location filename="../qml/Main.qml" line="2521"/>
+        <location filename="../qml/Main.qml" line="2664"/>
         <source>No capture devices were found.</source>
         <translation>לא נמצאו התקני לכידה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2539"/>
+        <location filename="../qml/Main.qml" line="2536"/>
         <source>Add input</source>
         <translation>הוסיפו קלט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2547"/>
+        <location filename="../qml/Main.qml" line="2544"/>
         <source>Add input…</source>
         <translation>הוסיפו קלט…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2574"/>
+        <location filename="../qml/Main.qml" line="2571"/>
         <source>Two devices per session — remove one to add another.</source>
         <translation>שני התקנים לכל הפעלה — הסירו אחד כדי להוסיף אחר.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2603"/>
-        <location filename="../qml/Main.qml" line="4281"/>
+        <location filename="../qml/Main.qml" line="2600"/>
+        <location filename="../qml/Main.qml" line="4278"/>
         <source>Refresh</source>
         <translation>רעננו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2613"/>
-        <location filename="../qml/Main.qml" line="2627"/>
-        <location filename="../qml/Main.qml" line="6141"/>
+        <location filename="../qml/Main.qml" line="2610"/>
+        <location filename="../qml/Main.qml" line="2624"/>
+        <location filename="../qml/Main.qml" line="6138"/>
         <source>Stop</source>
         <translation>עצרו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2613"/>
-        <location filename="../qml/Main.qml" line="6723"/>
-        <location filename="../qml/Main.qml" line="7678"/>
+        <location filename="../qml/Main.qml" line="2610"/>
+        <location filename="../qml/Main.qml" line="6720"/>
+        <location filename="../qml/Main.qml" line="7675"/>
         <source>Monitor</source>
         <translation>ניטור</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2627"/>
+        <location filename="../qml/Main.qml" line="2624"/>
         <source>Record…</source>
         <translation>הקליטו…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2647"/>
+        <location filename="../qml/Main.qml" line="2644"/>
         <source>recording %1 s</source>
         <translation>מקליט %1 שניות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2648"/>
+        <location filename="../qml/Main.qml" line="2645"/>
         <source>monitoring %1 s</source>
         <translation>מנטר %1 שניות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2659"/>
+        <location filename="../qml/Main.qml" line="2656"/>
         <source>Monitoring is free — nothing is written and no filename is asked for. The levels below are real. Open Live session to set up and start a real take.</source>
         <translation>ניטור הוא חופשי — שום דבר לא נכתב ולא מתבקש שם קובץ. הרמות שלמטה אמיתיות. פתחו &apos;הפעלה חיה&apos; כדי להגדיר ולהתחיל טייק אמיתי.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2681"/>
+        <location filename="../qml/Main.qml" line="2678"/>
         <source>LEVELS</source>
         <translation>רמות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2759"/>
+        <location filename="../qml/Main.qml" line="2756"/>
         <source>Meters — show</source>
         <translation>מדים — הצג</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2761"/>
+        <location filename="../qml/Main.qml" line="2758"/>
         <source>Coded</source>
         <translation>מקודד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2762"/>
+        <location filename="../qml/Main.qml" line="2759"/>
         <source>Rendered</source>
         <translation>מרונדר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2858"/>
+        <location filename="../qml/Main.qml" line="2855"/>
         <source>Two independent programmes. The meters are not a pair — nothing here is correlated.</source>
         <translation>שתי תוכניות עצמאיות. המדידים אינם זוג — שום דבר כאן אינו מתואם.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2862"/>
+        <location filename="../qml/Main.qml" line="2859"/>
         <source>All %1 speakers are driven — the bed carries the panned objects. Coded shows the channels as encoded.</source>
         <translation>כל %1 הרמקולים מונעים — שכבת הבסיס נושאת את האובייקטים שנפרסו בפנורמה. &apos;מקודד&apos; מציג את הערוצים כפי שקודדו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2865"/>
+        <location filename="../qml/Main.qml" line="2862"/>
         <source>%1 of %2 positions are driven. The rest are carried silent — switch to Coded to see them.</source>
         <translation>%1 מתוך %2 מיקומים מונעים. השאר נישאים בשקט — עברו ל&apos;מקודד&apos; כדי לראות אותם.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2867"/>
+        <location filename="../qml/Main.qml" line="2864"/>
         <source>Every coded channel is driven — Coded and Rendered are the same here.</source>
         <translation>כל ערוץ מקודד מונע — &apos;מקודד&apos; ו&apos;מרונדר&apos; זהים כאן.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2870"/>
+        <location filename="../qml/Main.qml" line="2867"/>
         <source>%1 of %2 bed positions fed — the rest of the audio rides as objects, not channels.</source>
         <translation>%1 מתוך %2 מיקומים בשכבת הבסיס מוזנים — שאר האודיו נישא כאובייקטים, לא כערוצים.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2873"/>
+        <location filename="../qml/Main.qml" line="2870"/>
         <source>%1 of %2 coded channels fed by the assignments.</source>
         <translation>%1 מתוך %2 ערוצים מקודדים מוזנים על ידי השיוכים.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2875"/>
+        <location filename="../qml/Main.qml" line="2872"/>
         <source>All %1 coded channels fed by the assignments.</source>
         <translation>כל %1 הערוצים המקודדים מוזנים על ידי השיוכים.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2885"/>
+        <location filename="../qml/Main.qml" line="2882"/>
         <source>Load a source, or start a live capture, and every coded channel gets a meter here.</source>
         <translation>טענו מקור, או התחילו לכידה חיה, וכל ערוץ מקודד יקבל מדיד כאן.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2897"/>
+        <location filename="../qml/Main.qml" line="2894"/>
         <source>SOUNDFIELD</source>
         <translation>שדה צליל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2919"/>
+        <location filename="../qml/Main.qml" line="2916"/>
         <source>Programme 1</source>
         <translation>תוכנית 1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2919"/>
+        <location filename="../qml/Main.qml" line="2916"/>
         <source>Programme 2</source>
         <translation>תוכנית 2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2945"/>
+        <location filename="../qml/Main.qml" line="2942"/>
         <source>its own dialnorm and compression</source>
         <translation>dialnorm ודחיסה משלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2955"/>
+        <location filename="../qml/Main.qml" line="2952"/>
         <source>No room to draw — dual mono has no soundstage. The listener&apos;s receiver plays one programme or the other.</source>
         <translation>אין חדר לצייר — לדואל מונו אין במת צליל. המקלט של המאזין מנגן תוכנית אחת או האחרת.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="2965"/>
+        <location filename="../qml/Main.qml" line="2962"/>
         <source>Load a source, or start a live capture, and the plan&apos;s positions are drawn here at their real angles.</source>
         <translation>טענו מקור, או התחילו לכידה חיה, ומיקומי התרשים ישורטטו כאן בזוויות האמיתיות שלהם.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3009"/>
+        <location filename="../qml/Main.qml" line="3006"/>
         <source>Run %1 stopped after %2 — %3</source>
         <translation>הרצה %1 נעצרה אחרי %2 — %3</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3011"/>
+        <location filename="../qml/Main.qml" line="3008"/>
         <source>Run %1 stopped — %2</source>
         <translation>הרצה %1 נעצרה — %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3078"/>
+        <location filename="../qml/Main.qml" line="3075"/>
         <source>Choose another device</source>
         <translation>בחירת התקן אחר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3095"/>
+        <location filename="../qml/Main.qml" line="3092"/>
         <source>Retry as file</source>
         <translation>ניסיון חוזר כקובץ</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3104"/>
+        <location filename="../qml/Main.qml" line="3101"/>
         <source>Dismiss</source>
         <translation>סגרו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3126"/>
+        <location filename="../qml/Main.qml" line="3123"/>
         <source>You came here from the guided steps. Anything you change is kept when you go back.</source>
         <translation>הגעתם לכאן מהשלבים המודרכים. כל שינוי שתעשו נשמר כשתחזרו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3133"/>
+        <location filename="../qml/Main.qml" line="3130"/>
         <source>Back to guided</source>
         <translation>חזרה למודרך</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3162"/>
+        <location filename="../qml/Main.qml" line="3159"/>
         <source>THE STREAM</source>
         <translation>הזרם</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3191"/>
+        <location filename="../qml/Main.qml" line="3188"/>
         <source>TOOLS</source>
         <translation>כלים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3250"/>
+        <location filename="../qml/Main.qml" line="3247"/>
         <source>%1 non-default setting(s)</source>
         <translation>%1 הגדרות שאינן ברירת מחדל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3370"/>
+        <location filename="../qml/Main.qml" line="3367"/>
         <source>PRESETS</source>
         <translation>ערכות מוכנות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3376"/>
+        <location filename="../qml/Main.qml" line="3373"/>
         <source>starting points, not the model</source>
         <translation>נקודות התחלה, לא המודל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3442"/>
+        <location filename="../qml/Main.qml" line="3439"/>
         <source>Codec — follows the channels</source>
         <translation>קודק — עוקב אחרי הערוצים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3443"/>
-        <location filename="../qml/Main.qml" line="3470"/>
+        <location filename="../qml/Main.qml" line="3440"/>
+        <location filename="../qml/Main.qml" line="3467"/>
         <source>Codec</source>
         <translation>קודק</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3453"/>
+        <location filename="../qml/Main.qml" line="3450"/>
         <source>Bit rate — band-edge reference, not a target</source>
         <translation>קצב סיביות — ייחוס לקצה הפס, לא יעד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3454"/>
-        <location filename="../qml/Main.qml" line="3489"/>
+        <location filename="../qml/Main.qml" line="3451"/>
+        <location filename="../qml/Main.qml" line="3486"/>
         <source>Bit rate</source>
         <translation>קצב סיביות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3459"/>
-        <location filename="../qml/Main.qml" line="3506"/>
+        <location filename="../qml/Main.qml" line="3456"/>
+        <location filename="../qml/Main.qml" line="3503"/>
         <source>Container</source>
         <translation>מכל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3531"/>
+        <location filename="../qml/Main.qml" line="3528"/>
         <source>%1 coded channels at %2 kbps will audibly starve — encoders refuse outright below the frame minimum.</source>
         <translation>%1 ערוצים מקודדים ב-%2 kbps ירעבו באופן שנשמע — מקודדים מסרבים על הסף מתחת למינימום של המסגרת.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3564"/>
+        <location filename="../qml/Main.qml" line="3561"/>
         <source>CHANNELS — THE TWO-TIER PICKER</source>
         <translation>ערוצים — הבורר הדו-שכבתי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3571"/>
+        <location filename="../qml/Main.qml" line="3568"/>
         <source>%1 of %2 positions used · %3 coded channels</source>
         <translation>%1 מתוך %2 מיקומים בשימוש · %3 ערוצים מקודדים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3582"/>
+        <location filename="../qml/Main.qml" line="3579"/>
         <source>Bed — pick one</source>
         <translation>שכבת הבסיס — בחרו אחת</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3619"/>
-        <location filename="../qml/Main.qml" line="3675"/>
+        <location filename="../qml/Main.qml" line="3616"/>
+        <location filename="../qml/Main.qml" line="3672"/>
         <source>1+1 · dual</source>
         <translation>1+1 · דואל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3621"/>
-        <location filename="../qml/Main.qml" line="3684"/>
+        <location filename="../qml/Main.qml" line="3618"/>
+        <location filename="../qml/Main.qml" line="3681"/>
         <source>2 progs</source>
         <translation>2 תוכניות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3707"/>
+        <location filename="../qml/Main.qml" line="3704"/>
         <source>One bed, always. Extras add to it — the format cannot carry a ceiling channel, or any other, without a bed underneath.</source>
         <translation>שכבת בסיס אחת, תמיד. התוספות מתווספות אליה — הפורמט לא יכול לשאת ערוץ תקרה, או כל ערוץ אחר, בלי שכבת בסיס תחתיו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3719"/>
+        <location filename="../qml/Main.qml" line="3716"/>
         <source>Low frequency</source>
         <translation>תדר נמוך</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3727"/>
+        <location filename="../qml/Main.qml" line="3724"/>
         <source>not part of dual mono</source>
         <translation>לא חלק מדואל מונו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3727"/>
+        <location filename="../qml/Main.qml" line="3724"/>
         <source>fixed by object mode</source>
         <translation>מקובע על ידי מצב האובייקטים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3771"/>
+        <location filename="../qml/Main.qml" line="3768"/>
         <source>None</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3772"/>
+        <location filename="../qml/Main.qml" line="3769"/>
         <source>One · LFE</source>
         <translation>אחד · LFE</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3773"/>
+        <location filename="../qml/Main.qml" line="3770"/>
         <source>Two · LFE + LFE2</source>
         <translation>שניים · LFE + LFE2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3865"/>
+        <location filename="../qml/Main.qml" line="3862"/>
         <source>Two means two independent low-frequency channels carrying different signal — not one signal sent to two subwoofers. This is what makes a 7.2.4 rather than a 7.1.4.</source>
         <translation>שניים פירושו שני ערוצי תדר נמוך עצמאיים שנושאים אות שונה — לא אות אחד שנשלח לשני סאב-וופרים. זה מה שהופך את זה ל-7.2.4 ולא ל-7.1.4.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3875"/>
+        <location filename="../qml/Main.qml" line="3872"/>
         <source>Extras — added to the bed</source>
         <translation>תוספות — נוספות לשכבת הבסיס</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3882"/>
+        <location filename="../qml/Main.qml" line="3879"/>
         <source>pairs toggle together</source>
         <translation>זוגות מתחלפים יחד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3921"/>
+        <location filename="../qml/Main.qml" line="3918"/>
         <source>%1. %2</source>
         <translation>%1. %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3958"/>
+        <location filename="../qml/Main.qml" line="3955"/>
         <source>moves to Dolby Digital Plus</source>
         <translation>עובר ל-Dolby Digital Plus</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3998"/>
+        <location filename="../qml/Main.qml" line="3995"/>
         <source>Dual mono carries two unrelated soundtracks — a second language, a commentary track — chosen by the listener, not mixed together. There is no stereo pair, no surround, no LFE and no downmix, and each programme carries its own dialnorm and compression.</source>
         <translation>דואל מונו נושא שני פסקולים לא קשורים — שפה שנייה, רצועת פרשנות — שהמאזין בוחר ביניהם, לא מעורבבים יחד. אין זוג סטריאו, אין סראונד, אין LFE ואין דאונמיקס, וכל תוכנית נושאת dialnorm ודחיסה משלה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4010"/>
+        <location filename="../qml/Main.qml" line="4007"/>
         <source>Dual mono is not a layout — it is two programmes. Extras, the LFE and objects do not apply, and the assignments below choose which sound is which programme.</source>
         <translation>דואל מונו אינו פריסה — אלה שתי תוכניות. התוספות, ה-LFE והאובייקטים אינם רלוונטיים, והשיוכים שלמטה בוחרים איזה צליל הוא איזו תוכנית.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4013"/>
+        <location filename="../qml/Main.qml" line="4010"/>
         <source>AC-4 objects have no bed: the objects are written as objects, and the positions above are not used.</source>
         <translation>לאובייקטי AC-4 אין שכבת בסיס: האובייקטים נכתבים כאובייקטים, והמיקומים שלמעלה אינם בשימוש.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4016"/>
+        <location filename="../qml/Main.qml" line="4013"/>
         <source>Object mode fixes the bed at 5.1. The positions above describe the bed, not the objects.</source>
         <translation>מצב האובייקטים מקבע את שכבת הבסיס על 5.1. המיקומים שלמעלה מתארים את שכבת הבסיס, לא את האובייקטים.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4019"/>
+        <location filename="../qml/Main.qml" line="4016"/>
         <source>Anything past a bed and its LFE needs Dolby Digital Plus, so the codec has followed the channels — up to sixteen rendered locations, including a second, independent LFE.</source>
         <translation>כל מה שמעבר לשכבת בסיס ול-LFE שלה דורש Dolby Digital Plus, ולכן הקודק עקב אחרי הערוצים — עד שישה עשר מיקומים מרונדרים, כולל LFE שני ועצמאי.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4021"/>
+        <location filename="../qml/Main.qml" line="4018"/>
         <source>A bed with or without an LFE is Dolby Digital, capped at 5.1. Adding any extra — rear, ceiling or a second LFE — moves the stream to Dolby Digital Plus.</source>
         <translation>שכבת בסיס עם LFE או בלעדיו היא Dolby Digital, עם תקרה של 5.1. הוספת כל תוספת — אחורי, תקרה או LFE שני — מעבירה את הזרם ל-Dolby Digital Plus.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4039"/>
+        <location filename="../qml/Main.qml" line="4036"/>
         <source>ROUTING — WHAT HAPPENS TO THIS SOURCE</source>
         <translation>ניתוב — מה קורה למקור הזה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4059"/>
+        <location filename="../qml/Main.qml" line="4056"/>
         <source>SOURCE</source>
         <translation>מקור</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4068"/>
+        <location filename="../qml/Main.qml" line="4065"/>
         <source>nothing</source>
         <translation>כלום</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4072"/>
+        <location filename="../qml/Main.qml" line="4069"/>
         <source>2 mono programmes</source>
         <translation>2 תוכניות מונו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4075"/>
+        <location filename="../qml/Main.qml" line="4072"/>
         <source>1 source · %1 ch</source>
         <translation>מקור אחד · %1 ערוצים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4076"/>
+        <location filename="../qml/Main.qml" line="4073"/>
         <source>%1 sources · %2 ch</source>
         <translation>%1 מקורות · %2 ערוצים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4102"/>
+        <location filename="../qml/Main.qml" line="4099"/>
         <source>CODED</source>
         <translation>מקודד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4111"/>
+        <location filename="../qml/Main.qml" line="4108"/>
         <source>2 programmes</source>
         <translation>2 תוכניות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4114"/>
+        <location filename="../qml/Main.qml" line="4111"/>
         <source>%1 objects + 5.1 bed</source>
         <translation>%1 אובייקטים + שכבת בסיס 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4121"/>
+        <location filename="../qml/Main.qml" line="4118"/>
         <source>%1 coded · %2 spk</source>
         <translation>%1 מקודדים · %2 רמק׳</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4173"/>
+        <location filename="../qml/Main.qml" line="4170"/>
         <source>Filled = fed by a source. Outlined = carried silent.</source>
         <translation>מלא = מוזן ממקור. מתוחם = נישא בשקט.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4190"/>
+        <location filename="../qml/Main.qml" line="4187"/>
         <source>ASSIGNMENTS — EVERY SOURCE CHANNEL GOES SOMEWHERE, OR NOWHERE ON PURPOSE</source>
         <translation>שיוכים — כל ערוץ מקור הולך לאנשהו, או לשומקום במכוון</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4204"/>
+        <location filename="../qml/Main.qml" line="4201"/>
         <source>A stereo file cannot be one object — an object is a single point in the room. Send each channel to its own object, or put the pair on bed channels.</source>
         <translation>קובץ סטריאו לא יכול להיות אובייקט אחד — אובייקט הוא נקודה יחידה בחדר. שלחו כל ערוץ לאובייקט משלו, או שימו את הזוג על ערוצי שכבת הבסיס.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4227"/>
+        <location filename="../qml/Main.qml" line="4224"/>
         <source>LOUDNESS</source>
         <translation>עוצמת שמע</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4234"/>
+        <location filename="../qml/Main.qml" line="4231"/>
         <source>Coding tools and broadcast metadata →</source>
         <translation>כלי קידוד ומטא-נתוני שידור →</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4263"/>
-        <location filename="../qml/Main.qml" line="4275"/>
+        <location filename="../qml/Main.qml" line="4260"/>
+        <location filename="../qml/Main.qml" line="4272"/>
         <source>PASSTHROUGH TO A RECEIVER</source>
         <translation>מעבר ישיר למקלט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4287"/>
+        <location filename="../qml/Main.qml" line="4284"/>
         <source>Playing…</source>
         <translation>מנגן…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4287"/>
-        <location filename="../qml/Main.qml" line="7901"/>
+        <location filename="../qml/Main.qml" line="4284"/>
+        <location filename="../qml/Main.qml" line="7898"/>
         <source>Play</source>
         <translation>נגנו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4301"/>
+        <location filename="../qml/Main.qml" line="4298"/>
         <source>Sends the encoded stream as IEC 61937 bursts in exclusive mode, so the receiver decodes it. AC-3 rides data-type-1 bursts and E-AC-3 data-type-21 bursts at four-times rate — each endpoint&apos;s label says which it accepts, and Play stays greyed for a stream the selected endpoint cannot take. Only S/PDIF and HDMI endpoints can bitstream at all.</source>
         <translation>שולח את הזרם המקודד כמקטעי IEC 61937 במצב בלעדי, כך שהמקלט מפענח אותו. AC-3 רוכב על מקטעי data-type-1 ו-E-AC-3 על מקטעי data-type-21 בקצב פי ארבעה — התווית של כל נקודת קצה אומרת מה היא מקבלת, ו&apos;נגנו&apos; נשאר מעומעם עבור זרם שנקודת הקצה שנבחרה לא יכולה לקבל. רק נקודות קצה של S/PDIF ו-HDMI יכולות לשדר זרם סיביות בכלל.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4323"/>
-        <location filename="../qml/Main.qml" line="4340"/>
+        <location filename="../qml/Main.qml" line="4320"/>
+        <location filename="../qml/Main.qml" line="4337"/>
         <source>Annex E coding tools</source>
         <translation>כלי הקידוד של נספח E</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4329"/>
+        <location filename="../qml/Main.qml" line="4326"/>
         <source>Object mode is on — the Annex E tools don&apos;t apply here. The JOC bed is coded with the encoder&apos;s own fixed tool choices; turn object mode off on the Objects tab to hand-drive coupling, SPX or AHT.</source>
         <translation>מצב האובייקטים פעיל — כלי נספח E אינם רלוונטיים כאן. שכבת הבסיס של JOC מקודדת בבחירות הכלים הקבועות של המקודד עצמו; כבו את מצב האובייקטים בלשונית האובייקטים כדי להפעיל ידנית coupling, SPX או AHT.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4330"/>
+        <location filename="../qml/Main.qml" line="4327"/>
         <source>AC-3 has no Annex E tools — coupling bands, spectral extension and AHT exist in the E-AC-3 syntax only. Switch the codec to Dolby Digital Plus on the Format tab and they appear here.</source>
         <translation>ל-AC-3 אין כלי נספח E — פסי coupling, הרחבה ספקטרלית ו-AHT קיימים בתחביר של E-AC-3 בלבד. החליפו את הקודק ל-Dolby Digital Plus בלשונית הפורמט והם יופיעו כאן.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4345"/>
+        <location filename="../qml/Main.qml" line="4342"/>
         <source>Each of these buys bits somewhere and spends quality somewhere else, so none is on by default. Encoding the same material with and without one is the only way to say whether it earned its place.</source>
         <translation>כל אחד מאלה קונה סיביות במקום אחד ומוציא איכות במקום אחר, ולכן אף אחד אינו פעיל כברירת מחדל. קידוד אותו חומר עם ובלי אחד מהם הוא הדרך היחידה לומר אם הוא הצדיק את מקומו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4358"/>
+        <location filename="../qml/Main.qml" line="4355"/>
         <source>Channel coupling</source>
         <translation>צימוד ערוצים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4364"/>
-        <location filename="../qml/Main.qml" line="4388"/>
+        <location filename="../qml/Main.qml" line="4361"/>
+        <location filename="../qml/Main.qml" line="4385"/>
         <source>begin band</source>
         <translation>פס התחלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4375"/>
-        <location filename="../qml/Main.qml" line="4376"/>
-        <location filename="../qml/Main.qml" line="4399"/>
-        <location filename="../qml/Main.qml" line="4400"/>
-        <location filename="../qml/Main.qml" line="4423"/>
-        <location filename="../qml/Main.qml" line="4424"/>
+        <location filename="../qml/Main.qml" line="4372"/>
+        <location filename="../qml/Main.qml" line="4373"/>
+        <location filename="../qml/Main.qml" line="4396"/>
+        <location filename="../qml/Main.qml" line="4397"/>
+        <location filename="../qml/Main.qml" line="4420"/>
+        <location filename="../qml/Main.qml" line="4421"/>
         <source>auto</source>
         <translation>אוטומטי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4378"/>
+        <location filename="../qml/Main.qml" line="4375"/>
         <source>Channel coupling begin band</source>
         <translation>פס ההתחלה של צימוד הערוצים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4382"/>
+        <location filename="../qml/Main.qml" line="4379"/>
         <source>Spectral extension</source>
         <translation>הרחבה ספקטרלית</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4402"/>
+        <location filename="../qml/Main.qml" line="4399"/>
         <source>Spectral extension begin band</source>
         <translation>פס ההתחלה של ההרחבה הספקטרלית</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4406"/>
+        <location filename="../qml/Main.qml" line="4403"/>
         <source>Adaptive hybrid transform</source>
         <translation>טרנספורם היברידי אדפטיבי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4412"/>
-        <location filename="../qml/Main.qml" line="4426"/>
+        <location filename="../qml/Main.qml" line="4409"/>
+        <location filename="../qml/Main.qml" line="4423"/>
         <source>GAQ mode</source>
         <translation>מצב GAQ</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4431"/>
+        <location filename="../qml/Main.qml" line="4428"/>
         <source>Attenuate the spectral-extension seam</source>
         <translation>החלישו את התפר של ההרחבה הספקטרלית</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4440"/>
+        <location filename="../qml/Main.qml" line="4437"/>
         <source>GAQ mode 0 is the transform with gain-adaptive quantisation switched off, which is how GAQ&apos;s own contribution gets measured.</source>
         <translation>מצב GAQ 0 הוא הטרנספורם עם קוונטיזציה אדפטיבית להגבר מכובה, וכך נמדדת תרומתו של GAQ עצמו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4449"/>
+        <location filename="../qml/Main.qml" line="4446"/>
         <source>forge tools token:  %1</source>
         <translation>אסימון הכלים של forge:  %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4475"/>
+        <location filename="../qml/Main.qml" line="4472"/>
         <source>Loudness</source>
         <translation>עוצמת שמע</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4480"/>
+        <location filename="../qml/Main.qml" line="4477"/>
         <source>Downmix</source>
         <translation>דאונמיקס</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4489"/>
-        <location filename="../qml/Main.qml" line="4494"/>
+        <location filename="../qml/Main.qml" line="4486"/>
+        <location filename="../qml/Main.qml" line="4491"/>
         <source>Centre downmix</source>
         <translation>דאונמיקס מרכזי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4503"/>
-        <location filename="../qml/Main.qml" line="4508"/>
+        <location filename="../qml/Main.qml" line="4500"/>
+        <location filename="../qml/Main.qml" line="4505"/>
         <source>Surround downmix</source>
         <translation>דאונמיקס סראונד</translation>
     </message>
     <message>
+        <location filename="../qml/Main.qml" line="4526"/>
         <location filename="../qml/Main.qml" line="4529"/>
-        <location filename="../qml/Main.qml" line="4532"/>
-        <location filename="../qml/Main.qml" line="4621"/>
+        <location filename="../qml/Main.qml" line="4618"/>
         <source>Heavy compression</source>
         <translation>דחיסה כבדה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4559"/>
-        <location filename="../qml/Main.qml" line="4648"/>
-        <location filename="../qml/Main.qml" line="5604"/>
+        <location filename="../qml/Main.qml" line="4556"/>
+        <location filename="../qml/Main.qml" line="4645"/>
+        <location filename="../qml/Main.qml" line="5601"/>
         <source>ceiling</source>
         <translation>תקרה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4572"/>
+        <location filename="../qml/Main.qml" line="4569"/>
         <source>Heavy compression ceiling</source>
         <translation>תקרת הדחיסה הכבדה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4576"/>
-        <location filename="../qml/Main.qml" line="4665"/>
+        <location filename="../qml/Main.qml" line="4573"/>
+        <location filename="../qml/Main.qml" line="4662"/>
         <source>dialogue at</source>
         <translation>דיאלוג ב-</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4588"/>
+        <location filename="../qml/Main.qml" line="4585"/>
         <source>Heavy compression dialogue level</source>
         <translation>רמת הדיאלוג של הדחיסה הכבדה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4601"/>
+        <location filename="../qml/Main.qml" line="4598"/>
         <source>Heavy compression (§7.7.2) is a peak ceiling in the mono downmix at syncframe resolution — an assurance for links that overmodulate, not the subjectively pleasing reduction dynrng provides.</source>
         <translation>דחיסה כבדה (§7.7.2) היא תקרת שיא בדאונמיקס המונו ברזולוציית syncframe — הבטחה עבור קישורים שמאפננים יתר על המידה, לא ההפחתה הנעימה סובייקטיבית ש-dynrng מספק.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4617"/>
+        <location filename="../qml/Main.qml" line="4614"/>
         <source>Heavy compression — programme 2</source>
         <translation>דחיסה כבדה — תוכנית 2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4661"/>
+        <location filename="../qml/Main.qml" line="4658"/>
         <source>Heavy compression ceiling, programme 2</source>
         <translation>תקרת הדחיסה הכבדה, תוכנית 2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4677"/>
+        <location filename="../qml/Main.qml" line="4674"/>
         <source>Heavy compression dialogue level, programme 2</source>
         <translation>רמת הדיאלוג של הדחיסה הכבדה, תוכנית 2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4685"/>
+        <location filename="../qml/Main.qml" line="4682"/>
         <source>Ch2&apos;s own peak ceiling (§7.7.2.2) - dual mono has no downmix to bound, so this is measured on programme 2&apos;s own signal, independently of the card above.</source>
         <translation>תקרת השיא של Ch2 עצמו (§7.7.2.2) - לדואל מונו אין דאונמיקס לתחום, ולכן זה נמדד על האות של תוכנית 2 עצמה, ללא תלות בכרטיס שלמעלה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4695"/>
-        <location filename="../qml/Main.qml" line="4699"/>
+        <location filename="../qml/Main.qml" line="4692"/>
+        <location filename="../qml/Main.qml" line="4696"/>
         <source>Mixing metadata</source>
         <translation>מטא-נתוני מיקסוג</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4726"/>
-        <location filename="../qml/Main.qml" line="4731"/>
+        <location filename="../qml/Main.qml" line="4723"/>
+        <location filename="../qml/Main.qml" line="4728"/>
         <source>preferred downmix</source>
         <translation>דאונמיקס מועדף</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4739"/>
-        <location filename="../qml/Main.qml" line="4752"/>
+        <location filename="../qml/Main.qml" line="4736"/>
+        <location filename="../qml/Main.qml" line="4749"/>
         <source>LFE mix</source>
         <translation>מיקס LFE</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4749"/>
-        <location filename="../qml/Main.qml" line="4750"/>
-        <location filename="../qml/Main.qml" line="7683"/>
+        <location filename="../qml/Main.qml" line="4746"/>
+        <location filename="../qml/Main.qml" line="4747"/>
+        <location filename="../qml/Main.qml" line="7680"/>
         <source>off</source>
         <translation>כבוי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4760"/>
+        <location filename="../qml/Main.qml" line="4757"/>
         <source>E-AC-3 dropped bsi&apos;s two coarse levels and carries a richer group inside mixmdate instead (Table E1.2), including an LFE mix level AC-3 has no way to express. &quot;Off&quot; is a decision in its own right: LFE mixing disabled, not merely turned down.</source>
         <translation>E-AC-3 זנח את שתי הרמות הגסות של bsi ונושא במקומן קבוצה עשירה יותר בתוך mixmdate (טבלה E1.2), כולל רמת מיקס LFE ש-AC-3 אין לו דרך לבטא. “כבוי” היא החלטה בפני עצמה: מיקס LFE מושבת, לא רק מונמך.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4770"/>
+        <location filename="../qml/Main.qml" line="4767"/>
         <source>Service &amp; production</source>
         <translation>שירות והפקה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4777"/>
-        <location filename="../qml/Main.qml" line="4783"/>
+        <location filename="../qml/Main.qml" line="4774"/>
+        <location filename="../qml/Main.qml" line="4780"/>
         <source>service</source>
         <translation>שירות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4791"/>
-        <location filename="../qml/Main.qml" line="4806"/>
+        <location filename="../qml/Main.qml" line="4788"/>
+        <location filename="../qml/Main.qml" line="4803"/>
         <source>mixed at</source>
         <translation>מוקסס ב-</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4802"/>
-        <location filename="../qml/Main.qml" line="4803"/>
+        <location filename="../qml/Main.qml" line="4799"/>
+        <location filename="../qml/Main.qml" line="4800"/>
         <source>not stated</source>
         <translation>לא צוין</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4810"/>
+        <location filename="../qml/Main.qml" line="4807"/>
         <source>room type</source>
         <translation>סוג החדר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4827"/>
-        <location filename="../qml/Main.qml" line="4833"/>
+        <location filename="../qml/Main.qml" line="4824"/>
+        <location filename="../qml/Main.qml" line="4830"/>
         <source>Dolby Surround</source>
         <translation>Dolby Surround</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4843"/>
-        <location filename="../qml/Main.qml" line="4849"/>
+        <location filename="../qml/Main.qml" line="4840"/>
+        <location filename="../qml/Main.qml" line="4846"/>
         <source>Dolby Headphone</source>
         <translation>Dolby Headphone</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4859"/>
-        <location filename="../qml/Main.qml" line="4865"/>
+        <location filename="../qml/Main.qml" line="4856"/>
+        <location filename="../qml/Main.qml" line="4862"/>
         <source>Surround EX</source>
         <translation>Surround EX</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4874"/>
-        <location filename="../qml/Main.qml" line="4880"/>
+        <location filename="../qml/Main.qml" line="4871"/>
+        <location filename="../qml/Main.qml" line="4877"/>
         <source>A/D</source>
         <translation>ממיר A/D</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4896"/>
+        <location filename="../qml/Main.qml" line="4893"/>
         <source>Copyright</source>
         <translation>זכויות יוצרים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4903"/>
+        <location filename="../qml/Main.qml" line="4900"/>
         <source>Original bit stream</source>
         <translation>זרם סיביות מקורי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4911"/>
+        <location filename="../qml/Main.qml" line="4908"/>
         <source>Annex D (bsid 6)</source>
         <translation>נספח D (bsid 6)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="4922"/>
+        <location filename="../qml/Main.qml" line="4919"/>
         <source>What the stream says about itself, not about how to decode it: which service this is (ATSC A/53 and DVB key associated-service handling off it), how the mix was monitored, and the Dolby Surround / Headphone / Surround EX flags. AC-3 carries the last three only under Annex D, which reuses the two time code fields §D1 says were never applied for their original purpose; E-AC-3 gathers the whole group into infomdat, which naming any of these turns on.</source>
         <translation>מה שהזרם אומר על עצמו, לא על איך לפענח אותו: איזה שירות זה (ATSC A/53 ו-DVB מסתמכים עליו לטיפול בשירותים משויכים), איך המיקס נוטר, והדגלים Dolby Surround / Headphone / Surround EX. AC-3 נושא את שלושת האחרונים רק תחת נספח D, שמשתמש מחדש בשני שדות קוד הזמן ש-§D1 אומר שמעולם לא יושמו למטרתם המקורית; E-AC-3 מאסף את כל הקבוצה לתוך infomdat, ומתן ערך לכל אחד מאלה מפעיל אותו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5114"/>
+        <location filename="../qml/Main.qml" line="5111"/>
         <source>Encode as Dolby Atmos objects</source>
         <translation>קידוד כאובייקטים של Dolby Atmos</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5124"/>
+        <location filename="../qml/Main.qml" line="5121"/>
         <source>%1 objects from the assignments · AC-4 objects · positions ride as object audio metadata</source>
         <translation>%1 אובייקטים מהשיוכים · אובייקטי AC-4 · המיקומים נישאים כמטא-נתוני שמע של אובייקט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5127"/>
+        <location filename="../qml/Main.qml" line="5124"/>
         <source>%1 objects from the assignments · E-AC-3 over a 5.1 bed · positions ride as OAMD</source>
         <translation>%1 אובייקטים מהשיוכים · E-AC-3 מעל שכבת בסיס 5.1 · המיקומים נישאים כ-OAMD</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5168"/>
+        <location filename="../qml/Main.qml" line="5165"/>
         <source>Objects over a 5.1 bed want 384 kbps or better</source>
         <translation>אובייקטים מעל שכבת בסיס 5.1 רוצים 384 kbps או יותר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5175"/>
+        <location filename="../qml/Main.qml" line="5172"/>
         <source>Set it</source>
         <translation>הגדירו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5196"/>
+        <location filename="../qml/Main.qml" line="5193"/>
         <source>AC-4 objects are written at 2 048 samples a frame with one position update per object a frame, %1 objects at most, the LFE one of them, to a raw stream or an MP4 file. Encoding also writes %2 beside the stream, the scene the command below reads. The coding and the dialnorm are on the AC-4 tab, the codec on the Format tab.</source>
         <translation>אובייקטי AC-4 נכתבים ב-2,048 דגימות למסגרת, עם עדכון מיקום אחד לכל אובייקט בכל מסגרת, לכל היותר %1 אובייקטים, אחד מהם ה-LFE, לזרם גולמי או לקובץ MP4. הקידוד כותב גם את %2 לצד הזרם, הסצנה שהפקודה שלמטה קוראת. הקידוד וה-dialnorm בלשונית AC-4, והקודק בלשונית הפורמט.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5236"/>
+        <location filename="../qml/Main.qml" line="5233"/>
         <source>SOUNDS AVAILABLE</source>
         <translation>צלילים זמינים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5243"/>
+        <location filename="../qml/Main.qml" line="5240"/>
         <source>Import audio…</source>
         <translation>ייבאו אודיו…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5250"/>
+        <location filename="../qml/Main.qml" line="5247"/>
         <source>Add live input</source>
         <translation>הוסיפו קלט חי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5291"/>
+        <location filename="../qml/Main.qml" line="5288"/>
         <source>%1 ch · in use</source>
         <translation>%1 ערוצים · בשימוש</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5302"/>
+        <location filename="../qml/Main.qml" line="5299"/>
         <source>Change →</source>
         <translation>שינוי →</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5325"/>
+        <location filename="../qml/Main.qml" line="5322"/>
         <source>Nothing is an object yet. Objects come from the assignments — send a sound to &quot;an object&quot; and it appears here with a place in the room.</source>
         <translation>שום דבר עדיין אינו אובייקט. אובייקטים מגיעים מהשיוכים — שלחו צליל אל “אובייקט” והוא יופיע כאן עם מיקום בחדר.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5331"/>
+        <location filename="../qml/Main.qml" line="5328"/>
         <source>Open assignments</source>
         <translation>פתחו את השיוכים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5351"/>
+        <location filename="../qml/Main.qml" line="5348"/>
         <source>ROOM — PLAN (top-down)</source>
         <translation>החדר — מבט על (מלמעלה)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5357"/>
+        <location filename="../qml/Main.qml" line="5354"/>
         <source>drag to place</source>
         <translation>גררו כדי למקם</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5365"/>
+        <location filename="../qml/Main.qml" line="5362"/>
         <source>Looking down on the room: left↔right is horizontal, front↔rear is vertical.</source>
         <translation>מבט מלמעלה על החדר: שמאל↔ימין הוא האופקי, קדמה↔אחור הוא האנכי.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5386"/>
+        <location filename="../qml/Main.qml" line="5383"/>
         <source>Room plan, top-down</source>
         <translation>מבט על של החדר, מלמעלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5387"/>
-        <location filename="../qml/Main.qml" line="7261"/>
+        <location filename="../qml/Main.qml" line="5384"/>
+        <location filename="../qml/Main.qml" line="7258"/>
         <source>%1 object(s); drag a selected marker to place it</source>
         <translation>%1 אובייקטים; גררו סמן נבחר כדי למקם אותו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5407"/>
-        <location filename="../qml/Main.qml" line="5621"/>
-        <location filename="../qml/Main.qml" line="7283"/>
+        <location filename="../qml/Main.qml" line="5404"/>
+        <location filename="../qml/Main.qml" line="5618"/>
+        <location filename="../qml/Main.qml" line="7280"/>
         <source>front</source>
         <translation>קדמה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5415"/>
-        <location filename="../qml/Main.qml" line="5629"/>
-        <location filename="../qml/Main.qml" line="7291"/>
+        <location filename="../qml/Main.qml" line="5412"/>
+        <location filename="../qml/Main.qml" line="5626"/>
+        <location filename="../qml/Main.qml" line="7288"/>
         <source>rear</source>
         <translation>אחור</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5475"/>
-        <location filename="../qml/Main.qml" line="5493"/>
-        <location filename="../qml/Main.qml" line="5839"/>
-        <location filename="../qml/Main.qml" line="6436"/>
-        <location filename="../qml/Main.qml" line="7354"/>
-        <location filename="../qml/Main.qml" line="7372"/>
+        <location filename="../qml/Main.qml" line="5472"/>
+        <location filename="../qml/Main.qml" line="5490"/>
+        <location filename="../qml/Main.qml" line="5836"/>
+        <location filename="../qml/Main.qml" line="6433"/>
+        <location filename="../qml/Main.qml" line="7351"/>
+        <location filename="../qml/Main.qml" line="7369"/>
         <source>obj %1</source>
         <translation>אובייקט %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5477"/>
-        <location filename="../qml/Main.qml" line="7356"/>
+        <location filename="../qml/Main.qml" line="5474"/>
+        <location filename="../qml/Main.qml" line="7353"/>
         <source>x %1, y %2</source>
         <translation>x %1, y %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5535"/>
+        <location filename="../qml/Main.qml" line="5532"/>
         <source>This object follows its authored path — dragging edits its idle position, not the path. Scrub the timeline and Add key to author motion.</source>
         <translation>האובייקט הזה עוקב אחרי המסלול שנכתב לו — גרירה עורכת את מיקום המנוחה שלו, לא את המסלול. גללו את ציר הזמן והשתמשו ב&apos;הוספת מפתח&apos; כדי לכתוב תנועה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5546"/>
+        <location filename="../qml/Main.qml" line="5543"/>
         <source>ROOM — ELEVATION (side-on)</source>
         <translation>החדר — חתך גובה (מהצד)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5552"/>
+        <location filename="../qml/Main.qml" line="5549"/>
         <source>drag: depth + height</source>
         <translation>גרירה: עומק + גובה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5560"/>
+        <location filename="../qml/Main.qml" line="5557"/>
         <source>Looking at the room from the side: front↔rear is horizontal, floor↔ceiling is vertical — not just up/down.</source>
         <translation>מבט על החדר מהצד: קדמה↔אחור הוא האופקי, רצפה↔תקרה הוא האנכי — לא רק מעלה/מטה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5574"/>
+        <location filename="../qml/Main.qml" line="5571"/>
         <source>Room elevation, side-on</source>
         <translation>חתך גובה של החדר, מהצד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5576"/>
+        <location filename="../qml/Main.qml" line="5573"/>
         <source>selected object height %1</source>
         <translation>גובה האובייקט הנבחר %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5577"/>
+        <location filename="../qml/Main.qml" line="5574"/>
         <source>no object selected</source>
         <translation>לא נבחר אובייקט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5615"/>
+        <location filename="../qml/Main.qml" line="5612"/>
         <source>ear level</source>
         <translation>גובה האוזן</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5712"/>
+        <location filename="../qml/Main.qml" line="5709"/>
         <source>obj %1 · z %2</source>
         <translation>אובייקט %1 · z %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5767"/>
+        <location filename="../qml/Main.qml" line="5764"/>
         <source>OBJECTS</source>
         <translation>אובייקטים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5773"/>
+        <location filename="../qml/Main.qml" line="5770"/>
         <source>How objects move</source>
         <translation>איך האובייקטים נעים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5775"/>
+        <location filename="../qml/Main.qml" line="5772"/>
         <source>Author a path</source>
         <translation>כתיבת מסלול</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5776"/>
+        <location filename="../qml/Main.qml" line="5773"/>
         <source>Drive it live</source>
         <translation>הנעה חיה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5793"/>
+        <location filename="../qml/Main.qml" line="5790"/>
         <source>Live driving needs a monitored capture. Open Live session to drag objects against running audio.</source>
         <translation>הנעה חיה דורשת לכידה מנוטרת. פתחו &apos;הפעלה חיה&apos; כדי לגרור אובייקטים מול אודיו שרץ.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5808"/>
+        <location filename="../qml/Main.qml" line="5805"/>
         <source>Object</source>
         <translation>אובייקט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5808"/>
+        <location filename="../qml/Main.qml" line="5805"/>
         <source>Sound</source>
         <translation>צליל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5808"/>
+        <location filename="../qml/Main.qml" line="5805"/>
         <source>x</source>
         <translation>x</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5808"/>
+        <location filename="../qml/Main.qml" line="5805"/>
         <source>y</source>
         <translation>y</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5809"/>
+        <location filename="../qml/Main.qml" line="5806"/>
         <source>z</source>
         <translation>z</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5809"/>
+        <location filename="../qml/Main.qml" line="5806"/>
         <source>LFE</source>
         <translation>LFE</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5809"/>
+        <location filename="../qml/Main.qml" line="5806"/>
         <source>Keys</source>
         <translation>מפתחות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5841"/>
+        <location filename="../qml/Main.qml" line="5838"/>
         <source>%1, x %2, y %3, z %4</source>
         <translation>%1, x %2, y %3, z %4</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5898"/>
+        <location filename="../qml/Main.qml" line="5895"/>
         <source>static</source>
         <translation>סטטי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5902"/>
+        <location filename="../qml/Main.qml" line="5899"/>
         <source>%1 keys</source>
         <translation>%1 מפתחות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5936"/>
+        <location filename="../qml/Main.qml" line="5933"/>
         <source>Add an object</source>
         <translation>הוסיפו אובייקט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5941"/>
+        <location filename="../qml/Main.qml" line="5938"/>
         <source>Change what feeds them →</source>
         <translation>שנו את מה שמזין אותם →</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5959"/>
+        <location filename="../qml/Main.qml" line="5956"/>
         <source>%1 of %2 objects · %3 assigned to speakers</source>
         <translation>%1 מתוך %2 אובייקטים · %3 מוקצים לרמקולים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5963"/>
+        <location filename="../qml/Main.qml" line="5960"/>
         <source>%1 of %2 objects · %3 pinned to the bed</source>
         <translation>%1 מתוך %2 אובייקטים · %3 מוצמדים לשכבת הבסיס</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5966"/>
+        <location filename="../qml/Main.qml" line="5963"/>
         <source>%1 of %2 objects · each one is a sound with a place</source>
         <translation>%1 מתוך %2 אובייקטים · כל אחד הוא צליל עם מיקום</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5984"/>
-        <location filename="../qml/Main.qml" line="6012"/>
+        <location filename="../qml/Main.qml" line="5981"/>
+        <location filename="../qml/Main.qml" line="6009"/>
         <source>LFE send — object %1</source>
         <translation>שליחה ל-LFE — אובייקט %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6030"/>
+        <location filename="../qml/Main.qml" line="6027"/>
         <source>An AC-4 object stream has no LFE send, and no bed: send a channel to an LFE for the stream&apos;s one LFE object.</source>
         <translation>בזרם אובייקטים של AC-4 אין שליחה ל-LFE ואין שכבת בסיס: שלחו ערוץ ל-LFE כדי לקבל את אובייקט ה-LFE היחיד של הזרם.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6031"/>
+        <location filename="../qml/Main.qml" line="6028"/>
         <source>Height changes the metadata, not the bed — a 5.1 ring has no speakers above it. The LFE send is the only route to that channel: no direction points at it, so panning never reaches it.</source>
         <translation>הגובה משנה את המטא-נתונים, לא את שכבת הבסיס — לטבעת 5.1 אין רמקולים מעליה. השליחה ל-LFE היא הנתיב היחיד לערוץ הזה: אף כיוון לא מצביע עליו, ולכן פנורמה לעולם לא מגיעה אליו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6057"/>
+        <location filename="../qml/Main.qml" line="6054"/>
         <source>MOTION</source>
         <translation>תנועה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6069"/>
+        <location filename="../qml/Main.qml" line="6066"/>
         <source>scrub · double-click for a key · drag to retime (snaps) · right-click removes · shift-drag a clip moves its keys too</source>
         <translation>גלילה · לחיצה כפולה יוצרת מפתח · גרירה משנה תזמון (נצמדת) · לחיצה ימנית מסירה · גרירה עם shift על קליפ מזיזה גם את המפתחות שלו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6105"/>
+        <location filename="../qml/Main.qml" line="6102"/>
         <source>Fit</source>
         <translation>התאימו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6115"/>
+        <location filename="../qml/Main.qml" line="6112"/>
         <source>Export paths…</source>
         <translation>ייצאו מסלולים…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6122"/>
+        <location filename="../qml/Main.qml" line="6119"/>
         <source>Add key</source>
         <translation>הוסיפו מפתח</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6129"/>
+        <location filename="../qml/Main.qml" line="6126"/>
         <source>Delete key</source>
         <translation>מחקו מפתח</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6141"/>
+        <location filename="../qml/Main.qml" line="6138"/>
         <source>Preview</source>
         <translation>הציגו תצוגה מקדימה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6184"/>
+        <location filename="../qml/Main.qml" line="6181"/>
         <source>Object motion timeline</source>
         <translation>ציר הזמן של תנועת האובייקטים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6185"/>
+        <location filename="../qml/Main.qml" line="6182"/>
         <source>playhead at %1 s%2</source>
         <translation>ראש הניגון ב-%1 שניות%2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6188"/>
+        <location filename="../qml/Main.qml" line="6185"/>
         <source>, %1 key(s)</source>
         <translation>, %1 מפתחות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6538"/>
+        <location filename="../qml/Main.qml" line="6535"/>
         <source>key at %1 s</source>
         <translation>מפתח ב-%1 שניות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6651"/>
+        <location filename="../qml/Main.qml" line="6648"/>
         <source>&lt;b&gt;Renegotiating with %1.&lt;/b&gt; The receiver is re-locking to the new bitstream format — expect a second of silence. This is normal AVR behaviour on a format change.</source>
         <translation>&lt;b&gt;מתנהל משא ומתן מחדש עם %1.&lt;/b&gt; המקלט ננעל מחדש על פורמט זרם הסיביות החדש — צפו לשנייה של שקט. זו התנהגות רגילה של AVR בשינוי פורמט.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6653"/>
+        <location filename="../qml/Main.qml" line="6650"/>
         <source>Renegotiating with the receiver. It is re-locking to the new bitstream format — expect a second of silence. This is normal AVR behaviour on a format change.</source>
         <translation>מתנהל משא ומתן מחדש עם המקלט. הוא ננעל מחדש על פורמט זרם הסיביות החדש — צפו לשנייה של שקט. זו התנהגות רגילה של AVR בשינוי פורמט.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6660"/>
+        <location filename="../qml/Main.qml" line="6657"/>
         <source>Skip</source>
         <translation>דלגו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6686"/>
-        <location filename="../qml/Main.qml" line="6693"/>
+        <location filename="../qml/Main.qml" line="6683"/>
+        <location filename="../qml/Main.qml" line="6690"/>
         <source>Receiver</source>
         <translation>מקלט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6695"/>
+        <location filename="../qml/Main.qml" line="6692"/>
         <source>No passthrough</source>
         <translation>אין מעבר ישיר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6736"/>
+        <location filename="../qml/Main.qml" line="6733"/>
         <source>Also write the take to disk</source>
         <translation>כתבו את הטייק גם לדיסק</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6742"/>
+        <location filename="../qml/Main.qml" line="6739"/>
         <source>Raw-WAV safety copy</source>
         <translation>עותק ביטחון בפורמט WAV גולמי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6751"/>
+        <location filename="../qml/Main.qml" line="6748"/>
         <source>Start session</source>
         <translation>התחילו הפעלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6771"/>
+        <location filename="../qml/Main.qml" line="6768"/>
         <source>Pick a device on the rail first, then set up the take here — monitor, an optional receiver leg, and whether to write it to disk.</source>
         <translation>בחרו קודם התקן בסרגל, ואז הגדירו כאן את הטייק — ניטור, רגל מקלט אופציונלית, והאם לכתוב אותו לדיסק.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6780"/>
+        <location filename="../qml/Main.qml" line="6777"/>
         <source>A live session always runs at the fixed bit rate — passthrough bursts are fixed-size, so frames cannot float. Variable rate applies to file encodes only.</source>
         <translation>הפעלה חיה תמיד רצה בקצב הסיביות הקבוע — מקטעי המעבר הישיר הם בגודל קבוע, ולכן מסגרות לא יכולות לצוף. קצב משתנה חל על קידוד לקבצים בלבד.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6798"/>
+        <location filename="../qml/Main.qml" line="6795"/>
         <source>Drive objects from OSC</source>
         <translation>הניעו אובייקטים מ-OSC</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6804"/>
+        <location filename="../qml/Main.qml" line="6801"/>
         <source>port</source>
         <translation>פורט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6818"/>
+        <location filename="../qml/Main.qml" line="6815"/>
         <source>OSC port</source>
         <translation>פורט OSC</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6824"/>
+        <location filename="../qml/Main.qml" line="6821"/>
         <source>any interface</source>
         <translation>כל ממשק</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6834"/>
+        <location filename="../qml/Main.qml" line="6831"/>
         <source>Objects an OSC message addresses (/object/&lt;n&gt;/xyz, 0-based) move live; anything it never addresses stays where you left it. &quot;any interface&quot; opens the port beyond this machine — leave it off unless you mean to.</source>
         <translation>אובייקטים שהודעת OSC פונה אליהם (/object/&lt;n&gt;/xyz, מבוסס 0) נעים בזמן אמת; כל מה שהיא לא פונה אליו נשאר במקום שהשארתם. “כל ממשק” פותח את הפורט מעבר למכונה הזאת — השאירו את זה כבוי אלא אם אתם מתכוונים לכך.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6849"/>
+        <location filename="../qml/Main.qml" line="6846"/>
         <source>Stop session</source>
         <translation>עצרו את ההפעלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6856"/>
+        <location filename="../qml/Main.qml" line="6853"/>
         <source>RUNNING</source>
         <translation>רץ</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6872"/>
+        <location filename="../qml/Main.qml" line="6869"/>
         <source>FRAMES</source>
         <translation>מסגרות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6882"/>
+        <location filename="../qml/Main.qml" line="6879"/>
         <source>DROPPED</source>
         <translation>הושמטו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6895"/>
+        <location filename="../qml/Main.qml" line="6892"/>
         <source>OSC</source>
         <translation>OSC</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6897"/>
+        <location filename="../qml/Main.qml" line="6894"/>
         <source>%1 updates, %2 dropped</source>
         <translation>%1 עדכונים, %2 הושמטו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6909"/>
+        <location filename="../qml/Main.qml" line="6906"/>
         <source>Also writing the take to disk</source>
         <translation>הטייק נכתב גם לדיסק</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6920"/>
+        <location filename="../qml/Main.qml" line="6917"/>
         <source>Chain</source>
         <translation>שרשרת</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6929"/>
+        <location filename="../qml/Main.qml" line="6926"/>
         <source>CAPTURE</source>
         <translation>לכידה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6934"/>
+        <location filename="../qml/Main.qml" line="6931"/>
         <source>Capture device</source>
         <translation>התקן לכידה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6968"/>
+        <location filename="../qml/Main.qml" line="6965"/>
         <source>LIVE ENCODE</source>
         <translation>קידוד חי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6979"/>
+        <location filename="../qml/Main.qml" line="6976"/>
         <source>meters and soundfield follow this</source>
         <translation>המדידים ושדה הצליל עוקבים אחרי זה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="6994"/>
+        <location filename="../qml/Main.qml" line="6991"/>
         <source>RECEIVER LEG — IEC 61937</source>
         <translation>רגל המקלט — IEC 61937</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7012"/>
+        <location filename="../qml/Main.qml" line="7009"/>
         <source>exclusive · E-AC-3 bursts (data type 21)</source>
         <translation>בלעדי · מקטעי E-AC-3 (data type 21)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7013"/>
+        <location filename="../qml/Main.qml" line="7010"/>
         <source>exclusive · AC-3 bursts (data type 1)</source>
         <translation>בלעדי · מקטעי AC-3 (data type 1)</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7055"/>
+        <location filename="../qml/Main.qml" line="7052"/>
         <source>The encode is a 5.1 bed with %1 objects; the receiver leg is a Dolby Digital 5.1 downmix of that bed. Every object move is visible on the meters and the soundfield, but %2 can only bitstream Dolby Digital — the amplifier plays the downmix, not the motion.</source>
         <translation>הקידוד הוא שכבת בסיס 5.1 עם %1 אובייקטים; רגל המקלט היא דאונמיקס Dolby Digital 5.1 של שכבת הבסיס הזאת. כל תנועת אובייקט נראית במדידים ובשדה הצליל, אבל %2 יכול לשדר כזרם סיביות רק Dolby Digital — המגבר מנגן את הדאונמיקס, לא את התנועה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7058"/>
+        <location filename="../qml/Main.qml" line="7055"/>
         <source>The encode is a 5.1 bed with %1 objects; the receiver leg is that Dolby Digital Plus 5.1 bed. Every object move is visible on the meters and the soundfield, but a consumer decoder gates object decoding — the amplifier plays the bed, not the motion.</source>
         <translation>הקידוד הוא שכבת בסיס 5.1 עם %1 אובייקטים; רגל המקלט היא אותה שכבת בסיס 5.1 של Dolby Digital Plus. כל תנועת אובייקט נראית במדידים ובשדה הצליל, אבל מפענח צרכני חוסם פענוח אובייקטים — המגבר מנגן את שכבת הבסיס, לא את התנועה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7061"/>
+        <location filename="../qml/Main.qml" line="7058"/>
         <source>The encode is %1; the receiver leg is a Dolby Digital 5.1 downmix — everything past it is visible on the meters, not audible on the amplifier.</source>
         <translation>הקידוד הוא %1; רגל המקלט היא דאונמיקס Dolby Digital 5.1 — כל מה שמעבר לזה נראה במדידים, לא נשמע במגבר.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7094"/>
+        <location filename="../qml/Main.qml" line="7091"/>
         <source>No passthrough opened — %1 The session still encodes, meters and monitors; only the receiver leg is missing.</source>
         <translation>לא נפתח מעבר ישיר — %1 ההפעלה עדיין מקודדת, מודדת ומנטרת; רק רגל המקלט חסרה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7111"/>
+        <location filename="../qml/Main.qml" line="7108"/>
         <source>Live room</source>
         <translation>החדר החי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7123"/>
+        <location filename="../qml/Main.qml" line="7120"/>
         <source>OBJECTS IN THIS SESSION</source>
         <translation>אובייקטים בהפעלה הזאת</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7132"/>
+        <location filename="../qml/Main.qml" line="7129"/>
         <source>%1 of %2 slots live</source>
         <translation>%1 מתוך %2 משבצות חיות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7135"/>
+        <location filename="../qml/Main.qml" line="7132"/>
         <source>%1 objects live</source>
         <translation>%1 אובייקטים חיים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7172"/>
+        <location filename="../qml/Main.qml" line="7169"/>
         <source>obj %1 · %2 · dragging</source>
         <translation>אובייקט %1 · %2 · נגרר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8169"/>
+        <location filename="../qml/Main.qml" line="8166"/>
         <source>An encode is running. The runs strip shows its progress.</source>
         <translation>קידוד רץ כעת. רצועת ההרצות מציגה את ההתקדמות שלו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8170"/>
+        <location filename="../qml/Main.qml" line="8167"/>
         <source>Encodes the loaded sources into the output folder set in Settings. The runs strip reports the result.</source>
         <translation>מקודד את המקורות שנטענו אל תיקיית הפלט שנקבעה בהגדרות. רצועת ההרצות מדווחת על התוצאה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7160"/>
-        <location filename="../qml/Main.qml" line="7175"/>
+        <location filename="../qml/Main.qml" line="7157"/>
+        <location filename="../qml/Main.qml" line="7172"/>
         <source>obj %1 · %2</source>
         <translation>אובייקט %1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="3440"/>
+        <location filename="../qml/Main.qml" line="3437"/>
         <source>Codec — object mode: E-AC-3 or AC-4</source>
         <translation>קודק — מצב אובייקטים: E-AC-3 או AC-4</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="5129"/>
+        <location filename="../qml/Main.qml" line="5126"/>
         <source>Off — the stream is a plain channel bed. Turning this on writes E-AC-3 over 5.1, or AC-4 objects where AC-4 is the codec.</source>
         <translation>כבוי — הזרם הוא שכבת בסיס ערוצית פשוטה. הפעלת האפשרות כותבת E-AC-3 מעל 5.1, או אובייקטי AC-4 כשהקודק הוא AC-4.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7205"/>
+        <location filename="../qml/Main.qml" line="7202"/>
         <source>Live object channel</source>
         <translation>ערוץ אובייקט חי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7216"/>
+        <location filename="../qml/Main.qml" line="7213"/>
         <source>Add</source>
         <translation>הוסיפו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7225"/>
+        <location filename="../qml/Main.qml" line="7222"/>
         <source>Reassign selected</source>
         <translation>שייכו מחדש את הנבחר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7233"/>
+        <location filename="../qml/Main.qml" line="7230"/>
         <source>Silence selected</source>
         <translation>השתיקו את הנבחר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7243"/>
+        <location filename="../qml/Main.qml" line="7240"/>
         <source>drag to move — you hear it immediately</source>
         <translation>גררו כדי להזיז — שומעים את זה מיד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7260"/>
+        <location filename="../qml/Main.qml" line="7257"/>
         <source>Live room plan, top-down</source>
         <translation>מבט על של החדר החי, מלמעלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7449"/>
+        <location filename="../qml/Main.qml" line="7446"/>
         <source>LATENCY</source>
         <translation>השהיה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7456"/>
+        <location filename="../qml/Main.qml" line="7453"/>
         <source>~%1 ms measured</source>
         <translation>~%1 ms נמדד</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7457"/>
+        <location filename="../qml/Main.qml" line="7454"/>
         <source>~%1 ms est.</source>
         <translation>~%1 ms מוערך</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7472"/>
+        <location filename="../qml/Main.qml" line="7469"/>
         <source>Layout — switching re-locks the receiver</source>
         <translation>פריסה — החלפה נועלת מחדש את המקלט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7477"/>
+        <location filename="../qml/Main.qml" line="7474"/>
         <source>Atmos objects over a 5.1 bed — fixed while object mode is on</source>
         <translation>אובייקטים של Atmos מעל שכבת בסיס 5.1 — מקובע כל עוד מצב האובייקטים פעיל</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7478"/>
+        <location filename="../qml/Main.qml" line="7475"/>
         <source>Now encoding %1</source>
         <translation>מקודד כעת %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7563"/>
+        <location filename="../qml/Main.qml" line="7560"/>
         <source>Dotted layouts encode and meter fully — %1 bitstreams Dolby Digital only, so this receiver hears a 5.1 downmix of them.</source>
         <translation>פריסות מקווקוות מקודדות ונמדדות במלואן — %1 משדר כזרם סיביות רק Dolby Digital, ולכן המקלט הזה שומע דאונמיקס 5.1 שלהן.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7577"/>
+        <location filename="../qml/Main.qml" line="7574"/>
         <source>%1 takes Dolby Digital Plus — every layout here bitstreams as encoded.</source>
         <translation>%1 מקבל Dolby Digital Plus — כל פריסה כאן משודרת כזרם סיביות כפי שקודדה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7587"/>
+        <location filename="../qml/Main.qml" line="7584"/>
         <source>The take is being written to disk, so the layout is fixed for this run — a restart would clobber the first half of the file.</source>
         <translation>הטייק נכתב לדיסק, ולכן הפריסה מקובעת להרצה הזאת — הפעלה מחדש הייתה דורסת את המחצית הראשונה של הקובץ.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7588"/>
+        <location filename="../qml/Main.qml" line="7585"/>
         <source>A layout change is a deliberate act, not a silent one: the stream stops, the receiver renegotiates, and about a second of audio is lost. The receiver&apos;s own display changes with it.</source>
         <translation>שינוי פריסה הוא מעשה מכוון, לא שקט: הזרם נעצר, המקלט מנהל משא ומתן מחדש, וכשנייה של אודיו אובדת. התצוגה של המקלט עצמו משתנה איתו.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7596"/>
+        <location filename="../qml/Main.qml" line="7593"/>
         <source>Receiver reports</source>
         <translation>המקלט מדווח</translation>
     </message>
     <message>
+        <location filename="../qml/Main.qml" line="7610"/>
         <location filename="../qml/Main.qml" line="7613"/>
-        <location filename="../qml/Main.qml" line="7616"/>
         <source>DOLBY DIGITAL</source>
         <translation>DOLBY DIGITAL</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7616"/>
+        <location filename="../qml/Main.qml" line="7613"/>
         <source>DOLBY DIGITAL PLUS</source>
         <translation>DOLBY DIGITAL PLUS</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7627"/>
+        <location filename="../qml/Main.qml" line="7624"/>
         <source>Input</source>
         <translation>כניסה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7637"/>
+        <location filename="../qml/Main.qml" line="7634"/>
         <source>5.1</source>
         <translation>5.1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7647"/>
+        <location filename="../qml/Main.qml" line="7644"/>
         <source>Lock</source>
         <translation>נעילה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7652"/>
+        <location filename="../qml/Main.qml" line="7649"/>
         <source>no passthrough</source>
         <translation>אין מעבר ישיר</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7653"/>
+        <location filename="../qml/Main.qml" line="7650"/>
         <source>re-locking</source>
         <translation>ננעל מחדש</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7654"/>
+        <location filename="../qml/Main.qml" line="7651"/>
         <source>locked</source>
         <translation>נעול</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7663"/>
+        <location filename="../qml/Main.qml" line="7660"/>
         <source>Underruns</source>
         <translation>מקרי underrun</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7746"/>
+        <location filename="../qml/Main.qml" line="7743"/>
         <source>RUNS</source>
         <translation>הרצות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7807"/>
+        <location filename="../qml/Main.qml" line="7804"/>
         <source>%1 · %2 · %3 · %4%</source>
         <translation>%1 · %2 · %3 · %4%</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7812"/>
+        <location filename="../qml/Main.qml" line="7809"/>
         <source>%1 · %2 · %3%4</source>
         <translation>%1 · %2 · %3%4</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7817"/>
+        <location filename="../qml/Main.qml" line="7814"/>
         <source>%1 · %2 · %3 · %4%5</source>
         <translation>%1 · %2 · %3 · %4%5</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7825"/>
+        <location filename="../qml/Main.qml" line="7822"/>
         <source>Opens this run&apos;s details, including the command line it was started with.</source>
         <translation>פותח את פרטי ההרצה הזאת, כולל שורת הפקודה שאיתה היא הופעלה.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7870"/>
+        <location filename="../qml/Main.qml" line="7867"/>
         <source>Progress</source>
         <translation>התקדמות</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7871"/>
+        <location filename="../qml/Main.qml" line="7868"/>
         <source>%1%</source>
         <translation>%1%</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7881"/>
+        <location filename="../qml/Main.qml" line="7878"/>
         <source>Cancel run %1</source>
         <translation>ביטול הרצה %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7903"/>
+        <location filename="../qml/Main.qml" line="7900"/>
         <source>Play run %1 to the receiver</source>
         <translation>ניגון הרצה %1 במקלט</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7914"/>
+        <location filename="../qml/Main.qml" line="7911"/>
         <source>Show in folder</source>
         <translation>הציגו בתיקייה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7916"/>
+        <location filename="../qml/Main.qml" line="7913"/>
         <source>Show run %1 in its folder</source>
         <translation>הצגת הרצה %1 בתיקייה שלה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7931"/>
+        <location filename="../qml/Main.qml" line="7928"/>
         <source>Details</source>
         <translation>פרטים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7933"/>
+        <location filename="../qml/Main.qml" line="7930"/>
         <source>Why run %1 did not finish</source>
         <translation>למה הרצה %1 לא הסתיימה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7953"/>
+        <location filename="../qml/Main.qml" line="7950"/>
         <source>More…</source>
         <translation>עוד…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7955"/>
+        <location filename="../qml/Main.qml" line="7952"/>
         <source>More for run %1</source>
         <translation>עוד עבור הרצה %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7964"/>
+        <location filename="../qml/Main.qml" line="7961"/>
         <source>QC this run</source>
         <translation>בצעו QC להרצה הזאת</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="7969"/>
+        <location filename="../qml/Main.qml" line="7966"/>
         <source>Inspect objects</source>
         <translation>בדיקת אובייקטים</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8029"/>
+        <location filename="../qml/Main.qml" line="8026"/>
         <source>forge command line</source>
         <translation>שורת הפקודה של forge</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8030"/>
+        <location filename="../qml/Main.qml" line="8027"/>
         <source>Opens the command line that reproduces this encode, with a Copy button.</source>
         <translation>פותח את שורת הפקודה שמשחזרת את הקידוד הזה, עם כפתור &apos;העתיקו&apos;.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8060"/>
+        <location filename="../qml/Main.qml" line="8057"/>
         <source>forge</source>
         <translation>forge</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8067"/>
+        <location filename="../qml/Main.qml" line="8064"/>
         <source>command line ↗</source>
         <translation>שורת הפקודה ↗</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8107"/>
+        <location filename="../qml/Main.qml" line="8104"/>
         <source>THE COMMAND LINE — REPRODUCES THIS ENCODE</source>
         <translation>שורת הפקודה — משחזרת את הקידוד הזה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8127"/>
+        <location filename="../qml/Main.qml" line="8124"/>
         <source>Encode runs the encoder in-process — this is the exact forge equivalent, quoting and all.</source>
         <translation>&apos;קידוד&apos; מריץ את המקודד בתוך התהליך — זו המקבילה המדויקת ב-forge, כולל המרכאות.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8134"/>
+        <location filename="../qml/Main.qml" line="8131"/>
         <source>Copy</source>
         <translation>העתיקו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8156"/>
+        <location filename="../qml/Main.qml" line="8153"/>
         <source>Encoding…</source>
         <translation>מקודד…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8161"/>
+        <location filename="../qml/Main.qml" line="8158"/>
         <source>Encode to folder</source>
         <translation>קודדו לתיקייה</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="8162"/>
+        <location filename="../qml/Main.qml" line="8159"/>
         <source>Encode to .%1</source>
         <translation>קודדו ל-.%1</translation>
     </message>
