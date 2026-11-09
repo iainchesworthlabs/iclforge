@@ -70,7 +70,13 @@ TEST_CASE("the extension of the channel meaning has a body of length + 1 words (
             extension.put(9, 5);   // sixteench_dynamic_object_count
             // length + 1 words of body; with the nibble in front of them one more word holds it.
             const std::size_t words = length + 1U + (nibble_in_body ? 0U : 1U);
-            extension.put(0, static_cast<int>(words * 16U - extension.bit_count()));
+            // put() takes at most 32 bits (it asserts, in a build with assertions on), and the
+            // padding for length 15 is more than 200.
+            for (auto pad = static_cast<int>(words * 16U - extension.bit_count()); pad > 0;) {
+                const int chunk = pad < 32 ? pad : 32;
+                extension.put(0, chunk);
+                pad -= chunk;
+            }
             const std::vector<std::byte> body = extension.take();
             bytes.insert(bytes.end(), body.begin(), body.end());
             const std::uint16_t crc = major_sync_crc(bytes);

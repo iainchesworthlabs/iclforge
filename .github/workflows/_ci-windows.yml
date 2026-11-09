@@ -1069,11 +1069,13 @@ jobs:
       # Hearth's own archive (cmake/Packaging.cmake's hearth component,
       # apps/hearth/ui/CMakeLists.txt's install rules, phase A7). Guarded by
       # matrix.release_package alone, not matrix.crucible above: Hearth
-      # builds and packages on every Windows leg (ICLFORGE_BUILD_HEARTH,
-      # root CMakeLists.txt, defaults ON), windows-msvc-arm64 included,
-      # where Crucible does not.
+      # builds and packages on every Windows leg that has Qt (ICLFORGE_BUILD_HEARTH,
+      # root CMakeLists.txt, defaults ON). windows-msvc-arm64 has no Qt installed, so its
+      # configure says "Qt6 not found: hearth is skipped" and it ships no Hearth archive
+      # (release.yml asks that leg for the library zip and installer only); asserting one
+      # failed the leg before its packages were uploaded, which the release then missed.
       - name: Assert the Hearth was packaged (Windows)
-        if: matrix.release_package && (matrix.preset == 'windows-msvc' || inputs.do_package)
+        if: matrix.release_package && matrix.preset != 'windows-msvc-arm64' && (matrix.preset == 'windows-msvc' || inputs.do_package)
         shell: bash
         run: |
           set -euo pipefail
