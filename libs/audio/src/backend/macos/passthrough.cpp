@@ -453,6 +453,11 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
     if (format_kind != BitstreamFormat::kMat && !coreaudio::physical_format_id(format_kind)) {
         return std::unexpected(PassthroughError::kUnsupportedFormat);
     }
+    if (coreaudio::carrier_rate(format_kind, sample_rate) == 0) {
+        // MAT at a content rate it has no link for, refused before a device is looked up as the
+        // other backends do.
+        return std::unexpected(PassthroughError::kFormatRejected);
+    }
     // A stream whose device died still holds its IOProc, its watch, and the
     // hog and format it took; stop() gives all of them back. With nothing
     // started it does nothing.
