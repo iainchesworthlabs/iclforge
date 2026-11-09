@@ -12,30 +12,134 @@
 # already on the disk (vcpkg's, say), an extracted libopus 1.6.1 at ICLFORGE_OPUS_SOURCE_DIR. A
 # tree given that way is not checked: it is the builder's own.
 #
+# THE TARBALL, in this order. (1) A copy already on the disk: opus-<version>.tar.gz in the directory
+# ICLFORGE_OPUS_TARBALL_DIR names (a cache variable, or the environment variable of that name). It
+# is used only when its SHA-256 is the pinned one; any other file there is refused with a warning
+# and deleted, never used. (2) Otherwise a download from xiph.org, tried ICLFORGE_OPUS_ATTEMPTS
+# times (default 5) with a growing pause between tries (5, 10, 20, 30 s: about a minute), each
+# under a timeout and each held to the same SHA-256. One flaky connection ("SSL connect error")
+# failed a whole CI configure on 2026-11-09 for want of that. A download that passes is also copied
+# into the directory of (1) when that is set, so that a CI cache of it can be saved. Nothing here
+# relaxes the pin: no path reaches the build with a tarball that did not hash to it.
+#
+# Run as a script - `cmake -DICLFORGE_OPUS_TARBALL_DIR=<dir> -P opus.cmake` - it does only (1) and
+# (2) for that directory and stops. .github/actions/opus-tarball uses that to restore and fill the
+# CI cache before the first configure.
+#
 # MEASURED, on an ESP32-C6 (docs/platforms/bare-metal/esp32-c6.md, "Opus from a server"): 7.5 ms to
 # decode 20 ms of 128 kbit/s stereo (37% of the core), 27,060 bytes of decoder state, about 16.4 KB
 # of stack.
 # ---------------------------------------------------------------------------
 set(ICLFORGE_OPUS_VERSION "1.6.1")
 set(ICLFORGE_OPUS_SHA256 "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1")
-set(ICLFORGE_OPUS_URL "https://downloads.xiph.org/releases/opus/opus-${ICLFORGE_OPUS_VERSION}.tar.gz")
+# The URL, the number of tries and the pauses between them may be overridden (a mirror, or a file://
+# URL and no pauses in a test); the SHA-256 above may not.
+if(NOT ICLFORGE_OPUS_URL)
+    set(ICLFORGE_OPUS_URL "https://downloads.xiph.org/releases/opus/opus-${ICLFORGE_OPUS_VERSION}.tar.gz")
+endif()
+if(NOT ICLFORGE_OPUS_ATTEMPTS)
+    set(ICLFORGE_OPUS_ATTEMPTS 5)
+endif()
+if(NOT DEFINED ICLFORGE_OPUS_RETRY_DELAYS)
+    set(ICLFORGE_OPUS_RETRY_DELAYS "5;10;20;30")
+endif()
 set(ICLFORGE_OPUS_SOURCE_DIR "" CACHE PATH
     "An extracted libopus ${ICLFORGE_OPUS_VERSION} source tree to build from, in place of the release tarball")
+set(ICLFORGE_OPUS_TARBALL_DIR "" CACHE PATH
+    "A directory that holds (or is to receive) opus-${ICLFORGE_OPUS_VERSION}.tar.gz; default: the environment variable of the same name")
+if(ICLFORGE_OPUS_TARBALL_DIR STREQUAL "" AND DEFINED ENV{ICLFORGE_OPUS_TARBALL_DIR})
+    set(ICLFORGE_OPUS_TARBALL_DIR "$ENV{ICLFORGE_OPUS_TARBALL_DIR}")
+endif()
+
+# Puts the pinned libopus tarball at <dest>, or stops with the reason. Afterwards <dest> is a file
+# whose SHA-256 is ICLFORGE_OPUS_SHA256: a download goes to <dest>.part and is renamed only once
+# it has passed.
+function(iclforge_opus_obtain dest)
+    set(seed "")
+    if(NOT ICLFORGE_OPUS_TARBALL_DIR STREQUAL "")
+        set(seed "${ICLFORGE_OPUS_TARBALL_DIR}/opus-${ICLFORGE_OPUS_VERSION}.tar.gz")
+    endif()
+    # A copy that is already there: the seed first, then whatever an earlier configure left.
+    foreach(candidate IN ITEMS "${seed}" "${dest}")
+        if(NOT candidate STREQUAL "" AND EXISTS "${candidate}")
+            file(SHA256 "${candidate}" have)
+            if(have STREQUAL ICLFORGE_OPUS_SHA256)
+                if(NOT candidate STREQUAL dest)
+                    file(COPY_FILE "${candidate}" "${dest}")
+                endif()
+                message(STATUS "iclforge: libopus ${ICLFORGE_OPUS_VERSION} tarball taken from ${candidate}")
+                return()
+            endif()
+            message(WARNING "iclforge: ${candidate} is not libopus ${ICLFORGE_OPUS_VERSION} "
+                            "(SHA-256 ${have}, expected ${ICLFORGE_OPUS_SHA256}); it is not used.")
+            file(REMOVE "${candidate}")
+        endif()
+    endforeach()
+    get_filename_component(dest_dir "${dest}" DIRECTORY)
+    file(MAKE_DIRECTORY "${dest_dir}")
+    list(LENGTH ICLFORGE_OPUS_RETRY_DELAYS delays)
+    set(try 1)
+    while(TRUE)
+        file(REMOVE "${dest}.part")
+        # No EXPECTED_HASH here: file(DOWNLOAD) turns a failed transfer into a hard CMake error
+        # when it is given one ("cannot compute hash on failed download", which is what failed
+        # the 2026-11-09 configure and cannot be retried), and STATUS does not soften that. The
+        # hash is checked below, on a transfer that completed, and a mismatch counts as a failed try.
+        file(DOWNLOAD "${ICLFORGE_OPUS_URL}" "${dest}.part" TIMEOUT 120 INACTIVITY_TIMEOUT 30
+             STATUS opus_status)
+        list(GET opus_status 0 opus_code)
+        if(opus_code EQUAL 0)
+            file(SHA256 "${dest}.part" have)
+            if(have STREQUAL ICLFORGE_OPUS_SHA256)
+                file(RENAME "${dest}.part" "${dest}")
+                break()
+            endif()
+            set(opus_status "${opus_code};SHA-256 ${have} is not the pinned ${ICLFORGE_OPUS_SHA256}")
+        endif()
+        file(REMOVE "${dest}.part")
+        if(try GREATER_EQUAL ICLFORGE_OPUS_ATTEMPTS)
+            message(FATAL_ERROR
+                "iclforge: libopus ${ICLFORGE_OPUS_VERSION} could not be fetched from "
+                "${ICLFORGE_OPUS_URL} (${opus_status}). Extract it somewhere and set "
+                "ICLFORGE_OPUS_SOURCE_DIR to the directory that holds include/opus.h.")
+        endif()
+        # The pause after try N is the Nth delay, or the last one when the list is shorter.
+        set(pause 0)
+        if(delays GREATER 0)
+            math(EXPR idx "${try} - 1")
+            if(idx GREATER_EQUAL delays)
+                math(EXPR idx "${delays} - 1")
+            endif()
+            list(GET ICLFORGE_OPUS_RETRY_DELAYS ${idx} pause)
+        endif()
+        message(STATUS "iclforge: libopus download, try ${try} of ${ICLFORGE_OPUS_ATTEMPTS} failed "
+                       "(${opus_status}); trying again in ${pause} s")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep ${pause})
+        math(EXPR try "${try} + 1")
+    endwhile()
+    message(STATUS "iclforge: libopus ${ICLFORGE_OPUS_VERSION} tarball downloaded (try ${try})")
+    # Leave a verified copy where a cache can pick it up.
+    if(NOT seed STREQUAL "" AND NOT seed STREQUAL dest)
+        file(MAKE_DIRECTORY "${ICLFORGE_OPUS_TARBALL_DIR}")
+        file(COPY_FILE "${dest}" "${seed}")
+    endif()
+endfunction()
+
+# Script mode (`cmake -P opus.cmake`): fill ICLFORGE_OPUS_TARBALL_DIR and stop.
+if(CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
+    if(ICLFORGE_OPUS_TARBALL_DIR STREQUAL "")
+        message(FATAL_ERROR "iclforge: script mode needs -DICLFORGE_OPUS_TARBALL_DIR=<directory>.")
+    endif()
+    iclforge_opus_obtain("${ICLFORGE_OPUS_TARBALL_DIR}/opus-${ICLFORGE_OPUS_VERSION}.tar.gz")
+    return()
+endif()
 
 if(ICLFORGE_OPUS_SOURCE_DIR STREQUAL "")
     set(_opus_dl "${CMAKE_BINARY_DIR}/iclforge_opus")
     set(_opus_tree "${_opus_dl}/opus-${ICLFORGE_OPUS_VERSION}")
     if(NOT EXISTS "${_opus_tree}/include/opus.h")
         file(MAKE_DIRECTORY "${_opus_dl}")
-        file(DOWNLOAD "${ICLFORGE_OPUS_URL}" "${_opus_dl}/opus.tar.gz"
-             EXPECTED_HASH SHA256=${ICLFORGE_OPUS_SHA256} STATUS _opus_status)
-        list(GET _opus_status 0 _opus_code)
-        if(NOT _opus_code EQUAL 0)
-            message(FATAL_ERROR
-                "iclforge: libopus ${ICLFORGE_OPUS_VERSION} could not be fetched from "
-                "${ICLFORGE_OPUS_URL} (${_opus_status}). Extract it somewhere and set "
-                "ICLFORGE_OPUS_SOURCE_DIR to the directory that holds include/opus.h.")
-        endif()
+        iclforge_opus_obtain("${_opus_dl}/opus.tar.gz")
         file(ARCHIVE_EXTRACT INPUT "${_opus_dl}/opus.tar.gz" DESTINATION "${_opus_dl}"
              PATTERNS "opus-${ICLFORGE_OPUS_VERSION}/celt/*" "opus-${ICLFORGE_OPUS_VERSION}/silk/*"
                       "opus-${ICLFORGE_OPUS_VERSION}/src/*" "opus-${ICLFORGE_OPUS_VERSION}/include/*"

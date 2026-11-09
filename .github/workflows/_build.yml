@@ -3734,6 +3734,11 @@ jobs:
           persist-credentials: false
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      # The Opus tarball the two C6 hearth_sink builds below need, restored from the cache or
+      # fetched with retries before they configure (.github/actions/opus-tarball).
+      - name: Get the Opus tarball
+        uses: ./.github/actions/opus-tarball
+
       - name: Ensure QEMU for RISC-V is present
         shell: bash
         run: |
