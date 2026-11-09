@@ -1,0 +1,103 @@
+name: Opus tarball
+description: >-
+  Puts the pinned libopus source tarball on the runner before an ESP-IDF configure, so that one
+  flaky download from downloads.xiph.org cannot fail the job. Restores it from the actions cache
+  (keyed by the version and SHA-256 that firmware/esp-idf/iclforge/opus.cmake pins), fetches it
+  with retries when the cache has none, and on a default-branch run saves what it fetched. The
+  configure that follows finds it through ICLFORGE_OPUS_TARBALL_DIR, which this action exports.
+  Run it after actions/checkout, in any job whose configure has CONFIG_ICLFORGE_SENDSPIN_OPUS on
+  (the C6 hearth-sink profiles today).
+
+runs:
+  using: composite
+  steps:
+    # The version and the SHA-256 are read out of opus.cmake, so that file stays the one place the
+    # pin lives, and are checked against a strict pattern before they reach an output, so nothing
+    # a checkout holds can shape the key or what a later step runs. The cache entry is the whole
+    # release tarball (about 10 MB: libopus ships its DNN weights in it), because the pin is a
+    # hash of exactly those bytes and a cached subset could not be re-checked against it. One entry
+    # per Opus release, with no restore-keys fallback: only the pinned tarball is the right one.
+    - name: Work out the Opus tarball cache key
+      id: plan
+      shell: bash
+      run: |
+        set -euo pipefail
+        cmake_file="$GITHUB_WORKSPACE/firmware/esp-idf/iclforge/opus.cmake"
+        pin() {
+          sed -n "s/^set(ICLFORGE_OPUS_$1 \"\([^\"]*\)\")\r\{0,1\}\$/\1/p" "$cmake_file" | head -n 1
+        }
+        version="$(pin VERSION)"
+        sha="$(pin SHA256)"
+        if ! printf '%s' "$version" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+          echo "::error::opus.cmake has no usable ICLFORGE_OPUS_VERSION (got '$version')"
+          exit 1
+        fi
+        if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$'; then
+          echo "::error::opus.cmake has no usable ICLFORGE_OPUS_SHA256 (got '$sha')"
+          exit 1
+        fi
+        {
+          echo "version=$version"
+          echo "sha256=$sha"
+          echo "key=opus-tarball-$version-$sha"
+        } >>"$GITHUB_OUTPUT"
+
+    # ~ and $HOME are the same place for the cache action and for a step in a container job
+    # (setup-vcpkg's tool cache relies on that too).
+    - name: Restore the Opus tarball
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/iclforge/opus-tarball
+        key: ${{ steps.plan.outputs.key }}
+
+    # opus.cmake run as a script does exactly what the configure would: use the tarball in the
+    # directory when its SHA-256 is the pin (a restored file is never trusted on its say-so), refuse
+    # and delete one that is not, and otherwise download with retries and back-off. The hash is then
+    # checked again here, in the shell, before anything is saved.
+    #
+    # continue-on-error: this step only prepares. A configure with no tarball in the directory
+    # downloads with its own retries (the same code), so a failure here costs a second round of
+    # tries, not the job; a cache that could not be filled must never be what fails it.
+    - name: Fetch the Opus tarball if it is not cached
+      id: fetch
+      continue-on-error: true
+      shell: bash
+      env:
+        VERSION: ${{ steps.plan.outputs.version }}
+        SHA256: ${{ steps.plan.outputs.sha256 }}
+      run: | # zizmor: ignore[github-env] a $HOME-derived path, not attacker-influenced
+        set -euo pipefail
+        dir="$HOME/.cache/iclforge/opus-tarball"
+        file="$dir/opus-$VERSION.tar.gz"
+        mkdir -p "$dir"
+        # The container images carry cmake behind ESP-IDF's export script, not always on PATH.
+        if ! command -v cmake >/dev/null 2>&1 && [ -n "${IDF_PATH:-}" ] && [ -f "$IDF_PATH/export.sh" ]; then
+          . "$IDF_PATH/export.sh" >/dev/null 2>&1 || true
+        fi
+        if ! command -v cmake >/dev/null 2>&1; then
+          echo "::warning::cmake is not on PATH: the Opus tarball is left for the configure to fetch"
+          exit 1
+        fi
+        # Where the configure that follows looks (opus.cmake reads this variable).
+        echo "ICLFORGE_OPUS_TARBALL_DIR=$dir" >>"$GITHUB_ENV"
+        cmake "-DICLFORGE_OPUS_TARBALL_DIR=$dir" -P "$GITHUB_WORKSPACE/firmware/esp-idf/iclforge/opus.cmake"
+        actual="$(sha256sum "$file" | cut -d' ' -f1)"
+        if [ "$actual" != "$SHA256" ]; then
+          echo "::error::$file is $actual, not the pinned $SHA256; not used"
+          rm -f "$file"
+          exit 1
+        fi
+
+    # Saved right after the fetch, not by a post-job step, which a job that fails later would skip.
+    # Only from the default branch: a pull request's caches are readable by that pull request alone,
+    # and the key never changes, so one entry written from main serves every pull request and merge
+    # queue run (they read the default branch's caches). Not when the restore already hit: the key
+    # exists, and a save would only be told so. continue-on-error as in every cache save here.
+    - name: Save the Opus tarball
+      if: steps.fetch.outcome == 'success' && steps.restore.outputs.cache-hit != 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/iclforge/opus-tarball
+        key: ${{ steps.plan.outputs.key }}

@@ -39,6 +39,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # The Opus tarball the C6 profiles build, restored from the cache or fetched with retries
+      # before the first configure (.github/actions/opus-tarball): one failed download from
+      # downloads.xiph.org failed this job on 2026-11-09.
+      - name: Get the Opus tarball
+        uses: ./.github/actions/opus-tarball
+
       # Every profile is configured and verified before the step fails, so one run reports every
       # profile a change breaks. ESP32_PROFILE_GUARD=warn turns a finding into a warning, as it
       # does in the build jobs.

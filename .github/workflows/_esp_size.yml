@@ -55,6 +55,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # The Opus tarball the C6 profiles build, restored from the cache or fetched with retries
+      # before the first configure (.github/actions/opus-tarball): one failed download from
+      # downloads.xiph.org failed this job on 2026-11-09.
+      - name: Get the Opus tarball
+        uses: ./.github/actions/opus-tarball
+
       - name: Build the 4 MB C6 profile and hold its image to its slot
         shell: bash
         run: |
