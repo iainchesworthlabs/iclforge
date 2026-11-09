@@ -15,12 +15,15 @@
 # THE TARBALL, in this order. (1) A copy already on the disk: opus-<version>.tar.gz in the directory
 # ICLFORGE_OPUS_TARBALL_DIR names (a cache variable, or the environment variable of that name). It
 # is used only when its SHA-256 is the pinned one; any other file there is refused with a warning
-# and deleted, never used. (2) Otherwise a download from xiph.org, tried ICLFORGE_OPUS_ATTEMPTS
-# times (default 5) with a growing pause between tries (5, 10, 20, 30 s: about a minute), each
-# under a timeout and each held to the same SHA-256. One flaky connection ("SSL connect error")
-# failed a whole CI configure on 2026-11-09 for want of that. A download that passes is also copied
-# into the directory of (1) when that is set, so that a CI cache of it can be saved. Nothing here
-# relaxes the pin: no path reaches the build with a tarball that did not hash to it.
+# and deleted, never used. (2) Otherwise a download, from each of ICLFORGE_OPUS_URLS in turn
+# (downloads.xiph.org, which redirects to OSU Open Source Lab's mirror; that mirror's own URL; and
+# Gentoo's distfiles mirror, which is a different host and serves the same bytes), the whole list
+# tried ICLFORGE_OPUS_ATTEMPTS times (default 3) with a pause between rounds (5, then 15 s). Each
+# transfer has a timeout and is held to the same SHA-256, which is what makes a mirror safe to
+# list: a host that serves other bytes is just a failed try. The 2026-11-09 merge-queue runs of the
+# release failed twice in a row on "SSL connect error" to the one host there was. A download that
+# passes is also copied into the directory of (1) when that is set, so that a CI cache of it can be
+# saved. Nothing here relaxes the pin: no path reaches the build with a tarball that did not hash to it.
 #
 # Run as a script - `cmake -DICLFORGE_OPUS_TARBALL_DIR=<dir> -P opus.cmake` - it does only (1) and
 # (2) for that directory and stops. .github/actions/opus-tarball uses that to restore and fill the
@@ -32,16 +35,23 @@
 # ---------------------------------------------------------------------------
 set(ICLFORGE_OPUS_VERSION "1.6.1")
 set(ICLFORGE_OPUS_SHA256 "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1")
-# The URL, the number of tries and the pauses between them may be overridden (a mirror, or a file://
-# URL and no pauses in a test); the SHA-256 above may not.
-if(NOT ICLFORGE_OPUS_URL)
-    set(ICLFORGE_OPUS_URL "https://downloads.xiph.org/releases/opus/opus-${ICLFORGE_OPUS_VERSION}.tar.gz")
+# The URLs, the number of rounds and the pauses between them may be overridden (ICLFORGE_OPUS_URL
+# names one URL alone: a mirror, or a file:// URL and no pauses in a test); the SHA-256 above may not.
+if(NOT ICLFORGE_OPUS_URLS)
+    if(ICLFORGE_OPUS_URL)
+        set(ICLFORGE_OPUS_URLS "${ICLFORGE_OPUS_URL}")
+    else()
+        set(ICLFORGE_OPUS_URLS
+            "https://downloads.xiph.org/releases/opus/opus-${ICLFORGE_OPUS_VERSION}.tar.gz"
+            "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-${ICLFORGE_OPUS_VERSION}.tar.gz"
+            "https://distfiles.gentoo.org/distfiles/cb/opus-${ICLFORGE_OPUS_VERSION}.tar.gz")
+    endif()
 endif()
 if(NOT ICLFORGE_OPUS_ATTEMPTS)
-    set(ICLFORGE_OPUS_ATTEMPTS 5)
+    set(ICLFORGE_OPUS_ATTEMPTS 3)
 endif()
 if(NOT DEFINED ICLFORGE_OPUS_RETRY_DELAYS)
-    set(ICLFORGE_OPUS_RETRY_DELAYS "5;10;20;30")
+    set(ICLFORGE_OPUS_RETRY_DELAYS "5;15")
 endif()
 set(ICLFORGE_OPUS_SOURCE_DIR "" CACHE PATH
     "An extracted libopus ${ICLFORGE_OPUS_VERSION} source tree to build from, in place of the release tarball")
@@ -78,46 +88,59 @@ function(iclforge_opus_obtain dest)
     get_filename_component(dest_dir "${dest}" DIRECTORY)
     file(MAKE_DIRECTORY "${dest_dir}")
     list(LENGTH ICLFORGE_OPUS_RETRY_DELAYS delays)
-    set(try 1)
-    while(TRUE)
-        file(REMOVE "${dest}.part")
-        # No EXPECTED_HASH here: file(DOWNLOAD) turns a failed transfer into a hard CMake error
-        # when it is given one ("cannot compute hash on failed download", which is what failed
-        # the 2026-11-09 configure and cannot be retried), and STATUS does not soften that. The
-        # hash is checked below, on a transfer that completed, and a mismatch counts as a failed try.
-        file(DOWNLOAD "${ICLFORGE_OPUS_URL}" "${dest}.part" TIMEOUT 120 INACTIVITY_TIMEOUT 30
-             STATUS opus_status)
-        list(GET opus_status 0 opus_code)
-        if(opus_code EQUAL 0)
-            file(SHA256 "${dest}.part" have)
-            if(have STREQUAL ICLFORGE_OPUS_SHA256)
-                file(RENAME "${dest}.part" "${dest}")
-                break()
+    set(round 1)
+    set(fetched FALSE)
+    while(NOT fetched)
+        set(failures "")
+        foreach(url IN LISTS ICLFORGE_OPUS_URLS)
+            file(REMOVE "${dest}.part")
+            # No EXPECTED_HASH here: file(DOWNLOAD) turns a failed transfer into a hard CMake error
+            # when it is given one ("cannot compute hash on failed download", which is what failed
+            # the 2026-11-09 configure and cannot be retried), and STATUS does not soften that. The
+            # hash is checked below, on a transfer that completed, and a mismatch counts as a
+            # failed try like any other.
+            file(DOWNLOAD "${url}" "${dest}.part" TIMEOUT 120 INACTIVITY_TIMEOUT 30 STATUS opus_status)
+            list(GET opus_status 0 opus_code)
+            if(opus_code EQUAL 0)
+                file(SHA256 "${dest}.part" have)
+                if(have STREQUAL ICLFORGE_OPUS_SHA256)
+                    file(RENAME "${dest}.part" "${dest}")
+                    set(fetched TRUE)
+                    set(from "${url}")
+                    break()
+                endif()
+                set(opus_status "${opus_code};SHA-256 ${have} is not the pinned ${ICLFORGE_OPUS_SHA256}")
             endif()
-            set(opus_status "${opus_code};SHA-256 ${have} is not the pinned ${ICLFORGE_OPUS_SHA256}")
+            file(REMOVE "${dest}.part")
+            string(APPEND failures "
+  ${url}: ${opus_status}")
+            message(STATUS "iclforge: libopus download from ${url} failed (${opus_status})")
+        endforeach()
+        if(fetched)
+            break()
         endif()
-        file(REMOVE "${dest}.part")
-        if(try GREATER_EQUAL ICLFORGE_OPUS_ATTEMPTS)
+        if(round GREATER_EQUAL ICLFORGE_OPUS_ATTEMPTS)
             message(FATAL_ERROR
                 "iclforge: libopus ${ICLFORGE_OPUS_VERSION} could not be fetched from "
-                "${ICLFORGE_OPUS_URL} (${opus_status}). Extract it somewhere and set "
+                "${ICLFORGE_OPUS_URLS} after ${round} rounds (last status of each:${failures}). "
+                "Extract it somewhere and set "
                 "ICLFORGE_OPUS_SOURCE_DIR to the directory that holds include/opus.h.")
         endif()
-        # The pause after try N is the Nth delay, or the last one when the list is shorter.
+        # The pause after round N is the Nth delay, or the last one when the list is shorter.
         set(pause 0)
         if(delays GREATER 0)
-            math(EXPR idx "${try} - 1")
+            math(EXPR idx "${round} - 1")
             if(idx GREATER_EQUAL delays)
                 math(EXPR idx "${delays} - 1")
             endif()
             list(GET ICLFORGE_OPUS_RETRY_DELAYS ${idx} pause)
         endif()
-        message(STATUS "iclforge: libopus download, try ${try} of ${ICLFORGE_OPUS_ATTEMPTS} failed "
-                       "(${opus_status}); trying again in ${pause} s")
+        message(STATUS "iclforge: libopus round ${round} of ${ICLFORGE_OPUS_ATTEMPTS} failed on every "
+                       "URL; trying again in ${pause} s")
         execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep ${pause})
-        math(EXPR try "${try} + 1")
+        math(EXPR round "${round} + 1")
     endwhile()
-    message(STATUS "iclforge: libopus ${ICLFORGE_OPUS_VERSION} tarball downloaded (try ${try})")
+    message(STATUS "iclforge: libopus ${ICLFORGE_OPUS_VERSION} tarball downloaded from ${from} (round ${round})")
     # Leave a verified copy where a cache can pick it up.
     if(NOT seed STREQUAL "" AND NOT seed STREQUAL dest)
         file(MAKE_DIRECTORY "${ICLFORGE_OPUS_TARBALL_DIR}")
