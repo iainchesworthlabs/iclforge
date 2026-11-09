@@ -28,7 +28,8 @@ a crypt:skip pattern), cbcs (AES-CBC with a pattern and a constant IV, so no `se
 Profiles (--profile):
   plain             the layout above
   dolby-ott         the protection layout of Dolby's public OTT reference streams (the Spott test
-                    app's DASH and HLS audio), as measured from them, for `cenc` and `cbcs` of an E-AC-3 or AC-4 input:
+                    app's DASH and HLS audio), as measured from them, for `cenc` and `cbcs`
+                    of an E-AC-3 or AC-4 input:
                     E-AC-3   whole sample protected. `cenc`: tenc v0, 8-byte IV, `saiz` with the
                              default size 8, `senc` flags 0, and the PIFF uuid copy of the `senc`
                              after it. `cbcs`: tenc v1 with a 16-byte constant IV and pattern 0:0

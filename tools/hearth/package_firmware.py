@@ -37,8 +37,8 @@ tools/ci/check_firmware_package.py checks before anything is uploaded.
 
 `index` writes the update index of one channel from a release's manifest:
 hearth-update-<channel>.json, the small file a board reads to learn what the
-newest release is and, for each image, its size and SHA-256. sign_index.py signs it afterwards. The facts are the manifest's, so they
-have one source; the board picks its image by them.
+newest release is and, for each image, its size and SHA-256. sign_index.py signs it afterwards.
+The facts are the manifest's, so they have one source; the board picks its image by them.
 
 Stdlib only, as the CI container's Python needs nothing installed for it.
 """
