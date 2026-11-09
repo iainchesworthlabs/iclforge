@@ -1,1 +1,0 @@
-**`forge normalize` writes the 2 channel dialogue norm as the measurement plus 6, with its control-enabled bit set, as DEE writes them.** `forge qc` reads the 2 channel field back as the norm plus 6, and prints the difference. The 6 and 8 channel fields are unchanged. No gain is applied: the stream is lossless, so only the fields change.

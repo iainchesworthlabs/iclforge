@@ -1,1 +1,0 @@
-**A TrueHD matrix may write any of the 16 rows.** The decoder refused an output channel above `max_matrix_chan`; the owner's disc has a 12 channel substream (`max_matrix_chan` 11) whose matrices write channel 15 (ERRATA 65). `truehd_substream3_search.py` skips empty segments and tries two more readings.

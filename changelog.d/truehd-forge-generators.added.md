@@ -1,1 +1,0 @@
-**`forge silence` and `forge sine` write TrueHD when the output ends in `.thd`.** The signal is coded losslessly in mono, stereo, 51 or 71 (the first channel at `freq_hz`, each later one a quarter higher); the AC-3 bit rate and the metadata options are refused by name.
