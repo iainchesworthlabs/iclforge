@@ -1,6 +1,6 @@
 """Generates the encoder-made substreams the decoder's presentation tests multiplex.
 
-Phase D7 of planning/ac4.md builds presentations of several substreams (music and effects with
+Phase D7 builds presentations of several substreams (music and effects with
 dialogue, main with associated audio, main with a dialogue enhancement substream) from the
 substreams of separate streams: the main and music and effects substreams from DEE's committed
 tone legs (testdata/external-baseline/ac4-51-tones-384 and ac4-20-tones-192), and the

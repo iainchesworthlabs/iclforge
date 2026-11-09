@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The pairing view (planning/hearth-design.md, "Network - discovery and
-// pairing"): a sink not paired with this computer. Pairing is asked for with
+// The pairing view: a sink not paired with this computer. Pairing is asked for with
 // the button here, never by selecting the row - selecting one only shows what
 // it is, and asking takes the sink from whichever server holds it
 // (network_sinks.hpp's own header comment). Once asked, the sink shows a

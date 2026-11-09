@@ -1,8 +1,7 @@
 # ---------------------------------------------------------------------------
-# iclforge::sendspin - the Sendspin protocol for Hearth (planning/hearth-reference-player.md,
-# A4): the server half hearth's engine uses, and the player half the test sink and
-# the ESP32 sinks use, with the _iclforge_player@v1 role on both
-# (planning/hearth-sendspin-extension.md).
+# iclforge::sendspin - the Sendspin protocol for Hearth: the server half hearth's engine uses, and
+# the player half the test sink and
+# the ESP32 sinks use, with the _iclforge_player@v1 role on both.
 #
 # Two layers. The core needs nothing: JSON, base64url, the transport-mode framing, the
 # audio chunk formats, the handshake-phase and core messages, pairing tokens, admission
@@ -14,7 +13,7 @@
 # fuzz build keeps no vcpkg dependency.
 #
 # ICLFORGE_SENDSPIN_PLAYER_ONLY builds the core and the player half, which is what a board
-# runs (planning/hearth-reference-player.md, B3): the Noise responder, pairing, the clock and
+# runs: the Noise responder, pairing, the clock and
 # the player session, with the crypto seam over whichever mbedTLS the board's SDK provides,
 # named by ICLFORGE_SENDSPIN_MBEDTLS_TARGET. The ESP-IDF component sets both
 # (firmware/esp-idf/iclforge/CMakeLists.txt) and brings its own WebSocket and mDNS. No vcpkg.

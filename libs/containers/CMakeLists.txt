@@ -16,7 +16,7 @@
 # no codec and the codecs never reach for it: front ends link both. A vcpkg feature and a Conan
 # option of each part's name switch its option; a part that is off compiles none of its sources and
 # installs none of its headers (cmake/InstallLibrary.cmake). The five were libraries of their own
-# until planning/consolidation.md's C3.
+# until they were merged here.
 # ---------------------------------------------------------------------------
 set(_containers_sources src/iec61937/iec61937.cpp src/iec61937/mat.cpp)
 set(_containers_not_built "")

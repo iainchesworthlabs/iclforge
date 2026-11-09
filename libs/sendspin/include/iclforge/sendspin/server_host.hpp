@@ -24,7 +24,7 @@
 #include "iclforge/sendspin/websocket.hpp"
 
 // A Sendspin server on a computer: every connection to its clients, whichever side dialled, and
-// the groups that play to them (planning/hearth-reference-player.md, A4, the server half).
+// the groups that play to them.
 //
 // The host listens for clients that dial it and advertises _sendspin-server._tcp, browses for
 // players that advertise _sendspin._tcp and dials them, and runs a ServerSession under a
@@ -32,15 +32,14 @@
 // client, or an approved one on the Sentinel that offers unpaired access, gets playback with
 // player@v1; a client whose token the operator entered is re-handshaken to its pairing PSK and
 // paired by it; any other waits with no activities until the operator pairs or approves it. A
-// paired client that offers _iclforge_player@v1 gets that role instead of player@v1
-// (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1).
+// paired client that offers _iclforge_player@v1 gets that role instead of player@v1.
 //
 // Groups play one programme to several clients: a member playing player@v1 gets the programme's
 // PCM in the first of its formats the group can produce from it (PCM or FLAC at any depth, Opus at
 // 48 kHz), and a member playing _iclforge_player@v1 gets the coded stream's bursts, all on one
 // timeline started far enough ahead for the member that needs the most lead.
 //
-// The other roles are activated by policy (planning/hearth-sendspin-extension.md, Other roles):
+// The other roles are activated by policy:
 // controller@v1, metadata@v1 and color@v1 for any client that lists them, artwork@v1 and
 // visualizer@v1 for a client that lists them and is not aiosendspin 9.1.1, and source@v1 only for a
 // client the operator has allowed it. A group gives its members' roles the programme's metadata,
@@ -344,8 +343,7 @@ class Group {
         std::uint16_t pc = 0;
         std::uint16_t pd = 0;
         std::span<const std::uint8_t> payload;
-        // The programme frame that is the burst's first decoded sample
-        // (planning/hearth-sendspin-extension.md, Timing).
+        // The programme frame that is the burst's first decoded sample.
         std::int64_t frame = 0;
         // The samples it decodes to: 1,536 for AC-3 and E-AC-3, and an AC-4
         // frame's length, which follows its frame rate.

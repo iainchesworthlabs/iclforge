@@ -1,6 +1,6 @@
 #pragma once
 
-// The AC-4 decoder as the player uses it (planning/ac4.md, D14b): what reading
+// The AC-4 decoder as the player uses it: what reading
 // an AC-4 stream needs that is not the player's own loop. player.cpp includes
 // this only when CONFIG_ICLFORGE_AC4 is on, and with it off none of this is in
 // the build.
@@ -158,9 +158,9 @@ namespace iclforge::ac4bridge {
 
 // Every delivered sample's bit pattern, in delivery order, through FNV-1a: the
 // probe's own hash (firmware/baremetal/probe.cpp's PcmHash), so a value printed
-// here is comparable with one printed there. Decision 26 of planning/ac4.md
-// promises the float tier's output identical on the host, the Cortex-M3 leg and
-// the ESP32s, and this is what says whether it is.
+// here is comparable with one printed there. The float tier's output is promised
+// identical on the host, the Cortex-M3 leg and the ESP32s, and this is what says
+// whether it is.
 struct PcmHash {
     std::uint64_t state = 14695981039346656037ULL;
 

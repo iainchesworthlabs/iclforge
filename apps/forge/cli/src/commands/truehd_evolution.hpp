@@ -75,6 +75,7 @@ class EvolutionSurvey {
     std::uint64_t length_fits_ = 0;
     std::array<ReadingTally, 2> readings_{};  // EMDF, then the letter of §15.4
     std::uint64_t frames_read_ = 0;           // by either
+    std::uint64_t tagged_ = 0;                // of them, with a non-zero primary protection field
     std::map<std::uint64_t, std::uint64_t> payload_ids_{};
     std::map<std::uint64_t, std::uint64_t> primary_codes_{};
     std::map<std::uint64_t, std::uint64_t> secondary_codes_{};
@@ -84,6 +85,16 @@ class EvolutionSurvey {
     std::uint64_t oamd_unread_ = 0;
     std::uint64_t oamd_other_programs_ = 0;
     std::vector<ProgramTally> programs_{};
+    // Where the update blocks of the object audio metadata take effect, value to count: the
+    // payload configurations' sample offsets (-1: none sent), the first block's own sample offset,
+    // the blocks' offset factors and ramp durations, and each block's start in its access unit, the
+    // payload's offset plus the first block's plus 32 samples a unit of the block's factor (where
+    // `forge decode` places a block; TS 103 420 §5.5.6, §5.5.7).
+    std::map<std::int64_t, std::uint64_t> payload_offsets_{};
+    std::map<std::int64_t, std::uint64_t> update_offsets_{};
+    std::map<std::int64_t, std::uint64_t> offset_factors_{};
+    std::map<std::int64_t, std::uint64_t> ramps_{};
+    std::map<std::int64_t, std::uint64_t> starts_in_unit_{};
     std::uint64_t first_unit_ = 0;
     std::uint64_t last_unit_ = 0;
     std::uint64_t gap_min_ = 0;

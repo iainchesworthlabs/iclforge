@@ -1,6 +1,6 @@
 #pragma once
 
-// What one board can do, as data (planning/p4x-preferences.md): the screen, the sink's slots, the networks, the
+// What one board can do, as data: the screen, the sink's slots, the networks, the
 // clock, the object cap. A Hearth sink is one product base that many boards run with different supported
 // configurations - an ESP32-S3 with a rack of DACs, an ESP32-C6 with eight slots, an ESP32-P4 with a 7-inch
 // panel - and what separates them is this description, filled in ONCE at boot from the build and the hardware
@@ -148,8 +148,7 @@ struct BoardCaps {
     // (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS: 2 on the ESP32-C6); 0 states no limit. A layout
     // wider than this plays through no more speakers than the stream has channels (layout_options.hpp).
     int coded_channels_max = 0;
-    // The image can be replaced over the network: two app slots with a trial and a rollback
-    // (planning/esp32-ota.md).
+    // The image can be replaced over the network: two app slots with a trial and a rollback.
     bool firmware_slots = false;
 
     [[nodiscard]] bool has_screen() const { return display.present(); }

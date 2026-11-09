@@ -5,7 +5,7 @@
 
 #include "iclforge/system_actions.hpp"
 
-// What the System group of the board's Preferences does to the board (planning/p4x-preferences.md, E4),
+// What the System group of the board's Preferences does to the board,
 // as one set of calls that the screen and the REST routes both make, so that a restart or a reset from
 // the screen is the restart or the reset a route makes, with the same refusals and the same words. The
 // words themselves - the confirming steps, the reasons - are libs/device's (iclforge/system_actions.hpp).

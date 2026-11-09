@@ -12,8 +12,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The screens a sink has when there are no words to show (planning/hearth-sink-screen.md, S0, S1 and
- * S10): which one is up for what the app knows, what the native sink's status says (read by the real
+ * The screens a sink has when there are no words to show: which one is up for what the app knows,
+ * what the native sink's status says (read by the real
  * JNI writer's output), and each drawn at 1080p with no display and probed where the spec puts things.
  */
 class StatusScreenTest : RenderTestBase() {

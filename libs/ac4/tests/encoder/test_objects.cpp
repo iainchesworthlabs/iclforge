@@ -1,4 +1,4 @@
-// iclforge::ac4::Encoder's object audio end to end (planning/ac4.md, phase E9): A-JOC
+// iclforge::ac4::Encoder's object audio end to end: A-JOC
 // substreams of ETSI TS 103 190-2 V1.3.1 clause 5.7, over a computed downmix
 // in a var_channel_element() and over a static 5.1 bed, with bed objects, the
 // LFE and decorrelation, and direct-coded object substreams, each with its

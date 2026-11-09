@@ -208,7 +208,9 @@ the UI says so.
 Bed applications are mixed by the app, not by Windows, because the taps are per process and
 there is no "everything except these" tap (the exclude mode takes one process tree, not a
 list). A stereo bed application goes to the L and R bed slots; a 5.1 render maps one-to-one
-onto the five plus the LFE send; a 7.1 render folds the side and rear pairs into Ls and Rs.
+onto the five, and its LFE channel is summed with the other bed applications' into the encoder's
+own LFE (the `lfe` span of `encode_frame`, not an object slot); a 7.1 render folds the side and
+rear pairs into Ls and Rs and sends its LFE the same way. A positioned application's LFE is dropped.
 Total bed contributors are unbounded; total taps are one per playing session, and S1 ran
 sixteen at once without strain.
 
@@ -560,7 +562,7 @@ The runner's surface as it stands on 2026-09-03 (`apps/crucible/runner/src/main.
 `--null-sink SUBSTR` names the silent endpoint (default "Desktop Atmos" then, and "Crucible Silent
 Output" since 2026-10-01); `--key PATH` loads a signing key file, otherwise the
 `AC3FORGE_SIGNING_KEY_FILE` and `AC3FORGE_SIGNING_KEY` variables are read; `--pin MODE` starts
-pinned to one of `atmos`, `ddplus`, `dd`, `pcm`, `headphones` or `stereo`; `--low-latency`
+pinned to one of `atmos`, `ddplus`, `dd`, `truehd`, `pcm`, `headphones` or `stereo`; `--low-latency`
 selects one-block frames; `--bitrate KBPS` fixes the bitrate (otherwise 448 kb/s, or 1536 in low
 latency); `--set-default SUBSTR` moves the system default output to that endpoint before starting
 and restores it on quit. The verbs on stdin, `<app>` being the id that `list` prints: `list`,

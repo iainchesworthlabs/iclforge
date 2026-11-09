@@ -165,7 +165,7 @@ All of these are run from the repo root.
 | `gen_conformance_vectors.py` | the conformance vector bundle under `--out`, and with `--archive` its `.tar.gz` | needs a built `forge` (`--cli`); the one script CI runs, see above |
 | `gen_karaoke_example.py` | `examples/karaoke/auld-lang-syne/`: the karaoke example's four parts, its two lyrics files and its Forge GUI project, and with `--forge` its stream | stdlib only; `--check` compares the committed files; `tools/checks/test_gen_karaoke_example.py` runs it in CI; the sample path uses no C library function, so the files are the same on every platform |
 | `gen_karaoke_duet_example.py` | `examples/karaoke/leave-her-johnny/`: the duet example's four parts (the two vocals sing different lines), its two lyrics files and its Forge GUI project, which names the parts and nothing of their layout, and with `--forge` its stream | stdlib only; shares its voices and WAV writer with `gen_karaoke_example.py` through `karaoke_synth.py`; `--check` compares the committed files; `tools/checks/test_gen_karaoke_duet_example.py` runs it in CI |
-| `cenc_make_protected.py` | a protected (Common Encryption) fragmented MP4 from a clear AC-3, E-AC-3 or AC-4 MP4: all four schemes, the clear-lead and key-rotation layouts, and with `--profile dolby-ott` the protection layout of Dolby's public OTT reference audio (subsample map, 1:9 pattern, PIFF copy, PlayReady and Widevine `pssh`); not committed | needs the `cryptography` package; the audit's fixture writer, [`planning/cenc-conformance.md`](../../planning/cenc-conformance.md), checked against GPAC and FFmpeg; not a reference for the standard |
+| `cenc_make_protected.py` | a protected (Common Encryption) fragmented MP4 from a clear AC-3, E-AC-3 or AC-4 MP4: all four schemes, the clear-lead and key-rotation layouts, and with `--profile dolby-ott` the protection layout of Dolby's public OTT reference audio (subsample map, 1:9 pattern, PIFF copy, PlayReady and Widevine `pssh`); not committed | needs the `cryptography` package; the Common Encryption audit's fixture writer, checked against GPAC and FFmpeg; not a reference for the standard |
 | `gen_cenc_reader_fixtures.py` | the seven small protected MP4s in `libs/containers/fuzz/seeds/fuzz_mp4_demux/` that the MP4 reader's tests and fuzz harness read: three from packager layouts (`--set refusal`) and four with Dolby's OTT audio layout (`--set dolby-ott`) | needs a built `forge` (`--forge`) and the `cryptography` package; `--check` compares the committed files |
 | `gen_pseudo_locale.py` | `apps/forge/gui/assets/translations/forge_gui_xx.ts`, the GUI's pseudo-locale, made from `forge_gui_fr.ts` | stdlib only |
 
@@ -195,7 +195,9 @@ committed, except that the `truehd-fixtures` legs (0.25 s streams of 7.1, three
 substreams, 96 kHz and 16 and 20 bits) and four short length legs are, with their
 sources and DEE's logs, under `testdata/truehd-dee/`; `--fixtures-out DIR` writes that
 copy from a set, laid out so that `tools/checks/score_truehd_decode.py --set` reads it.
-The `truehd-long` group (300 s programmes) is made in a second set directory.
+The `truehd-long` group (300 s programmes) is made in a second set directory. The `truehd-last` group is the legs
+asked for in the last days of the licence: impulses and band-limited tones at 96 kHz, a
+stepped tone with and without `--optimize-data-rate`, dialnorm and DRC profiles on a stream of three presentations.
 `gen_ac4_baseline.py --gold-set` does the same for AC-4; without `--gold-set` it
 writes the short streams under `testdata/external-baseline/` that CI reads.
 
@@ -205,4 +207,3 @@ trying object audio end to end through a media server. The music is synthesised 
 numpy with a fixed seed, so the files are free to share and the output is reproducible.
 `python tools/generators/gen_atmos_demo_track.py --forge <a host build's forge> --out <dir>`;
 it needs numpy, scipy, `ffmpeg` on PATH and a built `forge`. Nothing it writes is committed.
-See `planning/atmos-demo-track.md`.

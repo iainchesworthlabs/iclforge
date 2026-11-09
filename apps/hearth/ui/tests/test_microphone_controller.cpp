@@ -1,4 +1,4 @@
-// MicrophoneController (planning/karaoke-microphone.md, M4): what the Karaoke page's microphone
+// MicrophoneController: what the Karaoke page's microphone
 // card binds to. The pipeline under it (the input, the meter, the placing of a voice, the score) is
 // tested where it lives (apps/hearth/engine/tests/test_microphone_session.cpp and
 // test_performance.cpp); what is held here is what this class adds for QML: that nothing opens

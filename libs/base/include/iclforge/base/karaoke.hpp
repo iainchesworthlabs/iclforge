@@ -8,8 +8,8 @@
 //
 // A karaoke stream carries a backing (L and R), a guide melody (M) and one or two vocals (V1, V2).
 // ETSI TS 102 366 Annex C defines it for AC-3 and the E-AC-3 decoder takes the same reading (the
-// reproduction is ours by analogy there: planning/karaoke-eac3.md, D1); an AC-4 mapping would
-// choose a presentation and a dialogue gain for the same choice (planning/karaoke-ac4-options.md).
+// reproduction is ours by analogy there); an AC-4 mapping would
+// choose a presentation and a dialogue gain for the same choice.
 // The types are here, header-only, so that every one of them names the same thing: the output
 // stages of libs/ac3, the settings and the wire's converters, and a later AC-4 resolver. Nothing in
 // this header is exported, and iclforge::ac3 re-exports the names, so no caller changed.

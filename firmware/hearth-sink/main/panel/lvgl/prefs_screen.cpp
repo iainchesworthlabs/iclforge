@@ -1,4 +1,4 @@
-// The Preferences sheet. See prefs_screen.hpp and planning/p4x-preferences.md.
+// The Preferences sheet. See prefs_screen.hpp.
 //
 // What a preference is, which choices it has, whether this board can make them and what the words are is
 // iclforge/preferences.hpp's (libs/device, tested on the host against every known board): this file measures the

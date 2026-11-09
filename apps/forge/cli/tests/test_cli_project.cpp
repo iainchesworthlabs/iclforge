@@ -236,3 +236,117 @@ TEST_CASE("forge project says what is wrong with a file that is not a project",
     CHECK(run_cli("project " + quoted(gone), log) == 2);
     CHECK(read_bytes(log).find("was not found") != std::string::npos);
 }
+
+TEST_CASE("forge project of a TrueHD project runs truehd-encode, and the stream decodes to the WAV",
+          "[cli][project][truehd]") {
+    const auto dir = scratch_dir();
+    // A real WAV: the example's own backing track, which the encode of the karaoke example reads.
+    const fs::path wav = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts" / "backing.wav";
+    const auto project = dir / "lossless.forgeproj";
+    {
+        std::ofstream out{project, std::ios::binary | std::ios::trunc};
+        out << R"({
+  "format": "iclforge-project",
+  "version": 1,
+  "sources": [{"path": ")" << wav.generic_string() << R"("}],
+  "encode": {"codec": "truehd", "container": "elementary", "bitrateKbps": 448,
+             "truehd": {"verify": true}}
+})";
+    }
+    const auto result = dir / "lossless.thd";
+    fs::remove(result);
+    const auto log = dir / "lossless.log";
+    SECTION("print shows the command and runs nothing") {
+        REQUIRE(run_cli("project " + quoted(project) + " " + quoted(result) + " print", log) == 0);
+        const std::string text = read_bytes(log);
+        INFO(text);
+        CHECK(text.rfind("forge truehd-encode ", 0) == 0);
+        CHECK(text.find(" verify") != std::string::npos);
+        CHECK_FALSE(fs::exists(result));
+    }
+    SECTION("run writes a TrueHD stream that decodes") {
+        REQUIRE(run_cli("project " + quoted(project), log) == 0);
+        INFO(read_bytes(log));
+        REQUIRE(fs::exists(result));
+        const auto decoded = dir / "lossless_decoded.wav";
+        REQUIRE(run_cli("decode " + quoted(result) + " " + quoted(decoded), log) == 0);
+        CHECK(fs::file_size(decoded) > 1000);
+    }
+    SECTION("what a lossless encode does not have is refused, with words") {
+        const auto bad = dir / "bad.forgeproj";
+        {
+            std::ofstream out{bad, std::ios::binary | std::ios::trunc};
+            out << R"({"format": "iclforge-project", "version": 1,
+  "sources": [{"path": ")" << wav.generic_string() << R"("}],
+  "encode": {"codec": "truehd", "container": "fmp4"}})";
+        }
+        CHECK(run_cli("project " + quoted(bad) + " " + quoted(dir / "bad_out") + " print", log) != 0);
+        CHECK(read_bytes(log).find("fragmented MP4") != std::string::npos);
+    }
+}
+
+TEST_CASE("forge project of a TrueHD project with options and several sources is the window's line, and "
+          "writes the same bytes as the command",
+          "[cli][project][truehd]") {
+    const auto dir = scratch_dir();
+    const fs::path parts = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts";
+    const fs::path backing = parts / "backing.wav";      // stereo
+    const fs::path melody = parts / "melody-guide.wav";  // mono
+    const auto project = dir / "several.forgeproj";
+    {
+        std::ofstream out{project, std::ios::binary | std::ios::trunc};
+        out << R"({
+  "format": "iclforge-project",
+  "version": 1,
+  "sources": [{"path": ")" << backing.generic_string() << R"("},
+              {"path": ")" << melody.generic_string() << R"(", "offsetSeconds": 0.25}],
+  "assignments": [{"source": 0, "channel": 0, "to": "L"},
+                  {"source": 0, "channel": 1, "to": "R"},
+                  {"source": 1, "channel": 0, "to": "C"}],
+  "encode": {"codec": "truehd", "container": "elementary",
+             "truehd": {"verify": true, "downmix": "standard", "restart": "16",
+                        "majorSync": 32, "matrix": "off"}}
+})";
+    }
+    const auto result = dir / "several.thd";
+    const auto direct = dir / "several-direct.thd";
+    fs::remove(result);
+    fs::remove(direct);
+    const auto log = dir / "several.log";
+    const std::string options =
+        " map=0.0:L,0.1:R,1.0:C offset=1:0.25 truehd-downmix=standard truehd-restart=16"
+        " truehd-major-sync=32 truehd-matrix=off verify";
+    SECTION("print shows the line the window shows") {
+        REQUIRE(run_cli("project " + quoted(project) + " " + quoted(result) + " print", log) == 0);
+        const std::string text = read_bytes(log);
+        INFO(text);
+        CHECK(text.rfind("forge truehd-encode ", 0) == 0);
+        CHECK(text.find(" src=" + melody.generic_string()) != std::string::npos);
+        CHECK(text.find(options) != std::string::npos);
+        CHECK_FALSE(fs::exists(result));
+    }
+    SECTION("run writes the bytes the command writes") {
+        REQUIRE(run_cli("project " + quoted(project) + " " + quoted(result), log) == 0);
+        INFO(read_bytes(log));
+        REQUIRE(run_cli("truehd-encode " + quoted(backing) + " " + quoted(direct) +
+                            " src=" + quoted(melody) + options,
+                        log) == 0);
+        INFO(read_bytes(log));
+        const std::string made = read_bytes(result);
+        REQUIRE_FALSE(made.empty());
+        CHECK(made == read_bytes(direct));
+    }
+    SECTION("an option the command would refuse is refused with its sentence") {
+        const auto bad = dir / "bad-option.forgeproj";
+        {
+            std::ofstream out{bad, std::ios::binary | std::ios::trunc};
+            out << R"({"format": "iclforge-project", "version": 1,
+  "sources": [{"path": ")" << backing.generic_string() << R"("}],
+  "encode": {"codec": "truehd", "truehd": {"firOrder": 12}}})";
+        }
+        CHECK(run_cli("project " + quoted(bad) + " " + quoted(dir / "bad.thd") + " print", log) != 0);
+        const std::string text = read_bytes(log);
+        CHECK(text.find("truehd-fir-order is 0 to 8") != std::string::npos);
+        CHECK(text.find("got '12'") != std::string::npos);
+    }
+}

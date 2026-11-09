@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -28,6 +29,7 @@
 #include "iclforge/base/speaker.hpp"
 #include "iclforge/objects/emdf.hpp"
 #include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/core/crc.hpp"
 #include "iclforge/truehd/encoder/encoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
@@ -302,6 +304,46 @@ TEST_CASE("a damaged stream fails a strict decode and is counted by a lenient on
     const std::string lenient = read_text(log);
     CHECK(lenient.find("(access unit, CRC, parity) failed: 0") == std::string::npos);
     CHECK(read_wav(out).channels == 2);
+}
+
+TEST_CASE("decode takes truehd-reading= by name and the other reading changes what depends on it",
+          "[forge-cli][truehd]") {
+    // ERRATA.md question 101. hb_filters filters from the first sample after each restart, so
+    // decoding it with the histories zeroed at a restart gives other samples; a stream that does not
+    // depend on the reading decodes to the same WAV.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "reading.log";
+    const fs::path filters = fs::path{ICLFORGE_TRUEHD_FIXTURE_DIR} / "handbuilt" / "hb_filters.thd";
+    const fs::path base = dir / "reading_base.wav";
+    const fs::path zeroed = dir / "reading_zeroed.wav";
+    REQUIRE(run_cli("decode \"" + filters.string() + "\" \"" + base.string() + "\"", log) == 0);
+    REQUIRE(run_cli("decode \"" + filters.string() + "\" \"" + zeroed.string() +
+                        "\" truehd-reading=zero-histories truehd-check=lenient",
+                    log) == 0);
+    CHECK(read_bytes(base) != read_bytes(zeroed));
+    // Strict, the zeroed decode stops at the lossless check that the unzeroed histories satisfy.
+    CHECK(run_cli("decode \"" + filters.string() + "\" \"" + zeroed.string() +
+                      "\" truehd-reading=zero-histories",
+                  log) == kExitInput);
+
+    const fs::path plain = fixture("truehd_st48_s24.thd");
+    const fs::path plain_base = dir / "reading_plain_base.wav";
+    const fs::path plain_alt = dir / "reading_plain_alt.wav";
+    REQUIRE(run_cli("decode \"" + plain.string() + "\" \"" + plain_base.string() + "\"", log) == 0);
+    for (const char* reading : {"seed-shr7-32", "zero-histories"}) {
+        CAPTURE(reading);
+        REQUIRE(run_cli("decode \"" + plain.string() + "\" \"" + plain_alt.string() +
+                            "\" truehd-reading=" + reading,
+                        log) == 0);
+        CHECK(read_bytes(plain_base) == read_bytes(plain_alt));
+    }
+
+    CHECK(run_cli("decode \"" + plain.string() + "\" \"" + plain_alt.string() +
+                      "\" truehd-reading=elsewhere",
+                  log) == kExitUsage);
+    // Only decode takes it.
+    CHECK(run_cli("levels \"" + plain.string() + "\" truehd-reading=zero-histories", log) ==
+          kExitUsage);
 }
 
 TEST_CASE("forge probe describes a TrueHD and an MLP stream", "[forge-cli][truehd]") {
@@ -794,7 +836,7 @@ TEST_CASE("forge probe detail=format is both, and the TrueHD details are refused
     CHECK(run_cli("probe \"" + ec3.string() + "\" detail=evolution", log) == 1);
     CHECK(read_text(log).find("describes TrueHD and MLP streams") != std::string::npos);
     CHECK(run_cli("probe \"" + stream.string() + "\" detail=everything", log) == 1);
-    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure or format") !=
+    CHECK(read_text(log).find("detail must be frames, blocks, evolution, structure, format, checks, rate or matrix") !=
           std::string::npos);
 }
 
@@ -1202,14 +1244,17 @@ TEST_CASE("a command that does not read TrueHD takes the track after a TrueHD on
         CHECK(written[1] == std::byte{0x77});
     }
 
-    SECTION("a file with TrueHD alone is checked by qc and refused by name by transcode") {
+    SECTION("a file with TrueHD alone is checked by qc and read by transcode") {
         CHECK(run_cli("qc \"" + truehd_only.string() + "\"", log) == 0);
         CHECK(read_text(log).find("(TrueHD,") != std::string::npos);
         CHECK(read_text(log).find("integrity verdict: PASS") != std::string::npos);
-        CHECK(run_cli("transcode \"" + truehd_only.string() + "\" \"" +
-                          (dir / "refused.ac3").string() + "\"",
-                      log) == kExitUsage);
-        CHECK(read_text(log).find("which 'transcode' does not read") != std::string::npos);
+        const fs::path transcoded = dir / "from_truehd.ac3";
+        CHECK(run_cli("transcode \"" + truehd_only.string() + "\" \"" + transcoded.string() + "\"",
+                      log) == 0);
+        const std::vector<std::byte> written = read_bytes(transcoded);
+        REQUIRE(written.size() > 2);
+        CHECK(written[0] == std::byte{0x0B});
+        CHECK(written[1] == std::byte{0x77});
     }
 }
 
@@ -1320,8 +1365,8 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
     SECTION("decode") {
         // Each of these was accepted, exit 0, and left the output as it would have been.
         for (const std::string option :
-             {"channels=2", "downmix=loro", "drc=0.5", "drcmode=rf", "karaoke", "conceal=mute",
-              "mix-lfe", "programme=3", "bed-only", "verify-objects", "gate-objects",
+             {"downmix=loro", "drc=0.5", "drcmode=rf", "karaoke", "conceal=mute",
+              "mix-lfe", "programme=3", "bed-only", "sign-objects",
               "dialnorm=27", "syntax-trace=trace.txt", "verify-content", "check-content",
               "heavy"}) {
             DYNAMIC_SECTION(option) {
@@ -1339,16 +1384,18 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
             CHECK(read_text(log).find("Nothing was verified") != std::string::npos);
         }
         SECTION("every option the line carries is named") {
-            CHECK(run_cli("decode " + in + out + "drc=0.5 truehd-check=lenient channels=2", log) ==
+            CHECK(run_cli("decode " + in + out + "drc=0.5 truehd-check=lenient mix-lfe", log) ==
                   kExitUsage);
             const std::string text = read_text(log);
-            CHECK(text.find("drc=0.5, channels=2") != std::string::npos);
+            CHECK(text.find("drc=0.5, mix-lfe") != std::string::npos);
             CHECK(text.find("truehd-check=lenient, ") == std::string::npos);
         }
-        SECTION("the objects directory and the ADM path are not dropped either") {
+        SECTION("the objects directory is not dropped either") {
             const fs::path objects = tone.dir / "objects_dir";
+            // Objects are the channels of substream 3, which truehd-presentation=all decodes.
             CHECK(run_cli("decode " + in + out + cli_arg(objects), log) == kExitUsage);
-            CHECK(read_text(log).find("writes no objects") != std::string::npos);
+            CHECK(read_text(log).find("only truehd-presentation=all decodes") !=
+                  std::string::npos);
             CHECK_FALSE(fs::exists(out_wav));
         }
         SECTION("the options it does apply, and a transform choice it warns about") {
@@ -1363,10 +1410,10 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
     }
     SECTION("truehd-encode") {
         const fs::path stream = tone.dir / "refused_options.thd";
-        const fs::path other = tone.dir / "refused_other.wav";
+        const fs::path other = tone.dir / "refused_other.wav";  // programme2= names it; src= and map= are applied now (the map= cases)
         fs::copy_file(tone.wav, other, fs::copy_options::overwrite_existing);
         const std::vector<std::string> options{
-            "src=" + other.string(), "map=0:0", "offset=0:5", "layout=stereo", "dialnorm=27",
+            "layout=stereo", "dialnorm=27",
             "drc=film-standard", "bsmod=0", "programme2=" + other.string(), "lfemix=off",
             "heavy", "couple", "annexd"};
         for (const std::string& option : options) {
@@ -1415,8 +1462,8 @@ TEST_CASE("an option a TrueHD run does not apply is refused by name, never dropp
         }
     }
     SECTION("probe") {
-        CHECK(run_cli("probe " + in + "detail=frames", log) == kExitUsage);
-        CHECK(read_text(log).find("probe does not apply detail=frames") != std::string::npos);
+        CHECK(run_cli("probe " + in + "detail=blocks", log) == kExitUsage);
+        CHECK(read_text(log).find("probe does not apply detail=blocks") != std::string::npos);
         CHECK(run_cli("probe " + in + "json=1", log) == 0);
     }
 }
@@ -1463,35 +1510,14 @@ TEST_CASE("levels and loudness take truehd-presentation= and truehd-check=",
     }
 }
 
-TEST_CASE("cut and cat refuse a TrueHD stream by name, and say why",
+TEST_CASE("cat names a TrueHD stream behind an AC-3 family one, and does not call it a sync error",
           "[forge-cli][truehd][refusals]") {
-    // They read it as AC-3 and stopped with an AC-3 frame-sync error, exit 2, that said nothing of
-    // the codec.
+    // cut and cat of TrueHD are in test_cli_truehd_cut.cpp. A join whose first input is E-AC-3 read
+    // the later TrueHD one as E-AC-3 and stopped with a frame-sync error, exit 2.
     const ToneFiles& tone = tone_files();
     const fs::path log = tone.dir / "tools.log";
     const fs::path out = tone.dir / "tools_out.thd";
     const std::string in = cli_arg(tone.thd);
-    struct Refusal {
-        std::string command;
-        std::string args;
-        std::string why;
-    };
-    const std::vector<Refusal> refusals{
-        {"cut", in + cli_arg(out) + "0.05 0.1", "major sync"},
-        {"cat", cli_arg(out) + in + in, "major sync"},
-    };
-    for (const Refusal& item : refusals) {
-        DYNAMIC_SECTION(item.command) {
-            fs::remove(out);
-            CHECK(run_cli(item.command + " " + item.args, log) == kExitUsage);
-            const std::string text = read_text(log);
-            CHECK(text.find("is TrueHD or MLP") != std::string::npos);
-            CHECK(text.find("'" + item.command + "' does not read") != std::string::npos);
-            CHECK(text.find(item.why) != std::string::npos);
-            CHECK(text.find("lost sync") == std::string::npos);
-            CHECK_FALSE(fs::exists(out));
-        }
-    }
     SECTION("a TrueHD stream anywhere in cat's inputs") {
         const fs::path ec3 = fixture("../audio/reference_51_eac3_448k_cplbndstrce0.ec3");
         REQUIRE(fs::exists(ec3));
@@ -1862,19 +1888,24 @@ TEST_CASE("normalize measures each presentation of a TrueHD stream and writes it
     CHECK(text.find("audio untouched") != std::string::npos);
     CHECK(text.find(fmt::format("2ch  measured {:+.2f} LKFS", lkfs_2ch)) != std::string::npos);
     CHECK(text.find(fmt::format("6ch  measured {:+.2f} LKFS", lkfs_6ch)) != std::string::npos);
-    CHECK(text.find(fmt::format("2ch  dialogue norm 0 -> {} (ATSC A/85 section 8)",
-                                dialnorm_of(lkfs_2ch))) != std::string::npos);
+    // The 2 channel field is 6 above the norm the measurement gives, and its control bit is on, as
+    // DEE writes them (ERRATA.md questions 51 and 54).
+    CHECK(text.find(fmt::format("2ch  dialogue norm 0 -> {} (ATSC A/85 section 8, plus 6 in the 2 "
+                                "channel field, control bit on, as DEE writes it)",
+                                dialnorm_of(lkfs_2ch) + 6)) != std::string::npos);
     CHECK(text.find(fmt::format("6ch  dialogue norm 0 -> {} (ATSC A/85 section 8)",
                                 dialnorm_of(lkfs_6ch))) != std::string::npos);
     CHECK(text.find("no gain is applied") != std::string::npos);
     CHECK(text.find("control-enabled bit is off") != std::string::npos);
     CHECK(text.find("provisional, no oracle until the DEE set") != std::string::npos);
 
-    // Every major sync carries the two dialogue norms, with a good CRC, and nothing else is set.
+    // Every major sync carries the two dialogue norms, with a good CRC, the 2 channel control bit,
+    // and nothing else is set.
     const auto meanings = channel_meanings(out);
     REQUIRE_FALSE(meanings.empty());
     iclforge::truehd::ChannelMeaning expected;
-    expected.twoch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_2ch));
+    expected.twoch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_2ch) + 6);
+    expected.twoch_control_enabled = true;
     expected.sixch_dialogue_norm = static_cast<std::uint8_t>(dialnorm_of(lkfs_6ch));
     for (const auto& meaning : meanings) {
         CHECK(meaning == expected);  // no 8 channel presentation: its field is left alone
@@ -1889,7 +1920,9 @@ TEST_CASE("normalize measures each presentation of a TrueHD stream and writes it
     REQUIRE(run_cli("probe " + cli_arg(out) + "json=1", log) == 0);
     const auto presentations =
         nlohmann::json::parse(read_text(log))["truehd"]["channel_meaning"]["presentations"];
-    CHECK(presentations["2ch"]["dialogue_norm"] == dialnorm_of(lkfs_2ch));
+    CHECK(presentations["2ch"]["dialogue_norm"] == dialnorm_of(lkfs_2ch) + 6);
+    CHECK(presentations["2ch"]["control_enabled"] == true);
+    CHECK(presentations["6ch"]["control_enabled"] == false);
     CHECK(presentations["6ch"]["dialogue_norm"] == dialnorm_of(lkfs_6ch));
     const fs::path again = tone.dir / "normalized_again.thd";
     REQUIRE(run_cli("normalize " + cli_arg(out) + cli_arg(again), log) == 0);
@@ -1942,7 +1975,7 @@ TEST_CASE(
         REQUIRE(run_cli("normalize " + cli_arg(thd) + cli_arg(out), log) == 0);
         for (const auto& meaning : channel_meanings(out)) {
             CHECK(meaning.sixch_dialogue_norm == 31);
-            CHECK(meaning.twoch_dialogue_norm == 31);
+            CHECK(meaning.twoch_dialogue_norm == 37);  // 31 and the 2 channel field's 6
         }
 
         const fs::path silent_wav = tone.dir / "normalize_silent.wav";
@@ -2089,7 +2122,18 @@ TEST_CASE(
                 0);
         REQUIRE(run_cli("qc " + cli_arg(on), log) == 0);
         const std::string after = read_text(log);
-        CHECK(after.find("(matches)") != std::string::npos);
+        // Both presentations match: the 2 channel field holds the norm plus 6 and qc takes the 6
+        // off before it compares (ERRATA.md question 51).
+        const auto matches = [&after]() {
+            std::size_t count = 0;
+            for (auto at = after.find("(matches)"); at != std::string::npos;
+                 at = after.find("(matches)", at + 1)) {
+                ++count;
+            }
+            return count;
+        };
+        CHECK(matches() == 2);
+        CHECK(after.find(", the field's ") != std::string::npos);
         CHECK(after.find("control on, dialogue norm " + std::to_string(dialnorm_of(lkfs_6ch))) !=
               std::string::npos);
         CHECK(after.find("claimed              " +
@@ -2203,8 +2247,8 @@ TEST_CASE("qc of a TrueHD stream fails, exit 6, on a damaged stream, a join, and
         CHECK(run_cli("qc " + cli_arg(late), log) == 6);
         const std::string text = read_text(log);
         CHECK(text.find("data rate            2.00 Mbit/s declared") != std::string::npos);
-        CHECK(text.find("unit(s) late  FAIL") != std::string::npos);
-        CHECK(text.find(" 0 unit(s) late") == std::string::npos);
+        CHECK(text.find("ms short)  FAIL") != std::string::npos);
+        CHECK(text.find(", 0 unit(s) start before") == std::string::npos);
         // Everything else about that stream is sound.
         CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
     }
@@ -2217,28 +2261,273 @@ TEST_CASE("qc of a TrueHD stream fails, exit 6, on a damaged stream, a join, and
     }
 }
 
-TEST_CASE("transcode and fmp4 refuse a TrueHD stream by name", "[forge-cli][truehd][refusals]") {
+TEST_CASE("qc of a TrueHD stream holds the word that ends it to the rules of the player",
+          "[forge-cli][truehd][qc][terminators]") {
+    // TH spec 16.5 and the DEE findings report spec-answers-2026-11-04 D10: a stream may end in
+    // terminatorA and a count (0xD234E000 | zero_samples) or in 0xD234D234, or in neither; the word
+    // belongs in the last access unit only; nothing else may follow the last block; the count is
+    // below 4096. The decoder takes all of it; qc counts it.
+    namespace th = iclforge::truehd;
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "qc_end.log";
+    // 47,987 frames are not a whole number of access units, so the encoder ends the stream with
+    // terminatorA and the count of the samples that pad the last unit.
+    std::vector<std::int32_t> samples = tone_samples();
+    samples.resize(47987 * 6);
+    const fs::path wav = tone.dir / "qc_end.wav";
+    const fs::path stream = tone.dir / "qc_end.thd";
+    write_wav(wav, 48000, 6, 0x60F, samples);
+    REQUIRE(run_cli("truehd-encode " + cli_arg(wav) + cli_arg(stream), log) == 0);
+    const std::vector<std::byte> good = read_bytes(stream);
+    const auto write = [&tone](const std::string& name, const std::vector<std::byte>& bytes) {
+        const fs::path path = tone.dir / name;
+        std::ofstream out{path, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        return path;
+    };
+    // The stream with `word` as the last 32 bits of the payload of every substream of its last
+    // unit, and the parity and CRC bytes that cover them made again, so that nothing else is wrong.
+    const auto with_word = [&good](std::uint32_t word) {
+        std::vector<std::byte> bytes = good;
+        const auto info = th::probe_stream(bytes);
+        REQUIRE(info.has_value());
+        th::ElementaryReader reader{std::span<const std::byte>{bytes}};
+        std::span<const std::byte> last;
+        while (const auto unit = reader.next()) {
+            last = *unit;
+        }
+        const auto parsed = th::parse_access_unit(last, info->num_substreams, true);
+        REQUIRE(parsed.has_value());
+        for (int i = 0; i < parsed->num_substreams; ++i) {
+            const auto index = static_cast<std::size_t>(i);
+            const auto segment = parsed->segments[index];
+            REQUIRE(parsed->entries[index].crc_present);
+            std::byte* base = bytes.data() + (segment.data() - bytes.data());
+            const std::size_t payload = segment.size() - 2;
+            for (unsigned b = 0; b < 4; ++b) {
+                base[payload - 4 + b] = static_cast<std::byte>((word >> (24U - (8U * b))) & 0xFFU);
+            }
+            const std::span<const std::byte> covered{base, payload};
+            base[payload] = static_cast<std::byte>(th::substream_parity(covered));
+            base[payload + 1] = static_cast<std::byte>(th::substream_crc(covered));
+        }
+        return bytes;
+    };
+
+    SECTION("a stream with no word, and one that ends on one, pass") {
+        CHECK(run_cli("qc " + cli_arg(tone.thd), log) == 0);
+        CHECK(read_text(log).find(
+                  "stream end           0 terminator word(s) at most in a substream, 0 not in the "
+                  "last unit, 0 illegal word(s) after the last block, 0 zero_samples count(s) of "
+                  "4096 or more  PASS") != std::string::npos);
+        CHECK(run_cli("qc " + cli_arg(stream), log) == 0);
+        CHECK(read_text(log).find(
+                  "stream end           1 terminator word(s) at most in a substream, 0 not in the "
+                  "last unit, 0 illegal word(s) after the last block, 0 zero_samples count(s) of "
+                  "4096 or more  PASS") != std::string::npos);
+    }
+    SECTION("the end-of-stream marker, and a count of none or of a few samples, pass") {
+        // A count above the unit's samples is a unit the decoder cannot read, not a word to judge.
+        for (const std::uint32_t word : {0xD234D234U, 0xD234E000U, 0xD234E01CU}) {
+            CHECK(run_cli("qc " + cli_arg(write("qc_end_legal.thd", with_word(word))), log) == 0);
+            CHECK(read_text(log).find("0 zero_samples count(s) of 4096 or more  PASS") !=
+                  std::string::npos);
+        }
+    }
+    SECTION("the word in a unit that is not the last fails") {
+        std::vector<std::byte> twice = good;
+        twice.insert(twice.end(), good.begin(), good.end());
+        CHECK(run_cli("qc " + cli_arg(write("qc_end_twice.thd", twice)), log) == 6);
+        const std::string text = read_text(log);
+        CHECK(text.find("2 terminator word(s) at most in a substream, 1 not in the last unit") !=
+              std::string::npos);
+        CHECK(text.find("of 4096 or more  FAIL") != std::string::npos);
+        CHECK(text.find("integrity verdict: FAIL") != std::string::npos);
+    }
+    SECTION("a word that begins 0xD234 and is neither form fails") {
+        for (const std::uint32_t word : {0xD234A000U, 0xD234D233U, 0xD2340000U}) {
+            CHECK(run_cli("qc " + cli_arg(write("qc_end_illegal.thd", with_word(word))), log) == 6);
+            const std::string text = read_text(log);
+            CHECK(text.find("0 not in the last unit, 1 illegal word(s) after the last block, 0 "
+                            "zero_samples count(s) of 4096 or more  FAIL") != std::string::npos);
+            // Everything else about the stream is sound: the checks were made again.
+            CHECK(text.find("restart header, parity, segment CRC)  PASS") != std::string::npos);
+            CHECK(text.find("interval(s) ok, 0 failed  PASS") != std::string::npos);
+        }
+    }
+    SECTION("a zero_samples of 4096 or more fails, by itself") {
+        for (const std::uint32_t count : {0x1000U, 0x100DU, 0x1FFFU}) {
+            CHECK(run_cli("qc " + cli_arg(write("qc_end_big.thd", with_word(0xD234E000U | count))),
+                          log) == 6);
+            CHECK(read_text(log).find("0 illegal word(s) after the last block, 1 zero_samples "
+                                      "count(s) of 4096 or more  FAIL") != std::string::npos);
+        }
+    }
+}
+
+TEST_CASE("fmp4 and transcode to AC-4 refuse a TrueHD stream by name", "[forge-cli][truehd][refusals]") {
     const ToneFiles& tone = tone_files();
     const fs::path log = tone.dir / "refusals.log";
     const fs::path out = tone.dir / "refused_out";
-    struct Refusal {
-        std::string command;
-        std::string args;
-    };
-    const std::vector<Refusal> refusals{
-        {"transcode", cli_arg(tone.thd) + cli_arg(out.string() + ".ac3")},
-        {"fmp4", cli_arg(tone.thd) + cli_arg(out)},
-    };
-    for (const Refusal& item : refusals) {
-        DYNAMIC_SECTION(item.command) {
-            CHECK(run_cli(item.command + " " + item.args, log) == kExitUsage);
-            const std::string text = read_text(log);
-            CHECK(text.find("is TrueHD or MLP") != std::string::npos);
-            CHECK(text.find(item.command == "fmp4" ? "CMAF, HLS or DASH"
-                                                   : "'" + item.command + "' does not read") !=
-                  std::string::npos);
-            CHECK(text.find("lost sync") == std::string::npos);
+    SECTION("fmp4") {
+        CHECK(run_cli("fmp4 " + cli_arg(tone.thd) + cli_arg(out), log) == kExitUsage);
+        const std::string text = read_text(log);
+        CHECK(text.find("is TrueHD or MLP") != std::string::npos);
+        CHECK(text.find("CMAF, HLS or DASH") != std::string::npos);
+        CHECK(text.find("lost sync") == std::string::npos);
+    }
+    SECTION("transcode to AC-4") {
+        const fs::path ac4 = tone.dir / "refused_out.ac4";
+        CHECK(run_cli("transcode " + cli_arg(tone.thd) + cli_arg(ac4), log) == kExitUsage);
+        CHECK(read_text(log).find("no TrueHD to AC-4") != std::string::npos);
+        CHECK_FALSE(fs::exists(ac4));
+    }
+    SECTION("transcode applies few options, and says which") {
+        const fs::path ac3 = tone.dir / "refused_out.ac3";
+        CHECK(run_cli("transcode " + cli_arg(tone.thd) + cli_arg(ac3) + "programme=2", log) == kExitUsage);
+        CHECK(read_text(log).find("refused, not dropped") != std::string::npos);
+        CHECK_FALSE(fs::exists(ac3));
+    }
+}
+
+namespace {
+
+// The RMS of channel `channel` of a 24-bit WAV (forge's, 68-byte header) or a 16-bit one, over the
+// middle half of the samples, so that the encoder's delay and tail are out of it.
+double channel_rms(const fs::path& wav_path, std::uint32_t channel, std::uint32_t& channels_out) {
+    const std::vector<std::byte> bytes = read_bytes(wav_path);
+    REQUIRE(bytes.size() > 44);
+    // Walk the chunks to the format and the data.
+    std::size_t at = 12;
+    std::uint32_t channels = 0;
+    std::uint32_t bits = 0;
+    std::size_t data = 0;
+    std::size_t data_size = 0;
+    while (at + 8 <= bytes.size()) {
+        const std::string id{reinterpret_cast<const char*>(bytes.data() + at), 4};
+        const std::size_t size = le(bytes, at + 4, 4);
+        if (id == "fmt ") {
+            channels = le(bytes, at + 10, 2);
+            bits = le(bytes, at + 22, 2);
+        } else if (id == "data") {
+            data = at + 8;
+            data_size = std::min<std::size_t>(size, bytes.size() - data);
+            break;
         }
+        at += 8 + size + (size & 1U);
+    }
+    REQUIRE(channels > channel);
+    REQUIRE((bits == 16 || bits == 24 || bits == 32));  // 32 bits: IEEE float, as a DD+ decode writes
+    channels_out = channels;
+    const std::size_t width = bits / 8;
+    const std::size_t frames = data_size / (width * channels);
+    double sum = 0.0;
+    std::size_t counted = 0;
+    for (std::size_t frame = frames / 4; frame < frames * 3 / 4; ++frame) {
+        const std::size_t offset = data + (frame * channels + channel) * width;
+        double sample = 0.0;
+        if (bits == 32) {
+            std::uint32_t raw = 0;
+            for (std::size_t i = 0; i < width; ++i) {
+                raw |= std::to_integer<std::uint32_t>(bytes[offset + i]) << (8U * i);
+            }
+            float value = 0.0F;
+            std::memcpy(&value, &raw, sizeof value);
+            sample = static_cast<double>(value);
+        } else {
+            std::int32_t value = 0;
+            for (std::size_t i = 0; i < width; ++i) {
+                value |= static_cast<std::int32_t>(std::to_integer<std::uint32_t>(bytes[offset + i])
+                                                   << (8U * i + (32U - bits)));
+            }
+            sample = static_cast<double>(value) / 2147483648.0;
+        }
+        sum += sample * sample;
+        ++counted;
+    }
+    return std::sqrt(sum / static_cast<double>(counted));
+}
+
+}  // namespace
+
+TEST_CASE("transcode of a TrueHD stream to AC-3 and E-AC-3 keeps the programme",
+          "[forge-cli][truehd][transcode]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "transcode.log";
+    const std::string in = cli_arg(tone.thd);
+    // The tone's channels are sines of known size (kToneShare); a lossy encode keeps each within a
+    // dB or so of its RMS, and the channel they are in.
+    for (const std::string suffix : {"ac3", "ec3"}) {
+        DYNAMIC_SECTION(suffix) {
+            const fs::path coded = tone.dir / ("transcoded." + suffix);
+            const fs::path decoded = tone.dir / ("transcoded_" + suffix + ".wav");
+            fs::remove(coded);
+            REQUIRE(run_cli("transcode " + in + cli_arg(coded) + "448", log) == 0);
+            CHECK(read_text(log).find("dialogue norm") != std::string::npos);
+            REQUIRE(fs::exists(coded));
+            REQUIRE(run_cli("decode " + cli_arg(coded) + cli_arg(decoded), log) == 0);
+            std::uint32_t channels = 0;
+            for (std::uint32_t channel = 0; channel < 6; ++channel) {
+                // The WAV of a 5.1 decode lists L R C LFE Ls Rs; the LFE is band-limited and a
+                // 1 kHz tone is out of its range, so only the full-range channels are compared.
+                if (channel == 3) {
+                    continue;
+                }
+                const double rms = channel_rms(decoded, channel, channels);
+                const double wanted = kToneShare[channel] / std::sqrt(2.0);
+                CHECK(channels == 6);
+                CHECK(std::abs(20.0 * std::log10(rms / wanted)) < 1.5);
+            }
+        }
+    }
+    SECTION("the 2ch presentation is a stereo programme") {
+        const fs::path coded = tone.dir / "transcoded_2ch.ac3";
+        const fs::path decoded = tone.dir / "transcoded_2ch.wav";
+        REQUIRE(run_cli("transcode " + in + cli_arg(coded) + "192 truehd-presentation=2ch", log) == 0);
+        REQUIRE(run_cli("decode " + cli_arg(coded) + cli_arg(decoded), log) == 0);
+        std::uint32_t channels = 0;
+        const double left = channel_rms(decoded, 0, channels);
+        CHECK(channels == 2);
+        CHECK(std::abs(20.0 * std::log10(left / (kToneShare[0] / std::sqrt(2.0)))) < 1.5);
+    }
+    SECTION("the dialogue norm the stream stores is carried as the dialnorm") {
+        // The 6 channel field is the dialnorm; the 2 channel field is the dialnorm plus 6.
+        const fs::path coded = tone.dir / "stored_dialnorm.thd";
+        REQUIRE(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(coded) +
+                            "truehd-dialnorm-6ch=27 truehd-dialnorm-2ch=33",
+                        log) == 0);
+        const auto dialnorm_of = [&](const std::string& options) {
+            const fs::path ac3 = tone.dir / "stored_dialnorm.ac3";
+            const fs::path wav = tone.dir / "stored_dialnorm.wav";
+            fs::remove(ac3);
+            REQUIRE(run_cli("transcode " + cli_arg(coded) + cli_arg(ac3) + "448 " + options, log) ==
+                    0);
+            REQUIRE(run_cli("decode " + cli_arg(ac3) + cli_arg(wav), log) == 0);
+            return read_text(log);
+        };
+        CHECK(dialnorm_of("").find("metadata: dialnorm 27 ") != std::string::npos);
+        CHECK(dialnorm_of("truehd-presentation=6ch").find("metadata: dialnorm 27 ") !=
+              std::string::npos);
+        CHECK(dialnorm_of("truehd-presentation=2ch").find("metadata: dialnorm 27 ") !=
+              std::string::npos);
+        // The operator's word beats the stream's.
+        CHECK(dialnorm_of("dialnorm=20").find("metadata: dialnorm 20 ") != std::string::npos);
+    }
+    SECTION("a stream that stores no dialogue norm keeps the encoder's default, and says so") {
+        REQUIRE(run_cli("transcode " + in + cli_arg(tone.dir / "no_dialnorm.ac3") + "448", log) == 0);
+        CHECK(read_text(log).find("stores no dialogue norm") != std::string::npos);
+    }
+    SECTION("to stdout, nothing but the stream is written there") {
+        const fs::path piped = tone.dir / "transcoded_stdout.ac3";
+        const std::string command = "\"" + std::string(ICLFORGE_CLI_EXE) + "\" transcode " + in + "- 448 codec=ac3 > " +
+                                    cli_arg(piped) + "2> " + cli_arg(tone.dir / "stderr.log");
+        REQUIRE(iclforge::test::platform::run_shell(command) == 0);
+        CHECK(fs::file_size(piped) > 1000);
+        const std::vector<std::byte> bytes = read_bytes(piped);
+        REQUIRE(bytes.size() > 2);
+        CHECK(bytes[0] == std::byte{0x0B});
+        CHECK(bytes[1] == std::byte{0x77});
     }
 }
 
@@ -2294,5 +2583,362 @@ TEST_CASE("truehd-encode reports an output that could not be written", "[forge-c
         CHECK(run_cli(command + " \"" + good.string() + "\" \"" + link.string() + "\"", log) != 0);
         CHECK(read_text(log).find("write failed") != std::string::npos);
         fs::remove(link, ec);
+    }
+}
+
+TEST_CASE("decode channels=2 is the stream's own 2 channel presentation", "[forge-cli][truehd][options]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "channels.log";
+    const std::string in = cli_arg(tone.thd);
+    const fs::path two = tone.dir / "channels_two.wav";
+    const fs::path named = tone.dir / "channels_named.wav";
+    const fs::path coded = tone.dir / "channels_coded.wav";
+    const fs::path best = tone.dir / "channels_best.wav";
+    REQUIRE(run_cli("decode " + in + cli_arg(two) + "channels=2", log) == 0);
+    REQUIRE(run_cli("decode " + in + cli_arg(named) + "truehd-presentation=2ch", log) == 0);
+    CHECK(read_wav(two).channels == 2);
+    CHECK(read_wav(two).s32le == read_wav(named).s32le);  // the same substream, not a fold
+    SECTION("as-coded is what a decode does, and an option that disagrees is refused") {
+        REQUIRE(run_cli("decode " + in + cli_arg(coded) + "channels=as-coded", log) == 0);
+        REQUIRE(run_cli("decode " + in + cli_arg(best), log) == 0);
+        CHECK(read_wav(coded).s32le == read_wav(best).s32le);
+        CHECK(run_cli("decode " + in + cli_arg(tone.dir / "channels_bad.wav") +
+                          "channels=2 truehd-presentation=6ch",
+                      log) == kExitUsage);
+        CHECK(read_text(log).find("asks for another") != std::string::npos);
+    }
+    SECTION("loudness says the dialnorm it implies beside the stream's own") {
+        const fs::path stored = tone.dir / "loudness_dialnorm.thd";
+        REQUIRE(run_cli("truehd-encode " + cli_arg(tone.wav) + cli_arg(stored) +
+                            "truehd-dialnorm-6ch=11",
+                        log) == 0);
+        REQUIRE(run_cli("loudness " + cli_arg(stored), log) == 0);
+        const std::string text = read_text(log);
+        CHECK(text.find("dialnorm ") != std::string::npos);
+        CHECK(text.find("the stream's own dialnorm 11") != std::string::npos);
+        REQUIRE(run_cli("loudness " + in, log) == 0);
+        CHECK(read_text(log).find("the stream stores no dialogue norm") != std::string::npos);
+    }
+}
+
+TEST_CASE("silence and sine with a .thd output make TrueHD streams", "[forge-cli][truehd][generators]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "generators.log";
+    const fs::path stream = tone.dir / "generated.thd";
+    const fs::path wav = tone.dir / "generated.wav";
+
+    SECTION("sine is the signal the formula gives, sample for sample") {
+        // 1 s, 1000 Hz at 50%, stereo: a tone in each channel, the second a quarter higher.
+        REQUIRE(run_cli("sine " + cli_arg(stream) + "1 192 1000 50 stereo", log) == 0);
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        const Wav decoded = read_wav(wav);
+        CHECK(decoded.channels == 2);
+        CHECK(decoded.rate == 48000);
+        REQUIRE(decoded.s32le.size() == 48000U * 2U * 4U);
+        for (const std::size_t n : {std::size_t{0}, std::size_t{1}, std::size_t{12}, std::size_t{4801}, std::size_t{47999}}) {
+            for (std::size_t c = 0; c < 2; ++c) {
+                const double hz = 1000.0 * (1.0 + 0.25 * static_cast<double>(c));
+                const float sample = static_cast<float>(
+                    0.5 * std::sin(2.0 * 3.14159265358979323846 * hz * static_cast<double>(n) / 48000.0));
+                const auto expected = static_cast<std::int32_t>(
+                    std::clamp(std::nearbyint(static_cast<double>(sample) * 8388608.0), -8388608.0, 8388607.0));
+                const std::size_t at = (n * 2 + c) * 4;
+                const auto got = static_cast<std::int32_t>(
+                    le(std::vector<std::byte>(decoded.s32le.begin() + static_cast<std::ptrdiff_t>(at),
+                                              decoded.s32le.begin() + static_cast<std::ptrdiff_t>(at + 4)),
+                       0, 4)) >> 8;
+                CHECK(got == expected);
+            }
+        }
+    }
+    SECTION("silence decodes to zeros, and is small") {
+        REQUIRE(run_cli("silence " + cli_arg(stream) + "1", log) == 0);
+        CHECK(fs::file_size(stream) < 20000);
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        const Wav decoded = read_wav(wav);
+        CHECK(decoded.channels == 2);
+        CHECK(std::ranges::all_of(decoded.s32le, [](std::byte b) { return b == std::byte{0}; }));
+    }
+    SECTION("a 5.1 layout names its speakers as decode writes them") {
+        REQUIRE(run_cli("sine " + cli_arg(stream) + "1 192 440 25 51", log) == 0);
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        const Wav decoded = read_wav(wav);
+        CHECK(decoded.channels == 6);
+        CHECK(decoded.mask == 0x60F);
+    }
+    SECTION("what a lossless generator does not have is refused") {
+        CHECK(run_cli("sine " + cli_arg(stream) + "1 192 440 25 5.0c", log) == kExitUsage);
+        CHECK(read_text(log).find("mono, stereo, 51 or 71") != std::string::npos);
+        CHECK(run_cli("sine " + cli_arg(stream) + "1 192 440 25 stereo dialnorm=27", log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
+    }
+}
+
+namespace {
+
+// A build with no audio backend (the ALSA-less and ADM legs) refuses monitor, record and live
+// before their handlers run (main.cpp's Needs check), with this sentence and kExitUnavailable. The
+// option refusals the cases below look for come from the handlers, so there they are not reachable.
+bool refused_for_want_of_audio(const std::string& text) {
+    return text.find("is unavailable on this platform") != std::string::npos;
+}
+
+}  // namespace
+
+TEST_CASE("monitor reads a TrueHD stream: it plays it, or says why the output cannot",
+          "[forge-cli][truehd][monitor]") {
+    // On a machine with speakers this plays the second of tone; with none (a CI leg, this one) the
+    // device is what is missing, and the run says so with the exit status of a missing output.
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "monitor.log";
+    const std::string in = cli_arg(tone.thd);
+    SECTION("the stream is read, not refused") {
+        const int code = run_cli("monitor " + in, log);
+        const std::string text = read_text(log);
+        CHECK(code != kExitUsage);
+        CHECK(text.find("does not read") == std::string::npos);
+        if (code == 0) {
+            CHECK(text.find("monitoring ") != std::string::npos);
+            CHECK(text.find("(TrueHD, 6 channels (L R C LFE Ls Rs), 48000 Hz)") !=
+                  std::string::npos);
+            CHECK(text.find("played ") != std::string::npos);
+        }
+    }
+    SECTION("the presentation is chosen as decode chooses it, and what monitor does not apply is refused") {
+        CHECK(run_cli("monitor " + in + "truehd-presentation=2ch", log) != kExitUsage);
+        if (refused_for_want_of_audio(read_text(log))) {
+            return;
+        }
+        CHECK(run_cli("monitor " + in + "dialnorm=27", log) == kExitUsage);
+        CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
+        CHECK(run_cli("monitor " + in + "truehd-presentation=7ch", log) == kExitUsage);
+    }
+}
+
+TEST_CASE("record codec=truehd takes a lossless stream, or says why the device cannot",
+          "[forge-cli][truehd][record]") {
+    const ToneFiles& tone = tone_files();
+    const fs::path log = tone.dir / "record.log";
+    const fs::path stream = tone.dir / "recorded.thd";
+    SECTION("a take, or the missing device named") {
+        fs::remove(stream);
+        const int code = run_cli("record " + cli_arg(stream) + "1 192 0 codec=truehd", log);
+        const std::string text = read_text(log);
+        CHECK(text.find("codec must be ac3, eac3 or ac4") == std::string::npos);
+        if (code == 0) {
+            // A machine with a capture device: what it heard is a TrueHD stream that decodes.
+            REQUIRE(fs::exists(stream));
+            CHECK(text.find("recorded 1 s from ") != std::string::npos);
+            CHECK(run_cli("decode " + cli_arg(stream) + cli_arg(tone.dir / "recorded.wav"), log) == 0);
+        } else {
+            CHECK(code != kExitUsage);  // not a refusal of the option: the device is what is missing
+            CHECK_FALSE(fs::exists(stream));
+        }
+    }
+    SECTION("what it does not do is refused by name") {
+        run_cli("record " + cli_arg(stream) + "1 192 0 codec=truehd", log);
+        if (refused_for_want_of_audio(read_text(log))) {
+            return;
+        }
+        CHECK(run_cli("record " + cli_arg(tone.dir / "recorded.ac3") + "1 192 0 codec=truehd", log) ==
+              kExitUsage);
+        CHECK(read_text(log).find("name the output .thd") != std::string::npos);
+        CHECK(run_cli("record " + cli_arg(stream) + "1 192 0 codec=truehd dialnorm=27", log) == kExitUsage);
+        CHECK(read_text(log).find("does not apply dialnorm=27") != std::string::npos);
+        CHECK(run_cli("live 0 1 " + cli_arg(tone.dir / "live.thd") + "codec=truehd", log) == kExitUsage);
+        CHECK(read_text(log).find("does not code TrueHD") != std::string::npos);
+    }
+}
+
+// ---- truehd-encode: several sources, named places (map=, src=, offset=) ---------------------------
+
+namespace {
+
+// `frames` interleaved samples of `channels` channels, each a different but fixed sequence: the value
+// says which source it is (`seed`), which channel and which frame, so that a mix-up shows.
+std::vector<std::int32_t> marked_samples(std::size_t frames, std::uint32_t channels, std::uint32_t seed) {
+    std::vector<std::int32_t> samples;
+    for (std::size_t n = 0; n < frames; ++n) {
+        for (std::uint32_t c = 0; c < channels; ++c) {
+            const std::uint32_t mixed =
+                static_cast<std::uint32_t>(n) * 2654435761U + c * 40503U + seed * 977U;
+            samples.push_back(static_cast<std::int32_t>((mixed >> 11U) & 0x7FFFFU) - 0x40000);
+        }
+    }
+    return samples;
+}
+
+std::int32_t sample_of(const std::vector<std::int32_t>& interleaved, std::uint32_t channels,
+                       std::size_t frame, std::uint32_t channel) {
+    return interleaved[frame * channels + channel];
+}
+
+std::int32_t decoded_sample(const Wav& wav, std::size_t frame, std::uint32_t channel) {
+    return static_cast<std::int32_t>(le(wav.s32le, (frame * wav.channels + channel) * 4, 4)) >> 8;
+}
+
+}  // namespace
+
+TEST_CASE("truehd-encode places the channels of several sources by name with map=",
+          "[forge-cli][truehd][truehd-encode][map]") {
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "map.log";
+    constexpr std::size_t kFrames = 4800;
+    const std::vector<std::int32_t> a = marked_samples(kFrames, 2, 1);  // L R
+    const std::vector<std::int32_t> b = marked_samples(kFrames, 1, 2);  // C
+    const std::vector<std::int32_t> c = marked_samples(kFrames, 3, 3);  // LFE Ls Rs
+    const fs::path a_wav = dir / "map_a.wav";
+    const fs::path b_wav = dir / "map_b.wav";
+    const fs::path c_wav = dir / "map_c.wav";
+    write_wav(a_wav, 48000, 2, 0x3, a);
+    write_wav(b_wav, 48000, 1, 0x4, b);
+    write_wav(c_wav, 48000, 3, 0, c);  // no mask: map= names the places
+    const auto encode = [&](const std::string& tail, const fs::path& stream) {
+        return run_cli("truehd-encode " + cli_arg(a_wav) + cli_arg(stream) + tail, log);
+    };
+    const auto decode = [&](const fs::path& stream, const fs::path& wav) {
+        REQUIRE(run_cli("decode " + cli_arg(stream) + cli_arg(wav), log) == 0);
+        return read_wav(wav);
+    };
+
+    SECTION("channels from three sources land in the stream's order, whatever the map's") {
+        const fs::path stream = dir / "map_six.thd";
+        REQUIRE(encode("src=" + b_wav.string() + " src=" + c_wav.string() +
+                           " map=2.2:Rs,2.1:Ls,2.0:LFE,1.0:C,0.1:R,0.0:L verify",
+                       stream) == 0);
+        CHECK(read_text(log).find("placed ") != std::string::npos);
+        const Wav out = decode(stream, dir / "map_six.wav");
+        REQUIRE(out.channels == 6);
+        CHECK(read_text(log).find("(L R C LFE Ls Rs)") != std::string::npos);
+        REQUIRE(out.s32le.size() == kFrames * 6 * 4);
+        bool equal = true;
+        for (std::size_t n = 0; n < kFrames && equal; ++n) {
+            equal = decoded_sample(out, n, 0) == sample_of(a, 2, n, 0) &&
+                    decoded_sample(out, n, 1) == sample_of(a, 2, n, 1) &&
+                    decoded_sample(out, n, 2) == sample_of(b, 1, n, 0) &&
+                    decoded_sample(out, n, 3) == sample_of(c, 3, n, 0) &&
+                    decoded_sample(out, n, 4) == sample_of(c, 3, n, 1) &&
+                    decoded_sample(out, n, 5) == sample_of(c, 3, n, 2);
+        }
+        CHECK(equal);
+    }
+
+    SECTION("offset= puts silence ahead of a source, and a shorter source is padded with silence") {
+        const fs::path short_wav = dir / "map_short.wav";
+        write_wav(short_wav, 48000, 1, 0x4, marked_samples(1200, 1, 2));
+        const fs::path stream = dir / "map_offset.thd";
+        REQUIRE(encode("src=" + short_wav.string() + " map=0.0:L,0.1:R,1.0:C offset=1:0.025",
+                       stream) == 0);
+        const Wav out = decode(stream, dir / "map_offset.wav");
+        REQUIRE(out.channels == 3);
+        constexpr std::size_t kLead = 1200;  // 0.025 s at 48 kHz
+        REQUIRE(out.s32le.size() / (4 * 3) == kFrames);  // the longest: source 0
+        const std::vector<std::int32_t> shorter = marked_samples(1200, 1, 2);
+        bool equal = true;
+        for (std::size_t n = 0; n < kFrames && equal; ++n) {
+            const std::int32_t want_c =
+                n >= kLead && n < kLead + 1200 ? sample_of(shorter, 1, n - kLead, 0) : 0;
+            equal = decoded_sample(out, n, 0) == sample_of(a, 2, n, 0) &&
+                    decoded_sample(out, n, 2) == want_c;
+        }
+        CHECK(equal);
+    }
+
+    SECTION("offset= on a single file with no map= delays the whole file") {
+        const fs::path stream = dir / "map_lead.thd";
+        REQUIRE(encode("offset=0:0.025", stream) == 0);
+        const Wav out = decode(stream, dir / "map_lead.wav");
+        REQUIRE(out.channels == 2);
+        REQUIRE(out.s32le.size() / (4 * 2) == kFrames + 1200);
+        CHECK(decoded_sample(out, 0, 0) == 0);
+        CHECK(decoded_sample(out, 1199, 1) == 0);
+        CHECK(decoded_sample(out, 1200, 0) == sample_of(a, 2, 0, 0));
+        CHECK(decoded_sample(out, 1200 + 77, 1) == sample_of(a, 2, 77, 1));
+    }
+
+    SECTION("map= on one file names its places over its channel mask") {
+        const fs::path stream = dir / "map_swap.thd";
+        REQUIRE(encode("map=0.1:L,0.0:R", stream) == 0);
+        const Wav out = decode(stream, dir / "map_swap.wav");
+        REQUIRE(out.channels == 2);
+        CHECK(decoded_sample(out, 5, 0) == sample_of(a, 2, 5, 1));
+        CHECK(decoded_sample(out, 5, 1) == sample_of(a, 2, 5, 0));
+    }
+
+    SECTION("LFE2 is a place, and the case of a name does not matter") {
+        const fs::path stream = dir / "map_lfe2.thd";
+        REQUIRE(encode("src=" + b_wav.string() + " map=0.0:l,0.1:r,1.0:lfe2", stream) == 0);
+        const Wav out = decode(stream, dir / "map_lfe2.wav");
+        REQUIRE(out.channels == 3);
+        CHECK(read_text(log).find("(L R LFE2)") != std::string::npos);
+        CHECK(decoded_sample(out, 9, 2) == sample_of(b, 1, 9, 0));
+    }
+
+    SECTION("what cannot be placed is refused with a sentence, and nothing is written") {
+        const fs::path stream = dir / "map_refused.thd";
+        fs::remove(stream);
+        const auto refused = [&](const std::string& tail, const char* sentence) {
+            CHECK(encode(tail, stream) == kExitUsage);
+            CHECK(read_text(log).find(sentence) != std::string::npos);
+            CHECK_FALSE(fs::exists(stream));
+        };
+        refused("map=0.0:L,0.1:L", "map= places L twice");
+        refused("map=0.0:L,0.1:Q", "'Q' is not a TrueHD channel");
+        refused("map=0.0:L,0.5:R", "map= names channel 5 of source 0, which has 2");
+        refused("map=0.0:L,3.0:R", "map= names source 3, but there is 1");
+        refused("map=0.0:L,0.1", "needs a source, a channel and a place");
+        refused("map=x.0:L", "the source and the channel are numbers from 0");
+        refused("src=" + b_wav.string(), "src= needs map=");
+        refused("offset=2:1.5", "offset=2:1.5 names source 2, but there is 1");
+        refused("src=" + c_wav.string() + " map=0.0:L,0.1:R", "source 1 has no channel in map=");
+        // A pair needs its partner: the sentence names the sets either side.
+        refused("src=" + b_wav.string() + " src=" + c_wav.string() +
+                    " map=0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls",
+                "Ls needs Rs. The nearest sets are L R C LFE Ls Rs or L R C LFE");
+    }
+
+    SECTION("sources of two sample rates are refused") {
+        const fs::path slow = dir / "map_44k.wav";
+        write_wav(slow, 44100, 1, 0x4, marked_samples(1000, 1, 5));
+        const fs::path stream = dir / "map_rates.thd";
+        CHECK(encode("src=" + slow.string() + " map=0.0:L,0.1:R,1.0:C", stream) == kExitUsage);
+        CHECK(read_text(log).find("every source must share a sample rate") != std::string::npos);
+        CHECK_FALSE(fs::exists(stream));
+    }
+}
+
+TEST_CASE("monitor takes eight channels and the high rates, or names the one the output refused",
+          "[forge-cli][truehd][monitor]") {
+    // Like the case above: a machine with speakers plays a short burst (and sends the channels in
+    // the output's own speaker order, so no note that they are left in the stream's); one with
+    // none says why, and the sentence names the channel count and the rate that were asked for.
+    const fs::path dir = scratch_dir();
+    const fs::path log = dir / "monitor_wide.log";
+    // Eight channels at 96 kHz, and the six that 192 kHz allows (TH spec 9.6, 21.6).
+    for (const std::uint32_t rate : {96000U, 192000U}) {
+        const std::uint32_t channels = rate > 96000U ? 6U : 8U;
+        const std::string layout_names = channels == 8U ? "L R C LFE Ls Rs Lrs Rrs" : "L R C LFE Ls Rs";
+        const std::string name = "monitor_wide_" + std::to_string(rate);
+        const fs::path wav = dir / (name + ".wav");
+        const fs::path stream = dir / (name + ".thd");
+        write_wav(wav, rate, channels, channels == 8U ? 0x63F : 0x60F, marked_samples(rate / 20, channels, 7));
+        // Noise at 8 channels and these rates is past the peak rate; the stream is what is wanted here.
+        const int encoded = run_cli("truehd-encode " + cli_arg(wav) + cli_arg(stream) + "truehd-rate-check=lenient", log);
+        INFO(read_text(log));
+        REQUIRE(encoded == 0);
+        const int code = run_cli("monitor " + cli_arg(stream), log);
+        const std::string text = read_text(log);
+        INFO("rate " << rate << ": " << text);
+        CHECK(code != kExitUsage);
+        CHECK(text.find("does not read") == std::string::npos);
+        if (code == 0) {
+            CHECK(text.find("(TrueHD, " + std::to_string(channels) + " channels (" + layout_names + "), " +
+                            std::to_string(rate) + " Hz)") != std::string::npos);
+            CHECK(text.find("sent in the stream's order") == std::string::npos);
+        } else if (!refused_for_want_of_audio(text)) {
+            CHECK(text.find("(" + std::to_string(channels) + " channel(s) at " + std::to_string(rate) +
+                            " Hz)") != std::string::npos);
+        }
     }
 }

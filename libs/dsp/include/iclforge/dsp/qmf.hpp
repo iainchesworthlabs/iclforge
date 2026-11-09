@@ -26,7 +26,7 @@
 // engine (libs/dsp/src/tiered/qmf_slot.hpp: TS 103 190-1 Pseudocodes 65 and
 // 66 as one 64-point transform each), with this prototype in place of QWIN
 // and a rotation of each subband by the half sample the two modulations
-// differ by (planning/consolidation.md decision 21).
+// differ by.
 //
 // Perfect reconstruction is exact, not approximate - analysis followed by
 // synthesis returns the input to floating-point precision (measured: 300 dB

@@ -51,7 +51,7 @@ TABLE = project_graph.load_table()
 # table does not hold - the notices and packaging of the products, the tools and the build files -
 # is listed here. Every prefix ends in "/" so that a differently-named sibling directory that
 # merely starts with the same characters cannot accidentally match.
-# A program's tests are beside it (planning/monorepo.md), and the Catch2 binaries among them are
+# A program's tests are beside it, and the Catch2 binaries among them are
 # core's still, as they were in tests/: the Qt Quick suites that sat next to the windows stay with
 # the program. A directory that holds both kinds names its Catch2 files by their test_ prefix.
 APP_TESTS = (
@@ -111,7 +111,7 @@ def _lane_prefixes() -> dict[str, tuple[str, ...]]:
 
 LANE_PREFIXES: dict[str, tuple[str, ...]] = _lane_prefixes()
 
-# A library keeps its tests and fuzz targets beside its code (planning/monorepo.md):
+# A library keeps its tests and fuzz targets beside its code:
 # libs/<lib>/tests/ and libs/<lib>/fuzz/. They were outside src/, in tests/ and fuzz/, so a lane
 # that names a library's own tree does not take them: a test-only change does not light the
 # ESP-IDF lane.

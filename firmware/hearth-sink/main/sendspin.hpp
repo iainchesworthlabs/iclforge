@@ -16,7 +16,7 @@
 #include "iclforge/control.hpp"
 #include "iclforge/now_view.hpp"
 
-// The board as a Sendspin player (planning/hearth-reference-player.md, B3), as
+// The board as a Sendspin player, as
 // a seam CMake resolves, like the source and the sink:
 //
 //   sendspin/player/  the component's Sendspin player
@@ -37,8 +37,7 @@
 
 namespace player {
 
-// The port a server connects to, which the board's mDNS record advertises
-// (planning/hearth-sendspin-extension.md, row T4: a player's port).
+// The port a server connects to, which the board's mDNS record advertises.
 inline constexpr std::uint16_t kSendspinPort = 8928;
 
 // Whether this build has a player at all.
@@ -85,8 +84,8 @@ void sendspin_board_changed();
 // playing a stream waits until the stream has ended, so that a rename never cuts the music.
 void sendspin_name_changed();
 
-// The board is going away, into flash mode or through a restart
-// (planning/esp32-ota.md): every server is told the board is restarting,
+// The board is going away, into flash mode or through a restart:
+// every server is told the board is restarting,
 // the player stops writing to the sink, and the server stops listening. The
 // player and its host stay in memory, since other tasks hold pointers to
 // them; nothing starts them again, because the board restarts next.
@@ -95,8 +94,8 @@ void sendspin_leave();
 // GET /status's "sendspin" object, or nothing without a player.
 [[nodiscard]] std::optional<iclforge::ControlSendspin> sendspin_status();
 
-// --- The listener's sound: a level and distance for each speaker, and the identify tone ---------------
-// (planning/p4x-preferences.md, iclforge/render/speaker_trim.hpp). Both are applied by the player in the same
+// --- The listener's sound: a level and distance for each speaker, and the identify tone ---------------.
+// Both are applied by the player in the same
 // output stage as the music, after the decode and before the DAC, so they cover PCM, AC-3, E-AC-3, AC-4 and
 // objects alike. Without a player (sendspin/none/) there is nothing to apply them to.
 
@@ -156,7 +155,7 @@ struct IdentifyStatus {
 };
 [[nodiscard]] IdentifyStatus sendspin_identify_status();
 
-// What a screen draws while a stream plays (planning/p4x-now-playing.md): the layout in force, the
+// What a screen draws while a stream plays: the layout in force, the
 // last 100 ms of each output's level, and what the decoder found. One read of the player's own status,
 // with no JSON and none of the server's state, so that a panel can ask five times a second.
 struct SendspinPlaying {
@@ -178,7 +177,7 @@ struct SendspinPlaying {
 };
 [[nodiscard]] SendspinPlaying sendspin_now_playing();
 
-// The levels alone, for a view that follows every 100 ms window (planning/p4x-speakers-options.md): the same
+// The levels alone, for a view that follows every 100 ms window: the same
 // peak and RMS per output as sendspin_now_playing(), with the count of windows the player has closed, so that a
 // caller can tell a new window from the one it has. A lock and two short arrays, where sendspin_now_playing()
 // copies the player's whole status; fixed-size, so it allocates nothing.

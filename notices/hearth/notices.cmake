@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Hearth's NOTICES.txt: the third-party software libs/sendspin brings into Hearth's programs,
-# plus - on Windows and macOS - the Qt it bundles (planning/hearth-reference-player.md,
-# Dependencies), assembled by cmake/Notices.cmake from the fragments beside this file (and, for
+# plus - on Windows and macOS - the Qt it bundles, assembled by cmake/Notices.cmake from the
+# fragments beside this file (and, for
 # the Qt section, notices/fragments/, shared rather than copied - see that file's
 # header). The licence texts are the copyright files vcpkg installs with each port, and the
 # versions are those vcpkg recorded (Qt's from apps/hearth/ui/CMakeLists.txt's own find_package),

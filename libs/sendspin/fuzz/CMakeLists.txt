@@ -2,7 +2,7 @@
 # instrumentation and iclforge_add_fuzzer()). Their seeds and the inputs that once broke them
 # are beside them, in seeds/<harness>/ and regressions/<harness>/ (tools/fuzz/run.sh).
 
-# --- Sendspin (planning/hearth-reference-player.md, A4) ----------------------
+# --- Sendspin ----------------------
 # iclforge::sendspin's parsers are the first code a network peer's bytes reach, on
 # hearth's server and on a sink. Gated on ICLFORGE_BUILD_HEARTH like the
 # library; tools/fuzz/run.sh turns it on with ICLFORGE_SENDSPIN_CORE_ONLY, which

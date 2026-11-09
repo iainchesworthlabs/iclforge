@@ -9,7 +9,7 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sink/passthrough.hpp"
 
-// The link of the pass-through output on Android (planning/hearth-android.md, phase 1c): the process's
+// The link of the pass-through output on Android: the process's
 // one AudioTrack, which iclforge::audio's passthrough backend owns through the app's registered
 // PassthroughBridge. There is one device, and each connection's output has a link to it of its
 // own that is good while that output is the one that opened it: a server that has been displaced

@@ -373,11 +373,10 @@ network.
 
 ## AC-4
 
-The AC-4 decoder's fixed-point tier ([`planning/ac4.md`, D14d](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14d-the-c6-fixed-point))
+The AC-4 decoder's fixed-point tier (D14d)
 builds for this part from the same component, with `CONFIG_ICLFORGE_AC4`. Measured on 2026-10-03
 on the host and under QEMU, with the decoder's memory work of
-[D14f](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14f-the-decoders-memory)
-in. The board ran it on 2026-10-10 (below).
+D14f in. The board ran it on 2026-10-10 (below).
 
 | | Fixed | Float |
 |---|---:|---:|
@@ -407,7 +406,7 @@ code kept in flash it had 285,408, level with 2.0's 286,365, and with no network
 holds 2.0 with about 97,000 bytes to spare. The largest single allocation at 2.0 is a frame's two
 parsed tracks, 31,168 bytes, so the largest free block is not what limits it. The Sendspin player's ring,
 WebSocket server and WiFi buffers leave less than the probe's network image does, so a C6 sink
-takes AC-4 programmes from Hearth as PCM (`planning/ac4.md`, decision 32). The fixed tier's PCM
+takes AC-4 programmes from Hearth as PCM. The fixed tier's PCM
 hashes are those of the x86-64 host and the Cortex-M3 leg
 (`testdata/ac4-fixed-probe-pcm-hashes.json`).
 
@@ -436,8 +435,8 @@ from a desktop over HTTP and played with `POST /play`.
   without the network is not a product here, and a decode time against the 42.7 ms frame is not
   measured. Nothing in this section says the part could keep up.
 
-AC-4 reaches a C6 sink as PCM from Hearth, which is decision 32's plan and, since the board run, an accepted
-limit ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)).
+AC-4 reaches a C6 sink as PCM from Hearth, which was the plan (decision 32) and, since the board run, an accepted
+limit (decision 42).
 
 ## QEMU
 

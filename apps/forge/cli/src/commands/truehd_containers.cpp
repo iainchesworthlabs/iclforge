@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -13,25 +14,27 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
+#include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/base/loudness.hpp"
 #include "iclforge/base/speaker.hpp"
 #include "iclforge/containers/iec61937/mat.hpp"
-#include "iclforge/containers/matroska/matroska.hpp"
-#include "iclforge/containers/mp4/mp4.hpp"
-#include "iclforge/containers/mpegts/mpegts.hpp"
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "probe_truehd.hpp"
 #include "truehd.hpp"
+#include "truehd_meaning.hpp"
+#include "truehd_wrap.hpp"
 
-// TrueHD and MLP in the container, transport and analysis commands (planning/truehd.md, phase
-// T2c). The containers library knows no codec, so the facts a track description needs (the
+// TrueHD and MLP in the container, transport and analysis commands. The containers library knows
+// no codec, so the facts a track description needs (the
 // access units, which of them open with a major sync, the channel count, the end-of-stream padding)
 // are read here, with iclforge::truehd, and handed to it as plain values.
 //
@@ -44,19 +47,9 @@ namespace {
 
 namespace th = iclforge::truehd;
 namespace mat = iclforge::containers::iec61937;
-namespace mkv = iclforge::containers::matroska;
-namespace mp4 = iclforge::containers::mp4;
-namespace ts = iclforge::containers::mpegts;
+namespace wrap = iclforge::apps::truehd_wrap;
 
-// A stream scanned for what a container needs.
-struct Scan {
-    std::vector<std::span<const std::byte>> units;  // whole access units, views into the stream
-    std::vector<bool> major;                        // per unit: it opens with a major sync
-    th::StreamInfo info;
-    int channels = 0;         // of the best presentation the stream has
-    int padding_samples = 0;  // the end-of-stream marker's count (libs/truehd ERRATA 14)
-    std::uint32_t samples_per_unit = 0;
-};
+using Scan = wrap::Scan;
 
 std::string error_text(const th::Error& error) {
     return error.detail.empty() ? std::string{th::to_string(error.kind)}
@@ -64,48 +57,21 @@ std::string error_text(const th::Error& error) {
 }
 
 const char* codec_label(const th::MajorSync& major_sync) {
-    return major_sync.kind == th::StreamKind::kTrueHd ? "TrueHD" : "MLP";
+    return wrap::codec_label(major_sync);
 }
 
 // The units of `stream`, which decode lenient so that a container can still be written from a
 // stream with a fault in it: `probe` and `decode` are where a fault is reported.
 std::optional<Scan> scan_stream(std::span<const std::byte> stream, std::string_view in_path) {
-    const auto info = th::probe_stream(stream);
-    if (!info) {
-        fmt::println(stderr, "error: {}: {}", in_path, error_text(info.error()));
+    auto scan = wrap::scan_stream(stream, in_path);
+    if (!scan) {
+        fmt::println(stderr, "error: {}", scan.error());
         return std::nullopt;
     }
-    Scan scan;
-    scan.info = *info;
-    scan.samples_per_unit = static_cast<std::uint32_t>(info->samples_per_access_unit);
-    th::ElementaryReader reader(stream);
-    th::Decoder decoder(th::DecoderConfig{.strictness = th::Strictness::kLenient});
-    while (const auto unit = reader.next()) {
-        scan.units.push_back(*unit);
-        scan.major.push_back(th::starts_with_major_sync(unit->subspan(4)));
-        const auto decoded = decoder.decode(*unit);
-        if (decoded && *decoded) {
-            scan.channels = (*decoded)->channels;
-            scan.padding_samples += (*decoded)->padding_samples;
-        }
+    for (const std::string& warning : scan->warnings) {
+        fmt::println(stderr, "warning: {}", warning);
     }
-    if (reader.leading_bytes() != 0) {
-        fmt::println(stderr,
-                     "warning: {}: {} byte(s) ahead of the first access unit are not part of the "
-                     "stream and are left out",
-                     in_path, reader.leading_bytes());
-    }
-    if (reader.skipped_bytes() != reader.leading_bytes()) {
-        fmt::println(
-            stderr,
-            "warning: {}: {} byte(s) between access units do not read as one and are left out",
-            in_path, reader.skipped_bytes() - reader.leading_bytes());
-    }
-    if (scan.units.empty() || scan.channels == 0) {
-        fmt::println(stderr, "error: {}: no access unit decoded", in_path);
-        return std::nullopt;
-    }
-    return scan;
+    return std::move(*scan);
 }
 
 bool write_file(std::string_view out_path, std::span<const std::byte> bytes) {
@@ -123,18 +89,6 @@ bool write_file(std::string_view out_path, std::span<const std::byte> bytes) {
         return false;
     }
     return true;
-}
-
-mp4::AudioTrack mp4_track(const Scan& scan) {
-    return mp4::AudioTrack{
-        .codec_id = std::string{mp4::kCodecTruehd},
-        .sample_rate = scan.info.sample_rate,
-        .channels = scan.channels,
-        .samples_per_frame = scan.samples_per_unit,
-        .codec_config =
-            mp4::build_dmlp_payload({.format_info = scan.info.major_sync.format_info,
-                                     .peak_data_rate = scan.info.major_sync.peak_data_rate}),
-    };
 }
 
 // libs/containers/ERRATA.md open question 7: the level a carrier of MAT bursts runs at. A burst is
@@ -162,15 +116,9 @@ int run_mkv_truehd(std::span<const std::byte> stream, std::string_view in_path,
     if (!scan) {
         return kExitInput;
     }
-    mkv::MuxOptions options;
-    options.key_frames = scan->major;
-    const auto file = mkv::mux(mkv::AudioTrack{.codec_id = std::string{mkv::kCodecTruehd},
-                                               .sample_rate = scan->info.sample_rate,
-                                               .channels = scan->channels,
-                                               .samples_per_frame = scan->samples_per_unit},
-                               scan->units, options);
+    const auto file = wrap::mux(wrap::Container::kMatroska, *scan);
     if (!file) {
-        fmt::println(stderr, "error: {}", mkv::describe(file.error()));
+        fmt::println(stderr, "error: {}", file.error());
         return kExitInput;
     }
     if (!write_file(out_path, *file)) {
@@ -188,19 +136,9 @@ int run_mp4_truehd(std::span<const std::byte> stream, std::string_view in_path,
     if (!scan) {
         return kExitInput;
     }
-    // An edit list drops the samples the last access unit's end-of-stream marker counts as padding
-    // (libs/truehd ERRATA 14), as FFmpeg's decoder does, so a decode of the MP4 is as long as the
-    // source.
-    const std::uint64_t total =
-        static_cast<std::uint64_t>(scan->units.size()) * scan->samples_per_unit;
-    mp4::MuxOptions options;
-    options.sync_samples = scan->major;
-    options.edit = mp4::MuxOptions::Edit{
-        .start_samples = 0,
-        .duration_samples = total - static_cast<std::uint64_t>(scan->padding_samples)};
-    const auto file = mp4::mux(mp4_track(*scan), scan->units, options);
+    const auto file = wrap::mux(wrap::Container::kMp4, *scan);
     if (!file) {
-        fmt::println(stderr, "error: {}", mp4::describe(file.error()));
+        fmt::println(stderr, "error: {}", file.error());
         return kExitInput;
     }
     if (!write_file(out_path, *file)) {
@@ -228,14 +166,9 @@ int run_ts_truehd(std::span<const std::byte> stream, std::string_view in_path,
     if (!scan) {
         return kExitInput;
     }
-    const auto file =
-        ts::mux(ts::AudioTrack{.codec = ts::AudioCodec::kTruehd,
-                               .sample_rate = scan->info.sample_rate,
-                               .channels = scan->channels,
-                               .samples_per_frame = scan->samples_per_unit},
-                scan->units, ts::MuxOptions{.profile = ts::BroadcastProfile::kBluray});
+    const auto file = wrap::mux(wrap::Container::kTransport, *scan);
     if (!file) {
-        fmt::println(stderr, "error: {}", ts::describe(file.error()));
+        fmt::println(stderr, "error: {}", file.error());
         return kExitInput;
     }
     if (!write_file(out_path, *file)) {
@@ -576,6 +509,15 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
         return kExitRuntime;
     }
     fmt::println("  integrated loudness {:.1f} LKFS (BS.1770-5 Annex 3 weights)", *lkfs);
+    // As for E-AC-3: the loudness as the dialnorm it implies (ATSC A/85 section 8), beside the one
+    // the stream stores for the presentation decoded.
+    const int implied = iclforge::ac3::meta::dialnorm_from_lkfs(*lkfs);
+    if (const auto stored = stored_dialnorm(stream, meta.truehd_presentation)) {
+        fmt::println("  dialnorm {} implied; the stream's own dialnorm {}{}", implied, *stored,
+                     implied == *stored ? "" : " (they differ)");
+    } else {
+        fmt::println("  dialnorm {} implied; the stream stores no dialogue norm", implied);
+    }
     if (const auto peak = meter->true_peak_dbtp()) {
         fmt::println("  true peak {:.1f} dBTP", *peak);
     }
@@ -584,61 +526,6 @@ int run_loudness_truehd(std::span<const std::byte> stream, std::string_view in_p
 
 namespace {
 
-// TH spec §18's model of the transmission of a stream (RateReport): the encoder's own, so that a
-// stream it wrote within the rate is within it here.
-class RateModel {
-   public:
-    void add(std::size_t unit_bytes, const std::optional<th::MajorSync>& first_sync) {
-        if (!started_) {
-            if (!first_sync) {
-                return;
-            }
-            started_ = true;
-            rate_ = first_sync->sample_rate();
-            nominal_ = th::nominal_samples_per_access_unit(first_sync->ratebits());
-            // TH spec v3.9 section 4.4 (ERRATA.md question 12): bits per second.
-            report_.declared_bps = first_sync->peak_data_rate_bps();
-            limit_ = static_cast<std::int64_t>(rate_) * 75 / 1000;
-        }
-        if (report_.declared_bps == 0 || nominal_ <= 0) {
-            return;
-        }
-        const std::int64_t slot = position_ - nominal_;
-        std::int64_t start = slot;
-        if (units_ > 0) {
-            start = std::max({slot, last_arrival_end_, last_start_ + nominal_});
-        }
-        const auto bits_at_rate = static_cast<std::uint64_t>(unit_bytes) * 8U * rate_;
-        const auto arrival = static_cast<std::int64_t>((bits_at_rate + report_.declared_bps - 1U) /
-                                                       report_.declared_bps);
-        const std::int64_t latency = start + arrival - slot;
-        if (latency > limit_) {
-            ++report_.violations;
-        }
-        report_.worst_latency_ms =
-            std::max(report_.worst_latency_ms,
-                     1000.0 * static_cast<double>(latency) / static_cast<double>(rate_));
-        report_.max_unit_rate_bps = std::max<std::uint64_t>(
-            report_.max_unit_rate_bps, bits_at_rate / static_cast<std::uint64_t>(nominal_));
-        last_start_ = start;
-        last_arrival_end_ = start + arrival;
-        position_ += nominal_;
-        ++units_;
-    }
-
-    [[nodiscard]] const RateReport& report() const noexcept { return report_; }
-
-   private:
-    RateReport report_{};
-    bool started_ = false;
-    std::uint32_t rate_ = 0;
-    int nominal_ = 0;
-    std::int64_t limit_ = 0;
-    std::int64_t position_ = 0;
-    std::int64_t last_start_ = 0;
-    std::int64_t last_arrival_end_ = 0;
-    std::uint64_t units_ = 0;
-};
 
 th::Presentation decoder_presentation(MeaningPresentation presentation) {
     switch (presentation) {
@@ -682,7 +569,7 @@ std::optional<TruehdMeasurement> measure_truehd(std::span<const std::byte> strea
             th::DecoderConfig{.presentation = th::Presentation::kAll, .strictness = strictness});
     }
     TruehdMeasurement out;
-    RateModel rate;
+    iclforge::apps::truehd_probe::RateModel rate;
     th::ElementaryReader reader(stream);
     std::vector<std::vector<float>> planes;
     while (true) {
@@ -715,7 +602,7 @@ std::optional<TruehdMeasurement> measure_truehd(std::span<const std::byte> strea
                 out.substreams = parsed->num_substreams;
             }
         }
-        rate.add(unit->size(), sync);
+        rate.add(*unit, sync);
         bool errored = false;
         for (const auto& track : tracks) {
             const auto result = track->decoder.decode(*unit);

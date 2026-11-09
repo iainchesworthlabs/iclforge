@@ -253,7 +253,7 @@ struct LevelAccumulator {
 
 // Every delivered sample's bit pattern, in delivery order, through FNV-1a:
 // printed beside the levels as <codec>.pcm_hash. For the fixed-point tier
-// (planning/arithmetic-tiers.md) the decode is integer arithmetic and this
+// the decode is integer arithmetic and this
 // value is the same on every leg - the host, the Cortex-M3, a RISC-V part -
 // which is the tier's own gate; for the floating tiers it varies with the
 // compiler and is informative only. Runs inside the sinks, whose time the

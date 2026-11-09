@@ -19,6 +19,10 @@
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/base/layout.hpp"
+#include "container_input.hpp"
+#include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/io/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "ac4_presentations.hpp"
 #include "ac4_sync_word.hpp"
@@ -87,7 +91,136 @@ struct DecodeOutcome {
     std::shared_ptr<RawResult> result;
 };
 
-// How an AC-3 karaoke stream is to be reproduced (planning/karaoke.md, P2):
+// What the head of the file says it is, as far as the TrueHD path goes: a bare TrueHD or MLP stream (an
+// access unit with a major sync), a Matroska, MP4 or transport stream that may hold a TrueHD track,
+// or neither. The stream is put back at its start.
+enum class HeadKind { kOther, kBareTruehd, kContainer };
+
+HeadKind head_kind(std::ifstream& in) {
+    std::vector<std::byte> head(std::max<std::size_t>(iclforge::truehd::kMaxLeadingBytes + 4096, 64 * 1024));
+    in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
+    head.resize(static_cast<std::size_t>(std::max<std::streamsize>(in.gcount(), 0)));
+    in.clear();
+    in.seekg(0);
+    if (head.size() >= 8 && iclforge::truehd::find_stream_start(head).has_value()) {
+        return HeadKind::kBareTruehd;
+    }
+    return iclforge::apps::sniff_container(head) != iclforge::apps::ContainerKind::kUnknown
+               ? HeadKind::kContainer
+               : HeadKind::kOther;
+}
+
+iclforge::base::Location location_of(iclforge::truehd::Channel channel) {
+    using C = iclforge::truehd::Channel;
+    using L = iclforge::base::Location;
+    switch (channel) {
+        case C::kL:
+            return L::kLeft;
+        case C::kR:
+            return L::kRight;
+        case C::kC:
+            return L::kCentre;
+        case C::kLfe:
+            return L::kLfe;
+        case C::kLs:
+            return L::kLeftSurround;
+        case C::kRs:
+            return L::kRightSurround;
+        case C::kLrs:
+            return L::kLrs;
+        case C::kRrs:
+            return L::kRrs;
+        case C::kLc:
+            return L::kLc;
+        case C::kRc:
+            return L::kRc;
+        case C::kCs:
+            return L::kCs;
+        case C::kTs:
+            return L::kTs;
+        case C::kLsd:
+            return L::kLsd;
+        case C::kRsd:
+            return L::kRsd;
+        case C::kLw:
+            return L::kLw;
+        case C::kRw:
+            return L::kRw;
+        case C::kLvh:
+            return L::kVhl;
+        case C::kRvh:
+            return L::kVhr;
+        case C::kCvh:
+            return L::kVhc;
+        case C::kLfe2:
+            return L::kLfe2;
+    }
+    return L::kLeft;
+}
+
+// The container a TrueHD stream was read from, as the summary line names it; empty for a bare stream.
+QString container_name(iclforge::apps::ContainerKind kind) {
+    switch (kind) {
+        case iclforge::apps::ContainerKind::kMatroska:
+            return QStringLiteral("Matroska");
+        case iclforge::apps::ContainerKind::kMp4:
+            return QStringLiteral("MP4");
+        case iclforge::apps::ContainerKind::kMpegTs:
+            return QStringLiteral("MPEG-TS");
+        case iclforge::apps::ContainerKind::kUnknown:
+            break;
+    }
+    return {};
+}
+
+// TrueHD or MLP, opened for the player: the index of its restarts and its format, no audio. The file
+// is a bare stream or a container with a TrueHD track; `no_truehd_track` is set when it is a sound
+// container with none.
+DecodeOutcome open_truehd(const QString& path, bool* no_truehd_track = nullptr) {
+    DecodeOutcome outcome;
+    auto source = forge_gui::TruehdPcmSource::open(path.toStdString(),
+                                                   iclforge::truehd::Presentation::kBest, no_truehd_track);
+    if (!source) {
+        outcome.error = QString::fromStdString(source.error());
+        return outcome;
+    }
+    auto result = std::make_shared<RawResult>();
+    const forge_gui::TruehdPcmInfo& info = (*source)->info();
+    QString layout;
+    for (const auto channel : info.layout) {
+        result->locations.push_back(location_of(channel));
+        layout += (layout.isEmpty() ? QString() : QStringLiteral(" ")) +
+                  to_qstring(iclforge::truehd::channel_name(channel));
+    }
+    if (layout.isEmpty()) {
+        layout = QStringLiteral("%1 channel(s)").arg(info.channels);
+    }
+    result->codec_label = info.mlp ? QStringLiteral("MLP") : QStringLiteral("TrueHD");
+    result->layout_label = layout;
+    result->sample_rate_hz = info.sample_rate;
+    // The level meter wants a coding mode: 5.1 and anything wider with an LFE reads as 3/2 + LFE,
+    // two channels as 2/0; it uses the mode for the LFE and the soundfield only.
+    result->acmod = info.channels <= 2 ? iclforge::ac3::Acmod::k2_0 : iclforge::ac3::Acmod::k3_2;
+    result->lfe = info.channels > 2;
+    result->frame_count = info.frames;
+    result->unit_count = info.units;
+    result->duration_seconds =
+        static_cast<double>(info.frames) / static_cast<double>(info.sample_rate);
+    // A container's file says so, and an edit list the player does not apply says why.
+    QStringList notes;
+    if (const QString name = container_name(info.container); !name.isEmpty()) {
+        notes << QStringLiteral("in %1").arg(name);
+    }
+    if (!info.trim_note.empty()) {
+        notes << to_qstring(info.trim_note);
+    }
+    result->programme_note = notes.join(QStringLiteral(" · "));
+    result->truehd = std::shared_ptr<forge_gui::TruehdPcmSource>(std::move(*source));
+    outcome.result = std::move(result);
+    return outcome;
+}
+
+// How an AC-3 karaoke stream is to be reproduced:
 // the decoder's OutputConfig fields, kOff being the coded channels.
 struct KaraokeChoice {
     iclforge::ac3::KaraokeReproduction reproduction = iclforge::ac3::KaraokeReproduction::kOff;
@@ -147,7 +280,7 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
     std::vector<iclforge::ac4::Speaker> layout;
     // Whether the frame-1 setup below has run - NOT order.empty(): a presentation of objects
     // alone has no speakers or channels at all (iclforge::ac4::DecodedFrame's own comment), so
-    // `order` legitimately stays empty for the life of the decode (planning/ac4.md, I5). Before
+    // `order` legitimately stays empty for the life of the decode. Before
     // this fix, such a stream re-ran the block below on every frame and still read as "no frame
     // decoded" at the end, since nothing ever made `order` non-empty to signal that decoding had
     // succeeded.
@@ -200,7 +333,7 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
             return false;
         }
         append_planar(result.channels, pcm.channels, order);
-        // Objects (planning/ac4.md, I5): D10's DecodedFrame::objects into the same
+        // Objects: D10's DecodedFrame::objects into the same
         // has_objects/object_count/object_audio fields the E-AC-3 path above fills, so
         // exportObjects() - already codec-agnostic - writes AC-4's objects the same way it
         // already writes E-AC-3 JOC's. A mid-stream count change is skipped, the same
@@ -244,6 +377,22 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
     if (!in) {
         outcome.error = QStringLiteral("Could not open %1.").arg(path);
         return outcome;
+    }
+    // TrueHD and MLP are not decoded into memory: a film's decode would not fit. The file is
+    // indexed and read a window at a time by the player (truehd_pcm_source.hpp).
+    const HeadKind head = head_kind(in);
+    if (head == HeadKind::kBareTruehd) {
+        in.close();
+        return open_truehd(path);
+    }
+    // A Matroska, MP4 or transport stream with a TrueHD track plays that track the same way, read
+    // where it lies in the file. One with none is read as it always was below.
+    if (head == HeadKind::kContainer) {
+        bool no_truehd_track = false;
+        auto opened = open_truehd(path, &no_truehd_track);
+        if (!no_truehd_track) {
+            return opened;
+        }
     }
     const std::vector<char> raw{std::istreambuf_iterator<char>(in),
                                 std::istreambuf_iterator<char>()};
@@ -302,8 +451,7 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
         }
         result->codec_label = QStringLiteral("E-AC-3");
         // A karaoke programme (one independent substream flagged bsmod 7 above 1/0) is reproduced
-        // under the same choice as an AC-3 stream is, below; any other decodes as it did
-        // (planning/karaoke-eac3.md, D1 to D3).
+        // under the same choice as an AC-3 stream is, below; any other decodes as it did.
         iclforge::ac3::DecoderConfig config;
         config.output.karaoke = karaoke_choice.reproduction;
         config.output.karaoke_vocals = karaoke_choice.vocals;
@@ -566,8 +714,8 @@ QVariantList StreamPlayerController::channelMeta() const {
     if (!result_) {
         return out;
     }
-    out.reserve(static_cast<qsizetype>(result_->channels.size()));
-    for (std::size_t at = 0; at < result_->channels.size(); ++at) {
+    out.reserve(static_cast<qsizetype>(result_->channel_total()));
+    for (std::size_t at = 0; at < result_->channel_total(); ++at) {
         const bool has_location = at < result_->locations.size();
         const auto azimuth =
             has_location ? forge_gui::location_azimuth_deg(result_->locations[at]) : std::nullopt;
@@ -799,13 +947,13 @@ void StreamPlayerController::decodePath(const QString& path) {
 }
 
 void StreamPlayerController::play() {
-    if (!result_ || busy_ || result_->channels.empty() || worker_active_) {
+    if (!result_ || busy_ || result_->channel_total() == 0 || worker_active_) {
         return;
     }
     if (!sink_) {
         sink_ = std::make_unique<iclforge::audio::MonitorSink>();
         const auto started = sink_->start(std::string{}, result_->sample_rate_hz,
-                                          static_cast<std::uint16_t>(result_->channels.size()));
+                                          static_cast<std::uint16_t>(result_->channel_total()));
         if (!started) {
             const auto why = iclforge::audio::describe(started.error());
             sink_.reset();
@@ -828,12 +976,13 @@ void StreamPlayerController::play() {
     // openFile() loaded a second file while this worker is still mid-flight.
     jobs_.run([this, result = result_] {
         std::uint64_t at = read_frame_.load(std::memory_order_relaxed);
-        const std::size_t channels = result->channels.size();
+        const std::size_t channels = result->channel_total();
         iclforge::ac3::analysis::LevelMeter meter{
             result->acmod, result->lfe, result->sample_rate_hz, static_cast<int>(channels)};
         auto published_at = std::chrono::steady_clock::now() - kPublishInterval;
         std::vector<float> chunk(kChunkFrames * channels);
         std::vector<std::span<const float>> views(channels);
+        std::vector<std::vector<float>> window;  // TrueHD: the decoded samples of one chunk
 
         // The position and the meters, at most once a kPublishInterval: from
         // the submit loop, and from the wait for the clip's tail to play out
@@ -907,12 +1056,30 @@ void StreamPlayerController::play() {
                 sink_lost = tail == iclforge::apps::PlayOut::kSinkLost;
                 break;
             }
-            const auto len = std::min<std::uint64_t>(kChunkFrames, result->frame_count - at);
-            chunk.resize(len * channels);
-            for (std::size_t ch = 0; ch < channels; ++ch) {
-                views[ch] = std::span{result->channels[ch]}.subspan(at, len);
-                for (std::uint64_t f = 0; f < len; ++f) {
-                    chunk[f * channels + ch] = result->channels[ch][at + f];
+            auto len = std::min<std::uint64_t>(kChunkFrames, result->frame_count - at);
+            if (result->truehd) {
+                // TrueHD or MLP: the window is decoded as it is needed (truehd_pcm_source.hpp). A
+                // read that delivers nothing is the end: the unit count is a little over what
+                // decodes, by the padding of the last unit.
+                len = result->truehd->read(at, static_cast<std::size_t>(len), window);
+                if (len == 0) {
+                    at = result->frame_count;
+                    continue;
+                }
+                chunk.resize(len * channels);
+                for (std::size_t ch = 0; ch < channels; ++ch) {
+                    views[ch] = std::span<const float>{window[ch]};
+                    for (std::uint64_t f = 0; f < len; ++f) {
+                        chunk[f * channels + ch] = window[ch][f];
+                    }
+                }
+            } else {
+                chunk.resize(len * channels);
+                for (std::size_t ch = 0; ch < channels; ++ch) {
+                    views[ch] = std::span{result->channels[ch]}.subspan(at, len);
+                    for (std::uint64_t f = 0; f < len; ++f) {
+                        chunk[f * channels + ch] = result->channels[ch][at + f];
+                    }
                 }
             }
             meter.process(views);
@@ -1037,6 +1204,19 @@ void StreamPlayerController::exportDecodedWav(const QUrl& url) {
     emit exportingChanged();
 
     jobs_.run([this, path, result = result_] {
+        if (result->truehd) {
+            // The 24-bit WAV `forge decode` writes, a window at a time: the decode is not in memory.
+            const std::string problem =
+                forge_gui::write_truehd_wav24(*result->truehd, path.toStdString());
+            const QString error = QString::fromStdString(problem);
+            QMetaObject::invokeMethod(this, [this, error] {
+                exporting_ = false;
+                export_error_ = error;
+                emit exportingChanged();
+                emit exportFinished();
+            });
+            return;
+        }
         // An AC-3 or E-AC-3 decode of three channels or more states its
         // speakers, as `forge decode` writes them: the file then loads back as
         // the coding mode it came from instead of the one its width suggests.

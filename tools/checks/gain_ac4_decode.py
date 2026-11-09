@@ -3,8 +3,7 @@ Part 1's formulas and Part 2's channel renderer.
 
 For each leg the decoder turns into PCM, at every frame rate, this decodes the stream as coded and
 again with an output option, and holds the second decode to the first through the formula the option
-applies, with the stream's own values read from `forge decode ... syntax-trace=` (planning/ac4.md,
-phase D6):
+applies, with the stream's own values read from `forge decode ... syntax-trace=`:
 
   level    output-level=-31, -24 and -17 with drcmode=off: every channel is the coded output times
            2^((Lout - dialnorm) / 6) (ETSI TS 103 190-1 clause 5.7.9.3.3), dialnorm being
@@ -49,12 +48,12 @@ The committed legs (testdata/external-baseline/) are checked by default. --gold 
 phase G0's local gold set in DIR (DIR/streams/<leg>/dee.ac4, DIR/gold-manifest.json), which never
 runs in CI, and with --g1 the G1 legs G1_LEGS names besides. --encoder checks streams
 `forge ac4-encode` writes from tones here, a leg for each metadata option the output processing
-reads (ENCODER_LEGS), at several frame rates (planning/ac4.md, phase E5), and 5.1.4 in each of the
+reads (ENCODER_LEGS), at several frame rates, and 5.1.4 in each of the
 encoder's immersive codec modes, the experimental ASPX_AJCC among them, with each height downmix,
 whose renders are held to Part 2's channel renderer with the custom downmix data the stream sends
 (phase E8).
 
---engine RENDER decodes through Hearth's engine instead (planning/ac4.md, phase I2): RENDER is
+--engine RENDER decodes through Hearth's engine instead: RENDER is
 hearth-render (apps/hearth/render), which plays a stream through the player, session and stream
 decoder the window uses, and each of forge's options above becomes the Decoder page's setting for
 it (engine_settings()). The coded output is the engine's too, on a layout of the stream's own

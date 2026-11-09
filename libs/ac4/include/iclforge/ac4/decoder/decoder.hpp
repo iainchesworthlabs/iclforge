@@ -138,8 +138,8 @@ class ICLFORGE_AC4_EXPORT Decoder {
 
     // decode(), reading `next` - the frame the following call is given - on
     // DecoderConfig::executor's other lane while this frame is reconstructed, so that
-    // the syntax of a frame is read while the signal of the one before it is made
-    // (planning/ac4.md, D14i). What comes out is what decode() without `next` gives, bit
+    // the syntax of a frame is read while the signal of the one before it is made.
+    // What comes out is what decode() without `next` gives, bit
     // for bit, and so are presentations() and metadata() after each call. Without an
     // executor with a second lane, with an empty `next`, with an object audio frame, one
     // that does not continue the stream or one in the efficient high frame rate mode,

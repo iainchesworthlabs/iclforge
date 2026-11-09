@@ -256,13 +256,18 @@ been compiled but never run on a device.
 
 ### TrueHD (MAT)
 
-!!! warning "Written, not built, not run"
-    The Hearth for Android bridge (`apps/hearth/android`) has two new optional methods, `isLinkSupported(carrierRateHz, channels)` and
+!!! success "Run once on a Shield: TrueHD named by the receiver, within limits"
+    The Hearth for Android bridge (`apps/hearth/android`) has two optional methods, `isLinkSupported(carrierRateHz, channels)` and
     `openLink(carrierRateHz, channels)`, that open an `ENCODING_IEC61937` track on `CHANNEL_OUT_7POINT1_SURROUND` at 192 kHz (176.4 kHz for the
     44.1 kHz family), for the backend's TrueHD (MAT). The native side looks them up as it looks up `pause()` and the rest, and refuses MAT
-    with `kUnsupportedFormat` for a bridge that lacks them, as this demo's does. It has not been compiled (the session that wrote it had
-    no NDK), has not run on a Shield, and has not been tried with the Onkyo TX-RZ740. Whether the Shield's HDMI policy takes it is a question for a run:
-    the findings list TrueHD and IEC 61937 at 7.1 masks, and only stereo IEC 61937 at 48 and 192 kHz has been tried.
+    with `kUnsupportedFormat` for a bridge that lacks them, as this demo's does. The Hearth app now uses them: a server that lists `truehd`
+    in its support object is sent TrueHD's access units, 24 to a chunk, `libs/sink` packs each chunk into a MAT burst, and the app offers
+    `truehd` only when `isLinkSupported` says the route takes the track. On 2026-11-04 an NVIDIA Shield Pro running the debug APK was sent
+    TrueHD stereo at 48 kHz by `hearth-testserver` for 40 s: `openLink` opened the track (192 kHz, 8 channels) and an Onkyo TX-RZ740 reported "Dolby TrueHD SUR, 48 kHz, 2.0 ch"
+    from 1.4 s in until it ended, with no underrun. Not shown: the owner's front-panel reading, lock across the Shield's 20.5 s HDMI flap, lock in the gap between two
+    items, 7.1 content, or any other rate. A command-line `AudioTrack` probe of the Shield, reported by the Shield test session, answered
+    `isDirectPlaybackSupported` true for IEC 61937 at 192 kHz on the 7.1 mask, and a MAT stream written as `ENCODING_DOLBY_TRUEHD` played with the
+    receiver staying on PCM; why is not known here.
 
 ### Diagnostic file replay
 
@@ -853,13 +858,12 @@ and the build 82. The binaries are arm64, so they are linked and not run by the 
 discovery runs when `ctest` does (`CMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST`). Pushed to a
 Shield with `adb`, the lyrics suite (83 cases) and the sendspin suite (243) passed on 2026-10-12; the
 one case that reads a fixture by the build host's absolute path needs that file put at that path
-relative to the working directory. This is the groundwork of [Hearth for Android](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md),
+relative to the working directory. This is the groundwork of Hearth for Android,
 not a second app.
 
 ### Hearth for Android: the app (phase 1b)
 
-`apps/hearth/android` is a second Gradle project, a Sendspin sink for Android TV
-([plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md)). Unlike
+`apps/hearth/android` is a second Gradle project, a Sendspin sink for Android TV. Unlike
 the Shield app above it links `libs/sendspin`, so its native build puts vcpkg in front of the NDK's
 toolchain (`app/src/main/cpp/CMakeLists.txt`):
 

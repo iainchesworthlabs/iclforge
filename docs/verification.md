@@ -179,7 +179,7 @@ scheduled workflows are separate.
 | The Catch2 suites, the example programs and the Qt Quick tests (`ctest`); the AC-4 tests named in the AC-4 section are among them, apart from those that read local streams, and the tests that read the owner's AC-4 content-signature sample skip when `ICLFORGE_CONTENT_SIGNATURE_SAMPLE` is unset | AC-3, E-AC-3, AC-4, TrueHD | Gate, queue, after a merge, nightly |
 | The unit tests of the oracle scripts (`tools/checks`, `tools/ci`), which include the AC-4 syntax digests and presentation tables | all | The gate's static job |
 | The gold-reference gate, `tools/checks/verify_gold_reference.sh`: our decode against FFmpeg's, per-channel floors, the committed DEE and FFmpeg streams, the cross-platform bitstream hashes (three gold streams and sixteen real-programme ones), and for TrueHD a bit-exact comparison with FFmpeg's strict decode of the committed fixtures and of `forge truehd-encode`'s stream | AC-3, E-AC-3, TrueHD | Gate on Linux GCC, queue on Windows MSVC, up to six legs after a merge, nine nightly |
-| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`), and the TrueHD checks against FFmpeg's strict decode (`verify_truehd_interop.py` with `--handbuilt`, `verify_truehd_encode_interop.py`, `verify_truehd_containers.py`, the codec matrix's TrueHD legs) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
+| FFmpeg Validate: the codec matrix, the metadata and coupling checks, `quality_race.py ci`, the encoder-space searches, the AC-4 scorers (`score_ac4_decode.py`, `score_ac4_encode.py`, `gain_ac4_decode.py`, `mix_ac4_decode.py`, `check_ac4_decode_scalar_snr.py`), and the TrueHD checks against FFmpeg's strict decode (`verify_truehd_interop.py` with `--handbuilt`, `verify_truehd_encode_interop.py`, `verify_truehd_containers.py`, `verify_crucible_truehd_leg.py`, the codec matrix's TrueHD legs) | all | Nightly, and on request (the `ci:deep` label, `gh workflow run ci.yml`) |
 | Hearth's engine against the AC-4 gain formulas (`gain_ac4_decode.py --engine`) | AC-4 | After a merge, nightly |
 | The ASan + UBSan leg with the codec matrix, and the TSan leg | all | Nightly |
 | `Fuzz Regress` | all | Every push to `main`, and every pull request unless the repository variable `PAUSE_NONESSENTIAL_CI` is `true` |
@@ -518,7 +518,10 @@ Two tiers, both gated in CI:
   legacy-core delivery (below). Fetched at run time and never committed — they are film
   excerpts, and pinning by hash is what keeps an upstream change from quietly moving the
   numbers. Runs nightly in the `Interop` workflow, and on a pull request that changes the decode
-  path or the harness.
+  path or the harness. The archive is volunteer-run and can be down for days, so a download is
+  retried and cached, and when it is still unreachable a pull request checks what it holds and
+  warns about the rest, while the nightly run on main fails: an outage is seen there, not on
+  every pull request that happens to touch the decode path.
 
 A third set is neither committed nor gated. `tools/generators/gen_dee_gold.py` keeps 1,086 of
 DEE's own streams on a local disk, made before DEE's licence ends on 2026-11-06, each rebuildable
@@ -714,8 +717,8 @@ what forge writes: the structure is that of one sample and one specification
 ([the open questions](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/ac4/ERRATA.md)),
 and the chain it was written for ends in roots this project does not hold. FFmpeg's raw AC-4
 demuxer takes the trailer for five more packets, so ffprobe does not agree with forge's frame count on
-a signed file; forge's own decode of the signed and unsigned stream is what is compared. TrueHD has no counterpart: nothing signs or
-verifies a TrueHD stream, and the owner's specification lists the evolution frame's signature layout as unconfirmed
+a signed file; forge's own decode of the signed and unsigned stream is what is compared. TrueHD has no counterpart for the content
+signature: the owner's specification lists the evolution frame's signature layout as unconfirmed (the per-frame protection tag is iclforge's own scheme, checked against an independent Python transcription, and is not a Dolby tag)
 ([Object signing](concepts/object-signing.md#sibling-truehd-evolution)).
 
 A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
@@ -1024,8 +1027,7 @@ lower case, upper case, dashed and `0x` prefixed, with `--track-id`, and with tw
 difference, nor did a control file FFmpeg had encrypted. The tool stops after the `moov` box. Whatever the cause, a tool that cannot be told from "ignores the key"
 proves nothing, so the check reports one skip for the decryption legs and `--require-decrypt` turns
 it into an error. No cipher output of forge's generator has been decrypted by a Dolby tool, and
-GPAC and FFmpeg remain the only decryption oracles ([planning/cenc-conformance.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md),
-section 6). Two ways to settle it: a newer streamdemuxer (the tested one is the AC-4 kit's; the
+GPAC and FFmpeg remain the only decryption oracles. Two ways to settle it: a newer streamdemuxer (the tested one is the AC-4 kit's; the
 Dolby Digital Plus kit was not examined), or a protected stream from Dolby with a published key.
 
 **Layouts the tool does not read.** For the 32 files that put a clear sample entry beside an
@@ -1283,7 +1285,7 @@ stereo at every rate and frame rate and in gapless parts, metadata at 2.0, 5.1, 
 stereo, substreams for presentations, 60 s programmes, and E-AC-3 and E-AC-3 JOC from the same
 sources, each with DEE's MP4 of it and what `forge` made of it. DEE writes no AC-4 from objects: its
 object encoders take only an Atmos master, and refuse every master this project writes as "not
-authored with Dolby tools" (`planning/ac4.md`, phase G0).
+authored with Dolby tools".
 
 ### The decoder's output
 
@@ -1591,8 +1593,7 @@ fps, plain and fragmented), give the same samples, to the last bit, as the eleme
 Forge cannot read the 12 HLS packed-audio files (`HLS/Audio_ID3/*_sub.ac4`). Each has an ID3v2 tag
 before every segment, 200 frames at 25 fps and 240 at 29.97, and forge, finding no AC-4 sync word at
 byte 0, tries the file as AC-3 and stops. With the tags skipped, the frames are the elementary
-stream's, byte for byte. The gap is in format detection and not in the decoder, and is recorded in
-`planning/ac4.md`.
+stream's, byte for byte. The gap is in format detection and not in the decoder.
 
 **A second source: Dolby's Spott reference files.** Thirteen audio-only MP4 files from Dolby's public test
 application (not in the kit, not committed, local only), each a codecs string in its name: four E-AC-3
@@ -1689,7 +1690,7 @@ readings in `libs/ac4/ERRATA.md` ("The 9.X.4 element") say, not that they are wh
 ### The decoder's 22.2 element
 
 The 22.2 element (Part 2 6.2.4.3, Tables 8 and 21 and Annex A.3) has no oracle outside the project: DEE
-does not write it (planning/ac4.md, "What DEE writes"), no stream of it is public, and librempeg does not
+does not write it, no stream of it is public, and librempeg does not
 decode it. What checks it is the standard's own tables and the project's two transcriptions:
 
 - **The syntax, in both transcriptions** (`libs/ac4/tests/decoder/test_channel_elements.cpp`,
@@ -1768,7 +1769,7 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
 
 ### The decoder's API and packaging
 
-Phase D8 gives the decoder's API the form planning/ac4.md sets for channel-based streams, reports
+Phase D8 gives the decoder's API its form for channel-based streams, reports
 what a stream carries through it, and installs the inspector, the decoder and the core
 ([AC-4 decoding](library/ac4.md)). The tests are in `libs/ac4/tests/decoder/test_api.cpp` unless
 named otherwise.
@@ -1982,7 +1983,7 @@ SIMPLE and ASPX. It shares
 `libs/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand
-behind it (`planning/ac4.md`, the encoder's ladder, and phases E5's to E8's exits), and a
+behind it, and a
 paragraph on the objects follows them:
 
 - **Three transcriptions agree.** The encoder records each element it writes in the shape the decoder
@@ -2353,7 +2354,7 @@ only, and part of the second has no outside reader.
    block data check, terminators, the marker in every unit, extra data, the directory's DRC word, a 7.1 stream in three substreams, every IIR order and a 16-channel fourth substream. Each
    stream is held to the signal it was made from, by the library and by the Python transcription. Their major sync is one FFmpeg
    accepts, so `tools/checks/verify_truehd_interop.py --handbuilt` also holds FFmpeg's strict decode to the manifest's account of
-   it: for nineteen of the twenty-nine it returns exactly that signal (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
+   it: for nineteen of the thirty-three it returns exactly that signal (and the bed of four more) (an IIR filter and Huffman codebooks 1 and 3, every IIR order, its
    `new_states`, LSB bypass under either restart sync, three matrices with a permuted `ch_assign` (also one that changes at each restart) and an output shift (also on a moved channel),
    noise generator 0, noise generator 1 at 48, 96 and 192 kHz, the block data
    length, the marker in the last unit, extra data present, the directory's DRC word present, and the 7.1 stream, whose channels FFmpeg returns in its own order). The other ten: with the marker in
@@ -2367,9 +2368,9 @@ only, and part of the second has no outside reader.
    `tools/checks/check_truehd_coverage.py` reads every committed stream with the Python transcription and fails when a feature
    (72 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
    the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
-   failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
-3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the set
-   is not committed, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
+   failing check.
+3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the full
+   set is not committed, 13 of its streams are in `testdata/truehd-dee`, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
 
 The encoder is held to the first tier from the other side. `tools/checks/verify_truehd_encode_interop.py` encodes 43 cases
@@ -2421,6 +2422,24 @@ content and a delay of the first samples is allowed, because DEE's channel order
 - **FAIL** when the decoder stops on a check, a lossless check fails, or a lossless leg decodes to something else (the report
   says whether FFmpeg's decode is the source either);
 - **SKIP** when a stream or source is not on disk, or the source is over `--max-seconds` (120; the 300 s soak programmes).
+
+The 13 streams in `testdata/truehd-dee` (0.25 s each: 2.0, 5.1 and 7.1 with three presentations, 48 and 96 kHz, 16, 20 and 24 bits, one DRC profile,
+an embedded timecode, and four lengths that are not a whole number of access units) are scored the same way with `--set testdata/truehd-dee`. On
+2026-10-31, with forge built from `1e4ee5c3e`, they give 11 PASS, 2 UNEXPLAINED (the two 96 kHz legs) and 0 FAIL.
+
+The full set was scored on 2026-10-29 before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of 128). **Rescored on 2026-10-31** with forge at `1e4ee5c3e` plus the alternative-reading
+switches (142 legs: the 128 of the set and the 14 of the group `truehd-last`, made the same day): **87 PASS, 9 ALTER,
+46 UNEXPLAINED, 0 FAIL**, 34,600 lossless-check intervals ok and none failed; the three 300 s programmes (2.0, 5.1 and 7.1) 3 PASS (16,872 intervals ok, none failed). The five Atmos legs made
+from the owner's DAMF master (`obj-thd-atmos-sollevante`, `-dmx`, `-e12`, `-e14`, `-e16`) have no PCM source for the scorer and are test inputs for the decoder only (SKIP). The 46 UNEXPLAINED
+are 25 legs at 96 kHz and 21 stepped-tone legs at 48 kHz (a difference of one 24-bit step in 52,022 to 182,077 values whatever the DRC profile, the data-rate option or the loudness path), every
+one with its own lossless check ok on every interval and FFmpeg's decode not the source either; ERRATA question 50 has the figures and the diagnostic legs. The 9 ALTER are the legs whose DEE
+option alters the audio.
+
+**What the set scores of the provisional readings** (`forge decode truehd-reading=`, ERRATA question 101): the output shift and the lossless fold indexed by matrix channel are scored (with the
+shift by output position 32 of the 87 PASS legs stop being the source, 44 legs FAIL and 4,961 of 34,600 intervals fail; with the fold by position 13,320 intervals in 77 legs fail; with the
+library's reading none fails); noise generator 1's details are scored (the 76 legs the decoder stopped on on 2026-10-29 now decode with every interval ok, 49 of them the source); the 16-bit
+`seed_shr7` and the filter histories surviving a restart are **not** scored (no leg, short or 300 s, changes under the other reading: no DEE stream draws on generator 0's noise or filters from
+the first sample after a restart). To repeat it: `score_truehd_decode.py --decoder 'forge decode truehd-reading=zero-histories truehd-check=lenient'` and the like.
 
 The exit status is 1 if any leg fails. Another decoder is scored with `--decoder 'PROGRAM [ARGS]'`, run as
 `PROGRAM [ARGS] STREAM OUT.wav`. After the licence ends the script needs no DEE and reads the set as it is left. The

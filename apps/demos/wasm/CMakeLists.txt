@@ -24,8 +24,8 @@
 # because the page already loads this one.
 #
 # pitch_bindings.cpp is the same for a singer's voice (libs/pitch, the tracker, reference melody and
-# scorer Hearth uses; planning/karaoke-microphone.md, M7): the page's microphone card follows a
-# microphone with the library's arithmetic and not a second implementation in JavaScript.
+# scorer Hearth uses): the page's microphone card follows a microphone with the library's
+# arithmetic and not a second implementation in JavaScript.
 add_executable(iclforge_wasm_decode decoder_bindings.cpp lyrics_bindings.cpp pitch_bindings.cpp)
 target_link_libraries(iclforge_wasm_decode PRIVATE iclforge::ac3 iclforge::lyrics iclforge::pitch
                       iclforge::warnings)

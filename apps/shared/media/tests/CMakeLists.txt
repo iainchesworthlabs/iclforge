@@ -34,6 +34,7 @@ iclforge_add_test_binary(iclforge-app-media-tests PROJECT app-media SOURCES
     test_ac4_objects_core.cpp
     test_associated_mix.cpp
     test_container_input.cpp
+    test_container_stream.cpp
     test_recording_sink.cpp
     test_sink_wait.cpp
     test_source_frame.cpp

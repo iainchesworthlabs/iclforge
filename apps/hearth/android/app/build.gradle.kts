@@ -5,7 +5,7 @@ plugins {
 // Release-keystore signing, wired to environment variables rather than local.properties, exactly as
 // apps/demos/android does it (the same four names): CI decodes a keystore secret to a runner-temp
 // file and exports them before assembleRelease. Absent locally and on ordinary CI, where every build
-// path degrades to the debug keystore. The app is sideloaded (planning/hearth-android.md, D14), so a
+// path degrades to the debug keystore. The app is sideloaded, so a
 // release key only matters for update-signature continuity.
 val releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
 val releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -158,8 +158,7 @@ val harnessFixtures = tasks.register<Copy>("stageHarnessFixtures") {
         include("dee_joc_514.ec3")
         into("object-fixture")
     }
-    // The lyric view's fixtures: the karaoke examples' documents (planning/hearth-sink-screen.md,
-    // Conformance).
+    // The lyric view's fixtures: the karaoke examples' documents.
     from(rootDir.resolve("../../../examples/karaoke")) {
         include("**/*.lrc")
         into("karaoke")
@@ -172,7 +171,7 @@ val harnessFixtures = tasks.register<Copy>("stageHarnessFixtures") {
     into(layout.buildDirectory.dir("harness-assets"))
 }
 // The family's faces, from the shared theme (apps/shared/theme/assets/fonts), so that there is one copy
-// of each (planning/hearth-sink-screen.md, Tokens): Archivo for Latin, Noto Sans Hebrew and Arabic for
+// of each: Archivo for Latin, Noto Sans Hebrew and Arabic for
 // the scripts a phone may lack, with their licences beside them as the SIL Open Font License asks.
 // Greek, Cyrillic and CJK fall back to the system's faces.
 val stagedFonts = tasks.register<Copy>("stageFonts") {

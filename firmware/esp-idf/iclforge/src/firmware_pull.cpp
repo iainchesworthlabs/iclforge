@@ -1,5 +1,5 @@
-// Updates from GitHub releases. See ../include/iclforge/firmware_pull.hpp, planning/esp32-ota.md
-// (O10) and libs/device/include/iclforge/firmware_update.hpp, which holds every rule that needs no
+// Updates from GitHub releases. See ../include/iclforge/firmware_pull.hpp
+// and libs/device/include/iclforge/firmware_update.hpp, which holds every rule that needs no
 // ESP-IDF.
 
 #include "iclforge/firmware_pull.hpp"
@@ -353,8 +353,8 @@ struct VerifyContext {
     bool judge_dates = true;
 };
 
-// Called for each certificate of the chain after mbedTLS has judged it (planning/esp32-ota.md,
-// "Expiry and the clock"): the anchor's own dates are not looked at, because it is trusted by being
+// Called for each certificate of the chain after mbedTLS has judged it: the anchor's own dates are
+// not looked at, because it is trusted by being
 // in the build, and in a build with no clock no certificate's are.
 int on_verify(void* arg, mbedtls_x509_crt* crt, int /*depth*/, std::uint32_t* flags) {
     const auto* ctx = static_cast<const VerifyContext*>(arg);
@@ -1031,8 +1031,7 @@ int FirmwarePull::on_from_release(httpd_req* req) {
     }
     if (!impl_->firmware->host_allowed(req)) {
         return reply_text(req, "403 Forbidden",
-                          "firmware changes are taken only on the board's own address or name "
-                          "(planning/esp32-ota.md)");
+                          "firmware changes are taken only on the board's own address or name");
     }
     const std::string asked = read_body(req, 64);
     {

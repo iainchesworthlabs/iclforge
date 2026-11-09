@@ -60,7 +60,7 @@ TABLE = project_graph.load_table()
 # The lanes a Linux C++ build gate has something to say about.
 BUILT_LANES = frozenset(("core", "linux"))
 
-DOCS_PREFIXES = ("docs/", "docs-snippets/", "planning/", "overrides/", "assets/")
+DOCS_PREFIXES = ("docs/", "docs-snippets/", "overrides/", "assets/")
 DOCS_ROOT_FILES = ("LICENSE", "mkdocs.yml")
 DOCS_SUFFIX = ".md"
 
@@ -102,7 +102,7 @@ ESP_IMAGE_PREFIXES = (
 # the libraries and the vendored code that was inside the sendspin library. Tests, apps and
 # build files are not here on purpose, since the comparison measures the library's own
 # benchmarks, at two builds a job. A library's own tests/ and fuzz/ are beside its code
-# (planning/monorepo.md) and are tests all the same.
+# and are tests all the same.
 COMPARE_KINDS = ("library", "vendored")
 LIBRARY_CONSUMERS = re.compile(r"^libs/[^/]+/(?:tests|fuzz)/")
 

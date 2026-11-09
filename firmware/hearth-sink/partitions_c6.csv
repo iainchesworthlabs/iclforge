@@ -14,8 +14,7 @@
 # Ethernet seam) passed it; the time a board keeps and the title card followed
 # on main, to 1.87 MB. The slots took the room, and the 64 KB after `coredump`
 # is left over because an application partition starts on a 64 KB boundary.
-# planning/esp32-ota.md named this as the step for when the image outgrew the
-# slot.
+# This was the planned step for when the image outgrew the slot.
 #
 # This table changes only over USB, like every other: a C6 on the 1.75 MiB
 # table moves to this one with one `write-flash @flash_args` that keeps its

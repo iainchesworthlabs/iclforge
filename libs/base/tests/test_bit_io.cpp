@@ -18,9 +18,9 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/bitwriter.hpp"
 
-// planning/consolidation.md's C4 made one bit reader and one writer of the six the tree had:
+// The consolidation made one bit reader and one writer of the six the tree had:
 // base's, which AC-3, EMDF and OAMD read and write through, AC-4's decoder's and encoder's, which
-// record a syntax trace, and the AC-4 inspector's. Below are those as they were before C4, verbatim
+// record a syntax trace, and the AC-4 inspector's. Below are those as they were before it, verbatim
 // but for their namespaces, and the random sequences of operations that hold the one reader and the
 // one writer to each: the same values, positions, overflow flags, bytes and records.
 

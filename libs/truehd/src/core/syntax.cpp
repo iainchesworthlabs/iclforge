@@ -1,11 +1,20 @@
 #include "iclforge/truehd/core/syntax.hpp"
 
 #include <algorithm>
-#include <utility>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <span>
+#include <string_view>
 
 #include "core/bit_io.hpp"
 #include "core/huffman.hpp"
+#include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/bitwriter.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 
 namespace iclforge::truehd {
 
@@ -91,8 +100,194 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
     return context.max_matrix_chan + 1 + (context.noise_type ? 0 : kNoiseChannels);
 }
 
+// TH spec §10.2.1a, restart sync 0x31EC: the matrix section of the object substream. Two present
+// bits (A: this block changes the matrices; B: it sends their headers, and a section without
+// them reuses the last ones and sends only coefficients), the count less one, the header of every
+// matrix (output channel 4 bits, frac_bits 4, f_shift + 1 in 3, two reserved bits, four bits per
+// matrix, and a presence mask over the matrix channels), the coefficients of every matrix, then
+// the second precision term (A2, B2, C2; ERRATA.md entry 69). Provisional for what the owner's
+// streams do not show.
+[[nodiscard]] std::expected<MatrixSet, Error> read_object_matrices(BitReader& reader,
+                                                                  const BlockContext& context) {
+    MatrixSet set;
+    const int channels = context.max_matrix_chan + 1;
+    const bool changed = reader.read(1) != 0;
+    set.coeffs_sent = changed;
+    if (changed) {
+        const bool headers = reader.read(1) != 0;
+        if (headers) {
+            const unsigned count = reader.read(4) + 1;
+            if (count > static_cast<unsigned>(kMaxObjectMatrices)) {
+                return std::unexpected(
+                    Error{ErrorKind::kBadParameter, "more than 16 primitive matrices"});
+            }
+            set.count = static_cast<std::uint8_t>(count);
+            for (unsigned m = 0; m < count; ++m) {
+                MatrixSpec& matrix = set.items[m];
+                matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
+                matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
+                matrix.f_shift = static_cast<std::int8_t>(static_cast<int>(reader.read(3)) - 1);
+                matrix.field_2b = static_cast<std::uint8_t>(reader.read(2));
+                matrix.field_m4 = static_cast<std::uint8_t>(reader.read(4));
+                // Provisional (ERRATA.md entry 69): a matrix whose two bits are not 0 has the LSB
+                // bypass, one bit a sample in the block data (1 and 2 seen).
+                matrix.lsb_bypass = matrix.field_2b != 0;
+                const std::uint32_t mask = reader.read(channels);
+                for (int c = 0; c < channels; ++c) {
+                    matrix.present[static_cast<std::size_t>(c)] = ((mask >> c) & 1U) != 0;
+                }
+                // New headers keep the extension widths of the matrix at the same place in the
+                // last set (ERRATA.md entry 69).
+                if (context.object_previous != nullptr && m < context.object_previous->count) {
+                    matrix.ext_width = context.object_previous->items[m].ext_width;
+                    matrix.ext_field2 = context.object_previous->items[m].ext_field2;
+                }
+            }
+        } else {
+            if (context.object_previous == nullptr || context.object_previous->count == 0) {
+                return std::unexpected(Error{ErrorKind::kBadParameter,
+                                             "object matrices reuse headers none were sent for"});
+            }
+            set = *context.object_previous;
+            for (MatrixSpec& matrix : set.items) {
+                matrix.coeff = {};
+                matrix.ext_value = {};
+            }
+            set.extension = false;
+            set.coeffs_sent = true;
+            set.deltas_sent = false;
+        }
+        for (unsigned m = 0; m < set.count; ++m) {
+            MatrixSpec& matrix = set.items[m];
+            if (matrix.frac_bits - matrix.f_shift > 15) {
+                return std::unexpected(
+                    Error{ErrorKind::kBadParameter, "matrix coefficients finer than 2^-15"});
+            }
+            for (int c = 0; c < channels; ++c) {
+                const auto index = static_cast<std::size_t>(c);
+                if (matrix.present[index]) {
+                    matrix.coeff[index] = read_signed(reader, matrix.frac_bits + 2);
+                }
+            }
+        }
+    } else if (context.object_previous != nullptr) {
+        set = *context.object_previous;  // the matrices and their running state stand
+        set.extension = false;
+        set.coeffs_sent = false;
+        set.deltas_sent = false;
+    }
+    // The extension (A2, B2, C2; ERRATA.md entry 69): slopes of the coefficients, for a moving
+    // object. A2 says the extension is on; B2 that this section replaces the deltas (else the deltas
+    // stand); C2 that the width of the deltas of every matrix follows (4 bits, then 2 bits that
+    // scale the delta), else the last widths stand. A matrix with width w sends a delta of w + 1 bits for each coefficient it has;
+    // a matrix of width 0 sends none.
+    if (reader.read(1) != 0) {
+        set.extension = true;
+        if (reader.read(1) != 0) {
+            set.deltas_sent = true;
+            if (reader.read(1) != 0) {
+                for (unsigned m = 0; m < set.count; ++m) {
+                    MatrixSpec& matrix = set.items[m];
+                    matrix.ext_width = static_cast<std::uint8_t>(reader.read(4));
+                    matrix.ext_field2 = static_cast<std::uint8_t>(reader.read(2));
+                }
+            }
+            for (unsigned m = 0; m < set.count; ++m) {
+                MatrixSpec& matrix = set.items[m];
+                if (matrix.ext_width == 0) {
+                    continue;
+                }
+                for (int c = 0; c < channels; ++c) {
+                    const auto index = static_cast<std::size_t>(c);
+                    if (matrix.present[index]) {
+                        matrix.ext_value[index] = read_signed(reader, matrix.ext_width + 1);
+                    }
+                }
+            }
+        }
+    }
+    return set;
+}
+
+void write_object_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
+    const ObjectSectionForm& form = set.form;
+    if (set.count == 0 && form.change) {
+        put_field(writer, 0, 1);  // A: no change
+        put_field(writer, 0, 1);  // no second precision term
+        return;
+    }
+    const int channels = context.max_matrix_chan + 1;
+    const auto count = std::min<std::size_t>(set.count, set.items.size());
+    put_field(writer, form.change ? 1U : 0U, 1);  // A
+    if (form.change) {
+        put_field(writer, form.headers ? 1U : 0U, 1);  // B
+        if (form.headers) {
+            put_field(writer, set.count - 1U, 4);
+            for (std::size_t m = 0; m < count; ++m) {
+                const MatrixSpec& matrix = set.items[m];
+                std::uint32_t mask = 0;
+                for (int c = 0; c < channels; ++c) {
+                    if (matrix.present[static_cast<std::size_t>(c)]) {
+                        mask |= 1U << c;
+                    }
+                }
+                put_field(writer, matrix.out_ch, 4);
+                put_field(writer, matrix.frac_bits, 4);
+                put_field(writer, static_cast<unsigned>(matrix.f_shift + 1), 3);
+                // field_2b is the number of bypass bits a sample (ERRATA.md entry 69); a bypass
+                // without a count sends one.
+                put_field(
+                    writer,
+                    matrix.lsb_bypass ? std::max<unsigned>(matrix.field_2b, 1U) : matrix.field_2b,
+                    2);
+                put_field(writer, matrix.field_m4, 4);
+                put_field(writer, mask, channels);
+            }
+        }
+        for (std::size_t m = 0; m < count; ++m) {
+            const MatrixSpec& matrix = set.items[m];
+            for (int c = 0; c < channels; ++c) {
+                const auto index = static_cast<std::size_t>(c);
+                if (matrix.present[index]) {
+                    put_signed(writer, matrix.coeff[index], matrix.frac_bits + 2);
+                }
+            }
+        }
+    }
+    put_field(writer, form.extension ? 1U : 0U, 1);  // A2
+    if (!form.extension) {
+        return;
+    }
+    put_field(writer, form.deltas ? 1U : 0U, 1);  // B2
+    if (!form.deltas) {
+        return;
+    }
+    put_field(writer, form.widths ? 1U : 0U, 1);  // C2
+    if (form.widths) {
+        for (std::size_t m = 0; m < count; ++m) {
+            put_field(writer, set.items[m].ext_width, 4);
+            put_field(writer, set.items[m].ext_field2, 2);
+        }
+    }
+    for (std::size_t m = 0; m < count; ++m) {
+        const MatrixSpec& matrix = set.items[m];
+        if (matrix.ext_width == 0) {
+            continue;
+        }
+        for (int c = 0; c < channels; ++c) {
+            const auto index = static_cast<std::size_t>(c);
+            if (matrix.present[index]) {
+                put_signed(writer, matrix.ext_value[index], matrix.ext_width + 1);
+            }
+        }
+    }
+}
+
 [[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,
                                                             const BlockContext& context) {
+    if (context.object_matrices) {
+        return read_object_matrices(reader, context);
+    }
     const unsigned count = reader.read(4);
     if (count > kMaxMatrices) {
         return std::unexpected(Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
@@ -107,13 +302,11 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
         matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
         matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
         matrix.lsb_bypass = reader.read(1) != 0;
-        if (matrix.out_ch > context.max_matrix_chan) {
-            return std::unexpected(
-                Error{ErrorKind::kBadParameter, "matrix output channel above max_matrix_chan"});
-        }
-        if (matrix.frac_bits > 14) {
-            return std::unexpected(Error{ErrorKind::kBadParameter, "matrix frac_bits above 14"});
-        }
+        // The field is 4 bits and a row buffer has 16 rows. The owner's discs send output channel 15
+        // in a 12 channel substream (max_matrix_chan 11), so the field is not held to
+        // max_matrix_chan (ERRATA.md entry 65).
+        // frac_bits is 4 bits wide: every value is a width (frac_bits + 2); 15 is seen in substream 3
+        // of the owner's discs, where the encoder sends finer coefficients (ERRATA.md entry 60).
         for (int c = 0; c < coefficients; ++c) {
             const auto index = static_cast<std::size_t>(c);
             matrix.present[index] = reader.read(1) != 0;
@@ -129,6 +322,10 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 }
 
 void write_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
+    if (context.object_matrices) {
+        write_object_matrices(writer, context, set);
+        return;
+    }
     put_field(writer, set.count, 4);
     const int coefficients = matrix_coefficients(context);
     for (unsigned m = 0; m < set.count && m < set.items.size(); ++m) {
@@ -249,7 +446,9 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
                                                         const BlockContext& context) {
     BlockHeaderSpec header;
     std::uint8_t flags = context.presence_flags;
-    if (reader.read(1) != 0) {
+    // new_guards exists only while bit 0 is set (TH spec §8.2); a block that clears it cannot
+    // replace the flags again until the next restart.
+    if ((flags & presence::kGuards) != 0 && reader.read(1) != 0) {
         flags = static_cast<std::uint8_t>(reader.read(8));
         header.presence_flags = flags;
     }
@@ -277,37 +476,36 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
         }
         header.quant_step = steps;
     }
-    if ((flags & presence::kChannels) != 0) {
-        for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
-            ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
-            if (reader.read(1) == 0) {
-                continue;
-            }
-            update.present = true;
-            if ((flags & presence::kFir) != 0 && reader.read(1) != 0) {
-                auto fir = read_filter(reader, kMaxFirOrder);
-                if (!fir) {
-                    return std::unexpected(fir.error());
-                }
-                if (fir->has_state) {
-                    return std::unexpected(
-                        Error{ErrorKind::kBadParameter, "a FIR filter with state (TH spec §9.2)"});
-                }
-                update.fir = *fir;
-            }
-            if ((flags & presence::kIir) != 0 && reader.read(1) != 0) {
-                auto iir = read_filter(reader, kMaxIirOrder);
-                if (!iir) {
-                    return std::unexpected(iir.error());
-                }
-                update.iir = *iir;
-            }
-            if ((flags & presence::kHuffOffset) != 0 && reader.read(1) != 0) {
-                update.huff_offset = read_signed(reader, 15);
-            }
-            update.huff_type = static_cast<std::uint8_t>(reader.read(2));
-            update.huff_lsbs = static_cast<std::uint8_t>(reader.read(5));
+    // The loop over the channels' parameters is not gated by the flags (TH spec §8.2).
+    for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
+        ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
+        if (reader.read(1) == 0) {
+            continue;
         }
+        update.present = true;
+        if ((flags & presence::kFir) != 0 && reader.read(1) != 0) {
+            auto fir = read_filter(reader, kMaxFirOrder);
+            if (!fir) {
+                return std::unexpected(fir.error());
+            }
+            if (fir->has_state) {
+                return std::unexpected(
+                    Error{ErrorKind::kBadParameter, "a FIR filter with state (TH spec §9.2)"});
+            }
+            update.fir = *fir;
+        }
+        if ((flags & presence::kIir) != 0 && reader.read(1) != 0) {
+            auto iir = read_filter(reader, kMaxIirOrder);
+            if (!iir) {
+                return std::unexpected(iir.error());
+            }
+            update.iir = *iir;
+        }
+        if ((flags & presence::kHuffOffset) != 0 && reader.read(1) != 0) {
+            update.huff_offset = read_signed(reader, 15);
+        }
+        update.huff_type = static_cast<std::uint8_t>(reader.read(2));
+        update.huff_lsbs = static_cast<std::uint8_t>(reader.read(5));
     }
     if (reader.overflowed()) {
         return std::unexpected(truncated("block header"));
@@ -318,10 +516,12 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
 void write_block_header(BitWriter& writer, const BlockContext& context,
                         const BlockHeaderSpec& header) {
     std::uint8_t flags = context.presence_flags;
-    put_field(writer, header.presence_flags ? 1U : 0U, 1);
-    if (header.presence_flags) {
-        flags = *header.presence_flags;
-        put_field(writer, flags, 8);
+    if ((flags & presence::kGuards) != 0) {
+        put_field(writer, header.presence_flags ? 1U : 0U, 1);
+        if (header.presence_flags) {
+            flags = *header.presence_flags;
+            put_field(writer, flags, 8);
+        }
     }
     if ((flags & presence::kBlockSize) != 0) {
         put_field(writer, header.block_size ? 1U : 0U, 1);
@@ -351,34 +551,32 @@ void write_block_header(BitWriter& writer, const BlockContext& context,
             }
         }
     }
-    if ((flags & presence::kChannels) != 0) {
-        for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
-            const ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
-            put_field(writer, update.present ? 1U : 0U, 1);
-            if (!update.present) {
-                continue;
-            }
-            if ((flags & presence::kFir) != 0) {
-                put_field(writer, update.fir ? 1U : 0U, 1);
-                if (update.fir) {
-                    write_filter(writer, *update.fir);
-                }
-            }
-            if ((flags & presence::kIir) != 0) {
-                put_field(writer, update.iir ? 1U : 0U, 1);
-                if (update.iir) {
-                    write_filter(writer, *update.iir);
-                }
-            }
-            if ((flags & presence::kHuffOffset) != 0) {
-                put_field(writer, update.huff_offset ? 1U : 0U, 1);
-                if (update.huff_offset) {
-                    put_signed(writer, *update.huff_offset, 15);
-                }
-            }
-            put_field(writer, update.huff_type & 3U, 2);
-            put_field(writer, update.huff_lsbs & 0x1FU, 5);
+    for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
+        const ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
+        put_field(writer, update.present ? 1U : 0U, 1);
+        if (!update.present) {
+            continue;
         }
+        if ((flags & presence::kFir) != 0) {
+            put_field(writer, update.fir ? 1U : 0U, 1);
+            if (update.fir) {
+                write_filter(writer, *update.fir);
+            }
+        }
+        if ((flags & presence::kIir) != 0) {
+            put_field(writer, update.iir ? 1U : 0U, 1);
+            if (update.iir) {
+                write_filter(writer, *update.iir);
+            }
+        }
+        if ((flags & presence::kHuffOffset) != 0) {
+            put_field(writer, update.huff_offset ? 1U : 0U, 1);
+            if (update.huff_offset) {
+                put_signed(writer, *update.huff_offset, 15);
+            }
+        }
+        put_field(writer, update.huff_type & 3U, 2);
+        put_field(writer, update.huff_lsbs & 0x1FU, 5);
     }
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
 // Something that wants to see each block of rendered output on its way to the meters (the Meters view's mix and its 50 ms peaks,
-// iclforge/meters_tap.hpp; planning/p4x-meters-view.md). The player owns no copy of it and knows nothing of what it does: with none set, or
+// iclforge/meters_tap.hpp). The player owns no copy of it and knows nothing of what it does: with none set, or
 // one that does not want blocks, the player's path is one pointer load and nothing else, so an image with no screen pays for an interface and not a
 // feature.
 

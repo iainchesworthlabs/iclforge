@@ -485,8 +485,7 @@ clang-21 and MSVC builds, plus clang-tidy, before landing.
 
 ## AC-4
 
-AC-4 (ETSI TS 103 190) was built in the phases [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md)
-sets out, from the standard's two parts alone. The inspector came first (`libs/ac4`): sync frames,
+AC-4 (ETSI TS 103 190) was built in phases, from the standard's two parts alone. The inspector came first (`libs/ac4`): sync frames,
 the table of contents, presentations and substream framing, checked against Annex G's CRC-16 over
 every sync frame of the committed Dolby Encoding Engine (DEE) streams, MediaInfo's reading of them,
 and a Python transcription (`tools/references/ac4_parse.py`) that caught three of its bugs. Fuzzing

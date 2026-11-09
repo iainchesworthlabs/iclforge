@@ -940,7 +940,7 @@ jobs:
       # apt-installed, container-glibc-linked python3 "Bootstrap container"
       # already put ahead on PATH is the one that actually gets used.
       - name: Install Qt (prebuilt)
-        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           version: ${{ needs.toolchain-versions.outputs.qt_version }}
           aqtsource: ${{ needs.toolchain-versions.outputs.aqt_source }}
@@ -1416,7 +1416,7 @@ jobs:
       # binary (OpenSSF Scorecard's Binary-Artifacts check, alert #65) - it
       # can't be dropped since gradlew needs it, so this verifies its
       # checksum against Gradle's own known-good release hashes instead.
-      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       # ubuntu-latest ships several Temurin JDKs preinstalled, each with its
       # own JAVA_HOME_<version>_X64 env var (see actions/runner-images) -
@@ -1622,7 +1622,7 @@ jobs:
             packages/*.apk.sha512
           if-no-files-found: error
 
-  # The native libraries Hearth for Android links (planning/hearth-android.md, phase 0c):
+  # The native libraries Hearth for Android links:
   # libs/lyrics and libs/sendspin, with the vcpkg "hearth" feature's five packages, cross-built
   # for arm64-v8a under the NDK. build-android above cannot hold them to this: its Gradle wrapper
   # has no vcpkg and leaves ICLFORGE_BUILD_HEARTH off. A real CMake preset
@@ -1689,8 +1689,8 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/save-vcpkg-cache
 
-  # Hearth for Android's debug APK and its instrumented tests (planning/hearth-android.md, phases 1b
-  # and 1d): the Gradle project at apps/hearth/android, whose native build puts vcpkg in front of the
+  # Hearth for Android's debug APK and its instrumented tests: the Gradle project at
+  # apps/hearth/android, whose native build puts vcpkg in front of the
   # NDK's toolchain (app/src/main/cpp/CMakeLists.txt), which is the part build-android above cannot
   # do. The instrumented tests run the pass-through path (a server session, a loopback WebSocket, the
   # sink, the output, a model device) in the app's own process on an x86_64 emulator, and hold what the
@@ -1719,7 +1719,7 @@ jobs:
           fetch-depth: ${{ inputs.fetch_depth }}
 
       # The second committed gradle-wrapper.jar of the tree, checked as the first is.
-      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       - name: Select JDK 17
         shell: bash
@@ -1918,7 +1918,7 @@ jobs:
           CI: "1"
         run: npm test
 
-  # The ESP32 player's web page (firmware/esp-idf/iclforge/ui/, planning/esp32-device-ui.md)
+  # The ESP32 player's web page (firmware/esp-idf/iclforge/ui/)
   # in Chromium, against a stand-in for the firmware's REST routes that each test
   # starts for itself: every action and its error paths, the polling, the status
   # payloads recorded from the emulated board, accessibility and the flash
@@ -2201,7 +2201,7 @@ jobs:
       # otherwise, and when the probe went red on 2026-10-12 (a fixture that a decoder change
       # had outdated) none of the builds and none of the profile guards after it ran, for
       # fourteen hours, which is how a static-RAM budget that no C6 image could meet went
-      # unflagged (planning/esp32-platform-profiles.md, "The C6's static RAM budget"). It is
+      # unflagged. It is
       # `!cancelled()` and not `always()` so that a cancel still stops them. The job ends red
       # if any of them does.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -2271,7 +2271,7 @@ jobs:
           . "$IDF_PATH/export.sh"
           ./tools/checks/run_esp32s3_probe.sh --encoder
 
-      # The AC-4 decoder on this part (planning/ac4.md, D14c): the component's
+      # The AC-4 decoder on this part: the component's
       # CONFIG_ICLFORGE_AC4 with the AC-4 probe, the decoder's state in the
       # board's octal PSRAM, which QEMU emulates. Its own build directory
       # (build-ac4/), so the two steps above keep theirs. It holds the six
@@ -2879,7 +2879,7 @@ jobs:
           [ -n "$stopped" ] || fail "/status did not report the player as stopped"
           python3 "$console" --title "ESP32-S3 HTTP source" qemu-http.txt
           kill "$qemu" 2>/dev/null || true
-      # The web page (planning/esp32-device-ui.md) on the emulated board: the
+      # The web page on the emulated board: the
       # image the step above built, booted again with the same port forward,
       # and the page the firmware serves driven by Playwright - the only place
       # CI runs the routes iclforge::Control serves it on. A step of its own so
@@ -2969,8 +2969,7 @@ jobs:
           python3 "$console" --title "ESP32-S3 web page" qemu-ui.txt
           kill "$qemu" 2>/dev/null || true
 
-      # The stream set (firmware/hearth-sink/www/,
-      # planning/esp32-stream-set.md) over the HTTP source, rendered onto
+      # The stream set (firmware/hearth-sink/www/) over the HTTP source, rendered onto
       # 7.1.4: sdkconfig.ci-http714 is the HTTP shape with the capture sink's
       # twelve-slot TDM conversion, levels as coded and objects as their bed,
       # booting on the set's walk. tools/checks/check_stream_set.py holds the
@@ -3206,17 +3205,16 @@ jobs:
           rm -rf build sdkconfig
 
       # The Sendspin player as the S3 board builds it (sdkconfig.sendspin, over
-      # the hardware and PSRAM overlays, with sdkconfig.s3-fast of
-      # planning/ac4.md D14g: QIO flash, 64-byte data-cache lines, the code and
-      # constants in PSRAM): WiFi, PSRAM and the I2S sink, none of which QEMU
+      # the hardware and PSRAM overlays, with sdkconfig.s3-fast: QIO flash, 64-byte
+      # data-cache lines, the code and constants in PSRAM): WiFi, PSRAM and the I2S sink, none of which QEMU
       # has, so it is built and not run. Not sdkconfig.s3-dcache: with no AC-4
       # decoder in this image its 32 KB came out of the heap an E-AC-3 7.1.4
       # play runs in, which was down to 1.5 KB with it. Its protocol, playout and
       # levels run under QEMU in hearth-esp32s3, from the CI shape the step
       # after this one builds.
       #
-      # It is also the image the releases publish for this board
-      # (planning/esp32-ota.md, O8). tools/hearth/package_firmware.py writes
+      # It is also the image the releases publish for this board.
+      # tools/hearth/package_firmware.py writes
       # its app image, factory image, parts and ELF, and package-esp32-firmware
       # checks them and publishes them with the C6's and the P4's. On a release
       # the image carries the release's tag as its version; otherwise `git
@@ -3226,7 +3224,7 @@ jobs:
       # the image "1" (the C6 and P4 steps in build-esp32c3 do the same).
       #
       # The fragments are the profile's (firmware/hearth-sink/profiles.json, read by
-      # tools/hearth/sink_profile.py, planning/esp32-platform-profiles.md), and the build is held
+      # tools/hearth/sink_profile.py), and the build is held
       # to it before anything is packaged: the fragments it was given, every locked key, any size
       # or placement key nobody placed, the image and the static internal RAM. The repository
       # variable ESP32_PROFILE_GUARD=warn turns a finding into an annotation.
@@ -3234,8 +3232,8 @@ jobs:
       # an image that is not its profile) is not a footprint check and must not be skipped by one:
       # a step after a failed step is skipped by default, and on `main` the minimum-footprint
       # probes above and below failed first, so no sink build was ever held to its profile and the
-      # C6's static RAM budget was wrong for hours (planning/esp32-platform-profiles.md, "Where each
-      # check runs"). Every step that runs the guard, or carries an image to the packager, is
+      # C6's static RAM budget was wrong for hours. Every step that runs the guard, or carries an
+      # image to the packager, is
       # `!cancelled()`: it runs after an earlier failure and reports its own.
       - name: Build the S3 board's Sendspin player and package its image
         if: ${{ !cancelled() }}
@@ -3460,7 +3458,7 @@ jobs:
           ls -l "$image"
           rm -rf build sdkconfig
 
-      # Updates over the network (planning/esp32-ota.md, "Tests"), end to end on
+      # Updates over the network, end to end on
       # the emulated board. Image A (sdkconfig.ci-ota, over the Sendspin
       # player's shape) boots; tools/checks/run_ota_qemu.py then pushes it B (A
       # with another PROJECT_VER), an image that never becomes healthy and one
@@ -3547,7 +3545,7 @@ jobs:
           # just the map the first time. A missing file here should say so.
           if-no-files-found: error
 
-  # Hearth B4 (planning/hearth-reference-player.md): the Sendspin player
+  # Hearth B4: the Sendspin player
   # build-esp32s3 built for QEMU, played to from the host. hearth-testserver
   # pairs with the emulated board by the token on its console, gives it a 2.0
   # layout and plays it the E-AC-3 JOC fixture in one group with a test sink of
@@ -3700,7 +3698,7 @@ jobs:
     # unit, where build-esp32s3 is an Xtensa LX7 with one and build-footprint
     # is a Cortex-M3 with neither.
     #
-    # The fixed-point tier's own leg (planning/arithmetic-tiers.md, Phase D).
+    # The fixed-point tier's own leg.
     # What it's FOR is the hash check inside the runner: the tier promises PCM
     # that is identical on every machine, integer arithmetic having no
     # rounding mode or library last bit to differ by; the x86 host and the
@@ -3728,7 +3726,7 @@ jobs:
       # otherwise, and when the probe went red on 2026-10-12 (a fixture that a decoder change
       # had outdated) none of the builds and none of the profile guards after it ran, for
       # fourteen hours, which is how a static-RAM budget that no C6 image could meet went
-      # unflagged (planning/esp32-platform-profiles.md, "The C6's static RAM budget"). It is
+      # unflagged. It is
       # `!cancelled()` and not `always()` so that a cancel still stops them. The job ends red
       # if any of them does.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3800,8 +3798,8 @@ jobs:
       # two-board group play), but nothing before this step caught whether it still compiles.
       # Same container and toolchain as the two steps above, so it costs one more build.
       #
-      # It is also the image the releases publish for a C6 on the 4 MB table
-      # (planning/esp32-ota.md, O8), packaged as build-esp32s3 packages the S3
+      # It is also the image the releases publish for a C6 on the 4 MB table,
+      # packaged as build-esp32s3 packages the S3
       # board's; the step after this one builds the 16 MB table's.
       - name: Build hearth_sink's Sendspin player for the ESP32-C6 (no emulator for this part)
         if: ${{ !cancelled() }}
@@ -3866,7 +3864,7 @@ jobs:
       # step above gives: qemu-riscv32 has no machine for this part either. It is built for its
       # bootloader as much as its application. The bootloader starts at 0x2000 on this part,
       # below the partition table at 0x8000, and with rollback on (sdkconfig.defaults) it leaves
-      # 1,152 of those 24,576 bytes spare (sdkconfig.p4, planning/esp32-ota.md). An ESP-IDF
+      # 1,152 of those 24,576 bytes spare (sdkconfig.p4). An ESP-IDF
       # update that grows it past the window then fails here rather than in the next board
       # build for a P4. Same container and toolchain as the steps above.
       #
@@ -3900,7 +3898,7 @@ jobs:
             --out "$GITHUB_WORKSPACE/esp32-firmware"
 
       # The same sink for an ESP32-P4 of CHIP REVISION v3.x, with the lyric screen on the 7-inch MIPI DSI
-      # panel of Espressif's ESP32-P4X-Function-EV-Board (planning/karaoke-p4x-panel.md, D7), built and
+      # panel of Espressif's ESP32-P4X-Function-EV-Board, built and
       # not run, for the reason the step above gives, and published as the image for such a board
       # (hearth-sink-esp32p4-rev3). sdkconfig.p4-rev3 over sdkconfig.p4 is the revision, 400 MHz and
       # the 160 MHz I2S clock source; sdkconfig.panel and sdkconfig.panel-dsi are LVGL and the panel.
@@ -3955,7 +3953,7 @@ jobs:
 
       # The release profile again, with the stage timers on (-DICLFORGE_STAGE_TIMERS=ON), built and
       # not run, for the reason the step above gives. The AC-4 decoder is in every P4 image since the
-      # fold of p4-rev1-ac4 into p4-rev1 (planning/ac4-in-release-images.md), so the build above
+      # fold of p4-rev1-ac4 into p4-rev1, so the build above
       # already holds that its archives compile and link under this part's toolchain, -Werror and
       # profile options; what this step adds is the same image with the zone markers compiled in,
       # which is what the platform pages' stage tables are measured with. No image is packaged from it.
@@ -3990,7 +3988,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      # The ESP32-P4 probe project (planning/esp32-sink-tiers.md's Phase P1),
+      # The ESP32-P4 probe project,
       # built and not run, for the same reason as the ESP32-C6 step above:
       # qemu-system-riscv32 has no machine for this part either, so its
       # figures come from a board (docs/platforms/bare-metal/esp32-p4.md).
@@ -4007,7 +4005,7 @@ jobs:
           dir="$RUNNER_TEMP/esp32p4"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 build
 
-  # The sink firmware every release publishes (planning/esp32-ota.md, O8): the
+  # The sink firmware every release publishes: the
   # S3 board's image from build-esp32s3, and the two C6 images and the P4's
   # from build-esp32c3, checked together and published together.
   # tools/ci/check_firmware_package.py opens each one first and holds it to its
@@ -4169,7 +4167,7 @@ jobs:
       - name: Instructions per ENCODED frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --encoder --icount | tee "build/config-arm-none-eabi-minimal/icount-encode.txt"
 
-      # The fixed-point tier on the same leg (planning/arithmetic-tiers.md):
+      # The fixed-point tier on the same leg:
       # the probe built with -DICLFORGE_DECODE_SCALAR=fixed, every fixture's
       # levels gated as the float build's are, and its <codec>.pcm_hash lines
       # kept: the tier is integer arithmetic, so those hashes are the same on
@@ -4191,7 +4189,7 @@ jobs:
       - name: Fixed-point instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-fixed.txt"
 
-      # The AC-4 decoder on the same leg (planning/ac4.md, D14a): its own probe
+      # The AC-4 decoder on the same leg: its own probe
       # and its own image, in float, since AC-4 shares nothing with iclforge::ac3 and
       # an image carries one probe. Five committed streams; each channel's level,
       # the image, each fixture's peak heap, the stack a decode used, the
@@ -4209,7 +4207,7 @@ jobs:
       - name: AC-4 instructions per frame under QEMU -icount
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4.txt"
 
-      # The AC-4 decoder's fixed-point tier on the same leg (planning/ac4.md, D14d):
+      # The AC-4 decoder's fixed-point tier on the same leg:
       # integer arithmetic, so its hashes are the same here, on the host and on
       # RV32IMC, and are held to their own pins
       # (testdata/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the

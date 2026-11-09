@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The group editor (planning/hearth-design.md, "Network - editing a group",
-// network-group.png): a group's own name, its members with per-member
+// The group editor: a group's own name, its members with per-member
 // volume/mute and a way to remove one, adding a paired sink to it, the
 // group's own volume, and making it where Hearth plays. Backed by a real
 // iclforge::sendspin::Group (NetworkController.selectedGroup), which the engine

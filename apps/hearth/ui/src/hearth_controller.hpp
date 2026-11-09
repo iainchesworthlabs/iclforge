@@ -26,9 +26,8 @@ namespace iclforge::hearth::ui {
 struct TestOutputs;  // test_outputs.hpp
 }
 
-// The one object QML talks to for the queue and the transport
-// (planning/hearth-reference-player.md, A5: "a controller polling the
-// engine's snapshot"). Everything it shows comes from Engine::status(),
+// The one object QML talks to for the queue and the transport.
+// Everything it shows comes from Engine::status(),
 // read on a timer at CrucibleController's own rate (kPollMs) rather than
 // from Engine::on_change(), which runs on the engine's own thread and would
 // have to hop back to the GUI thread to touch a single Qt property - polling
@@ -145,7 +144,7 @@ class HearthController : public QObject {
     Q_PROPERTY(int routingOutputs READ routingOutputs NOTIFY speakerSetupChanged)
     // Each device output's own name - "FL", "LFE", "SL" - for the routing
     // grid's column headers to show beside their 1-based output number
-    // (Speakers.qml's own "1 FL" mockup, planning/hearth-design.md). From
+    // (Speakers.qml's own "1 FL" mockup). From
     // EngineStatus::speaker_mask (iclforge::audio::speakers.hpp's output_names()),
     // which falls back to the standard arrangement for routingOutputs' width
     // when the device does not report a mask; an entry is empty where even
@@ -208,7 +207,7 @@ class HearthController : public QObject {
     // --- play monitor (the Play page: levels, loudness, this frame's ------
     // detail, object placement and signal path) ---------------------------
     // Everything below comes from Engine::meters() and Engine::unit_report(),
-    // polled the same tick as status() - planning/hearth-reference-player.md's
+    // polled the same tick as status() - the
     // Monitor, which A5's first slice deferred until there was something real
     // to read (PlayPage.qml's own former header comment said so). Neither
     // call is new: both have existed on Engine since A3 slices 6 and 8: this

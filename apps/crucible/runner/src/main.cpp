@@ -17,7 +17,7 @@
 //   list                       the applications and their slots (<app> below is the id it prints)
 //   pos <app> <x> <y> <z>      position an application (x,y in [0,1], z in [-1,1])
 //   bed <app>                  send it back to the bed
-//   pin <mode>|off             atmos ddplus dd pcm headphones stereo
+//   pin <mode>|off             atmos ddplus dd truehd pcm headphones stereo
 //   key <path>|none            load or clear the signing key
 //   bypass on|off              PCM-side modes take the engine's own slots and bed, not a decode
 //   split <app> on|off         a stereo application as a pair of objects, or one mono fold
@@ -48,6 +48,7 @@ std::optional<OutputMode> parse_mode(const std::string& word) {
     if (word == "atmos") return OutputMode::kAtmos;
     if (word == "ddplus") return OutputMode::kDdPlus51;
     if (word == "dd") return OutputMode::kDd51;
+    if (word == "truehd") return OutputMode::kTrueHd51;
     if (word == "pcm") return OutputMode::kPcmSurround;
     if (word == "headphones") return OutputMode::kHeadphones;
     if (word == "stereo") return OutputMode::kStereo;

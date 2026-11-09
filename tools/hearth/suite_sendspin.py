@@ -137,7 +137,7 @@ def find_testserver(explicit: str | None, locks: Path) -> Path:
             return Path(candidate)
     raise SendspinError(
         "no hearth-testserver to play a Sendspin row with: pass --testserver, set "
-        "ICLFORGE_TESTSERVER, or build it (planning/esp32-board-bench.md, 'Sendspin rows')"
+        "ICLFORGE_TESTSERVER, or build it"
     )
 
 

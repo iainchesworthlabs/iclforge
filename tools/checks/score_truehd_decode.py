@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Scores a TrueHD decoder against the Dolby Encoding Engine's TrueHD streams of known sources.
 
-Run on the owner's machine, while the gold set exists: the set is not committed (DEE's licence
-ends on 2026-11-06 and its streams stay with the owner; planning/truehd.md, "Oracles").
-tools/generators/gen_dee_gold.py makes it, and this reads its manifest:
+Run on the owner's machine, while the gold set exists: the full set is not committed (DEE's
+licence ends on 2026-11-06 and its streams stay with the owner),
+but 13 of its streams, with their sources and a manifest cut to them, are in testdata/truehd-dee
+and score with --set testdata/truehd-dee. tools/generators/gen_dee_gold.py makes the set, and this
+reads its manifest:
 
     DIR/dee-gold-manifest.json         the legs, each with its sources and its stream
     DIR/streams/<leg>/dee.mlp          the stream DEE wrote (TrueHD, whatever the extension)
@@ -24,7 +26,9 @@ encoder made it.
          the decoder succeeded and the stream's own lossless check passed (at least one interval,
          none failed), but the decode is not the source and no option of the leg says why. The
          decode is what the encoder coded, so the difference arose before coding; it is listed
-         for the owner and does not fail the run
+         for the owner and does not fail the run. The legs at 96 kHz are the ones so far (ERRATA
+         question 50), and the report keeps, for each, the check's counts, the error in dB of
+         each channel and whether FFmpeg's decode is the source
   FAIL   the decoder failed (strict checks, a CRC, the lossless check), or a lossless leg
          decodes to something else
   SKIP   no stream or source on disk, or a source longer than --max-seconds

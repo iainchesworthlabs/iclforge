@@ -6,7 +6,7 @@ import HearthTest
 
 import "HearthTestHelpers.js" as H
 
-// The Karaoke page (KaraokePage.qml; planning/karaoke-design.md, K4): what it
+// The Karaoke page (KaraokePage.qml): what it
 // says of the stream playing, the choice it writes through to the decoder, and
 // what the engine then plays, measured tone by tone at the fake device
 // (TestServices.toneLevelDb()) on streams iclforge::ac3::FrameEncoder writes
@@ -299,7 +299,7 @@ TestCase {
     }
 
     // An E-AC-3 programme of one independent substream flagged bsmod 7 is a karaoke stream the
-    // decoder reproduces (planning/karaoke-eac3.md, D1 to D3): named, its parts heard, and the
+    // decoder reproduces: named, its parts heard, and the
     // surrounds silent under the default reproduction, as the AC-3 case above.
     function test_anEac3KaraokeStreamIsNamedAndReproducedAsAnAc3OneIs() {
         const win = openPage();

@@ -867,8 +867,7 @@ its own - and from there it is signed, checksummed, SBOM'd and attested exactly 
 See [Conformance vectors](conformance-vectors.md) for what is in it and how a decoder implementer
 uses it.
 
-And **the Hearth sink firmware** ([planning/esp32-ota.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md#published-images),
-O8). No tag has been cut since this job landed (`v0.10.0-beta.1` has no `hearth-sink-*` assets), so
+And **the Hearth sink firmware**. No tag has been cut since this job landed (`v0.10.0-beta.1` has no `hearth-sink-*` assets), so
 this is what the workflow is configured to publish rather than a route a published release has
 been seen to take. `_build.yml`'s `package-esp32-firmware` job gathers the five board images `build-esp32s3`
 and `build-esp32c3` build: `hearth-sink-esp32s3`, `hearth-sink-esp32c6` (4 MB table),

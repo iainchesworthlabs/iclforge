@@ -1,4 +1,4 @@
-# A Meters view for the no-lyrics screen, drawn on a computer before it is built (planning/p4x-meters-view.md). Two programs
+# A Meters view for the no-lyrics screen, drawn on a computer before it is built. Two programs
 # over the synthetic music of ../speakers_options/scene.hpp:
 #
 #   meters_options  three variants of the view (an instrument after RME's displays: a third-octave spectrum with peak holds,

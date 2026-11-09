@@ -27,7 +27,7 @@
 #include "iclforge/objects/motion.hpp"
 #include "iclforge/adm/ac3adm.hpp"
 
-// planning/ac4.md, I5's named exit criterion: "an ADM ... master from the committed fixtures the
+// The exit criterion: "an ADM ... master from the committed fixtures the
 // E-AC-3 object tests use, encoded to AC-4 by atmos-adm and decoded with adm_out, gives objects
 // whose positions, gains and timing match the master within tolerances you pin." Real,
 // subprocess-level integration test, the same "run the actual built binary" shape

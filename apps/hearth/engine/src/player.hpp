@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/iec61937/mat.hpp"
 #include "iclforge/render/identify.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
@@ -30,7 +31,7 @@
 #include "transport.hpp"
 #include "unit_reports.hpp"
 
-// The player (planning/hearth-reference-player.md, A3): the queue, the
+// The player: the queue, the
 // transport, one session at a time, and a PCM sink, put together.
 //
 // The transport decides; this carries the decision out. Each command is
@@ -84,7 +85,7 @@
 // for a member playing player@v1, and the item's own units, packed into
 // bursts the same way a bitstream output's are, for a member playing
 // _iclforge_player@v1 - network_group_sink.hpp's own comment has the shape.
-// An AC-4 item (planning/ac4.md, I2) is decoded for every output and reaches
+// An AC-4 item is decoded for every output and reaches
 // a member as a bitstream only this way: a sync frame to a burst, packed by
 // iclforge::containers::iec61937::Ac4BurstPacker in the burst type the item's largest frame
 // needs, each burst placed at its frame's own start on the item's timeline.
@@ -206,7 +207,7 @@ public:
     [[nodiscard]] PlayPosition position() const;
 
     // Tells the open network group which item's lyrics its members are to hold and where the sound is
-    // in it (W7d, planning/karaoke-phase2.md). Called by the engine each turn; nothing for any other
+    // in it (W7d). Called by the engine each turn; nothing for any other
     // output. An item's lyric file is read when the clock reaches it, or when the output is opened
     // again (a new stream: its members' lyrics went with the old one).
     void follow_lyrics();
@@ -256,8 +257,7 @@ public:
     // when they are: a bitstream is decoded by the receiver.
     [[nodiscard]] std::string_view settings_note() const;
 
-    // The speaker setup (planning/hearth-reference-player.md, A5's Speakers
-    // page): the per-slot trim and delay applied to the renderer's slots
+    // The speaker setup: the per-slot trim and delay applied to the renderer's slots
     // before they reach the open sink, local or not. Routing itself lives on
     // the sink (PcmSink::set_routing()/routing()): iclforge::audio::PcmOutput
     // already carries a patch and builds a sensible default from the
@@ -290,8 +290,7 @@ public:
     bool set_crossover_hz(double hz);
     [[nodiscard]] double crossover_hz() const { return crossover_hz_; }
 
-    // The identify tone (planning/hearth-reference-player.md, A5's Speakers
-    // page): pink noise on one render layout slot at a time, in place of
+    // The identify tone: pink noise on one render layout slot at a time, in place of
     // whatever the item playing would put there - take_block() overwrites
     // the block entirely (render::IdentifyTone::fill()'s own behaviour:
     // silence on every other slot too), ahead of trim_delay_, which does
@@ -520,6 +519,15 @@ private:
     // The output a session's item would be played through, as the decision
     // has it, asked while the open output is held.
     [[nodiscard]] OutputChoice decide(const Session& session) const;
+    // A TrueHD item's units to a network group, up to 24 to a chunk (sendspin::kTruehdUnitsPerChunk).
+    void send_truehd_unit_to_group(std::span<const std::byte> unit, std::uint32_t samples,
+                                   std::uint64_t start);
+    // Queues the chunk in progress, if there is one: at 24 units, and when the item ends.
+    void flush_truehd_chunk();
+    // Opens `path` as the settings say, which for a file with a TrueHD track first and a
+    // compressed one after it (settings_.track) includes which of the two plays: the compressed one
+    // where the output decision for it is a bitstream, else the TrueHD, decoded here.
+    [[nodiscard]] std::expected<Session, std::string> open_session(const std::string& path) const;
     [[nodiscard]] HeldOutput held_output() const;
     // Why the prepared item cannot join the open output although the
     // transport would join it, or empty: another endpoint, or units the
@@ -530,6 +538,16 @@ private:
     // the pending ring as a burst. `start` is where it sits in what the item
     // plays (Session::SentFn).
     void send_unit(std::span<const std::byte> unit, std::uint32_t samples, std::uint64_t start);
+    // TrueHD sent as MAT to a local output: the unit goes into the burst being filled (24 to a
+    // burst), and a whole burst is queued for the link.
+    void send_unit_as_mat(std::span<const std::byte> unit, std::uint32_t samples, std::size_t record);
+    // What a unit that has been packed adds to the burst being filled, and queueing that burst once
+    // it is whole.
+    void note_packed_unit(std::uint32_t samples, std::size_t record);
+    void queue_burst(std::vector<std::byte> burst, std::size_t record);
+    // The units a MAT burst still holds when the output is not going on to another item, padded
+    // into a burst of their own so that the end of the last item is heard.
+    void flush_mat_tail();
     // A unit the session sent, for a network group: the same packer, into
     // group_payload_ instead of the pending ring, and pending_group_bursts_
     // once a burst is whole (send_unit()'s own kNetworkGroup case). Nothing
@@ -644,6 +662,8 @@ private:
     // An AC-4 item's, for a network group: one per stream, which follows its
     // frames' phase (iec61937.hpp).
     std::optional<containers::iec61937::Ac4BurstPacker> ac4_packer_;
+    // TrueHD to a local output: 24 access units to a burst.
+    std::optional<containers::iec61937::MatPacker> mat_packer_;
     std::uint64_t packed_frames_ = 0;
     std::vector<Span> packed_spans_;
     // A network group's own burst-in-progress: the raw (unwrapped)
@@ -654,6 +674,14 @@ private:
     // group_payload_ was last empty (send_unit_to_group()).
     std::vector<std::byte> group_payload_;
     std::int64_t group_burst_start_frame_ = 0;
+    // A TrueHD chunk in progress in group_payload_: its access units, and the samples they code
+    // (send_truehd_unit_to_group()).
+    std::uint32_t group_truehd_units_ = 0;
+    // The first substreams of a TrueHD item the group's coded members take (0: all), from the plan
+    // the group opened with, and how many the stream has.
+    int group_coded_substreams_ = 0;
+    int group_stream_substreams_ = 0;
+    std::uint64_t group_truehd_samples_ = 0;
     // Bursts complete and waiting for room in the group, and how far into
     // the PCM ring's head block drain_group() has got (Pending's own
     // comment on why bursts are not pending_'s own entries).

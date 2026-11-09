@@ -6,7 +6,7 @@
 
 #include "iclforge/wall_clock.hpp"
 
-// The board's time of day (planning/p4x-now-playing.md, stage 3). A board has no clock of its own, so on
+// The board's time of day. A board has no clock of its own, so on
 // every ESP board that has a network (net/wifi/ and net/dual/: all the hardware) this keeps one with a time
 // server, over lwIP's SNTP client, from the moment the board holds an address, and says what the time is in
 // the zone the board was given. By default it is on. The server is the one a person named (PUT /ntp-server),

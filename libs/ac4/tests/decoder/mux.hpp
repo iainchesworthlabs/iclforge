@@ -1,6 +1,6 @@
 #pragma once
 
-// The test multiplexer of phase D7 (planning/ac4.md): it builds presentations
+// The test multiplexer of phase D7: it builds presentations
 // of several substreams (ETSI TS 103 190-2 V1.3.1 clause 4.8) from the
 // substreams of separate streams - DEE's, and the encoder's mono and stereo
 // ones, which DEE does not write - frame by frame.

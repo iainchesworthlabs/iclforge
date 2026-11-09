@@ -11,7 +11,7 @@
 #include <functional>
 #include <memory>
 
-// A singer's microphone, for the Karaoke page (planning/karaoke-microphone.md, M4): a fourth QML
+// A singer's microphone, for the Karaoke page: a fourth QML
 // singleton beside HearthController, NetworkController and KaraokeController, so that
 // hearth_controller.cpp does not grow. What it wraps is the engine's MicrophoneSession (the input,
 // the meter, the Performance against a reference); this class turns it into what a card binds to,
@@ -62,7 +62,7 @@ class MicrophoneController : public QObject {
     // (a value is snapped to the nearest). Kept. 100 is a semitone.
     Q_PROPERTY(
         int toleranceCents READ toleranceCents WRITE setToleranceCents NOTIFY toleranceChanged)
-    // Score against the singer's own key (planning/karaoke-microphone.md, "What a score means"):
+    // Score against the singer's own key:
     // the median of how far their first voiced frames were from the tune is taken off every frame,
     // so that a person who sings consistently flat or sharp is judged on the shape of the melody.
     // Off at every start of the program: a person should see that it is on. `keyShiftCents` is the

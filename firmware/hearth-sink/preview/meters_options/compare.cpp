@@ -1,4 +1,4 @@
-// Prototypes of a Meters view for the no-lyrics screen (planning/p4x-meters-view.md): an instrument display after the
+// Prototypes of a Meters view for the no-lyrics screen: an instrument display after the
 // owner's reference, RME's ADI-2/4 Pro SE and Fireface UCX II: a third-octave spectrum of the main mix with peak holds and a
 // dB scale, level meters with peak-hold ticks and the numeric peak, a status line.
 //

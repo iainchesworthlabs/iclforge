@@ -1,5 +1,5 @@
 """Gate the AC-4 decoder's float and fixed-point builds against its double build, on every
-committed stream (planning/ac4.md, D14a and D14d).
+committed stream.
 
 `ICLFORGE_DECODE_SCALAR=float` builds the decoder's QMF banks, transforms, A-SPX, A-CPL and
 the rest of libs/ac4/src/decoder/pcm in `float`, and `ICLFORGE_DECODE_SCALAR=fixed` in Q7.24 with

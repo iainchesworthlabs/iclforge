@@ -10,7 +10,7 @@
     python tools/hearth/bench_flash.py ota    BOARD --build-dir DIR --session ID [--force]
     python tools/hearth/bench_flash.py reset  BOARD --session ID
 
-It replaces the scripts that lived in D:\\ac3bld\\esp-reflash (planning/esp32-board-bench.md),
+It replaces the scripts that lived in D:\\ac3bld\\esp-reflash,
 and what they took from a hand-kept list of fragments it takes from the profile:
 
 - **build** is the build CI makes of the same profile (`sink_profile.py defaults`, the identity
@@ -34,7 +34,7 @@ and what they took from a hand-kept list of fragments it takes from the profile:
   a board whose row says it takes no OTA.
 - **reset** is a system reset by esptool's watchdog reset after the MAC check, and waits for the
   board: what brings back a P4 whose restart left its C6 link dead, and a way to boot one that
-  does not start that fault (planning/esp32-board-bench.md).
+  does not start that fault.
 
 Nothing prints or writes a network value: the logs go through bench.mask_text.
 """
@@ -344,8 +344,8 @@ def reset_board(
 ) -> dict[str, Any] | None:
     """A system reset of the board by esptool's watchdog reset, then /hardware once it answers
     (None when it does not within `wait` seconds). A watchdog reset, where `esp_restart` is a CPU
-    reset: it is what brought back a P4 whose restart had left its C6 link dead
-    (planning/esp32-board-bench.md). The chip's MAC is read first and a board that is not the
+    reset: it is what brought back a P4 whose restart had left its C6 link dead.
+    The chip's MAC is read first and a board that is not the
     row's is an error, though the reset by then has been sent to whatever is on the port."""
     code, text = run(
         esptool(board, "--before", "default-reset", "--after", "watchdog-reset", "read-mac"),

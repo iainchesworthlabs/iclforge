@@ -1,4 +1,4 @@
-// AC-4 in the rest of forge (planning/ac4.md, phase I1), each run against the
+// AC-4 in the rest of forge, each run against the
 // real binary: transcode between AC-4 and AC-3 or E-AC-3 in both directions
 // with the metadata that carries, the presentation it takes and what it
 // refuses; qc, levels and loudness of an AC-4 presentation; fmp4, mkv, probe

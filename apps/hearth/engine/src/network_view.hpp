@@ -8,17 +8,15 @@
 
 #include "iclforge/sendspin/iclforge_player.hpp"
 
-// Pure view-building for the Network page (planning/hearth-reference-player.md,
-// A6: discovery and pairing - the first slice; see network_sinks.hpp's own
-// comment for what is not here yet and why). Turning what NetworkSinks knows
+// Pure view-building for the Network page (A6: discovery and pairing - the first slice; see
+// network_sinks.hpp's own comment for what is not here yet and why). Turning what NetworkSinks knows
 // about a discovered Sendspin player into the strings the page reads is kept
 // apart from NetworkSinks itself so it can be tested the way output_decision.hpp
 // is - hand-built facts, no socket, no clock - while network_sinks.cpp, the
 // harder-to-test layer that calls this from what ServerHost and discovery
 // actually report, stays thin.
 //
-// A6's second slice (a Hearth sink's own speaker and decoder settings pages,
-// planning/hearth-reference-player.md#a6-network-outputs-in-the-application)
+// A6's second slice (a Hearth sink's own speaker and decoder settings pages)
 // reads SinkFacts' iclforge_support/iclforge_state directly rather than through
 // a new to_map()-style function here: unlike SinkRow/SinkDetail's plain display
 // strings, the settings pages need editable numeric fields QML binds to, and
@@ -29,7 +27,7 @@
 // is a lightweight, dependency-free header (no Qt, no iclforge::render), the same
 // reason network_sinks.hpp already includes sendspin headers directly.
 //
-// Wording follows planning/hearth-sendspin-extension.md's own terms: "roles",
+// Wording follows the Sendspin extension's own terms: "roles",
 // "takes", "outputs", "latency" and "clock" are its words for client/hello's
 // roles, the codecs and data types a sink accepts, its output slot count and
 // width, its required lead time, and whether its time filter has converged.
@@ -302,8 +300,7 @@ struct GroupFacts {
     std::vector<GroupMemberFacts> members{};
 };
 
-// One row of NetworkSinkList.qml's `groups` model - shown above the sinks,
-// as planning/hearth-reference-player.md's own design does.
+// One row of NetworkSinkList.qml's `groups` model - shown above the sinks.
 struct GroupRow {
     std::string id{};
     std::string name{};

@@ -1,6 +1,6 @@
 #pragma once
 
-// The Meters view's pixels: bar charts written straight into an RGB565 buffer (planning/p4x-meters-view.md, "Kit results"). The first drawing
+// The Meters view's pixels: bar charts written straight into an RGB565 buffer. The first drawing
 // made each bar three LVGL rectangles and a tick, and an update that moved 31 bars and a dozen meters left 100 to 200 small invalid areas, each a
 // pass over the object tree and a copy to the frame buffer: 130 to 440 ms an update on the P4, where the speakers view's few circles take 2 to 8.
 // Here a whole chart is one buffer, written by the rows that changed, and LVGL is told one area.
@@ -183,7 +183,7 @@ struct Change {
 };
 
 // What one more rectangle for LVGL to draw and copy costs, in the pixels of one. The kit's 5.1 room measured about 135 ns a pixel and
-// about a millisecond for the first pixel of an area (planning/p4x-meters-view.md, "Kit results"), so 8,000: a spectrum that moves every
+// about a millisecond for the first pixel of an area, so 8,000: a spectrum that moves every
 // bar a few rows is a handful of rectangles, not one of the whole plot's width and not one for each of its 31 bars.
 inline constexpr std::int64_t kAreaCostPx = 8'000;
 inline constexpr std::size_t kMaxChanges = 64;

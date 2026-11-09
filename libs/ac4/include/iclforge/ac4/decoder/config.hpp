@@ -84,7 +84,7 @@ enum class TargetDevice : std::uint8_t {
     kPortable,  // portable speakers
 };
 
-// The controls of planning/ac4.md's "One control for both formats" that act on
+// The controls, one set for both formats, that act on
 // the decoded channels. Decoder::set_output() changes them from the next frame.
 // Every field has a default, so a designated initializer names only the fields
 // it sets; the same holds for PresentationChoice and DecoderConfig.

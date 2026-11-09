@@ -80,14 +80,21 @@ constexpr std::size_t kAc4MaxCodedChannels =
     CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS;
 // The most frames a second of an AC-4 stream the board keeps up with (0 = no limit).
 constexpr std::uint32_t kAc4MaxFrameRate = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE;
+// Whether the board lists TrueHD (where it decodes it, which needs CONFIG_ICLFORGE_TRUEHD), the most
+// channels of it a unit may decode to, and the peak data rate it takes in kbit/s (0 = states none).
+constexpr bool kListTruehd = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD != 0;
+constexpr std::size_t kTruehdMaxCodedChannels =
+    CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS;
+constexpr std::uint32_t kTruehdMaxDataRate =
+    CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_DATA_RATE_KBPS;
 // The objects of an E-AC-3 stream the board places in real time; -1 states none.
 constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
 // are not listed, so a server sends none).
 constexpr std::uint32_t kLyricsMaxBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES;
 // What a lyric document needs of the heap it is made in, beyond a reserve, to be read and held:
-// measured at about ten times its text at the peak, on S3 and P4 (planning/hearth-sendspin-
-// extension.md, Lyrics). The internal heap always keeps `kLyricsHeapReserve`, and PSRAM, where the
+// measured at about ten times its text at the peak, on S3 and P4. The internal heap always keeps
+// `kLyricsHeapReserve`, and PSRAM, where the
 // document goes when there is room, `kLyricsPsramReserve`.
 constexpr std::size_t kLyricsHeapFactor = 12;
 constexpr std::size_t kLyricsTransientFactor = 3;
@@ -100,7 +107,7 @@ constexpr std::int32_t kBufferMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_BUFFER_MS;
 constexpr bool kUnpairedAccess = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_UNPAIRED_ACCESS != 0;
 constexpr bool kOfferPcm = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_PCM != 0;
 // Whether the hello lists metadata@v1, which only a board with a screen to draw it on does: the title
-// card (planning/p4x-now-playing.md). A board with none would be sent a message at every track and pause
+// card. A board with none would be sent a message at every track and pause
 // for nothing, and would keep a title it never shows.
 #if defined(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI) || defined(CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
 constexpr bool kListMetadata = true;
@@ -227,6 +234,10 @@ std::atomic<bool> g_name_pending{false};
     if (ac4) {
         s.data_types.push_back(ac::DataType::kAc4);
     }
+    // TrueHD, where the build decodes it and says to list it: one to 24 whole access units a chunk.
+    if (kListTruehd && iclforge::BurstPlayer::decodes_truehd()) {
+        s.data_types.push_back(ac::DataType::kTruehd);
+    }
     s.sample_rates = {static_cast<std::int32_t>(kSampleRate)};
     s.outputs.count = sink_slots();
     s.outputs.bit_depth = sink_slot_bits();
@@ -254,13 +265,23 @@ std::atomic<bool> g_name_pending{false};
     // The widest syncframe the player decodes (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS):
     // past it a syncframe is refused, so a server is told the figure rather than finding out a
     // burst at a time. 0 in the build states nothing.
+    // AC-4's and TrueHD's are the build's own: the DD+ figure is not what they keep up with.
     for (const ac::DataType type : s.data_types) {
-        const std::size_t limit = type == ac::DataType::kAc4 && kAc4MaxCodedChannels != 0
-                                      ? kAc4MaxCodedChannels
-                                      : kMaxCodedChannels;
+        std::size_t limit = kMaxCodedChannels;
+        if (type == ac::DataType::kAc4 && kAc4MaxCodedChannels != 0) {
+            limit = kAc4MaxCodedChannels;
+        } else if (type == ac::DataType::kTruehd) {
+            limit = kTruehdMaxCodedChannels;
+        }
         if (limit != 0) {
             s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(limit);
         }
+    }
+    // The peak data rate of a TrueHD stream the board takes (kbit/s), compared with the peak the
+    // stream declares; 0 in the build states none.
+    if (kTruehdMaxDataRate != 0 &&
+        std::ranges::find(s.data_types, ac::DataType::kTruehd) != s.data_types.end()) {
+        s.max_data_rate[static_cast<std::size_t>(ac::DataType::kTruehd)] = kTruehdMaxDataRate;
     }
     // The frames a second of AC-4 it keeps up with, where it lists AC-4 and the build says: a
     // server sends a faster stream another way, as it does one with more channels.
@@ -286,8 +307,8 @@ std::atomic<bool> g_name_pending{false};
     s.lyrics_max_bytes = kLyricsMaxBytes;
     // The codecs it reproduces karaoke for when told to (the `karaoke` setting): every one it
     // decodes. burst_player.cpp lays a karaoke AC-3 syncframe and an E-AC-3 programme of one
-    // independent substream out from the reproduction alike, so a server sends either as it is
-    // (planning/karaoke-eac3.md, D6); a board that said nothing here would be taken for AC-3's
+    // independent substream out from the reproduction alike, so a server sends either as it is;
+    // a board that said nothing here would be taken for AC-3's
     // alone.
     s.karaoke_codecs = karaoke_codecs;
     return s;
@@ -333,12 +354,12 @@ std::atomic<bool> g_name_pending{false};
     }
     const std::uint64_t capacity = player.buffer_capacity();
     // PCM, and Opus where the build decodes it (CONFIG_ICLFORGE_SENDSPIN_OPUS): FLAC would need its
-    // decoder on the board, which the player has not measured room for
-    // (planning/hearth-reference-player.md, B3). Stereo at 48 kHz, which is the only rate the
+    // decoder on the board, which the player has not measured room for.
+    // Stereo at 48 kHz, which is the only rate the
     // board plays. Opus is listed last, so that a server that is not asked for it sends PCM.
     // The depth of the sink's own slots first: a server sends the first format it can, and 24-bit
     // PCM to a 16-bit slot is half as much again in the air, in the ring and through the player
-    // for the same audio (planning/esp32-sink-compatibility-matrix.md, the C6 PCM runs).
+    // for the same audio.
     const m::AudioFormat pcm24{
         .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 24};
     const m::AudioFormat pcm16{
@@ -596,7 +617,7 @@ class Events final : public iclforge::SendspinEvents {
         report_now();
     }
 
-    // metadata@v1: what the server says is playing, for the title card (planning/p4x-now-playing.md).
+    // metadata@v1: what the server says is playing, for the title card.
     // The store takes the object as the server's dialect means it (title_card.hpp): the specification's
     // (and aiosendspin 10's, which Music Assistant runs now) is the whole state, and aiosendspin 9.1.1's only
     // what changed, a cleared field as null. A field is `kSet` when it came with a value, `kClear` when it
@@ -842,6 +863,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.max_coded_channels = kMaxCodedChannels;
     config.max_ac4_channels = kAc4MaxCodedChannels;
     config.max_ac4_frame_rate = kAc4MaxFrameRate;
+    config.max_truehd_channels = kTruehdMaxCodedChannels;
     // A stream declaring more objects than the board states it places is played as its bed
     // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
     if (kMaxObjects >= 0) {
@@ -1207,11 +1229,15 @@ SendspinPlaying sendspin_now_playing() {
             case ac::DataType::kAc4:
                 out.facts.codec = nv::Codec::kAc4;
                 break;
+            case ac::DataType::kTruehd:
+                out.facts.codec = nv::Codec::kTruehd;
+                break;
         }
         out.facts.have_decoder = true;
         out.facts.acmod = play.decoder.acmod;
         out.facts.lfe = play.decoder.lfe;
         out.facts.objects = play.decoder.objects;
+        out.facts.channels = play.decoder.channels;
     } else {
         // A burst stream before its first unit has decoded.
         out.facts.codec = nv::Codec::kUnknown;

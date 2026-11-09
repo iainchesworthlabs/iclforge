@@ -79,7 +79,7 @@ enum class PskCategory : std::uint8_t {
 struct PskReference {
     crypto::Digest32 psk_id{};
     // Absent only when the peer is aiosendspin 9.1.1, whose message 1 names no
-    // category (planning/hearth-sendspin-extension.md, C3).
+    // category.
     std::optional<PskCategory> category;
 };
 

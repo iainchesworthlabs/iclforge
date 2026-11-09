@@ -23,7 +23,7 @@
 // with +i. The passes are dsp/fft_kernels.hpp's, one function for each radix
 // and direction.
 //
-// Written against a scalar type (planning/ac4.md, "Arithmetic"); only double
+// Written against a scalar type; only double
 // is instantiated until the float and fixed-point tiers arrive.
 
 namespace iclforge::dsp::tiered {

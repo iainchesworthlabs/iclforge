@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The conformance fixtures of planning/hearth-sink-screen.md on the device: the frames this build of
+ * The conformance fixtures of the sink screen on the device: the frames this build of
  * libs/sink gives for each fixture at fixed positions are the checked-in ones (the host's tests hold the
  * same file, `libs/sink/tests/lyric-frames/golden.txt`), the scripts the spec lists in tiers T1 to T4 are
  * drawn by the box's own faces and not as boxes, the length rule's steps are the ones the view uses, and

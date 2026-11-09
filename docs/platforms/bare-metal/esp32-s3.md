@@ -19,7 +19,7 @@ the float32 path worth having and real-time decode worth measuring.
 | Atmos bed | Correct, decoded bed-only via `DecoderConfig::skip_object_reconstruction`. 11 allocations per frame |
 | Atmos objects | **Correct, reconstructed on target.** 22 allocations per frame — see [Objects](#objects). **And placed**: the `eac3_atmos_render` row pans a height-object stream onto 7.1.4 through the block form, every level the host's — see [Placed on loudspeakers](#placed-on-loudspeakers) |
 | Encode | AC-3 and E-AC-3, six rows: 5.1 and 2/0 through each encoder, 2/0 with coupling, spectral extension and AHT, and 2/0 §E3.5 enhanced coupling - six frames of synthesised programme each, byte count and FNV-1a hash checked against `firmware/baremetal/encode_fixture.hpp`, peak heap per row. One substream at a time; see [Encoding](#encoding) for what does not fit |
-| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame) as D14c measured it; 2.0 in A-SPX mode took 1.03 to 1.09, 5.1 2.1 to 3.2 and 5.1.4 4.4 to 5.6. Since D14g (2026-10-11) the decoder's second core, and QIO flash, 64-byte data-cache lines, the code in PSRAM and a 64 KB data cache (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`), take 2.0 to 0.40 (SIMPLE) and 0.50 (A-SPX), the converter at every frame rate to 0.67 to 0.87, E-AC-3 7.1.4 to 0.75 and 5.1 in SIMPLE mode to 0.99, with the PCM unchanged (D14g; D14h's single precision A-CPL interpolation moved the PCM of streams with A-CPL and took 5.1 in A-CPL mode 3 to 1.44); in an image built without those two files, with the second core, 2.0 SIMPLE takes 0.80 and A-SPX 0.99 ([Playback speed](#playback-speed)). The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). With both files, the Sendspin sink lists `ac4` at 2 channels and 25 frames a second ([AC-4 from a server](#ac-4-from-a-server)) |
+| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame) as D14c measured it; 2.0 in A-SPX mode took 1.03 to 1.09, 5.1 2.1 to 3.2 and 5.1.4 4.4 to 5.6. Since D14g (2026-10-11) the decoder's second core, and QIO flash, 64-byte data-cache lines, the code in PSRAM and a 64 KB data cache (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`), take 2.0 to 0.40 (SIMPLE) and 0.50 (A-SPX), the converter at every frame rate to 0.67 to 0.87, E-AC-3 7.1.4 to 0.75 and 5.1 in SIMPLE mode to 0.99, with the PCM unchanged (D14g; D14h's single precision A-CPL interpolation moved the PCM of streams with A-CPL and took 5.1 in A-CPL mode 3 to 1.44); in an image built without those two files, with the second core, 2.0 SIMPLE takes 0.80 and A-SPX 0.99 ([Playback speed](#playback-speed)). The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4). With both files, the Sendspin sink lists `ac4` at 2 channels and 25 frames a second ([AC-4 from a server](#ac-4-from-a-server)) |
 | Standalone probe fits internal SRAM | Yes, without PSRAM. 195,025-byte peak heap (`eac3_atmos_render`; 194,655 with Atmos objects reconstructed, 173,794 for the 7.1.4 fixture folded to stereo, 167,386 as coded) against 304,680 free under QEMU on 2026-09-29. The board reported 316,196 free on 2026-09-11, when the peak was 237,206 — see [Memory](#memory) |
 | Retained after teardown | 12 bytes, one `__cxa_thread_atexit` record, the spectrum scratch's pointer; 23,552 bytes while §E3.5 is in use |
 | Audio output | Two examples drive real peripherals — see [Examples](#examples) |
@@ -259,7 +259,7 @@ and why the floor sits where it does.
 #### As a Sendspin sink
 
 `sdkconfig.sendspin`, over the hardware and PSRAM overlays, makes the example a Sendspin player on
-Wi-Fi ([the Hearth plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-reference-player.md), B3). It has:
+Wi-Fi. It has:
 
 - the Noise responder;
 - pairing by token, or by a code shown on the console and the page;
@@ -269,8 +269,6 @@ Wi-Fi ([the Hearth plan](https://github.com/iainchesworthlabs/iclforge/blob/main
   onto the board's layout. The player advertises `ac3` and `eac3` as its data types, and `ac4` too
   in an image built with the AC-4 decoder and the 64 KB data cache, at 2 channels and 25 frames a
   second ([AC-4 from a server](#ac-4-from-a-server)); the release image has no decoder and does not.
-  Phase I6 of
-  [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#i6-the-esp32-sinks).
 
 [An ESP32-S3 sink](../../hearth/sink-esp32-s3.md) sets a board up.
 
@@ -428,8 +426,7 @@ cost it about 0.2 ms; the other seven are from a plain build.)
 The instruction cache stayed at its default 16 KB for all of this, and in the
 probe that held. In the Hearth sink's network shape, where WiFi and the
 rest of the player run beside the decoder, it did not: at 32 KB a 7.1.4 frame
-decoded 3.1 ms faster folded to 2.0 and 3.8 ms faster onto twelve slots
-([7.1.4 in real time](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-714-realtime.md)).
+decoded 3.1 ms faster folded to 2.0 and 3.8 ms faster onto twelve slots.
 The probe has not been measured at 32 KB.
 
 ### Where the time went
@@ -686,9 +683,7 @@ line mode without a fold, the one fixture where line mode has work to do.
 
 On 2026-09-10 the E-AC-3 5.1 fold cost 3.2 ms here where the Cortex-M3
 leg counted 10% of the frame, and the sink folding 7.1.4 to stereo
-over WiFi fell behind
-([`planning/esp32-stream-set.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-stream-set.md),
-"On a board"). The
+over WiFi fell behind. The
 output stage had no stage-timer zones of its own. With zones inside
 `OutputStage::apply` and around both decoders' §7.7 gain, stage-timed on
 2026-09-11 in internal SRAM, a frame of `eac3_714_fold`:
@@ -782,9 +777,7 @@ The same comparison through `hearth_sink`, built from `main` and from
 this change and run one after the other on one board on 2026-09-11: the
 network shape (`sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram` with
 WiFi), the stream set's `714-walk.ec3` served over the LAN, 2.0 on the I2S
-sink in line mode - the play that fell behind in
-[`planning/esp32-stream-set.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-stream-set.md)'s
-"On a board":
+sink in line mode - the play that fell behind:
 
 | | Before | After |
 |---|---:|---:|
@@ -1073,8 +1066,7 @@ this part is the segments' own stage and the second pass - 4.8 ms and about
 between them - and what it costs on the five gold streams, decoded and
 compared with the source, is 0.01 dB on the worst channel of the two E-AC-3
 streams and nothing on the AC-3 ones: the race was already dropping the
-segments on most of their frames. [The arithmetic-tiers plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md)
-is where the axis this is the first point of is written down.
+segments on most of their frames.
 
 What the part cannot encode, measured on the host profile ([Building](../../building.md#what-the-encode-direction-costs)
 has the table): 5.1 with AHT (312,744 bytes) or standard coupling (289,202)
@@ -1124,8 +1116,7 @@ run, under QEMU on 2026-09-29.
   which is the shape the sink opens now (sixteen slots in all); a
   twelve-slot DMA queue competes with WiFi for
   internal RAM; and at 0.90x the second core stops being optional for anything
-  that decodes 7.1.4 and does something else
-  ([`planning/esp32-714-realtime.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-714-realtime.md)).
+  that decodes 7.1.4 and does something else.
 - **The second core** was the lever the earlier estimates ranked first. It was
   not needed for stereo or 5.1, and the breakdown says why it would have
   disappointed: the stages that dominated were serial software floating point,
@@ -1404,8 +1395,7 @@ its limit is memory, not time (see [ESP32-C6](esp32-c6.md)).
 ## AC-4
 
 The component's AC-4 decoder (`CONFIG_ICLFORGE_AC4`, in `float`) builds for this part and decodes
-correctly under QEMU, with its state in PSRAM (phase D14c of
-[`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)).
+correctly under QEMU, with its state in PSRAM (phase D14c).
 It ran on a board on 2026-10-10 (D14c's board phase, [On the board](#on-the-board)): its PCM is the
 host's and the P4's on every stream, and it keeps up with real time at 2.0 in SIMPLE mode and at no
 wider or more coded stream (D14g's [Playback speed](#playback-speed) moved that line).
@@ -1415,8 +1405,7 @@ wider or more coded stream (D14g's [Playback speed](#playback-speed) moved that 
 A decode does not fit internal RAM beside what else the part runs. When D14c measured it, the probe's
 2.0 fixtures peaked at 413,611 to 601,504 bytes of heap, where this part has 347,051 free and a
 largest block of 249,856, and 5.1.4 peaked at 1,800,312. D14f has since cut the `float` decoder's
-peaks to 286,365 to 418,110 bytes at 2.0, 696,375 to 859,616 at 5.1 and 1,494,319 at 5.1.4
-([`planning/ac4.md`, D14f](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14f-the-decoders-memory)).
+peaks to 286,365 to 418,110 bytes at 2.0, 696,375 to 859,616 at 5.1 and 1,494,319 at 5.1.4.
 Decision 29 planned 2.0 in internal RAM; the owner decided on 2026-10-03 that the decoder's state
 goes in PSRAM instead, and the CI row holds what is left in internal RAM.
 
@@ -1602,16 +1591,15 @@ go. 512 stays.
   integer where the decode is `float`, so decision 30's PIE kernel, which was to go where one kernel
   holds a stream back, has none to go to.
 - **That is accepted.** What the S3 cannot decode in real time reaches it as PCM from Hearth, as
-  decision 32 had it for the C6 ([decision 42](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10),
+  decision 32 had it for the C6 (decision 42,
   2026-10-10). How a sink says what it decodes is I6's. D14g's second core and memory fragments moved the line
-  ([Playback speed](#playback-speed), [decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)).
+  ([Playback speed](#playback-speed), decision 43).
 
 ### Playback speed
 
 Measured on 2026-10-10 and 11 on `hearth-eb2c64` (ESP32-S3 rev v0.2, 240 MHz, 8 MB octal PSRAM, 16 MB quad flash), `hearth_sink` as in
 [On the board](#on-the-board), Wi-Fi up, a null sink, the same plays. Every play of every configuration below, 40 for each of four images
-with the second core off and on, gives the PCM hash D14c's plays gave, which is the P4's and the host's. Phase D14g of
-[`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md): the decoder took 2.6 to 3.5 times the
+with the second core off and on, gives the PCM hash D14c's plays gave, which is the P4's and the host's. Phase D14g: the decoder took 2.6 to 3.5 times the
 P4's time on a part at two thirds of its clock, and the board's stage timers had it spread over the decode.
 
 **Where the time was.** The inverse transform took 27.9 ms of a 5.1 A-CPL mode 3 frame here and 4.9 on the P4, 5.7 times, where the
@@ -1649,7 +1637,7 @@ column has; the second table has every configuration with them. What each is, an
   top of the three above with both cores. It is made of 32 KB of the heap: a play starts with 62 KB of internal RAM free instead of
   95 and its least is 31 to 49 KB where it was 64 to 81. Wi-Fi and lwIP cannot live on a few kilobytes
   ([The decode stack goes in PSRAM](#the-decode-stack-goes-in-psram)). The owner decided on 2026-10-11 to spend it
-([decision 43](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-10-10)) in the
+(decision 43) in the
 images that carry the AC-4 decoder, and it stays its own file so that a build that needs the 32 KB back drops one line.
 An image without the decoder was no place for it: the release shape (E-AC-3 and AC-3, no AC-4) with the cache and the decode
 stack in PSRAM had 1,479 bytes of internal RAM free at the least in an E-AC-3 7.1.4 play, and the cache bought it nothing
@@ -1660,7 +1648,7 @@ internal RAM free at the end of the lap (S3b, 2026-10-29), and an E-AC-3 2.0 str
 
 `sdkconfig.s3-fast` has the first three (QIO, the lines, the code and constants in PSRAM) and `sdkconfig.s3-dcache` the fourth, each
 over `sdkconfig.psram` (and `sdkconfig.ac4` where the decoder is in); the second goes after the first. Since 2026-10-29 the S3 board's release
-image has the decoder and takes both ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md)).
+image has the decoder and takes both.
 
 **The second core.** The decoder's stages that are per channel or per slot run on both cores (the player's worker task is on the core
 the decode task is not on): each channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots and its three
@@ -1887,9 +1875,8 @@ minimum-footprint profile, `double` by default elsewhere, and selectable in any 
 `-DICLFORGE_DECODE_SCALAR=float`. Which profile a build is and which scalar its decoder carries
 are independent CMake axes. The option's third value, `fixed`, is the tier for a part with no FPU
 at all - an ESP32-C3 or C6 - and the one value the profile honours over its own `float`
-default; [docs/building.md](../../building.md#minimum-footprint-decoder-profile) and
-[`planning/arithmetic-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md)
-say what it is and what it measured. It is not this part's tier:
+default; [docs/building.md](../../building.md#minimum-footprint-decoder-profile)
+says what it is and what it measured. It is not this part's tier:
 the S3's FPU makes `float` the right arithmetic here. Since 2026-09-09 the arithmetic between the bitstream and those
 buffers — mantissa dequantisation, dither, coordinates, decoupling, spectral extension, the AHT
 and JOC's mixing — follows the same scalar; it had stayed `double`, which on this FPU is

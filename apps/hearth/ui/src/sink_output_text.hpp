@@ -6,8 +6,8 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "network_view.hpp"
 
-// What the Network page's "What the sink reports" panel says of how a sink's stream leaves it
-// (planning/hearth-android.md, D6): the extension role's `output` state, which a sink that passes the
+// What the Network page's "What the sink reports" panel says of how a sink's stream leaves it:
+// the extension role's `output` state, which a sink that passes the
 // coded bits on to a receiver (Hearth for Android) says "passthrough" and one that decodes says "pcm".
 //
 // Here, with no QObject of its own, as sink_lyrics_text.hpp is, so that a test reads what each state

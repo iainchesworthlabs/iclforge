@@ -225,7 +225,7 @@ class ClassPaths(Fixture):
 
 
 class SecondApp(Fixture):
-    """A second Android app that links the same audio backend (planning/hearth-android.md)."""
+    """A second Android app that links the same audio backend."""
 
     SECOND = "apps/hearth/android/app"
 

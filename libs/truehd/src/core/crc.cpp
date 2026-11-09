@@ -1,6 +1,9 @@
 #include "iclforge/truehd/core/crc.hpp"
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
 
 namespace iclforge::truehd {
 
@@ -89,6 +92,20 @@ std::uint8_t restart_header_crc(std::span<const std::byte> data, std::size_t fir
         last = static_cast<std::uint8_t>((last << 1U) | bit_at(data, bit));
     }
     return static_cast<std::uint8_t>(reg ^ last);
+}
+
+std::uint8_t block_header_crc(std::span<const std::byte> data, std::size_t first_bit,
+                              std::size_t end_bit) noexcept {
+    constexpr std::uint8_t kPoly = 0x1D;
+    std::uint8_t reg = 0xA2;
+    for (std::size_t bit = first_bit; bit < end_bit; ++bit) {
+        const bool top = (reg & 0x80U) != 0;
+        reg = static_cast<std::uint8_t>((reg << 1U) | bit_at(data, bit));
+        if (top) {
+            reg ^= kPoly;
+        }
+    }
+    return reg;
 }
 
 std::uint8_t substream_parity(std::span<const std::byte> payload) noexcept {

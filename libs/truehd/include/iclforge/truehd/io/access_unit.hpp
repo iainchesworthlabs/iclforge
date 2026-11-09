@@ -10,6 +10,7 @@
 
 #include "iclforge/truehd/core/error.hpp"
 #include "iclforge/truehd/core/format.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
 #include "iclforge/truehd/export.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
 
@@ -98,9 +99,22 @@ write_access_unit_prefix(const std::optional<MajorSync>& major_sync,
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::optional<ExtraData> read_extra_data(
     std::span<const std::byte> bytes);
 
+// The restart header of the first substream segment that opens with one (TH spec §7.1): none when
+// the unit has none, or when the header does not read. For a caller that wants a header's fields
+// (output_timing, TH spec §3.4) without decoding the unit.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::optional<RestartHeader> first_restart_header(
+    const AccessUnit& unit);
+
 // The unit's length in bytes from its first two bytes, 0 if there are fewer than two (TH spec
 // §3.3).
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::size_t access_unit_length_bytes(
+    std::span<const std::byte> data) noexcept;
+
+// The length in bytes of the AC-3 frame at the start of `data`, or 0 when none is there. A Blu-ray
+// TrueHD track carries the AC-3 core of the same programme between its access units: 48 kHz, an
+// A/52 sync word, a frame size code and a bit stream id of 8 or less. Nothing else is looked at, and
+// a frame that runs past `data` is not one.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::size_t ac3_core_frame_bytes(
     std::span<const std::byte> data) noexcept;
 
 }  // namespace iclforge::truehd

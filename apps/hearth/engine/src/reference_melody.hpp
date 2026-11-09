@@ -11,7 +11,7 @@
 #include "iclforge/pitch/reference.hpp"
 
 // The reference melody a singer's pitch is scored against, taken from the karaoke stream being
-// played (planning/karaoke-microphone.md, D9; findings F4).
+// played.
 //
 // An Annex C karaoke stream carries the tune as coded channels: the guide melody M where a centre
 // would be, and one or two vocals V1 and V2 where the surrounds would be (Table C.2.1). Decoded as

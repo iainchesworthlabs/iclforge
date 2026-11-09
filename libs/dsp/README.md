@@ -7,7 +7,7 @@ The signal processing more than one library uses: the FFT, the QMF bank, the off
 A library.
 
 - **Uses:** `base`
-- **Used by:** `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `hearth-sink`, `objects`, `tests`
+- **Used by:** `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `hearth`, `hearth-sink`, `objects`, `tests`
 - **CI lanes:** core
 - **CMake target:** `iclforge::dsp`
 

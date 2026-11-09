@@ -95,7 +95,7 @@ test('decodes the bundled Atmos-in-DD+ fixture with real, moving object position
 // the library's output stage reproduces (Annex C of ETSI TS 102 366). The same stream that
 // iclforge-forge-cli-tests probes as karaoke and `forge decode karaoke` reproduces, so what the
 // page does here is what the command line writes: a native decode of each of these is held against
-// this module's by hand (planning/karaoke-phase2.md, W8), and a mismatch would show as a frame
+// this module's by hand, and a mismatch would show as a frame
 // that is not the library's.
 const KARAOKE_EXAMPLE = path.resolve(
     __dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.ac3');

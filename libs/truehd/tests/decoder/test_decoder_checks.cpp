@@ -33,6 +33,7 @@ struct Spec {
     bool data_check = false;
     // The block_data_bits field of the first block, when it is not the right value.
     std::optional<std::uint32_t> block_data_bits;
+    bool wrong_crc = false;  // the first block's block header CRC with one bit flipped
     std::vector<int> block_sizes{kBuiltBlockSize};
     int trailing_zero_bits = 0;
     std::optional<FilterSpec> fir;
@@ -77,9 +78,13 @@ std::vector<std::byte> segment_of(const Spec& spec, std::size_t* bits_before_pad
             writer.put(1, 1);  // block_header_exists
             writer.put(0, 1);  // no restart header
         }
-        write_block_header(writer, context, block);
+        BitWriter header_bits;
+        write_block_header(header_bits, context, block);
+        const std::uint8_t header_crc =
+            block_header_crc(header_bits.bytes(), 0, header_bits.bit_count());
+        writer.append(header_bits);
         if (spec.data_check) {
-            const std::uint32_t right = body_bits(size) + 16U;
+            const std::uint32_t right = body_bits(size);
             writer.put((b == 0 && spec.block_data_bits) ? *spec.block_data_bits : right, 16);
         }
         for (int i = 0; i < size; ++i) {
@@ -88,7 +93,7 @@ std::vector<std::byte> segment_of(const Spec& spec, std::size_t* bits_before_pad
             }
         }
         if (spec.data_check) {
-            writer.put(0, 8);  // block_data_crc: not checked
+            writer.put((b == 0 && spec.wrong_crc) ? header_crc ^ 1U : header_crc, 8);
         }
         writer.put(b + 1 == spec.block_sizes.size() ? 1 : 0, 1);  // last_block_in_segment
     }
@@ -178,7 +183,7 @@ TEST_CASE("block_data_bits is checked against the data, from the start of its ow
           "[truehd][decoder][checks]") {
     Spec spec;
     spec.data_check = true;
-    // The right value is the data plus the 16 bits of the field (ERRATA.md entry 21).
+    // The right value is the bits of the data and not those of the field (TH spec §8.1).
     require_decodes(spec, kBuiltBlockSize);
     auto good = decode_one(spec, Strictness::kStrict);
     REQUIRE(good.has_value());
@@ -190,7 +195,7 @@ TEST_CASE("block_data_bits is checked against the data, from the start of its ow
         }
     }
 
-    const std::uint32_t right = body_bits(kBuiltBlockSize) + 16U;
+    const std::uint32_t right = body_bits(kBuiltBlockSize);
     for (const std::uint32_t wrong : {right - 16U, right - 1U, right + 1U, right + 16U}) {
         CAPTURE(wrong);
         spec.block_data_bits = wrong;
@@ -206,6 +211,26 @@ TEST_CASE("block_data_bits is checked against the data, from the start of its ow
     // A length above 16000 bits is refused whatever the data (TH spec §8.1).
     spec.block_data_bits = 16001;
     require_refused(spec, ErrorKind::kBadBlockData);
+}
+
+TEST_CASE("the block header CRC follows the data and covers the block header",
+          "[truehd][decoder][checks]") {
+    Spec spec;
+    spec.data_check = true;
+    // Two blocks, the second without a restart header: its CRC covers its own header bits only.
+    spec.block_sizes = {kBuiltBlockSize, kBuiltBlockSize};
+    require_decodes(spec, 2 * kBuiltBlockSize);
+
+    spec.wrong_crc = true;
+    require_refused(spec, ErrorKind::kBadBlockData);
+    DecoderCounters counters;
+    auto lenient = decode_one(spec, Strictness::kLenient, &counters);
+    REQUIRE(lenient.has_value());
+    CHECK(lenient->has_value());
+    CHECK(counters.check_failures == 1);
+
+    // A register that starts at 0xA2 and takes no bit stays at 0xA2 (a block without a header).
+    CHECK(block_header_crc({}, 0, 0) == 0xA2);
 }
 
 TEST_CASE("data after the last block of a segment is refused in strict mode",

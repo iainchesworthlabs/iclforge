@@ -15,7 +15,7 @@ using audio::BitstreamFormat;
 
 // Whether `endpoint` will carry `stream` as it is. Never AC-4: Hearth sends
 // AC-4 as a bitstream only over the extension role, to sinks that decode it,
-// and decodes it for every local output (planning/ac4.md, I2), no receiver
+// and decodes it for every local output, no receiver
 // having been found that takes it.
 [[nodiscard]] bool carries_native(const EndpointFacts& endpoint,
                                    std::optional<BitstreamFormat> stream) {
@@ -44,8 +44,8 @@ using audio::BitstreamFormat;
            request.transcode_available;
 }
 
-// TrueHD and MLP, which this player decodes and never sends as they are or to a network sink
-// (planning/truehd-parity-hearth-player.md, H5 and H6): the name to say, and empty for any other.
+// TrueHD and MLP, which this player decodes and never sends as they are or to a network sink:
+// the name to say, and empty for any other.
 [[nodiscard]] std::string_view lossless_name(ItemCodec codec) {
     switch (codec) {
         case ItemCodec::kTruehd: return "TrueHD";
@@ -280,8 +280,8 @@ OutputChoice choose_output(const OutputRequest& request) {
                 .endpoint_name = {},
                 .group_name = request.group_name,
                 .reason = fmt::format(
-                    "Playing to the group \"{}\". Sending {} to a network sink as it is is not "
-                    "available, so it is decoded here and each sink is sent PCM.",
+                    "Playing to the group \"{}\". {} goes as it is to each sink that decodes it and "
+                    "is decoded here, and sent as PCM, for each that does not.",
                     request.group_name, lossless_name(request.codec))};
         }
         if (request.group_ready) {
@@ -365,7 +365,7 @@ OutputChoice choose_output(const OutputRequest& request) {
         }
         const bool want_ac3 = request.pinned == OutputMode::kBitstreamAsAc3;
         // AC-3 already is AC-3. E-AC-3 needs the transcode, and AC-4, which
-        // Hearth decodes for every output here (planning/ac4.md, I2), has none.
+        // Hearth decodes for every output here, has none.
         const bool needs_transcode = want_ac3 && *request.stream != BitstreamFormat::kAc3;
         const bool transcodes =
             *request.stream == BitstreamFormat::kEac3 && request.transcode_available;

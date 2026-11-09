@@ -51,6 +51,16 @@ class Board final : public iclforge::prefs::Backend {
         return true;
     }
 
+    [[nodiscard]] iclforge::nowview::IdleView idle_view() const override { return settings().idle_view; }
+
+    [[nodiscard]] bool set_idle_view(iclforge::nowview::IdleView view) override {
+        if (!settings_set_idle_view(view)) {
+            return false;
+        }
+        panel_set_idle_view(view);
+        return true;
+    }
+
     // Network. Only a board with both a cable and Wi-Fi has a choice; the call returns at once and the work is done on
     // a task of its own (network_set_preference), which the board keeps only once the interface holds an address.
     [[nodiscard]] std::string network_preference() const override {
@@ -177,7 +187,7 @@ class Board final : public iclforge::prefs::Backend {
         return sound_set_trim_text(statements).empty();
     }
 
-    // Late night (planning/hearth-late-night.md): stored, and the Sendspin player follows from the next stream.
+    // Late night: stored, and the Sendspin player follows from the next stream.
     [[nodiscard]] bool late_night() const override {
         return settings().dynamic_range == iclforge::ac3::DynamicRange::kLateNight;
     }

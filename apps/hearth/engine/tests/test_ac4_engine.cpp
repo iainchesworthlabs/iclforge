@@ -39,7 +39,7 @@
 #include "session.hpp"
 #include "stream_decoder.hpp"
 
-// The Hearth engine's AC-4 path (planning/ac4.md, phase I2): an AC-4 item
+// The Hearth engine's AC-4 path: an AC-4 item
 // opened by Session, decoded by StreamDecoder through iclforge::ac4::Decoder's public API
 // alone, rendered onto the output layout, and played by Player.
 //
@@ -185,8 +185,8 @@ Played play_item(const std::vector<std::byte>& bytes, const iclforge::render::Ou
 
 // iclforge::ac4::Decoder's own decode() of `bytes` with `config`, each channel on the
 // slot of `layout` at its speaker's location, and a frame that waits for an
-// I-frame as silence of its length. A presentation with objects (planning/
-// ac4.md, I5) renders them the same way place_ac4_frame() (stream_decoder.cpp)
+// I-frame as silence of its length. A presentation with objects renders them the same way
+// place_ac4_frame() (stream_decoder.cpp)
 // does - through Ac4ObjectRenderer, at config.output.downmix - so this stays a
 // meaningful, independently-computed check of what the engine now does with
 // them, not just of the channels beside them.
@@ -268,8 +268,7 @@ constexpr std::size_t kFrom = 6 * kFrame;
 constexpr std::size_t kTo = 28 * kFrame;
 constexpr double kToleranceDb = 0.01;
 
-// The values the tone stream carries for the controls to read (planning/
-// ac4.md, "One control for both formats").
+// The values the tone stream carries for the controls to read.
 constexpr double kDialnorm = -24.0;
 constexpr double kLoroCentreDb = -1.5;
 constexpr double kLoroSurroundDb = -4.5;
@@ -1151,7 +1150,7 @@ TEST_CASE("hearth ac4: an AC-4 item joins an E-AC-3 one in the same output", "[h
     CHECK(player.history()[1].first_frame == player.history()[0].frames);
 }
 
-// --- Objects (planning/ac4.md, I5) ----------------------------------------------------
+// --- Objects ----------------------------------------------------
 
 TEST_CASE("hearth ac4: a presentation with objects is rendered through Ac4ObjectRenderer",
           "[hearth][ac4]") {

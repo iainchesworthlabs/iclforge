@@ -3,8 +3,8 @@
 and the notices for what it ships.
 
 The archive cpack produces for the `hearth` component (cmake/Packaging.cmake)
-is Hearth's release asset - the desktop reference player
-(planning/hearth-reference-player.md, phase A7). Its failure mode is not an
+is Hearth's release asset - the desktop reference player.
+Its failure mode is not an
 empty file - it is a plausible-looking archive holding hearth.exe with no
 Qt beside it, which installs and then does not start, because the Qt deploy
 script (apps/hearth/ui/CMakeLists.txt) was filed under the wrong CPack

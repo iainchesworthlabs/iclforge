@@ -310,7 +310,7 @@ TEST_CASE("output decision: no outputs at all, and an item that cannot be bitstr
 
 TEST_CASE("output decision: an AC-4 item is decoded here whatever is pinned",
           "[hearth][output-decision][ac4]") {
-    // planning/ac4.md, I2: AC-4 decodes to PCM for every output of this
+    // I2: AC-4 decodes to PCM for every output of this
     // machine, and no IEC 61937 link carries it, even to a receiver that takes
     // AC-3 - AC-4 is not transcoded - or to one that says it takes E-AC-3.
     const std::vector<EndpointFacts> endpoints{receiver("Onkyo", /*eac3=*/true, /*ac3=*/true,
@@ -369,7 +369,7 @@ TEST_CASE("output decision: every mode and capability source describes itself",
     }
 }
 
-// TrueHD and MLP (planning/truehd-parity-hearth-player.md, H1): decoded here for every output,
+// TrueHD and MLP: decoded here for every output,
 // and the decision says by name why it is not sent as it is.
 TEST_CASE("output decision: a TrueHD item is decoded here, and the reason says passthrough of it is not available",
           "[hearth][output-decision][truehd]") {
@@ -426,7 +426,7 @@ TEST_CASE("output decision: a TrueHD item pinned to a bitstream output is decode
 }
 
 // ---------------------------------------------------------------------------------------------
-// TrueHD as MAT to a local output (planning/truehd-parity-hearth-player.md, H6) and the fallback
+// TrueHD as MAT to a local output and the fallback
 // chain when it cannot be (H8). Every platform is "not run" (mat_status.hpp), and the decision says
 // so; a test stands in for a platform that has been run.
 // ---------------------------------------------------------------------------------------------
@@ -439,7 +439,7 @@ using iclforge::hearth::MatPlatformStatus;
 using iclforge::hearth::MatRun;
 using iclforge::truehd::Presentation;
 
-EndpointFacts mat_receiver(std::string name, PassthroughBackend backend = PassthroughBackend::kAlsa,
+EndpointFacts mat_receiver(std::string name, PassthroughBackend backend = PassthroughBackend::kWasapi,
                            std::uint16_t channels = 8, bool is_default = false) {
     EndpointFacts facts = receiver(std::move(name), /*eac3=*/true, /*ac3=*/true, is_default);
     facts.channels = channels;
@@ -462,7 +462,7 @@ MatPlatformStatus every_platform_run(PassthroughBackend backend) {
 
 }  // namespace
 
-TEST_CASE("output decision: every platform's MAT output is not run, and says what it does instead",
+TEST_CASE("output decision: only the platforms a receiver has named TrueHD through are run",
           "[hearth][output-decision][truehd]") {
     for (const auto backend :
          {PassthroughBackend::kAlsa, PassthroughBackend::kPipeWire, PassthroughBackend::kWasapi,
@@ -470,8 +470,12 @@ TEST_CASE("output decision: every platform's MAT output is not run, and says wha
         const MatPlatformStatus status = iclforge::hearth::mat_status(backend);
         // This is the table the owner's rule is kept in: a platform becomes "run" in the same
         // commit as the page that records a run that passed on a receiver, and this test changes
-        // with it. Until then no platform may claim it.
-        CHECK(status.run == MatRun::kNotRun);
+        // with it. Run on 2026-11-01, Raspberry Pi 4B into an Onkyo TX-RZ740: ALSA and PipeWire;
+        // on 2026-11-04, an NVIDIA Shield Pro through Hearth for Android into it: Android.
+        const bool run = backend == PassthroughBackend::kAlsa ||
+                         backend == PassthroughBackend::kPipeWire ||
+                         backend == PassthroughBackend::kAndroid;
+        CHECK(status.run == (run ? MatRun::kRun : MatRun::kNotRun));
         CHECK(status.backend == backend);
         CHECK_FALSE(status.basis.empty());
     }
@@ -485,7 +489,7 @@ TEST_CASE("output decision: a platform not run is decoded here and the reason sa
     CHECK_FALSE(choice.stream.has_value());
     CHECK(mentions(choice.reason, "takes TrueHD (MAT)"));
     CHECK(mentions(choice.reason, "has not been run against a receiver"));
-    CHECK(mentions(choice.reason, "ALSA"));
+    CHECK(mentions(choice.reason, "WASAPI"));
     CHECK(mentions(choice.reason, "Pin Bitstream"));
     // The decode still states the presentation it plays.
     CHECK(choice.presentation == Presentation::k8ch);
@@ -504,6 +508,12 @@ TEST_CASE("output decision: a platform that has been run gets the stream as MAT 
     // A run that passed leaves nothing to warn about.
     CHECK_FALSE(mentions(choice.reason, "not been run"));
     CHECK_FALSE(choice.presentation.has_value());
+
+    // The real table: a run on ALSA is chosen unprompted, the same endpoint on WASAPI is not.
+    const std::vector<EndpointFacts> alsa = {mat_receiver("Receiver", PassthroughBackend::kAlsa)};
+    CHECK(choose_output(truehd_request(alsa)).mode == OutputMode::kBitstream);
+    const std::vector<EndpointFacts> wasapi = {mat_receiver("Receiver", PassthroughBackend::kWasapi)};
+    CHECK(choose_output(truehd_request(wasapi)).mode == OutputMode::kLocalPcm);
 
     // The output that does not take MAT is passed over for the one that does.
     const std::vector<EndpointFacts> two = {receiver("Soundbar", true, true), mat_receiver("Receiver")};
@@ -615,7 +625,7 @@ TEST_CASE("output decision: the fallback presentation is the output's stated wid
     CHECK_FALSE(choose_output(ac3).presentation.has_value());
 }
 
-TEST_CASE("output decision: a TrueHD item sent to a group is decoded here and each sink is sent PCM",
+TEST_CASE("output decision: a TrueHD item sent to a group goes as it is to a sink that decodes it, and as PCM to the rest",
           "[hearth][output-decision][truehd]") {
     using iclforge::hearth::ItemCodec;
     const std::vector<EndpointFacts> endpoints{analogue("Speakers", 2, true)};
@@ -628,7 +638,7 @@ TEST_CASE("output decision: a TrueHD item sent to a group is decoded here and ea
     CHECK(choice.mode == OutputMode::kNetworkGroup);
     CHECK(choice.group_name == "Living room");
     CHECK(mentions(choice.reason, "TrueHD"));
-    CHECK(mentions(choice.reason, "not available"));
+    CHECK(mentions(choice.reason, "goes as it is to each sink that decodes it"));
     CHECK(mentions(choice.reason, "PCM"));
     // The sentence an item of another codec gets, that the stream travels, is not said.
     CHECK_FALSE(mentions(choice.reason, "what travels is the stream"));

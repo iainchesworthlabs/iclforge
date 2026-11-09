@@ -14,13 +14,13 @@
 #include "iclforge/wall_clock.hpp"
 
 // The control surface: a few HTTP verbs over the player, for the ESP-IDF
-// integrator whose controller is not Home Assistant. planning/esp32-player.md
-// (Control) says why it is REST here and a media_player entity on ESPHome.
+// integrator whose controller is not Home Assistant. It is REST here and a
+// media_player entity on ESPHome.
 //
 //   GET  /            a web page that shows what the player is doing and drives
 //                     it through the routes below and nothing else, with its
 //                     script at GET /ui.js. Both are sent from flash as the
-//                     component embeds them (planning/esp32-device-ui.md).
+//                     component embeds them.
 //   GET  /api         the routes, as text
 //   GET  /status      what is playing and how it is going, as JSON
 //   GET  /hardware    what this board IS - the chip, its revision, whether it
@@ -28,8 +28,8 @@
 //                     firmware running on it - as JSON, gathered once at
 //                     startup rather than on every request: unlike /status,
 //                     nothing in it changes while the board runs.
-//                     planning/esp32-device-ui.md says why this is a route of
-//                     its own rather than part of /status.
+//                     That is why this is a route of its own rather than
+//                     part of /status.
 //   POST /play        body: the location to play - a URL for the HTTP source,
 //                     a path for a file source. 202 when accepted (the owner
 //                     opens it on its own task; /status says how that went),
@@ -59,7 +59,7 @@
 // board with a Sendspin player: the listener's own level and distance for each speaker, and a test tone out of each in turn.
 //
 // And updates over the network, which Control hands to the owner's Firmware
-// (firmware.hpp, planning/esp32-ota.md): GET and PUT /firmware, PUT
+// (firmware.hpp): GET and PUT /firmware, PUT
 // /firmware/mode and /firmware/rollback, and POST /restart. In flash mode
 // every route that would play something or change a setting answers 409.
 //
@@ -312,7 +312,7 @@ struct ControlHandlers {
 
     // GET and PUT /now-playing and /dim-after: what a board with a screen shows
     // while a song with no lyrics plays, and when that screen dims
-    // (iclforge/now_view.hpp, planning/p4x-now-playing.md). A board with no
+    // (iclforge/now_view.hpp). A board with no
     // screen leaves all four empty, and the routes answer that it has none.
     // set_now_playing is handed one of "speakers", "title", "clock" or "off";
     // false means this build cannot show that view (or the setting could not
@@ -324,13 +324,19 @@ struct ControlHandlers {
     std::function<std::string()> dim_after;
     std::function<bool(int minutes)> set_dim_after;
     // GET and PUT /speakers-style: how that screen's speakers show a level, "glow" or "pulse"
-    // (iclforge/now_view.hpp, planning/p4x-speakers-options.md). Empty on a board with no screen, as the
+    // (iclforge/now_view.hpp). Empty on a board with no screen, as the
     // four above. set_speakers_style is handed one of the two words; false means it could not be stored.
     // It acts at once, with no restart.
     std::function<std::string()> speakers_style;
     std::function<bool(std::string_view style)> set_speakers_style;
+    // GET and PUT /idle-view: what the waiting screen (nothing playing, the board set up) does once the dim time has passed
+    // with nothing touched, "lit", "dim", "clock" or "dark" (iclforge/now_view.hpp). Empty
+    // on a board with no screen. set_idle_view is handed one of the four words; false means it could not be stored (or,
+    // for a board with no clock, that "clock" is not one it can do). It acts at once, with no restart.
+    std::function<std::string()> idle_view;
+    std::function<bool(std::string_view view)> set_idle_view;
 
-    // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): GET and PUT
+    // What a person chose for the screen of a board that has one: GET and PUT
     // /brightness, the backlight's lit level in percent (iclforge/now_view.hpp: 10 to 100, handed to the setter
     // already read), and GET and PUT /clock-format, 24 or 12 hours with or without seconds (iclforge/wall_clock.hpp).
     // A board with no screen leaves all four empty and the routes answer that it has none. set_brightness is false
@@ -347,7 +353,7 @@ struct ControlHandlers {
     std::function<bool(const nowview::NightSchedule& night)> set_night;
 
     // GET and PUT /dynamic-range: how much of a Dolby stream's dynamic range the listener wants
-    // (iclforge/base/dynamic_range.hpp, planning/hearth-late-night.md). dynamic_range answers with
+    // (iclforge/base/dynamic_range.hpp). dynamic_range answers with
     // the words a PUT takes, "standard" or "late-night"; set_dynamic_range is handed one of them
     // and stores it, and the decoder follows from the next stream's start. A board that decodes
     // none of the Dolby codecs leaves both empty, and the routes answer that it has nothing to
@@ -355,7 +361,7 @@ struct ControlHandlers {
     std::function<std::string()> dynamic_range;
     std::function<bool(std::string_view range)> set_dynamic_range;
 
-    // The board's time of day (iclforge/wall_clock.hpp, planning/p4x-now-playing.md, stage 3), on every board that
+    // The board's time of day (iclforge/wall_clock.hpp), on every board that
     // keeps one: GET and PUT /timezone, /ntp-server and /time-sync, GET /time-zones and GET /status's "time". A board
     // that keeps no time (no network, or QEMU's) leaves them all empty, and the routes answer that it has none. Each
     // setter is handed what the route has already read as the setting (wallclock::parse_zone_choice and the like: an
@@ -452,7 +458,7 @@ struct ControlHandlers {
     // leaves the routes answering that the board takes no updates. The owner
     // keeps it alive for as long as Control runs.
     Firmware* firmware = nullptr;
-    // The routes of an update from GitHub releases (firmware_pull.hpp, planning/esp32-ota.md, O10):
+    // The routes of an update from GitHub releases (firmware_pull.hpp):
     // GET /firmware/available, POST /firmware/check, PUT /firmware/from-release and PUT
     // /firmware/channel. Null answers that the board takes no firmware updates.
     FirmwarePull* firmware_pull = nullptr;

@@ -363,8 +363,8 @@ TEST_CASE("wide frame, fixed frame, one line: every channel count from 1 to sixt
 TEST_CASE("wide frame: a TDM line's DMA queue holds its channels, not the sixteen slots it clocks",
           "[io][sink_plan]") {
     // The queue the P4's sink asks for: 3,072 frames (12 descriptors of 256 in the profile, 64 ms
-    // at 48 kHz) at 4 bytes a 32-bit slot. Internal RAM: the figures planning/karaoke-p4x-panel.md
-    // quotes for a 2.0, a 5.1 and a 9.1.6 layout.
+    // at 48 kHz) at 4 bytes a 32-bit slot. Internal RAM: the figures for a
+    // 2.0, a 5.1 and a 9.1.6 layout.
     constexpr std::size_t kQueueFrames = 12 * 256;
     constexpr std::size_t kSlotBytes = 4;
     const auto queue_bytes = [](std::size_t channels, SinkFrame frame) {

@@ -6,7 +6,7 @@
 
 #include "lvgl.h"
 
-// What differs between a panel and none (planning/karaoke-p4x-panel.md, D1): the display LVGL draws
+// What differs between a panel and none: the display LVGL draws
 // on, and the pointer it is touched with. CMake builds display_dsi.cpp (a MIPI DSI panel and its
 // touch controller) or display_null.cpp (a frame buffer in PSRAM), and the rest of the panel is the
 // same code for both, which is what makes what a board with no screen measures a measure of the one
@@ -37,13 +37,13 @@ bool display_open(Display& out);
 void display_set_backlight(int percent);
 
 // The three levels the screen asks for (set_backlight in board_info.hpp): lit, and what it goes down to when
-// the no-lyrics screen dims (planning/p4x-now-playing.md), the lowest at which the one line of the dark screen can
+// the no-lyrics screen dims, the lowest at which the one line of the dark screen can
 // still be read at arm's length in a dark room, and off. They are names for a level, not the percent the glass is
 // given: the lit one is whatever the person set as the brightness (iclforge::nowview::kDefaultBrightness unless
 // they did), and the dimmed one is the floor, never above it (iclforge::nowview::backlight_percent).
 inline constexpr int kBacklightNormalPercent = 80;
 inline constexpr int kBacklightDimPercent = 4;
-// The dark view (planning/p4x-now-playing.md): the backlight off, for a listener who wants no light.
+// The dark view: the backlight off, for a listener who wants no light.
 inline constexpr int kBacklightOffPercent = 0;
 
 // The percent the backlight is given for a level the screen asked for, with the person's brightness applied: what

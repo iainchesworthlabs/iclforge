@@ -1,5 +1,5 @@
-// The AC-4 encoder's average and variable bit rates (planning/ac4.md, phase
-// E5): frames whose sizes follow their content, an average-rate stream whose
+// The AC-4 encoder's average and variable bit rates: frames whose sizes follow their content, an
+// average-rate stream whose
 // decoder input buffer never holds more than Part 1 clause 6.2.4 sets or runs
 // dry, checked frame by frame from the stream alone for a decoder that starts
 // at any frame, and the rate Part 2 Annex B's br_code sequence carries.

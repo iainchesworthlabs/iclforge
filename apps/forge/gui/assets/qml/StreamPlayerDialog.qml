@@ -8,7 +8,7 @@ import ForgeGui
 // "Open stream" — the GUI twin of `forge monitor` (play an already-encoded
 // file's decoded bed through an ordinary output) fused with `forge decode`'s
 // export (a WAV of the bed, and for an Atmos or an AC-4 object stream one WAV
-// per decoded object - planning/ac4.md, I5). Open → decode → real transport, the same
+// per decoded object). Open → decode → real transport, the same
 // "distinct surface, reachable from the header" shape QcDialog.qml/
 // ObjectInspectorDialog.qml already use, for the identical reason: this
 // reads a stream that already exists, with no plan, no source and no
@@ -21,6 +21,9 @@ import ForgeGui
 Dialog {
     id: root
     objectName: "streamPlayerDialog"
+
+    // Asked for by the Encode TrueHD… button: the window opens the encode dialog (Main.qml).
+    signal encodeTruehdRequested()
 
     modal: true
     anchors.centerIn: parent
@@ -40,8 +43,10 @@ Dialog {
     FileDialog {
         id: spFileDialog
         objectName: "spFileDialog"
-        title: qsTr("Choose an AC-3 / E-AC-3 stream")
+        title: qsTr("Choose an AC-3, E-AC-3, AC-4 or TrueHD stream")
         nameFilters: [qsTr("AC-3 / E-AC-3 (*.ac3 *.ec3)"), qsTr("AC-4 (*.ac4)"),
+                      qsTr("TrueHD / MLP (*.thd *.mlp)"),
+                      qsTr("TrueHD in a container (*.mkv *.mp4 *.m4a *.m2ts *.ts)"),
                       qsTr("All files (*)")]
         onAccepted: StreamPlayerController.openFile(selectedFile)
     }
@@ -91,6 +96,14 @@ Dialog {
                 color: Theme.text
             }
             Button {
+                objectName: "spEncodeTruehdButton"
+                text: qsTr("Encode TrueHD…")
+                onClicked: {
+                    root.close();
+                    root.encodeTruehdRequested();
+                }
+            }
+            Button {
                 objectName: "spCloseButton"
                 text: qsTr("Close")
                 onClicked: root.close()
@@ -99,7 +112,7 @@ Dialog {
         Text {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Decodes an already-encoded AC-3/E-AC-3 file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.")
+            text: qsTr("Decodes an already-encoded AC-3, E-AC-3, AC-4 or TrueHD file and plays its decoded bed through an ordinary output — like every other decode in this window, an Atmos stream plays its 5.1 bed here, not unmixed objects (see Inspect objects for those). Export writes the decode to a WAV, and for an Atmos stream one WAV per object.")
             font.pixelSize: Theme.fontSmall
             color: Theme.neutral700
         }

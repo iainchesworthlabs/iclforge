@@ -4,7 +4,7 @@
 const path = require('path');
 const { defineConfig } = require('@playwright/test');
 
-// The ESP32 player's web page (planning/esp32-device-ui.md), on this harness's
+// The ESP32 player's web page, on this harness's
 // package, lockfile and Chromium - the WASM demos' - rather than a second
 // browser-test stack. Two projects:
 //

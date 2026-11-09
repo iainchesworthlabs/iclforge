@@ -575,6 +575,20 @@ struct Engine::Impl {
         // stopped one started again inherited the cleared flag, never
         // enumerated, and sat in "none" whatever the machine had.
         want_reprobe.store(true, std::memory_order_release);
+        // The same goes for an answer the last run's final probe left behind.
+        // The loop joins that probe on the way out, after its last pass over
+        // the results, so a probe still in flight at stop() - the watcher
+        // saw a device change, or reprobe() was called, as the engine was
+        // stopped - lands here with nobody to apply it. Started again, the
+        // next first pass would apply it, to a fresh stage, as the machine's
+        // first probe: the endpoints of the last run, and for a run that
+        // ended refused, none. start() would hand that back as this run's
+        // refusal whatever the machine has now. The probe thread is joined,
+        // so nothing writes this while it is cleared.
+        {
+            const std::lock_guard<std::mutex> lock(probe_mutex);
+            probe_result.reset();
+        }
         signing_status = signing.load(config.signing_key_path);
         build_encoder();
         note("engine started: " + std::to_string(config.low_latency ? 1 : iclforge::ac3::kBlocksPerFrame) + "-block frames, " +
@@ -801,7 +815,11 @@ struct Engine::Impl {
 
             const auto encode_start = std::chrono::steady_clock::now();
             ICLFORGE_ZONE_BEGIN(encode_zone, "encode");
-            auto unit = encoder->encode_frame(views, placements);
+            // The bed's own LFE rides beside the fifteen objects, not in them:
+            // an object cannot reach the LFE alone (lfe_send scales by the
+            // object's gain, which also pans it), and a tap's LFE is not an
+            // object. bed.lfe is sized to the frame, as encode_frame requires.
+            auto unit = encoder->encode_frame(views, placements, bed.lfe);
             ICLFORGE_ZONE_END(encode_zone);
             const double encode_ms = std::chrono::duration<double, std::milli>(
                                          std::chrono::steady_clock::now() - encode_start)

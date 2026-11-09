@@ -16,8 +16,8 @@
 #include "performance.hpp"
 #include "take_recorder.hpp"
 
-// A singer's microphone, from the person turning it on to what it heard (planning/karaoke-
-// microphone.md, M4): the input, a level meter, the loss of the device, and a Performance against
+// A singer's microphone, from the person turning it on to what it heard: the input, a level meter,
+// the loss of the device, and a Performance against
 // the reference once there is one. Qt-free and clockless: the caller says what time it is, so a
 // test runs it as fast as it likes and the window runs it from a timer.
 //
@@ -107,8 +107,8 @@ class MicrophoneSession {
     void set_offset_ms(std::int64_t ms);
     void set_score_options(const pitch::ScoreOptions& options);
 
-    // A take: the dry voice, mono, kept as a file until end_take() (planning/karaoke-microphone.md,
-    // M6). Only while the microphone is open; closing the microphone ends it, and keeps what was
+    // A take: the dry voice, mono, kept as a file until end_take(). Only while the microphone is
+    // open; closing the microphone ends it, and keeps what was
     // written. `partial` carries what the caller knows (the item, the reference, the headphones
     // answer); the alignment and where the take starts in the item are filled in here.
     [[nodiscard]] std::expected<void, std::string> begin_take(const std::filesystem::path& file,
@@ -135,7 +135,7 @@ class MicrophoneSession {
 
     [[nodiscard]] MicrophoneSnapshot snapshot() const;
 
-    // What a view of the performance is drawn from (planning/karaoke-microphone.md, M5). All of it
+    // What a view of the performance is drawn from. All of it
     // is empty or null until a reference has been read and the microphone is open.
     //
     // The counts for [start_ms, end_ms) of the item: a line's result.

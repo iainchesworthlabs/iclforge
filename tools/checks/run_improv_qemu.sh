@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Gives hearth_sink a network over Improv Wi-Fi under QEMU, and plays to the
-# Sendspin player it starts once it has one (planning/hearth-reference-player.md,
-# B2 and B4).
+# Sendspin player it starts once it has one.
 #
 # A board with no network listens for Improv on its console. QEMU has no radio,
 # so two images stand in for one board, each booted from a copy (QEMU writes

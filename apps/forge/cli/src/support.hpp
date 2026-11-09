@@ -154,9 +154,15 @@ struct Options {
     // 'decode', 'levels' and 'loudness' of TrueHD and MLP only: the substreams to read (best, 2ch,
     // 6ch, 8ch or all; empty is best), and whether a failed check is counted instead of stopping.
     std::string truehd_presentation;
+    // decode of a TrueHD Atmos stream: the speaker layout to place the objects on instead of writing
+    // the channels of substream 3 (an iclforge::render::OutputLayout name or list); empty: none.
+    std::string truehd_render;
     bool truehd_lenient = false;
+    // `decode truehd-reading=`: the other reading of a point the specification leaves open, for
+    // scoring a provisional reading (libs/truehd/ERRATA.md question 101); empty is the library's.
+    std::string truehd_reading;
     // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
-    // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without
+    // exit with kExitInput, after writing what it could decode. Without
     // it such a decode exits 0 and warns where it always did.
     bool strict = false;
     // 'truehd-encode' only: iclforge::truehd::EncoderConfig's choices. Unset means the encoder's
@@ -166,6 +172,15 @@ struct Options {
         std::optional<int> restart_units;             // truehd-restart=
         std::optional<std::uint32_t> peak_rate_kbps;  // truehd-peak-rate=
         bool rate_lenient = false;                    // truehd-rate-check=lenient
+        // truehd-bitrate=: the bitrate the stream is held to over 75 ms (the encoders), or the rate
+        // the arrival model runs at (probe detail=rate; the declared peak rate when unset).
+        std::optional<std::uint32_t> bitrate_kbps;
+        bool shape = false;                   // truehd-rate-mode=shape (truehd-atmos only)
+        std::optional<int> shape_bits;        // truehd-shape-bits=
+        std::optional<int> major_sync_units;  // truehd-major-sync=
+        // truehd-evo-frames= (truehd-atmos only): which of the metadata frames get an evolution
+        // frame. N > 0: every N-th (1 is all, the default), 0: none, -1: the first only.
+        int evo_stride = 1;
         std::optional<int> fir_order;                 // truehd-fir-order=
         bool matrix = true;                           // truehd-matrix=
         unsigned stereo_mode = 0;  // truehd-stereo-mode=: stereo, ltrt, headphone
@@ -173,6 +188,10 @@ struct Options {
         std::optional<std::array<double, 4>> downmix_gains;
     };
     TruehdEncode thdenc{};
+    // 'truehd-atmos' only: truehd-bed= (the 7.1 bed as a WAV; empty: rendered from the objects) and
+    // truehd-objects-lfe= (the first channel of the objects WAV is the LFE; the default).
+    std::string thd_bed_path;
+    bool thd_objects_lfe = true;
     // 'truehd-encode' and 'metadata' of TrueHD: the channel meaning of TH spec §14.1 the line names,
     // per presentation (2, 6 and 8 channels): dialogue norm, mix level, source format, the
     // control-enabled bit, and the two DRC start-up gains. Unset members are not touched.
@@ -182,8 +201,7 @@ struct Options {
     // syntax trace to this path - one line per syntax element the encoder
     // wrote or the decoder read, frame, substream, bit offset, width, value
     // and name, tab-separated, in the shape tools/references/ac4_syntax.py's
-    // `trace` command writes, so the three can be compared line by line
-    // (planning/ac4.md, the encoder's ladder, item 1).
+    // `trace` command writes, so the three can be compared line by line.
     std::string syntax_trace_path;
     // 'ac4-encode' only: codec-mode=, "auto" (or empty), "simple", "aspx",
     // "aspx-acpl-1", "aspx-acpl-2", "aspx-acpl-3", "scpl", "aspx-scpl" or
@@ -457,6 +475,9 @@ struct Options {
     // pin=<hex> (repeatable): a certificate by SHA-1 or SHA-256 fingerprint.
     std::vector<std::string> trust_anchors;
     std::vector<std::string> pins;
+    // trust-key=<path> (repeatable): a P-256 public key (PEM "PUBLIC KEY" or DER) the operator
+    // trusts to sign; a chain whose leaf carries it is anchored.
+    std::vector<std::string> trust_keys;
     // expect-publisher-uuid=<UUID> (repeatable): the publisher accounts the operator accepts. A
     // signature naming another is a finding in ac4-verify and a refusal in verify-content. CS spec
     // v2.6 §5.3: the UUID is not in the signing certificate, so without this it is only reported.
@@ -544,6 +565,8 @@ struct Options {
     // always done them.
     std::string take_layout;
     std::optional<iclforge::ac3::plan::Codec> take_codec;
+    // record codec=truehd: a lossless TrueHD take (audio_io.cpp), which is not a plan::Codec.
+    bool take_truehd = false;
     // 'record'/'live' only: how long the capture device may deliver nothing
     // before the session stops as a failure rather than sitting there
     // reading "running" (iclforge::audio::SilenceWatchdog, the same class and the
@@ -982,9 +1005,8 @@ void warn_associated_not_mixed(const Options& meta, std::string_view command,
 void warn_karaoke_not_applied(const Options& meta, std::string_view command,
                               std::string_view why);
 
-// karaoke given with an AC-4 stream: Annex C is AC-3's (and, by analogy, E-AC-3's:
-// planning/karaoke-eac3.md), AC-4 has no karaoke mode, and the reproduction is not
-// applied. The words `decode` uses for the same case.
+// karaoke given with an AC-4 stream: Annex C is AC-3's (and, by analogy, E-AC-3's), AC-4 has
+// no karaoke mode, and the reproduction is not applied. The words `decode` uses for the same case.
 void warn_karaoke_not_ac3(const Options& meta, std::string_view codec);
 
 // karaoke given to `spatial`, which places an E-AC-3 stream's objects and decodes
@@ -1013,7 +1035,7 @@ void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
 [[nodiscard]] bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
                                       const iclforge::ac3::DecodedFrame& frame);
 
-// The same question of an assembled E-AC-3 programme (planning/karaoke-eac3.md, D1 to D3): the
+// The same question of an assembled E-AC-3 programme: the
 // decoder's own rule, iclforge::ac3::is_karaoke_programme(), says whether it is one independent
 // substream flagged karaoke with no object layer, and the stage's channel count says whether
 // the reproduction changed anything.

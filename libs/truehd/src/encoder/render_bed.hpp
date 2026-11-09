@@ -1,0 +1,112 @@
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <span>
+#include <vector>
+
+#include "encoder/render_plan.hpp"
+#include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/encoder/bed_pan.hpp"
+#include "iclforge/truehd/encoder/object_paths.hpp"
+
+// The render rule of the object encoder: where an element sits, how much of it each row of the 7.1
+// bed gets, and the matrices that carry those shares (libs/truehd/notes/
+// feature-truehd-atmos-encoder-render.md). Everything here is a pure function of its arguments.
+//
+// An element's place is a room position as the object metadata has it (TS 103 420 §4.2.1: x 0 at
+// the left wall to 1 at the right, y 0 at the front wall to 1 at the back, z -1 at the floor to +1
+// at the ceiling). The legacy 7.1 bed has no height, so a high element is panned by its floor place
+// alone; with the measured law (the default) its height only enters the trim, and with the two
+// older laws it plays at full level, the rule libs/render states for a target without an upper layer.
+
+namespace iclforge::truehd::detail {
+
+// What the metadata says about an element for a stretch of time: the place the render and the
+// object metadata writer share, and the gain the element's signal already carries (1.0 when the
+// objects' gains are mixed into the signal, as cluster_elements does).
+struct ElementPlacement {
+    double x = 0.5;
+    double y = 0.5;
+    double z = 0.0;
+    double gain = 1.0;
+};
+
+// The bed rows in stream order, and the LFE's, which no panning reaches.
+inline constexpr int kBedLfeRow = 3;
+
+// How a place becomes shares of the bed's rows. kRing pans by azimuth on the 7.1 ring, which is
+// what libs/render does on the decode side. kWall is fitted to the 7.1 presentation of the owner's
+// DEE controls ctl_e and ctl_k (notes, "Fourth reading"): the place is projected from the middle
+// of the room onto its walls, and between two neighbouring speakers on a wall the shares are the
+// cosine and sine of the position along it (constant power, linear in the wall's coordinate). On a
+// wall it agrees with those streams to about 0.03; inside the room it is only the projection, which
+// the streams (ctl_j, ctl_l spread an interior place over three or four speakers) do not support.
+//
+// kMeasured is the rule read off the 7.1 presentation of the owner's DEE controls
+// (iclforge/truehd/encoder/bed_pan.hpp): the place is rounded to the metadata's 6 bit code, split
+// between the rows of speakers and then along each row by cos and sin, and a trim of up to -1.5 dB
+// (7.1) is applied by its distance from the front wall and its height. It is the default; the other
+// two are kept for the tests that hold them to libs/render and to the first fit.
+enum class PanLaw : std::uint8_t {
+    kRing,
+    kWall,
+    kMeasured,
+};
+
+// Where the speaker of a bed row sits on the room's wall: the place whose azimuth is the speaker's
+// own (30 degrees for L, 0 for C, 90 for Ls, 150 for Lrs, mirrored on the right), so that
+// pan_to_bed of it puts the whole signal on that row. Row 3 (the LFE) is at the centre of the
+// front wall, which has no direction of its own.
+[[nodiscard]] ElementPlacement bed_speaker_placement(int row) noexcept;
+
+// The share of the 8 bed rows an element at (x, y, z) has. By the ring law: constant-power pairwise
+// panning on the 7.1 ring (L 30, C 0, R -30, Ls 90, Rs -90, Lrs 150, Rrs -150 degrees,
+// counter-clockwise from the front), height ignored; the squares of the shares add up to 1 and a
+// place at the exact centre of the room has no direction and is rendered at the front. By the
+// measured law: see bed_pan.hpp, with the trim of the 7.1 layout, so the squares add up to
+// 10^(-0.15 * w) at most. The LFE row is 0.
+[[nodiscard]] std::array<double, kRenderBedRows> pan_to_bed(
+    double x, double y, double z = 0.0, PanLaw law = PanLaw::kMeasured) noexcept;
+
+// The gains of the free elements (8 and up) into the bed rows, for elements placed as given:
+// gain[row][k] = pan_to_bed(placement k)[row] times the placement's gain. Elements beyond
+// `free_elements.size()` get 0.
+[[nodiscard]] BedMixGains mix_gains(std::span<const ElementPlacement> free_elements,
+                                    PanLaw law = PanLaw::kMeasured) noexcept;
+
+// The plan for elements placed at the boundaries of sections: boundary s is the first sample of
+// section s, so there is one more boundary than there are sections, and `placements[s][k]` is the
+// place of the free element 8 + k there. A section's gains run in a straight line from the boundary
+// that opens it to the one that closes it. `section_samples` is the length of every section but
+// the last, which ends at `total_samples`.
+[[nodiscard]] RenderPlan build_render_plan(
+    int elements, std::int64_t section_samples, std::int64_t total_samples,
+    std::span<const std::vector<ElementPlacement>> placements, PanLaw law = PanLaw::kMeasured);
+
+// The gains at one sample of the stream: the plan's trajectory in a straight line from the
+// boundary before the sample to the one after it. Held at the first and last boundary outside.
+[[nodiscard]] BedMixGains gains_at(const RenderPlan& plan, std::int64_t sample) noexcept;
+
+// A mix gain as the wire carries a coefficient: gain * 2^frac_bits rounded to nearest, in the
+// range of a signed coefficient of frac_bits + 2 bits. Gains are 0 to 1, so only a gain a little
+// above 1 can clip.
+[[nodiscard]] std::int32_t quantise_mix_gain(double gain, int frac_bits) noexcept;
+
+// The plan as the encoder takes it (EncoderConfig::object_paths): one path for each free element k,
+// for the object 8 + k, with a knot at every section boundary holding round(gain * 2^16) into each
+// bed row. Straight lines between the knots, so the trajectory is the plan's. A gain beyond the
+// encoder's +-1.98 is held at it. Free elements the plan has no gain for (past its elements) get
+// no path.
+[[nodiscard]] std::vector<ObjectPath> object_paths_of(const RenderPlan& plan);
+
+// The matrices of the 8 bed rows for one set of gains, in row order: bed row j becomes the row it
+// holds less the share of each coded element (own coefficient +1.0, -gain on row 8 + k, frac_bits
+// 12 so that +1.0 is 4096). A row whose shares all quantise to 0 has no matrix. `noise_shift` is
+// the matrices' (0 draws none). The flip of row 8 and the LSB bypass of the owner's streams are not
+// here: they belong to the chain the matrix side builds (object_bed.hpp), which puts these after
+// them.
+[[nodiscard]] std::vector<MatrixSpec> bed_mix_matrices(const BedMixGains& gains, int elements,
+                                                       int noise_shift);
+
+}  // namespace iclforge::truehd::detail

@@ -232,7 +232,7 @@ struct SourceLayout {
 // layouts without a dependent substream do; E-AC-3 carries every one. AC-4 takes
 // what its encoder takes from a plan: mono, stereo and 5.1. It has no dual mono,
 // ac4-encode codes 7.0 and 7.1 only as an experimental option, and immersive
-// layouts wait for the encoder's immersive element (planning/ac4.md, E8). A
+// layouts wait for the encoder's immersive element. A
 // channel list that is 5.0 reaches AC-4 through validate().
 // clang-format off
 [[nodiscard]] constexpr bool carries(Codec codec, LayoutId id) {

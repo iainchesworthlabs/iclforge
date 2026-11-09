@@ -137,32 +137,76 @@ jobs:
       # being eight downloads every time - including on a re-run, which
       # previously refetched the lot, since RUNNER_TEMP does not survive a job.
       #
-      # Keyed on verify_fate_interop.py because that file IS the corpus: the
-      # sample list and every SHA-256 pin live in it. Any re-pin therefore
-      # misses the cache and refetches, which is the required direction. It
-      # also misses on an unrelated edit to the same file (a floor, a note),
-      # and that is the intended trade - a digest of just the pins would need a
-      # step of its own to compute and could only ever save a rare refetch.
-      #
       # Restoring a cache cannot weaken the gate: fetch_sample() re-hashes
       # every file it finds on disk against the pin and refetches on a
       # mismatch, so a truncated or tampered cache entry is repaired, never
       # trusted. The pin is verified on a cache hit exactly as on a fresh
-      # download.
+      # download. That is also what makes a restore from an older revision of
+      # the script safe: a re-pinned sample no longer matches and is fetched on
+      # its own, and every sample that did not change is reused.
       #
-      # That same re-hash is what makes the bare restore-keys prefix safe, and
-      # worth having: an inexact restore hands the job a corpus keyed to some
-      # earlier revision of the script, where a re-pinned sample no longer
-      # matches. It is refetched, individually, and every sample that did not
-      # change is reused - so changing one pin costs one download rather than
-      # eight, which is the whole point of caching a volunteer-run archive.
-      - name: Cache the pinned FATE corpus
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # What the cache must be is COMPLETE, and it used to be neither
+      # guaranteed nor repairable. The one key was
+      # fate-corpus-<hash of verify_fate_interop.py>, saved whenever it was not
+      # an exact hit. A run in an archive outage saved whatever had arrived
+      # (on 2026-11-08, 244 KB of the 1.2 MB corpus); every later run on that
+      # script hit it exactly, saved nothing, and went back to the archive for
+      # the rest - so the cache kept standing in for a corpus it did not hold,
+      # until it was evicted and the nightly runs failed with 8 of 8 samples
+      # unchecked. Now:
+      #
+      #   * `verify_fate_interop.py --cache-status` audits the directory against
+      #     the pins (deleting anything that fails them) and says how many of the
+      #     samples it holds. It runs after the restore and again after the
+      #     decode.
+      #   * A COMPLETE set is saved, once, as fate-corpus-v2-complete-... - and
+      #     only when what was restored was not already complete. A complete
+      #     cache is the end state: it is restored, found complete, and left
+      #     alone, so a steady state writes nothing and the entry cannot churn.
+      #   * An incomplete set is saved, as fate-corpus-v2-partial-..., only when
+      #     it holds MORE samples than what was restored, so an outage run
+      #     keeps what arrived and a retry builds on it, but a run that learned
+      #     nothing does not add an entry.
+      #   * A restore takes the newest COMPLETE entry (this revision of the
+      #     script's, else any revision's - the pins are re-checked per sample
+      #     either way), and only then the newest partial one. A partial entry
+      #     can never shadow a complete one, which is what the old single key
+      #     got wrong.
+      #
+      # Entries are immutable and named by run, so a bad one is not stuck: the
+      # next run saves a newer one and the newest wins. All of them together are
+      # about 1.2 MB, the actions cache is capped at 10 GB for the whole
+      # repository, and GitHub drops the least recently used entries first: the
+      # nightly run reads this one daily, which keeps it recent, and if it is
+      # evicted regardless the next run that reaches the archive rebuilds it.
+      #
+      # Restored and saved as separate steps (the same action's /restore and
+      # /save, at the same pinned commit) because the one-step form saves only
+      # when the whole job succeeds. An archive outage fails the job, so nothing
+      # fetched before it was ever kept. A cache is readable from the default
+      # branch and from the branch that made it, not between pull requests, so
+      # it is main's nightly run that does the seeding.
+      #
+      # The samples are excerpts of copyrighted films. They live in the actions
+      # cache of a private repository and nowhere else: not in the tree, not an
+      # artifact, not a release asset.
+      - name: Restore the pinned FATE corpus
+        id: fate-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/fate-samples
-          key: fate-corpus-${{ hashFiles('tools/checks/verify_fate_interop.py') }}
+          key: fate-corpus-v2-restore-${{ hashFiles('tools/checks/verify_fate_interop.py') }}
           restore-keys: |
-            fate-corpus-
+            fate-corpus-v2-complete-${{ hashFiles('tools/checks/verify_fate_interop.py') }}-
+            fate-corpus-v2-complete-
+            fate-corpus-v2-partial-${{ hashFiles('tools/checks/verify_fate_interop.py') }}-
+            fate-corpus-v2-partial-
+
+      - name: Audit the restored FATE corpus
+        id: fate-before
+        env:
+          FATE_CACHE_DIR: ${{ runner.temp }}/fate-samples
+        run: python3 tools/checks/verify_fate_interop.py --cache-status >> "$GITHUB_OUTPUT"
 
       # The corpus lands under RUNNER_TEMP, never in the workspace: these are
       # excerpts of copyrighted films, and nothing should be able to sweep them
@@ -171,7 +215,36 @@ jobs:
         env:
           ICLFORGE_CLI: build/config-linux-llvm/bin/forge
           FATE_CACHE_DIR: ${{ runner.temp }}/fate-samples
+          # The archive is volunteer-run and has been down for days, failing
+          # every pull request for something none of them changed. A pull
+          # request checks what it can fetch or has cached and says what it
+          # could not, as a warning; the nightly and manual runs stay strict,
+          # so an outage is still seen, once a day, where it can be acted on.
+          FATE_TOLERATE_UNREACHABLE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
         run: python3 tools/checks/verify_fate_interop.py
+
+      - name: Audit the FATE corpus to save
+        id: fate-after
+        if: always()
+        env:
+          FATE_CACHE_DIR: ${{ runner.temp }}/fate-samples
+        run: python3 tools/checks/verify_fate_interop.py --cache-status >> "$GITHUB_OUTPUT"
+
+      - name: Save the complete FATE corpus
+        if: always() && steps.fate-after.outputs.complete == 'true' && steps.fate-before.outputs.complete != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fate-samples
+          key: fate-corpus-v2-complete-${{ hashFiles('tools/checks/verify_fate_interop.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save the partial FATE corpus
+        if: always() && steps.fate-after.outputs.complete != 'true' && steps.fate-after.outputs.have != '0' && steps.fate-after.outputs.have != steps.fate-before.outputs.have
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fate-samples
+          key: fate-corpus-v2-partial-${{ hashFiles('tools/checks/verify_fate_interop.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # The DASH half of the same question. forge fmp4's manifests used to be
       # read back through FFmpeg's dash demuxer and nothing else, and that

@@ -2746,8 +2746,8 @@ TEST_CASE("MP4 refuses protected files laid out like Dolby's OTT reference audio
           "[mp4][reader][protected]") {
     using namespace iclforge::containers::mp4;
 
-    // The protection layout of the audio in Dolby's public OTT streams (planning/
-    // cenc-conformance.md, M13), in four small files from tools/generators/
+    // The protection layout of the audio in Dolby's public OTT streams, in four small files from
+    // tools/generators/
     // gen_cenc_reader_fixtures.py --set dolby-ott. What the reader does not read, it must step
     // over: a 'senc' with a subsample map or with no entries, a 'saiz' with a size table or a
     // count of 0, the PIFF uuid copy of the 'senc', PlayReady and Widevine 'pssh' boxes in

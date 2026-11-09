@@ -1,5 +1,5 @@
-// The AC-4 encoder at every frame rate of Part 1 Table 83 (planning/ac4.md,
-// phase E5): the decoder reads each stream with the encoder's trace, decodes
+// The AC-4 encoder at every frame rate of Part 1 Table 83: the decoder reads each stream with the
+// encoder's trace, decodes
 // each frame to the sample count the encoder gives it, and the tones in the
 // input come out at their level.
 
@@ -428,7 +428,7 @@ TEST_CASE("frame rates the sample rate does not have are refused", "[ac4][encode
 TEST_CASE(
     "over 100 000 frames at each frame rate every frame decodes to the samples counted for it",
     "[ac4][encoder][frame-rate][.long]") {
-    // Hidden, run on demand (planning/ac4.md, phase E5's exit): 98 wraps of
+    // Hidden, run on demand: 98 wraps of
     // sequence_counter, from 1 020 to 1, each keeping the phase Part 2 clause
     // 5.11 locks the frame lengths to. Mono silence in pieces, each frame
     // decoded as it comes; every rate on its own thread.

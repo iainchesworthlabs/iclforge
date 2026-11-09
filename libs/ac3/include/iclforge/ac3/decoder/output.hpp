@@ -202,8 +202,7 @@ struct OutputConfig {
     // KaraokeReproduction. FrameDecoder knows a frame is karaoke from its own
     // bsmod and acmod; Eac3Decoder from a programme's, for one independent
     // substream with no dependent substream and no object layer (the
-    // specification defines no E-AC-3 reproduction: planning/karaoke-eac3.md,
-    // D1 to D3).
+    // specification defines no E-AC-3 reproduction).
     KaraokeReproduction karaoke = KaraokeReproduction::kOff;
     // The listener's choice of vocals under kCapable; read for no other mode.
     KaraokeVocals karaoke_vocals = KaraokeVocals::kBoth;
@@ -352,7 +351,7 @@ struct MixLevels {
 // wire at all - falls back on -3 dB for the centre and -3 dB for the surrounds in
 // Lo/Ro, which is what Dolby's decoder folds such a stream at, and not on the AC-3
 // defaults above (-4.5 and -6 dB): those stand in for an AC-3 bsi with no level to
-// read, and an E-AC-3 bsi has none to fall back on (planning/karaoke-eac3.md, D10).
+// read, and an E-AC-3 bsi has none to fall back on.
 // Lt/Rt keeps §7.8.2's -3 dB, and an absent group is not zero.
 [[nodiscard]] ICLFORGE_AC3_EXPORT MixLevels mix_levels(const std::optional<meta::MixMetadata>& mix);
 

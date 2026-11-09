@@ -552,7 +552,7 @@ TEST_CASE("decoder settings: mode/downmix/dual-mono/objects/joc-domain/concealme
               .toStdString() == "line");
 }
 
-// --- AC-4's own decoder settings (planning/ac4.md, I2; DecoderAc4.qml) -------
+// --- AC-4's own decoder settings -------
 
 TEST_CASE("decoder settings: AC-4's own controls round-trip through the map",
           "[hearth][hearth-controller]") {
@@ -911,15 +911,17 @@ TEST_CASE("output_device_row: id/name/channels/speakers/rates/passthrough flags 
     CHECK(rates.at(1).toUInt() == 96000u);
     CHECK(row.value(QStringLiteral("supportsAc3")).toBool());
     CHECK_FALSE(row.value(QStringLiteral("supportsEac3")).toBool());
-    // Not a TrueHD output, and no platform has a run behind it.
+    // Not a TrueHD output. Whether this build's platform has a run behind it is mat_status()'s.
+    const bool run_here = iclforge::hearth::mat_status(iclforge::audio::passthrough_backend()).run ==
+                          iclforge::hearth::MatRun::kRun;
     CHECK_FALSE(row.value(QStringLiteral("supportsMat")).toBool());
-    CHECK_FALSE(row.value(QStringLiteral("matRun")).toBool());
+    CHECK(row.value(QStringLiteral("matRun")).toBool() == run_here);
 
     device.supports_mat_passthrough = true;
     const QVariantMap mat_row = iclforge::hearth::ui::output_device_row(device);
     CHECK(mat_row.value(QStringLiteral("supportsMat")).toBool());
-    // Opening the link is not a run: the row stays "not run" until mat_status() says otherwise.
-    CHECK_FALSE(mat_row.value(QStringLiteral("matRun")).toBool());
+    // Opening the link is not a run: matRun is the platform's, whatever the device does.
+    CHECK(mat_row.value(QStringLiteral("matRun")).toBool() == run_here);
 }
 
 // --- media_info_to_map() (the composite) -----------------------------------
@@ -1288,7 +1290,7 @@ TEST_CASE("media_info_to_map: an E-AC-3 karaoke programme is karaoke to the deco
           "independent substream with no objects",
           "[hearth][hearth-controller][karaoke]") {
     // The decoder reproduces a flagged programme when it is one independent substream and carries no
-    // object layer (ac3::is_karaoke_programme, planning/karaoke-eac3.md, D3); the page needs to know the
+    // object layer (ac3::is_karaoke_programme); the page needs to know the
     // difference between that and a programme that is only flagged.
     iclforge::hearth::MediaInfo info;
     MediaProgramme alone;
@@ -1449,7 +1451,7 @@ TEST_CASE("decoder_changes_from_sink_request: only a member of the group being p
     CHECK(ui::decoder_changes_from_sink_request(pending, QStringLiteral("g1")).isEmpty());
 }
 
-// --- TrueHD and MLP (planning/truehd-parity-hearth-player.md, H3) ------------
+// --- TrueHD and MLP ------------
 
 TEST_CASE("queue_row: a TrueHD or MLP item reads its codec off the facts, since it has no bitstream format",
           "[hearth][hearth-controller][truehd]") {
@@ -1530,6 +1532,32 @@ TEST_CASE("decoder settings: the TrueHD presentation and strictness round-trip, 
     settings.truehd.presentation = iclforge::truehd::Presentation::kAll;
     CHECK(iclforge::hearth::ui::decoder_settings_to_map(settings)
               .value(QStringLiteral("truehdPresentation")).toString().toStdString() == "best");
+
+    // Which track of a file with several plays: automatic unless it is chosen, and kept by a map
+    // that does not carry it.
+    DecoderSettings track;
+    CHECK(iclforge::hearth::ui::decoder_settings_to_map(track).value(QStringLiteral("track")).toString() ==
+          QStringLiteral("automatic"));
+    for (const auto choice : {iclforge::hearth::TrackPreference::kBest,
+                              iclforge::hearth::TrackPreference::kCompressed,
+                              iclforge::hearth::TrackPreference::kAutomatic}) {
+        track.track = choice;
+        const QVariantMap map = iclforge::hearth::ui::decoder_settings_to_map(track);
+        CHECK(iclforge::hearth::ui::decoder_settings_from_map(map, DecoderSettings{}).track == choice);
+    }
+    DecoderSettings chosen;
+    chosen.track = iclforge::hearth::TrackPreference::kCompressed;
+    CHECK(iclforge::hearth::ui::decoder_settings_from_map(QVariantMap{}, chosen).track ==
+          iclforge::hearth::TrackPreference::kCompressed);
+    QVariantMap unknown;
+    CHECK(iclforge::hearth::ui::decoder_settings_to_map([] {
+              DecoderSettings s;
+              s.track = iclforge::hearth::TrackPreference::kBest;
+              return s;
+          }()).value(QStringLiteral("track")).toString() == QStringLiteral("truehd"));
+    unknown.insert(QStringLiteral("track"), QStringLiteral("nonsense"));
+    CHECK(iclforge::hearth::ui::decoder_settings_from_map(unknown, chosen).track ==
+          iclforge::hearth::TrackPreference::kAutomatic);
 
     // A map that carries neither key keeps the base's.
     DecoderSettings base;

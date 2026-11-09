@@ -3,8 +3,8 @@
 Why. FFmpeg 6.1 writes `enca` and `tenc` for AC-3 and E-AC-3 but leaves the samples clear and the
 `senc` empty, and cannot put AC-4 in an MP4 at all, so it cannot make a protected Dolby fixture.
 GPAC's `MP4Box -crypt` can, but not the layouts a packager uses for a clear lead-in or a key
-rotation. This script writes those. It exists to make test input for the work planned in
-planning/cenc-conformance.md; nothing in the library reads it.
+rotation. This script writes those. It exists to make test input for the work planned on
+protected Dolby audio; nothing in the library reads it.
 
 What it is not. The scheme rules below are written from memory, not from ISO/IEC 23001-7, which this
 project does not hold. They are checked only by agreement with other implementations: GPAC 2.2.1
@@ -28,8 +28,8 @@ a crypt:skip pattern), cbcs (AES-CBC with a pattern and a constant IV, so no `se
 Profiles (--profile):
   plain             the layout above
   dolby-ott         the protection layout of Dolby's public OTT reference streams (the Spott test
-                    app's DASH and HLS audio), as planning/cenc-conformance.md section 6, M13
-                    measured it, for `cenc` and `cbcs` of an E-AC-3 or AC-4 input:
+                    app's DASH and HLS audio), as measured from them, for `cenc` and `cbcs`
+                    of an E-AC-3 or AC-4 input:
                     E-AC-3   whole sample protected. `cenc`: tenc v0, 8-byte IV, `saiz` with the
                              default size 8, `senc` flags 0, and the PIFF uuid copy of the `senc`
                              after it. `cbcs`: tenc v1 with a 16-byte constant IV and pattern 0:0
@@ -87,7 +87,7 @@ CONSTANT_IV = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
 COMMON_SYSTEM_ID = bytes.fromhex("1077efecc0b24d02ace33c1e52e2fb4b")
 WIDEVINE_SYSTEM_ID = bytes.fromhex("edef8ba979d64acea3c827dcd51d21ed")
 # PlayReady's SystemID and the Microsoft PIFF SampleEncryptionBox usertype, as the boxes of Dolby's
-# public OTT reference streams carry them (planning/cenc-conformance.md, M13).
+# public OTT reference streams carry them.
 PLAYREADY_SYSTEM_ID = bytes.fromhex("9a04f07998404286ab92e65be0885f95")
 PIFF_SENC_USERTYPE = bytes.fromhex("a2394f525a9b4f14a2446c427c648df4")
 # Clear lead of each AC-4 sample in the dolby-ott profile, in turn: within the 14 to 29 bytes that

@@ -1,7 +1,7 @@
 // The lyric screen on a computer (see CMakeLists.txt): lyric_screen.cpp, as the board runs it, fed a
 // document and a position instead of the Sendspin player, drawn by LVGL's software renderer into a
-// 1024 by 600 buffer and written as one 24-bit BMP a scenario. The scenarios are the screens of
-// planning/karaoke-p4x-panel.md, "The screens", S1 to S9.
+// 1024 by 600 buffer and written as one 24-bit BMP a scenario. The scenarios are the panel's
+// screens, S1 to S9.
 
 #include <algorithm>
 #include <cstdint>
@@ -50,7 +50,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// The display the screen is drawn on: the kit's 1024 by 600 for the screens of planning/karaoke-p4x-panel.md, and
+// The display the screen is drawn on: the kit's 1024 by 600 for the panel's screens, and
 // then each size the Adjust and Preferences sheets are checked at (open_display()).
 int g_width = 1024;
 int g_height = 600;
@@ -667,6 +667,9 @@ void say_no_title() {
     g_title_position.reset();
 }
 
+// A TrueHD 7.1 stream as the sink reports it: the A/52 mode it derives (3/2, with the LFE), and the eight channels it counted.
+const iclforge::nowview::StreamFacts kTrueHdSevenOne = {.codec = iclforge::nowview::Codec::kTruehd, .have_decoder = true, .acmod = 7,
+                                                        .lfe = true, .channels = 8};
 const std::vector<Level> kStereo = {{-9, -19}, {-11, -21}};
 const std::vector<Level> kFiveOne = {{-10, -19}, {-14, -24}, {-11, -20}, {-28, -37}, {-26, -35}, {-16, -27}};
 const std::vector<Level> kFiveOneNoCentre = {{-10, -19}, {-120, -120}, {-11, -20}, {-27, -36}, {-26, -35}, {-16, -27}};
@@ -1040,7 +1043,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
     return failures;
 }
 
-// The display and time preferences at one size (planning/p4x-preferences.md), driven by taps the way a person does:
+// The display and time preferences at one size, driven by taps the way a person does:
 // the brightness steps, the clock's hours and seconds are chosen, the night schedule is a switch and a pair of times in
 // an editor of its own, and the time zone a region and then a city. Each editor is held to what the sheet is held to
 // (audit()). The sheet is open, for the kit. Returns the number of failures, having said each.
@@ -1272,7 +1275,7 @@ int check_display_and_time(lv_obj_t* prefs, int width, int height, const fs::pat
     return failures;
 }
 
-// --- Sound: the Identify speakers button and the Speakers sheet (planning/hearth-speaker-trim-identify.md) --------------------
+// --- Sound: the Identify speakers button and the Speakers sheet --------------------
 
 namespace st = iclforge::render::speaker_trim;
 
@@ -1695,7 +1698,7 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     return failures;
 }
 
-// The Adjust and Preferences sheets at one display size (planning/p4x-preferences.md): drawn for the kit and for a
+// The Adjust and Preferences sheets at one display size: drawn for the kit and for a
 // board whose screen has no touch, held to a fingertip's size and to text that is not cut off (audit()), and driven by
 // taps the way a person does. Returns the number of failures, having said each.
 // Every touch target under `root` can be brought onto the glass: scrolled to, it is on the screen and inside every box
@@ -2052,7 +2055,8 @@ int check_layout_sheet(int width, int height, const fs::path& out, const std::st
     return failures;
 }
 
-// The Meters view at a display size, in each room the product has (planning/p4x-meters-view.md): the representation the rule gives for
+// The Meters view at a display size, in each room the product has: the representation the rule
+// gives for
 // the width and the room's outputs, twenty updates a second, no fall to ten, and the pixels LVGL flushes a second, which is what keeps
 // the invalid-area table at 256 honest: with LVGL's 32 every spectrum update redraws the whole glass (11 to 12 million pixels a second
 // at 1024 by 600), and a change that lost the 256 would show here as a number several times the bound. One picture a room.
@@ -2201,6 +2205,29 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         expect(shows_text(player::panel::screen_footer_object(), "Line ", true), "the footer says which line is being sung");
         expect(shows_text(player::panel::screen_footer_object(), "Delay +0 ms"), "and the lyric delay");
     }
+
+    // The same song with a TrueHD stream behind it: where the chips leave room the footer names the stream, and where they leave
+    // none (the kit's width) it says nothing of it and the lyric chips are as they were. Never a name cut off.
+    play_room("5.1", kTrueHdSevenOne, kFiveOne, 5200, "Music Assistant (d5369777-music-assistant)");
+    hold(lrc, 5'750);
+    g_now_us += 1'000'000;
+    pump(6);
+    write_bmp(out / ("footer-stream-" + size + ".bmp"));
+    failures += audit(player::panel::screen_footer_object(), "footer with a stream " + size);
+    const bool named = shows_text(player::panel::screen_footer_object(), "Dolby TrueHD", true);
+    if (width >= 960) {
+        expect(!named, "the kit's footer has no room for the stream's name under lyrics, and does not cut it off");
+        expect(shows_text(player::panel::screen_footer_object(), "Line ", true) &&
+                   shows_text(player::panel::screen_footer_object(), "Delay +0 ms"),
+               "and its lyric chips are where they were");
+    } else if (width >= 800) {
+        expect(named && shows_text(player::panel::screen_footer_object(), "Dolby TrueHD 7.1", true),
+               "an 800 px footer has room after the board's name and names the stream, 7.1 as the decoder counted it");
+    }
+    g_now_playing = false;
+    hold(lrc, 5'750);
+    g_now_us += 1'000'000;
+    pump(6);
 
     // Adjust: the lyric delay and the text size, and nothing else.
     expect(tap_button("Adjust"), "the footer has an Adjust button");
@@ -2351,7 +2378,7 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         pump(6);
     }
 
-    // The night schedule (planning/p4x-preferences.md): by the board's own time, the no-lyrics view goes dark as the dark
+    // The night schedule: by the board's own time, the no-lyrics view goes dark as the dark
     // view does, a touch lights it for 30 seconds, and a board that does not know the time is never dark by accident.
     {
         g_caps = iclforge::variants::p4_rev3_kit();
@@ -2398,6 +2425,177 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         expect(!player::panel::screen_stats().dimmed, "but not by day");
         g_board.stream = "bursts";
         g_settings = {nv::View::kSpeakers, 5};
+        hold(lrc, 5'750);
+        pump(6);
+    }
+
+    // The waiting screen: nothing playing, the board set up. Lit for the
+    // dim time, then the view chosen (a dim, the clock, or dark); a touch brings the status back and the time begins again;
+    // a board still to be set up, and one told to stay lit, are never dimmed; a screen already dimmed as the stream ends
+    // stays so, and the status is not lit between two songs.
+    {
+        constexpr std::int64_t kMinuteUs = 60'000'000;
+        const auto stats = [] { return player::panel::screen_stats(); };
+        const auto waiting_name = [&](const char* name) { return std::string(stats().name) == name; };
+        const auto be_waiting = [&] {
+            g_now_playing = false;
+            g_held = false;
+            g_board.stream = "idle";
+            g_board.server = "Music Assistant (d5369777-music-assistant)";
+            g_board.paired = 1;
+            g_board.connections = 1;
+            g_board.pairing_code.clear();
+        };
+        g_caps = iclforge::variants::p4_rev3_kit();
+        g_caps.display.width = width;
+        g_caps.display.height = height;
+        g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+        g_settings = {nv::View::kSpeakers, 5};
+        g_settings.idle_view = nv::IdleView::kDim;
+        be_waiting();
+        g_now_us += 40'000'000;
+        pump(6);
+        expect(waiting_name("idle") && !stats().dimmed, "the waiting screen is the status page, lit");
+        expect(shows_text(lv_screen_active(), "Waiting for something to play", true), "and says what it waits for");
+        g_now_us += 4 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "it is still lit 4 minutes on, with a dim time of 5");
+        g_now_us += 2 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed && stats().backlight == 4, "after the dim time it dims, the backlight at its floor");
+        expect(waiting_name("idle"), "on the status page");
+        write_bmp(out / ("waiting-dim-" + size + ".bmp"));
+        expect(shows_text(lv_screen_active(), "Waiting for something to play"), "with the one line of the dim");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed && stats().backlight == 80, "a touch lights it");
+        expect(waiting_name("idle"), "and it is the status page again");
+        g_now_us += 4 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "it stays lit for the dim time from that touch");
+        g_now_us += 2 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed, "and dims again after it");
+
+        // The clock.
+        g_settings.idle_view = nv::IdleView::kClock;
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed, "a touch lights the waiting screen when the clock is chosen");
+        g_wall = {};
+        g_now_us += 6 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed && waiting_name("idle"), "until the time is known, the clock saver is a dim of the status page");
+        g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+        pump(20);  // the screen reads the clock twice a second
+        expect(stats().dimmed && waiting_name("idle-clock"), "and the clock once it is");
+        expect(shows_text(lv_screen_active(), "21:47"), "it shows the time");
+        expect(!shows_text(lv_screen_active(), "Preferences") && !shows_text(lv_screen_active(), "Adjust"),
+               "and none of the footer");
+        write_bmp(out / ("waiting-clock-" + size + ".bmp"));
+        if (width >= 800) {
+            // The clock view's digits are one size (200 px): it is drawn as designed from 800 wide, as it is when a song plays.
+            failures += audit(lv_screen_active(), "waiting screen, clock saver " + size);
+        }
+        g_wall.local.minute = 48;
+        pump(20);
+        expect(shows_text(lv_screen_active(), "21:48"), "the time moves on");
+        tap(width / 2, height / 3);
+        pump(8);
+        expect(!stats().dimmed && waiting_name("idle"), "a touch brings the status page back");
+        expect(shows_text(lv_screen_active(), "Preferences") && shows_text(lv_screen_active(), "Adjust"),
+               "with its footer");
+        expect(tap_button("Preferences"), "and the footer works (the touch that woke it did not press a button)");
+        pump(8);
+        expect(player::panel::prefs_root() != nullptr, "Preferences opens from the waiting screen");
+        g_now_us += 10 * kMinuteUs;
+        pump(6);
+        expect(player::panel::prefs_root() == nullptr || !stats().dimmed, "and keeps the screen lit while it is open");
+        tap_button("Close");
+        pump(6);
+
+        // Dark.
+        g_settings.idle_view = nv::IdleView::kDark;
+        tap(width / 2, height / 3);
+        pump(6);
+        g_now_us += 4 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "dark: lit 4 minutes on");
+        g_now_us += 2 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed && stats().backlight == 0, "dark: the backlight is off after the dim time");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed && stats().backlight == 80, "dark: a touch lights it");
+        g_now_us += 40 * 1'000'000;
+        pump(6);
+        expect(!stats().dimmed, "and it is not dark again after the dark view's thirty seconds: the dim time governs");
+
+        // Stay lit, and a dim time of never.
+        g_settings.idle_view = nv::IdleView::kLit;
+        g_now_us += 600 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "left lit, the waiting screen is lit for hours");
+        g_settings.idle_view = nv::IdleView::kDim;
+        g_settings.dim_after_minutes = nv::kDimNever;
+        g_now_us += 600 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "with a dim time of never it is lit for hours");
+        g_settings.dim_after_minutes = 5;
+
+        // A board still to be set up keeps the screen lit and saying so.
+        g_board.paired = 0;
+        g_board.connections = 0;
+        g_board.server.clear();
+        g_now_us += 600 * kMinuteUs;
+        pump(6);
+        expect(!stats().dimmed, "a board that is not paired is never dimmed");
+        g_board.paired = 1;
+        g_board.connections = 1;
+        g_board.server = "Music Assistant (d5369777-music-assistant)";
+        g_board.pairing_code = "123456";
+        pump(6);
+        expect(!stats().dimmed, "nor one showing a pairing code");
+        g_board.pairing_code.clear();
+        tap(width / 2, height / 3);
+        pump(6);
+
+        // The status is not lit between two songs: a dimmed screen stays dimmed as the stream ends.
+        g_settings.idle_view = nv::IdleView::kDim;
+        g_board.stream = "bursts";
+        g_board.paired = 1;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(20);  // the screen reads the board's state twice a second
+        g_now_us += 6 * kMinuteUs;
+        pump(6);
+        expect(stats().dimmed, "the speakers are dimmed after the dim time");
+        be_waiting();
+        pump(20);
+        expect(stats().dimmed && waiting_name("idle"), "the stream ends and the waiting screen stays dimmed");
+        g_now_us += 60'000'000;
+        pump(6);
+        expect(stats().dimmed, "and stays so, with nothing touched");
+        tap(width / 2, height / 3);
+        pump(6);
+        expect(!stats().dimmed && waiting_name("idle"), "until a touch");
+        g_board.stream = "bursts";
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(20);
+        g_now_us += 6 * kMinuteUs;
+        pump(6);
+        be_waiting();
+        pump(20);
+        expect(stats().dimmed && waiting_name("idle"), "and the same for a second song that dims and ends");
+        tap(width / 2, height / 3);
+        pump(6);
+
+        // A song that starts on a panel nobody has touched for hours is not dimmed at once, as before.
+        g_board.stream = "bursts";
+        g_board.server = "";
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        g_settings = {nv::View::kSpeakers, 5};
+        g_board.paired = 0;
+        g_board.connections = 0;
         hold(lrc, 5'750);
         pump(6);
     }
@@ -2470,6 +2668,15 @@ bool read_now_playing(NowPlaying& out) {
     return true;
 }
 
+bool read_now_stream(NowStream& out) {
+    if (!g_now_playing) {
+        return false;
+    }
+    out.facts = g_now.facts;
+    out.kbps = g_now.kbps;
+    return true;
+}
+
 // What the speakers view reads from the player every frame: the scenario's levels, as a new window every 100 ms of
 // the preview's clock.
 bool read_now_levels(NowLevels& out) {
@@ -2529,6 +2736,11 @@ class PreviewBackend final : public iclforge::prefs::Backend {
     [[nodiscard]] iclforge::nowview::SpeakersStyle speakers_style() const override { return g_settings.speakers_style; }
     [[nodiscard]] bool set_speakers_style(iclforge::nowview::SpeakersStyle style) override {
         g_settings.speakers_style = style;
+        return true;
+    }
+    [[nodiscard]] iclforge::nowview::IdleView idle_view() const override { return g_settings.idle_view; }
+    [[nodiscard]] bool set_idle_view(iclforge::nowview::IdleView view) override {
+        g_settings.idle_view = view;
         return true;
     }
 
@@ -3173,7 +3385,7 @@ int main(int argc, char** argv) {
         {"s10-script-undrawable", [&] { hold(mixed, 4'000); }},
         {"s11-notes-dropped", [&] { hold(mixed, 1'200); }},
         {"s12-cyrillic-greek", [&] { hold(cyrillic_greek, 3'500); }},
-        // The pulse style (planning/p4x-speakers-options.md): the filled circle grows and shrinks a little with its
+        // The pulse style: the filled circle grows and shrinks a little with its
         // level, here in the same rooms as the glow above; the style is put back to glow after the scenarios.
         {"s18-speakers-2-0-pulse", [&] {
              g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kPulse;
@@ -3187,7 +3399,8 @@ int main(int argc, char** argv) {
                                  .objects = 15},
                        kSevenOneFour);
          }, 10'000'000},
-        // The Meters view (planning/p4x-meters-view.md): a spectrum of what the tap hears, a groove over the room, and the channels in the
+        // The Meters view: a spectrum of what the tap hears, a groove over the room, and the
+        // channels in the
         // representation the display's width and the room's outputs ask for.
         {"s19-meters-2-0", [&] {
              g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kGlow;
@@ -3201,6 +3414,39 @@ int main(int argc, char** argv) {
                        kSevenOneFour, 768);
          }, 10'000'000},
         {"s19-meters-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix, 640); }, 10'000'000},
+        // The footer names the stream under every view: TrueHD 7.1 from Music
+        // Assistant at 5.2 Mb/s under the speakers with no title said, the title card, the Meters view and the lyrics, and PCM under lyrics.
+        {"s20-footer-speakers-truehd", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("7.1.4", kTrueHdSevenOne, kSevenOneFour, 5200, "Music Assistant (d5369777-music-assistant)");
+             say_no_title();
+         }, 10'000'000},
+        {"s20-footer-title-truehd", [&] {
+             g_settings.view = iclforge::nowview::View::kTitle;
+             say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
+         }},
+        {"s20-footer-meters-truehd", [&] {
+             g_settings.view = iclforge::nowview::View::kMeters;
+             say_no_title();
+         }, 10'000'000},
+        {"s20-footer-lyrics-truehd", [&] {
+             play_room("7.1.4", kTrueHdSevenOne, kSevenOneFour, 5200, "Music Assistant (d5369777-music-assistant)");
+             hold(auld, 1'750);
+         }},
+        {"s20-footer-lyrics-pcm", [&] {
+             play_room("2.0", {.codec = iclforge::nowview::Codec::kPcm}, kStereo, 0, "Music Assistant (d5369777-music-assistant)");
+             hold(auld, 1'750);
+         }},
+        {"s20-footer-lyrics-eac3-no-server", [&] {
+             play_room("5.1", kDolbyFiveOne, kFiveOne, 640);
+             hold(auld, 1'750);
+         }},
+        // A stream before its first unit has decoded is only "Coded audio"; and the sentence view (nothing chosen to draw) names the stream too.
+        {"s20-footer-coded-not-yet-decoded", [&] {
+             play_room("7.1.4", {.codec = iclforge::nowview::Codec::kUnknown}, kSevenOneFour, 0, "Music Assistant (d5369777-music-assistant)");
+             g_settings.view = iclforge::nowview::View::kOff;
+             g_held = false;
+         }},
     };
 
     int number = 0;

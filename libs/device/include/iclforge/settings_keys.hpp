@@ -8,7 +8,7 @@
 #include <vector>
 
 // The keys of a Hearth board's own settings in NVS (firmware/hearth-sink/main/settings.hpp) and which
-// of them "Reset preferences" puts back to the image's defaults (planning/p4x-preferences.md, E4).
+// of them "Reset preferences" puts back to the image's defaults.
 //
 // A board's settings are of two kinds. The ones a person chooses once and leaves - what the screen shows,
 // when it dims, the clock - are PREFERENCES, and Reset preferences returns them to how a new board
@@ -43,6 +43,7 @@ inline constexpr const char* kNetworkPreference = "net_pref";
 inline constexpr const char* kNowView = "np_view";
 inline constexpr const char* kDimAfter = "np_dim";
 inline constexpr const char* kSpeakersStyle = "np_style";
+inline constexpr const char* kIdleView = "idle_view";
 inline constexpr const char* kTimeZone = "time_zone";
 inline constexpr const char* kTimeZoneName = "tz_name";
 inline constexpr const char* kBrightness = "bright";
@@ -67,7 +68,7 @@ enum class Kind : std::uint8_t {
     // How the board's outputs are wired, what room they serve and where that room is (its time zone): kept by Reset
     // preferences. A person set these up for the room, not for taste.
     setup,
-    // A technical setting that stays out of Preferences (planning/p4x-preferences.md): kept by Reset
+    // A technical setting that stays out of Preferences: kept by Reset
     // preferences.
     technical,
 };
@@ -94,6 +95,7 @@ inline constexpr std::array kKeys = {
     Key{kNowView, Kind::preference, "what the screen shows without lyrics"},
     Key{kDimAfter, Kind::preference, "when the screen dims"},
     Key{kSpeakersStyle, Kind::preference, "speakers style"},
+    Key{kIdleView, Kind::preference, "what the waiting screen does"},
     // The name a person chose the zone by: kept by Reset preferences, with the zone it names (the owner, 2026-10-25:
     // Reset preferences keeps the time zone).
     Key{kTimeZoneName, Kind::setup, "time zone"},

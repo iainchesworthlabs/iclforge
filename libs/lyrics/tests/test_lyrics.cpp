@@ -21,8 +21,7 @@
 #include "iclforge/lyrics/timing.hpp"
 
 // libs/lyrics/src/lyrics.cpp: the LRC reader, the lyrics file's place
-// beside an item, and the cursor the lyric view asks on every frame
-// (planning/karaoke.md, L1 to L6).
+// beside an item, and the cursor the lyric view asks on every frame.
 
 namespace {
 
@@ -233,7 +232,7 @@ TEST_CASE("lyrics: what is not lyrics says why", "[lyrics]") {
     CHECK(tags_only.error().find("no lyrics") != std::string::npos);
 }
 
-// ---- a duet's singer (planning/karaoke-phase2.md, W11) -----------------------------------------
+// ---- a duet's singer -----------------------------------------
 
 TEST_CASE("lyrics: a line's singer is the marker at its start, and not part of its text",
           "[lyrics][duet]") {
@@ -328,7 +327,7 @@ TEST_CASE("lyrics: a plain file may carry the marker too, and the names are id t
     CHECK(lyrics.lines[1].singer == Singer::kSecond);
 }
 
-// ---- SubRip (planning/karaoke-phase2.md, W13c) -------------------------------------------------
+// ---- SubRip -------------------------------------------------
 
 TEST_CASE("subrip: cues are lines that end where their cue does, with the gap between them",
           "[lyrics][subrip]") {
@@ -495,7 +494,7 @@ TEST_CASE("subrip: the file beside an item is its .lrc, and its .srt where there
     CHECK(both->filename().string() == "song.lrc");
 }
 
-// ---- Advanced SubStation Alpha (planning/karaoke-phase2.md, W13d) -------------------------------
+// ---- Advanced SubStation Alpha -------------------------------
 
 namespace {
 
@@ -674,7 +673,7 @@ TEST_CASE("ass: the file beside an item is its .lrc, then its .srt, then its .as
     CHECK(iclforge::lyrics::find_lyrics_file(item)->extension().string() == ".lrc");
 }
 
-// ---- MIDI karaoke (planning/karaoke-phase2.md, W13e) --------------------------------------------
+// ---- MIDI karaoke --------------------------------------------
 
 namespace {
 
@@ -972,7 +971,7 @@ TEST_CASE("midi karaoke: what cannot be read says why", "[lyrics][midi]") {
 TEST_CASE("midi karaoke: words in the common code pages are refused by name, not read as other text",
           "[lyrics][midi][encoding]") {
     // What a karaoke file written before UTF-8 was usual holds: the reader checks every syllable as
-    // UTF-8 and refuses the file at the first that is not (planning/karaoke-phase2.md, D8). Each of
+    // UTF-8 and refuses the file at the first that is not. Each of
     // these is the first syllable of a file whose other syllables are plain.
     const auto bytes = [](std::initializer_list<int> values) {
         std::string out;
@@ -1186,7 +1185,7 @@ TEST_CASE("lyrics: the file beside an item, in any case of the extension", "[lyr
     CHECK_FALSE(none.error().empty());
 }
 
-// ---- UTF-16, Hebrew and Yiddish (planning/karaoke-phase2.md, D8) ---------------------------------
+// ---- UTF-16, Hebrew and Yiddish ---------------------------------
 //
 // The Hebrew and Yiddish lines are generated here, so there is no licence question; the UTF-8 each
 // is expected to become is written out in bytes and not produced by the code under test.

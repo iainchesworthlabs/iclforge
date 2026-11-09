@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Dolby's tools against protected (Common Encryption) Dolby audio files.
 
-planning/cenc-conformance.md says what ISO/IEC 23001-7 asks of a protected Dolby audio track and
-that the project implements none of it. This script asks Dolby's own programs what they make of the
+ISO/IEC 23001-7 asks things of a protected Dolby audio track, and the project implements none of
+it. This script asks Dolby's own programs what they make of the
 test files `tools/generators/cenc_make_protected.py` writes (and of GPAC's `MP4Box -crypt`, when
 installed) for AC-3, E-AC-3, E-AC-3 JOC and AC-4, in the four schemes cenc, cbc1, cens and cbcs.
 

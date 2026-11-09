@@ -68,6 +68,8 @@ struct ChannelMeaning {
 };
 
 inline constexpr int kChannelMeaningBits = 64;
+// TH spec §4.1.1: the major sync flags of an Atmos stream, and of a stream that is not.
+inline constexpr std::uint16_t kMajorSyncFlagsAtmos = 0x1000;
 
 // Names the first field of `meaning` whose value its width cannot hold (TH spec §12.3, §12.5: the
 // two start-up gains are signed, 6 and 7 bits; the dialogue norms are 6 bits for the 2 channel
@@ -83,13 +85,18 @@ inline constexpr int kChannelMeaningBits = 64;
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::array<std::uint8_t, 8> pack_channel_meaning(
     const ChannelMeaning& meaning);
 
+// Names the first field of `extra` whose value its width cannot hold (TH spec §14.2); an empty view
+// when every field fits. The writer and the encoder's configuration check use it.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::string_view extra_channel_meaning_problem(
+    const ExtraChannelMeaning& extra) noexcept;
+
 struct MajorSync {
     StreamKind kind = StreamKind::kTrueHd;
     // TH spec §5.1 / §5.2: the 32 bits after the sync word; the accessors below split them by
     // `kind`.
     std::uint32_t format_info = 0;
     std::uint16_t signature = kSignature;
-    std::uint16_t flags = 0;  // TH spec §4.1: 0x4000 in an MLP stream FFmpeg writes, 0 in TrueHD
+    std::uint16_t flags = 0;  // TH spec §4.1.1: 0x4000 in an MLP stream, 0x1000 in Atmos, 0 in TrueHD
     std::uint16_t reserved = 0;
     bool is_vbr = false;
     std::uint16_t peak_data_rate = 0;          // 15 bits; TH spec §4.4, see peak_data_rate_bps()
@@ -151,9 +158,11 @@ struct MajorSync {
     std::span<const std::byte> data, bool verify_crc = true);
 
 // Writes the major sync with its CRC. A TrueHD stream's channel meaning is written from
-// `channel_meaning`, an MLP stream's from `channel_meaning_bytes`. The writer does not write an
-// extension (`extra` must be empty): kUnsupported otherwise. A channel meaning with a field wider
-// than its width is kBadParameter, the detail naming the field (channel_meaning_problem()).
+// `channel_meaning`, an MLP stream's from `channel_meaning_bytes`. With `extra` set (a TrueHD
+// stream whose channel meaning has extra_present) the 16-channel extension of TH spec §14.2
+// follows: its length is the words the fields take, so a dynamic-object-only programme is the 4
+// bytes the owner's discs have; it is kBadParameter without extra_present. A channel meaning or an
+// extension with a field wider than its width is kBadParameter, the detail naming the field.
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<std::vector<std::byte>, Error> write_major_sync(
     const MajorSync& major_sync);
 

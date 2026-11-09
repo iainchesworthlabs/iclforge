@@ -226,7 +226,7 @@ target_compile_options(ac3adm_suppress_gcc15_null_deref INTERFACE
 # The bridge (bridge.hpp, coordinates.hpp, iab_bridge.hpp; iclforge::adm's build, write and build_iab)
 # maps the parsed ADM graph, and an IAB master's frames, onto the object model iclforge::ac3's Atmos
 # encoder takes, and back. It was a library of its own, iclforge::admbridge, until
-# planning/consolidation.md's C2 merged it here: it is meaningless without the parser and gated by
+# it was merged here: it is meaningless without the parser and gated by
 # the same ICLFORGE_BUILD_ADM. Its public headers name iclforge::oba's and iclforge::iab's types in
 # their signatures (iclforge::objects::oba::ObjectPath, iclforge::iab::IABitstreamFrame), so anything linking
 # iclforge::adm needs both: LINK_PUBLIC. The parser stays codec-blind; the object model is not a

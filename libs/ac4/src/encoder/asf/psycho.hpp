@@ -6,8 +6,7 @@
 #include "encoder/asf/coder.hpp"
 #include "encoder/asf/layout.hpp"
 
-// The encoder's psychoacoustic model (planning/ac4.md, "Rate control and the
-// psychoacoustic model"; decision 17): per scale factor band of each window
+// The encoder's psychoacoustic model: per scale factor band of each window
 // group, the noise energy the band can carry unheard.
 //
 // Written for AC-4's bands from the published sources iclforge::ac3::quality's model
@@ -29,8 +28,8 @@
 // SPL, rises from 15 dB SPL at 11 kHz to 50 at 15 kHz, and removed the top
 // octave of the speech and music that DEE's streams keep: with it the race's
 // log-spectral distance at 192 kbps was 4.3 dB on music and 2.9 on speech,
-// against DEE's 2.4 and 0.4, and without it 2.2 and 0.1 (planning/ac4.md, the
-// encoder's ladder, item 5). iclforge::ac3::quality's model makes the same curve
+// against DEE's 2.4 and 0.4, and without it 2.2 and 0.1. iclforge::ac3::quality's model makes the
+// same curve
 // optional for the same reason.
 
 namespace iclforge::ac4::detail {

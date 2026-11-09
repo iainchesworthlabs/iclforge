@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::sink - a Sendspin sink a program runs (planning/hearth-android.md, D3): it listens on a
+# iclforge::sink - a Sendspin sink a program runs: it listens on a
 # WebSocket and advertises _sendspin._tcp, pairs by its pairing PSK and a dynamic or static code,
 # admits servers as the specification ranks them, keeps the identity and the pairing records, answers
 # the roles a server lists, and hands each stream it is sent to an output the program supplies. Its
@@ -31,7 +31,8 @@ target_link_libraries(iclforge_sink PRIVATE iclforge::warnings iclforge::coverag
 add_library(iclforge_sink_decode STATIC src/decoding_output.cpp)
 add_library(iclforge::sink_decode ALIAS iclforge_sink_decode)
 target_link_libraries(iclforge_sink_decode PUBLIC iclforge::sink iclforge::ac3 iclforge::ac4
-                                                  iclforge::containers iclforge::objects iclforge::render)
+                                                  iclforge::containers iclforge::objects iclforge::render
+                                                  iclforge::truehd)
 target_link_libraries(iclforge_sink_decode PRIVATE iclforge::warnings iclforge::coverage)
 
 # The pass-through output (include/iclforge/sink/passthrough.hpp): a burst output that rebuilds each

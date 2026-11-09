@@ -1,7 +1,7 @@
 #pragma once
 
-// The board's sound preferences: the test tone through the speakers and the level and distance kept for each
-// (planning/hearth-speaker-trim-identify.md, iclforge/render/speaker_trim.hpp). One implementation for three callers:
+// The board's sound preferences: the test tone through the speakers and the level and distance kept for each.
+// One implementation for three callers:
 // the control surface's routes (GET and PUT /trim, GET and POST /identify - hearth_sink.cpp hands them out), the
 // Preferences' backend (preferences.cpp: the Identify speakers button and the trim's summary) and the Speakers sheet
 // (panel/lvgl/sound_sheet.cpp), so that a person on the glass and one on the web page are refused in the same words and

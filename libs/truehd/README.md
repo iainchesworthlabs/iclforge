@@ -2,7 +2,7 @@
 
 The Dolby TrueHD and MLP bitstream, a lossless decoder and an encoder, written from the owner's *Dolby TrueHD (MLP) Reference
 Specification* v3.9 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
-[planning/truehd.md](../../planning/truehd.md) is the plan; [ERRATA.md](ERRATA.md) lists, first, the questions only
+[ERRATA.md](ERRATA.md) lists, first, the questions only
 the owner can answer, and then every place the specification and the streams disagree.
 
 It links `iclforge::base` and nothing else. The option is `ICLFORGE_BUILD_TRUEHD` (on by default).
@@ -39,7 +39,7 @@ first restart header. A failed check (the check nibble, a CRC, a parity byte, th
 `Strictness::kStrict` and a counter with `kLenient`. The decoder reads substreams 0 to 2 (up to 8 channels) and the
 generic 16-channel substream 3 the same way. FFmpeg's encoders write neither 7.1 nor the sixteen-channel substream: 7.1 is
 checked through this library's encoder, whose streams FFmpeg's decoder reads, and the sixteen-channel substream has no
-external oracle, because FFmpeg refuses its restart sync (see the plan).
+external oracle, because FFmpeg refuses its restart sync.
 
 ## Encoding
 
@@ -56,15 +56,29 @@ auto tail = encoder->flush();                                  // pads and ends 
 The encoder holds one restart interval of input before it emits it. `verify` has the decoder read every unit back; `Encoder::refusal_reason()`
 names the rule a configuration breaks. See [docs/library/truehd.md](../../docs/library/truehd.md#encoding).
 
+### Atmos
+
+`EncoderConfig::object_channels` (1 to 16) writes a fourth substream (restart sync 0x31EC) of object channels after the 7.1 bed, with
+the 16-channel extension of the major sync; `encode()` then takes `channels` + `object_channels` values a frame. The bed's substreams are
+the 7.1 stream's byte for byte, so FFmpeg's strict decode returns the bed. `Presentation::kAll` decodes the object channels. The library
+does not parse or write the object audio metadata (it links `iclforge::base` only): `forge` does, with `iclforge::objects`
+(`forge truehd-atmos`, `forge decode`). Provisional: ERRATA.md entries 60 to 64, and nothing outside this repository reads
+substream 3.
+
+`EncoderConfig::object_layout = ObjectLayout::kBedMatrices` writes substream 3 the way the owner's discs have it (ERRATA.md entry 70):
+`min_chan` 8, only the channels from 8 up coded, and primitive matrices (with matrix noise and one LSB bypass matrix, as options) that
+rebuild all `object_channels` (9 to 16) from the bed rows and those channels. The 7.1 bed is then made from the objects by a fixed render,
+so `encode()` takes the objects alone. Static within a restart interval; no moving objects, no downmix presentations.
+
 ## Checks
 
 `iclforge-truehd-tests` builds its own streams with the library's writers, and decodes the FFmpeg fixtures in
 `testdata/truehd/` (`tools/generators/gen_truehd_ffmpeg.py` makes them) against the SHA-256 of FFmpeg's strict decode.
 The hand-built streams in `testdata/truehd/handbuilt/` (`tools/references/truehd_writer.py`) cover what FFmpeg's encoders
 do not write: an IIR filter, LSB bypass, several matrices with a permuted `ch_assign` (also one that changes at each restart), noise generators 0 and 1, a negative
-output shift, 16 bit MLP words, the block data check, terminators, the end-of-stream marker, extra data, the directory's DRC word
-and the 16-channel substream. They are held to the signal each was made from, by this decoder and by
-`tools/references/truehd_syntax.py`, and FFmpeg's strict decode of nineteen of the twenty-nine returns that signal too
+output shift, 16 bit MLP words, the block data check, terminators, the end-of-stream marker, extra data, the directory's DRC word,
+the 16-channel substream, and a 12 channel substream 3 with object audio metadata (`hb_atmos_objects`). They are held to the signal each was made from, by this decoder and by
+`tools/references/truehd_syntax.py`, and FFmpeg's strict decode of nineteen of the thirty-three returns that signal too (and the bed of the four with a fourth substream)
 (`tools/checks/verify_truehd_interop.py --handbuilt`; its manifest says what FFmpeg does with the other ten). The extra data's
 layout, the DRC word's values, the block data CRC, the terminators and the 16-channel substream have no external oracle.
 

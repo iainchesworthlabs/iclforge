@@ -15,12 +15,14 @@ void BedMix::resize(std::size_t frames) {
     for (auto& slot : slots) {
         slot.assign(frames, 0.0F);
     }
+    lfe.assign(frames, 0.0F);
 }
 
 void BedMix::clear() {
     for (auto& slot : slots) {
         std::ranges::fill(slot, 0.0F);
     }
+    std::ranges::fill(lfe, 0.0F);
 }
 
 void fold_to_mono(std::span<const float> interleaved, std::uint16_t channels,
@@ -161,6 +163,7 @@ void add_to_bed(std::span<const float> interleaved, std::uint16_t channels, floa
                 l[i] += gain * f[0];
                 r[i] += gain * f[1];
                 c[i] += gain * f[2];
+                bed.lfe[i] += gain * f[3];
                 ls[i] += gain * f[4];
                 rs[i] += gain * f[5];
             }
@@ -171,6 +174,7 @@ void add_to_bed(std::span<const float> interleaved, std::uint16_t channels, floa
                 l[i] += gain * f[0];
                 r[i] += gain * f[1];
                 c[i] += gain * f[2];
+                bed.lfe[i] += gain * f[3];
                 ls[i] += gain * kMinus3dB * (f[4] + f[6]);
                 rs[i] += gain * kMinus3dB * (f[5] + f[7]);
             }

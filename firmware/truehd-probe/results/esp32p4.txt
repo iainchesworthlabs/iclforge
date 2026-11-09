@@ -1,0 +1,113 @@
+truehd_probe.chip=esp32p4
+truehd_probe.cpu_mhz=360
+truehd_probe.task_stack_bytes=131072
+truehd_probe.heap_internal_free_at_start=489076
+truehd_probe.heap_internal_largest_block_at_start=258048
+truehd_probe.heap_spiram_free_at_start=0
+truehd_probe.truehd_mono48_s24.stage=split
+truehd_probe.truehd_mono48_s24.stage=construct units=300
+truehd_probe.truehd_mono48_s24.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_mono48_s24.stage=decode
+truehd_probe.truehd_mono48_s24.format=1 ch 48000 Hz 24 bit, 300 units of 40 samples
+truehd_probe.truehd_mono48_s24.pcm=match
+truehd_probe.truehd_mono48_s24.cycles_per_unit_mean=24134
+truehd_probe.truehd_mono48_s24.us_per_unit_mean=67.04
+truehd_probe.truehd_mono48_s24.us_per_unit_max=315.04
+truehd_probe.truehd_mono48_s24.ms_per_second_of_audio=80.4
+truehd_probe.truehd_mono48_s24.realtime_factor=0.080
+truehd_probe.truehd_mono48_s24.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_mono48_s24.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_st48_s16.stage=split
+truehd_probe.truehd_st48_s16.stage=construct units=300
+truehd_probe.truehd_st48_s16.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_st48_s16.stage=decode
+truehd_probe.truehd_st48_s16.format=2 ch 48000 Hz 16 bit, 300 units of 40 samples
+truehd_probe.truehd_st48_s16.pcm=match
+truehd_probe.truehd_st48_s16.cycles_per_unit_mean=36492
+truehd_probe.truehd_st48_s16.us_per_unit_mean=101.37
+truehd_probe.truehd_st48_s16.us_per_unit_max=371.58
+truehd_probe.truehd_st48_s16.ms_per_second_of_audio=121.6
+truehd_probe.truehd_st48_s16.realtime_factor=0.122
+truehd_probe.truehd_st48_s16.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_st48_s16.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_st48_s24.stage=split
+truehd_probe.truehd_st48_s24.stage=construct units=300
+truehd_probe.truehd_st48_s24.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_st48_s24.stage=decode
+truehd_probe.truehd_st48_s24.format=2 ch 48000 Hz 24 bit, 300 units of 40 samples
+truehd_probe.truehd_st48_s24.pcm=match
+truehd_probe.truehd_st48_s24.cycles_per_unit_mean=39941
+truehd_probe.truehd_st48_s24.us_per_unit_mean=110.95
+truehd_probe.truehd_st48_s24.us_per_unit_max=375.56
+truehd_probe.truehd_st48_s24.ms_per_second_of_audio=133.1
+truehd_probe.truehd_st48_s24.realtime_factor=0.133
+truehd_probe.truehd_st48_s24.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_st48_s24.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_st44_s24.stage=split
+truehd_probe.truehd_st44_s24.stage=construct units=276
+truehd_probe.truehd_st44_s24.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_st44_s24.stage=decode
+truehd_probe.truehd_st44_s24.format=2 ch 44100 Hz 24 bit, 276 units of 40 samples
+truehd_probe.truehd_st44_s24.pcm=match
+truehd_probe.truehd_st44_s24.cycles_per_unit_mean=41540
+truehd_probe.truehd_st44_s24.us_per_unit_mean=115.39
+truehd_probe.truehd_st44_s24.us_per_unit_max=379.44
+truehd_probe.truehd_st44_s24.ms_per_second_of_audio=127.4
+truehd_probe.truehd_st44_s24.realtime_factor=0.127
+truehd_probe.truehd_st44_s24.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_st44_s24.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_st96_s24.stage=split
+truehd_probe.truehd_st96_s24.stage=construct units=300
+truehd_probe.truehd_st96_s24.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_st96_s24.stage=decode
+truehd_probe.truehd_st96_s24.format=2 ch 96000 Hz 24 bit, 300 units of 80 samples
+truehd_probe.truehd_st96_s24.pcm=match
+truehd_probe.truehd_st96_s24.cycles_per_unit_mean=69114
+truehd_probe.truehd_st96_s24.us_per_unit_mean=191.98
+truehd_probe.truehd_st96_s24.us_per_unit_max=463.87
+truehd_probe.truehd_st96_s24.ms_per_second_of_audio=230.4
+truehd_probe.truehd_st96_s24.realtime_factor=0.230
+truehd_probe.truehd_st96_s24.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_st96_s24.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_st192_s24.stage=split
+truehd_probe.truehd_st192_s24.stage=construct units=300
+truehd_probe.truehd_st192_s24.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_st192_s24.stage=decode
+truehd_probe.truehd_st192_s24.format=2 ch 192000 Hz 24 bit, 300 units of 160 samples
+truehd_probe.truehd_st192_s24.pcm=match
+truehd_probe.truehd_st192_s24.cycles_per_unit_mean=125124
+truehd_probe.truehd_st192_s24.us_per_unit_mean=347.57
+truehd_probe.truehd_st192_s24.us_per_unit_max=631.37
+truehd_probe.truehd_st192_s24.ms_per_second_of_audio=417.1
+truehd_probe.truehd_st192_s24.realtime_factor=0.417
+truehd_probe.truehd_st192_s24.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_st192_s24.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_m51_s16.stage=split
+truehd_probe.truehd_m51_s16.stage=construct units=300
+truehd_probe.truehd_m51_s16.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_m51_s16.stage=decode
+truehd_probe.truehd_m51_s16.format=6 ch 48000 Hz 16 bit, 300 units of 40 samples
+truehd_probe.truehd_m51_s16.pcm=match
+truehd_probe.truehd_m51_s16.cycles_per_unit_mean=79349
+truehd_probe.truehd_m51_s16.us_per_unit_mean=220.41
+truehd_probe.truehd_m51_s16.us_per_unit_max=730.01
+truehd_probe.truehd_m51_s16.ms_per_second_of_audio=264.5
+truehd_probe.truehd_m51_s16.realtime_factor=0.264
+truehd_probe.truehd_m51_s16.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_m51_s16.heap_spiram_decoder_bytes=0
+truehd_probe.truehd_m51_s24.stage=split
+truehd_probe.truehd_m51_s24.stage=construct units=300
+truehd_probe.truehd_m51_s24.constructed_internal_free=331088 largest=163840
+truehd_probe.truehd_m51_s24.stage=decode
+truehd_probe.truehd_m51_s24.format=6 ch 48000 Hz 24 bit, 300 units of 40 samples
+truehd_probe.truehd_m51_s24.pcm=match
+truehd_probe.truehd_m51_s24.cycles_per_unit_mean=95818
+truehd_probe.truehd_m51_s24.us_per_unit_mean=266.16
+truehd_probe.truehd_m51_s24.us_per_unit_max=762.86
+truehd_probe.truehd_m51_s24.ms_per_second_of_audio=319.4
+truehd_probe.truehd_m51_s24.realtime_factor=0.319
+truehd_probe.truehd_m51_s24.heap_internal_decoder_bytes=158020
+truehd_probe.truehd_m51_s24.heap_spiram_decoder_bytes=0
+truehd_probe.stack_used_bytes=60368
+truehd_probe.heap_internal_minimum_free=326324
+result=pass

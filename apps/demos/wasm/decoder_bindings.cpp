@@ -384,9 +384,9 @@ class PushDecoder {
     // Whether the unit just pushed is Annex C karaoke type, from its own syncframe header: a
     // lone AC-3 syncframe flagged bsmod 7 above 1/0, or an E-AC-3 syncframe standing alone as
     // one independent substream with the same flag and no object layer - the programme the
-    // decoder reproduces (iclforge::ac3::is_karaoke_programme; planning/karaoke-eac3.md, D1 to
-    // D3). Not read from the decoded unit, which does not carry an AC-3 core's bsmod. An E-AC-3
-    // bed's bsmod is the one in its infomdat, which the header reads the same way.
+    // decoder reproduces (iclforge::ac3::is_karaoke_programme). Not read from the decoded unit,
+    // which does not carry an AC-3 core's bsmod. An E-AC-3 bed's bsmod is the one in its
+    // infomdat, which the header reads the same way.
     [[nodiscard]] static bool is_karaoke_unit(std::span<const std::byte> unit) {
         const auto header = iclforge::ac3::io::read_frame_header(unit);
         if (!header.has_value() || header->bytes != unit.size()) {

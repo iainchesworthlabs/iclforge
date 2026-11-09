@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # Third-party code the build fetches rather than finds. The code the tree carries is under
-# external/ (planning/monorepo.md, decision 14); vcpkg stays the manager for what it provides.
+# external/; vcpkg stays the manager for what it provides.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
 

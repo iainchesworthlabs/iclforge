@@ -124,6 +124,7 @@ Settings image_defaults() {
     defaults.now_view = iclforge::nowview::kDefaultView;
     defaults.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
     defaults.speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
+    defaults.idle_view = iclforge::nowview::kDefaultIdleView;
     defaults.brightness_percent = CONFIG_ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT;
     defaults.clock_format = iclforge::wallclock::clock_format_from_stored(CONFIG_ICLFORGE_EXAMPLE_CLOCK_FORMAT)
                                 .value_or(iclforge::wallclock::ClockFormat{});
@@ -216,6 +217,14 @@ void load_all() {
         } else {
             std::printf("settings: stored speakers style %ld is not one this build knows; keeping %s\n",
                         static_cast<long>(stored), iclforge::nowview::speakers_style_name(g_settings.speakers_style));
+        }
+    }
+    if (nvs_get_i32(handle, sk::kIdleView, &stored) == ESP_OK) {
+        if (const auto view = iclforge::nowview::idle_view_from_stored(stored)) {
+            g_settings.idle_view = *view;
+        } else {
+            std::printf("settings: stored waiting screen %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::idle_view_name(g_settings.idle_view));
         }
     }
     if (nvs_get_i32(handle, sk::kBrightness, &stored) == ESP_OK) {
@@ -423,6 +432,14 @@ bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style) {
         return false;
     }
     g_settings.speakers_style = style;
+    return true;
+}
+
+bool settings_set_idle_view(iclforge::nowview::IdleView view) {
+    if (!write_int(sk::kIdleView, static_cast<std::int32_t>(view))) {
+        return false;
+    }
+    g_settings.idle_view = view;
     return true;
 }
 

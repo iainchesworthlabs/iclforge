@@ -1,5 +1,5 @@
 // The panel's task: LVGL, the lyric screen, the drawing statistics and the read-back route. See
-// ../panel.hpp and planning/karaoke-p4x-panel.md.
+// ../panel.hpp.
 //
 // One task owns LVGL. Each cycle it brings the screen up to date from what the Sendspin player holds
 // and lets LVGL draw what that dirtied; a cycle takes a few hundred microseconds when a word fills
@@ -178,6 +178,36 @@ BoardInfo read_board_info() {
     return info;
 }
 
+namespace {
+// The bitrate of what was played, smoothed (a PCM stream has no coded bytes and no figure). One meter serves every
+// reader, since only one view shows at a time and they all watch the same stream.
+int measured_kbps(const SendspinPlaying& playing) {
+    static iclforge::nowview::BitrateMeter meter;
+    static bool metered = false;
+    if (playing.facts.codec == iclforge::nowview::Codec::kPcm) {
+        meter.reset();
+        metered = false;
+    } else {
+        if (!metered) {
+            meter.reset();
+            metered = true;
+        }
+        meter.observe(playing.coded_bytes, static_cast<std::uint32_t>(time_us() / 1000));
+    }
+    return meter.kbps();
+}
+}  // namespace
+
+bool read_now_stream(NowStream& out) {
+    const SendspinPlaying playing = sendspin_now_playing();
+    if (!playing.active) {
+        return false;
+    }
+    out.facts = playing.facts;
+    out.kbps = measured_kbps(playing);
+    return true;
+}
+
 bool read_now_playing(NowPlaying& out) {
     const SendspinPlaying playing = sendspin_now_playing();
     if (!playing.active) {
@@ -205,21 +235,8 @@ bool read_now_playing(NowPlaying& out) {
         out.heading.assign(heading.data(), heading.size());
     }
     first = false;
-    // The bitrate of what was played, smoothed (a PCM stream has no coded bytes and no figure).
-    static iclforge::nowview::BitrateMeter meter;
-    static bool metered = false;
-    if (playing.facts.codec == iclforge::nowview::Codec::kPcm) {
-        meter.reset();
-        metered = false;
-    } else {
-        if (!metered) {
-            meter.reset();
-            metered = true;
-        }
-        meter.observe(playing.coded_bytes, static_cast<std::uint32_t>(time_us() / 1000));
-    }
     out.facts = playing.facts;
-    out.kbps = meter.kbps();
+    out.kbps = measured_kbps(playing);
     if (playing.have_levels) {
         out.peak_db.assign(playing.peak_db.begin(), playing.peak_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
         out.rms_db.assign(playing.rms_db.begin(), playing.rms_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
@@ -264,6 +281,7 @@ NowSettings read_now_settings() {
     settings.view = g_follow.view();
     settings.dim_after_minutes = g_follow.dim_after_minutes();
     settings.speakers_style = g_follow.speakers_style();
+    settings.idle_view = g_follow.idle_view();
     settings.night = g_follow.night();
     // The time of day is asked only by a schedule that is on: the clock is read under the wall clock's own lock.
     if (settings.night.enabled) {
@@ -381,7 +399,7 @@ void rest(std::int64_t rest_us) {
 
 // The audio comes first. A decoder that spends a long share of its 32 ms on a burst (a 7.1.4 object stream, AC-4) is slowed by the screen's memory
 // traffic beside it: the kit measured the Meters view at +1.6 to 2.2 ms a burst under JOC, +0.5 to 0.7 with the screen's task kept on the decode
-// core (planning/p4x-meters-view.md, "What the screen costs the audio path"). So while the mean burst is at CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+// core. So while the mean burst is at CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
 // or more (in at that, out at 70 % of it, so it does not flap) the Meters view is held at ten updates a second. At YIELD 2 this task is also made
 // on the decode core (start()), where it cannot run beside the decode task: FreeRTOS here has no call to move a task between cores, so that one is
 // for always. Looked at once a second; a stream that is not bursts is never busy.
@@ -741,6 +759,8 @@ void panel_set_dim_after(int minutes) { g_follow.set_dim_after(minutes); }
 
 void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style) { g_follow.set_speakers_style(style); }
 
+void panel_set_idle_view(iclforge::nowview::IdleView view) { g_follow.set_idle_view(view); }
+
 void panel_set_brightness(int percent) { g_follow.set_brightness(percent); }
 
 void panel_set_clock_format(iclforge::wallclock::ClockFormat format) { g_follow.set_clock_format(format); }
@@ -758,6 +778,7 @@ bool panel_start() {
     g_follow.set_view(settings().now_view);
     g_follow.set_dim_after(settings().dim_after_minutes);
     g_follow.set_speakers_style(settings().speakers_style);
+    g_follow.set_idle_view(settings().idle_view);
     g_follow.set_brightness(settings().brightness_percent);
     g_follow.set_clock_format(settings().clock_format);
     g_follow.set_night(settings().night);

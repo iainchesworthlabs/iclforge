@@ -1,5 +1,8 @@
 #include "support.hpp"
 
+#include <fmt/base.h>
+#include <fmt/chrono.h>  // IWYU pragma: keep - fmt::formatter<time_point> for "{:%FT%TZ}" below
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -12,9 +15,6 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
-#include <fmt/base.h>
-#include <fmt/chrono.h>  // IWYU pragma: keep - fmt::formatter<time_point> for "{:%FT%TZ}" below
-#include <fmt/format.h>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -30,6 +30,11 @@
 #include <utility>
 #include <vector>
 
+#include "associated_mix.hpp"
+#include "code_pages.hpp"
+#include "commands/truehd.hpp"
+#include "container_input.hpp"
+#include "exit_codes.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
@@ -40,42 +45,39 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
-#include "iclforge/ac3/io/object_strip.hpp"
-#include "iclforge/ac4/decoder/config.hpp"
-#include "iclforge/ac4/decoder/decoder.hpp"
-#include "iclforge/ac4/decoder/frame.hpp"
-#include "iclforge/ac4/decoder/presentation.hpp"
-#include "iclforge/ac4/encoder/config.hpp"
-#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/io/object_strip.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 #include "iclforge/ac3/meta/qc.hpp"
-#include "iclforge/containers/mp4/dash.hpp"
-#include "iclforge/containers/mp4/mp4.hpp"
-#include "iclforge/objects/joc_domain.hpp"
-#include "iclforge/objects/oamd.hpp"
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
+#include "iclforge/ac4/encoder/encoder.hpp"
+#include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/base/crypto/content_signature.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 #include "iclforge/base/crypto/x509.hpp"
 #include "iclforge/base/karaoke.hpp"
-#include "iclforge/ac4/io/carriage.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
-#include "iclforge/ac4/core/toc.hpp"
-#include "iclforge/ac4/encoder/encoder.hpp"
-#include "associated_mix.hpp"
-#include "code_pages.hpp"
-#include "commands/truehd.hpp"
-#include "container_input.hpp"
-#include "exit_codes.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/containers/mp4/dash.hpp"
+#include "iclforge/containers/mp4/mp4.hpp"
+#include "iclforge/objects/joc_domain.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/truehd/io/metadata_edit.hpp"
 #include "platform/stdio_binary.hpp"
 #include "recording_sink.hpp"
 #include "stream_playback.hpp"
+#include "truehd_encode_core.hpp"
 #include "usage.hpp"
 
 namespace forge_cli {
@@ -289,82 +291,24 @@ bool parse_block_mix_config(std::string_view text,
 // those too, its own final "unknown option".
 enum class MetadataOptionResult : std::uint8_t { kNotMetadata, kOk, kError };
 
-// A whole number in [low, high] with nothing else in the token, signs allowed.
-bool parse_int_in(std::string_view text, int low, int high, int& out) {
-    int value = 0;
-    const auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (ec != std::errc{} || ptr != text.data() + text.size() || value < low || value > high) {
-        return false;
-    }
-    out = value;
-    return true;
-}
-
 // The channel meaning options of TH spec §14.1, which `truehd-encode` writes and `metadata` sets in
-// a finished stream: one option for each field of each presentation, named after the presentation
-// it belongs to. The ranges are the widths of the fields (iclforge::truehd::channel_meaning_problem).
-// Provisional, no oracle until the DEE set: libs/truehd/ERRATA.md, questions 51 to 55.
-using MeaningEdit = iclforge::truehd::ChannelMeaningEdit;
-
-struct MeaningNumber {
-    std::string_view name;  // after "truehd-"
-    int low;
-    int high;
-    std::optional<int> MeaningEdit::*field;
-};
-
-constexpr std::array<MeaningNumber, 10> kMeaningNumbers{{
-    {"dialnorm-2ch", 0, 63, &MeaningEdit::twoch_dialogue_norm},
-    {"dialnorm-6ch", 0, 31, &MeaningEdit::sixch_dialogue_norm},
-    {"dialnorm-8ch", 0, 31, &MeaningEdit::eightch_dialogue_norm},
-    {"mix-level-2ch", 0, 63, &MeaningEdit::twoch_mix_level},
-    {"mix-level-6ch", 0, 63, &MeaningEdit::sixch_mix_level},
-    {"mix-level-8ch", 0, 63, &MeaningEdit::eightch_mix_level},
-    {"source-format-6ch", 0, 31, &MeaningEdit::sixch_source_format},
-    {"source-format-8ch", 0, 63, &MeaningEdit::eightch_source_format},
-    {"heavy-drc-start-up-gain", -32, 31, &MeaningEdit::heavy_drc_start_up_gain},
-    {"drc-start-up-gain", -64, 63, &MeaningEdit::drc_start_up_gain},
-}};
-
-struct MeaningFlag {
-    std::string_view name;
-    std::optional<bool> MeaningEdit::*field;
-};
-
-constexpr std::array<MeaningFlag, 3> kMeaningFlags{{
-    {"control-2ch", &MeaningEdit::twoch_control_enabled},
-    {"control-6ch", &MeaningEdit::sixch_control_enabled},
-    {"control-8ch", &MeaningEdit::eightch_control_enabled},
-}};
-
+// a finished stream: one option for each field of each presentation, named after the presentation it
+// belongs to. What each takes is iclforge::apps::truehd_encode::set_meaning_option, which the
+// window's Encode TrueHD dialog shares. Provisional, no oracle until the DEE set: libs/truehd/
+// ERRATA.md, questions 51 to 55.
 // kNotMetadata when `name` (an option without its "truehd-") is none of them.
 MetadataOptionResult parse_truehd_meaning_option(std::string_view name, std::string_view value,
-                                                 std::string_view token, MeaningEdit& edit) {
-    for (const MeaningNumber& number : kMeaningNumbers) {
-        if (name != number.name) {
-            continue;
-        }
-        int parsed = 0;
-        if (!parse_int_in(value, number.low, number.high, parsed)) {
-            fmt::println(stderr, "error: truehd-{} is a whole number from {} to {} (got '{}')",
-                         name, number.low, number.high, token);
-            return MetadataOptionResult::kError;
-        }
-        edit.*number.field = parsed;
-        return MetadataOptionResult::kOk;
+                                                 std::string_view token,
+                                                 iclforge::truehd::ChannelMeaningEdit& edit) {
+    namespace core = iclforge::apps::truehd_encode;
+    if (!core::is_meaning_option(name)) {
+        return MetadataOptionResult::kNotMetadata;
     }
-    for (const MeaningFlag& flag : kMeaningFlags) {
-        if (name != flag.name) {
-            continue;
-        }
-        if (value != "on" && value != "off") {
-            fmt::println(stderr, "error: truehd-{} is on or off (got '{}')", name, token);
-            return MetadataOptionResult::kError;
-        }
-        edit.*flag.field = value == "on";
-        return MetadataOptionResult::kOk;
+    if (const auto set = core::set_meaning_option(edit, name, value); !set) {
+        fmt::println(stderr, "error: {} (got '{}')", set.error(), token);
+        return MetadataOptionResult::kError;
     }
-    return MetadataOptionResult::kNotMetadata;
+    return MetadataOptionResult::kOk;
 }
 
 // "programmeN" or "programmeN-<suffix>" for N in 2..8 - the range §E2.3.1.2
@@ -2421,13 +2365,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         // TrueHD and MLP, which 'decode', 'levels' and 'loudness' read; each says when the input is
         // something else.
         const bool reads_truehd = command == "decode" || command == "levels" ||
-                                  command == "loudness" || command == "qc";
+                                  command == "loudness" || command == "qc" ||
+                                  command == "transcode" || command == "monitor";
         if (reads_truehd && key == "truehd-presentation") {
             if (value != "best" && value != "2ch" && value != "6ch" && value != "8ch" && value != "all") {
                 fmt::println(stderr, "error: truehd-presentation is best, 2ch, 6ch, 8ch or all (got '{}')", token);
                 return false;
             }
             out.truehd_presentation = std::string{value};
+            continue;
+        }
+        if (command == "decode" && key == "truehd-render") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: truehd-render needs a speaker layout, such as 7.1 (got '{}')", token);
+                return false;
+            }
+            out.truehd_render = std::string{value};
             continue;
         }
         if (reads_truehd && key == "truehd-check") {
@@ -2438,9 +2391,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.truehd_lenient = value == "lenient";
             continue;
         }
+        if (command == "decode" && key == "truehd-reading") {
+            if (value != "seed-shr7-32" && value != "zero-histories" &&
+                value != "shift-by-position" && value != "fold-by-position") {
+                fmt::println(stderr,
+                             "error: truehd-reading is seed-shr7-32, zero-histories, "
+                             "shift-by-position or fold-by-position (got '{}')",
+                             token);
+                return false;
+            }
+            out.truehd_reading = std::string{value};
+            continue;
+        }
         // The channel meaning of TH spec §14.1, which 'truehd-encode' writes and 'metadata' sets in a
         // finished TrueHD stream.
-        if ((command == "truehd-encode" || command == "metadata") && key.starts_with("truehd-")) {
+        if ((command == "truehd-encode" || command == "truehd-atmos" || command == "metadata") &&
+            key.starts_with("truehd-")) {
             switch (parse_truehd_meaning_option(key.substr(7), value, token, out.thd_meaning)) {
                 case MetadataOptionResult::kOk:
                     continue;
@@ -2450,8 +2416,29 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     break;
             }
         }
-        // TrueHD encoding, which 'truehd-encode' alone reads (iclforge::truehd::EncoderConfig).
-        if (command == "truehd-encode" && key.starts_with("truehd-")) {
+        // TrueHD Atmos encoding: the bed and the LFE of the objects.
+        if (command == "truehd-atmos" && key == "truehd-bed") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: truehd-bed needs the path of a 7.1 WAV");
+                return false;
+            }
+            out.thd_bed_path = std::string{value};
+            continue;
+        }
+        if (command == "truehd-atmos" && key == "truehd-objects-lfe") {
+            if (value != "on" && value != "off") {
+                fmt::println(stderr, "error: truehd-objects-lfe is on or off (got '{}')", token);
+                return false;
+            }
+            out.thd_objects_lfe = value == "on";
+            continue;
+        }
+        // TrueHD encoding, which 'truehd-encode' and 'truehd-atmos' read
+        // (iclforge::truehd::EncoderConfig).
+        // ('probe' reads truehd-bitrate= alone: the rate detail=rate runs the arrival model at.)
+        if (((command == "truehd-encode" || command == "truehd-atmos") &&
+             key.starts_with("truehd-")) ||
+            (command == "probe" && key == "truehd-bitrate")) {
             Options::TruehdEncode& enc = out.thdenc;
             const std::string_view name = key.substr(7);
             if (name == "downmix") {
@@ -2465,7 +2452,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             if (name == "restart") {
                 const auto units = parse_u32_or(value, 0);
-                if (units == 0 || units > 4096) {
+                if (units == 0 || units > iclforge::apps::truehd_encode::kRestartMaxUnits) {
                     fmt::println(
                         stderr,
                         "error: truehd-restart is the access units between restart headers, "
@@ -2478,7 +2465,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             if (name == "peak-rate") {
                 const auto kbps = parse_u32_or(value, 0);
-                if (kbps == 0 || kbps > 100000) {
+                if (kbps == 0 || kbps > iclforge::apps::truehd_encode::kPeakRateMaxKbps) {
                     fmt::println(
                         stderr,
                         "error: truehd-peak-rate is a rate in kbit/s, 1 to 100000 (got '{}')",
@@ -2497,8 +2484,78 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 enc.rate_lenient = value == "lenient";
                 continue;
             }
+            if (name == "bitrate") {
+                const auto kbps = parse_u32_or(value, 0);
+                if (kbps < iclforge::apps::truehd_encode::kBitrateMinKbps ||
+                    kbps > iclforge::apps::truehd_encode::kBitrateMaxKbps) {
+                    fmt::println(
+                        stderr, "error: truehd-bitrate is a rate in kbit/s, 1000 to 100000 (got '{}')",
+                        token);
+                    return false;
+                }
+                enc.bitrate_kbps = kbps;
+                continue;
+            }
+            if (name == "rate-mode") {
+                if (value != "strict" && value != "shape") {
+                    fmt::println(stderr, "error: truehd-rate-mode is strict or shape (got '{}')",
+                                 token);
+                    return false;
+                }
+                if (value == "shape" && command != "truehd-atmos") {
+                    fmt::println(stderr,
+                                 "error: truehd-rate-mode=shape gives up low bits of the object "
+                                 "channels, which only truehd-atmos has");
+                    return false;
+                }
+                enc.shape = value == "shape";
+                continue;
+            }
+            if (name == "shape-bits") {
+                const auto bits = parse_u32_or(value, 99);
+                if (bits > 16) {
+                    fmt::println(stderr, "error: truehd-shape-bits is 0 to 16 (got '{}')", token);
+                    return false;
+                }
+                enc.shape_bits = static_cast<int>(bits);
+                continue;
+            }
+            if (name == "major-sync") {
+                const auto units = parse_u32_or(value, 70000);
+                if (units > iclforge::apps::truehd_encode::kMajorSyncMaxUnits) {
+                    fmt::println(stderr,
+                                 "error: truehd-major-sync is the access units between major "
+                                 "syncs, 0 (one at every restart header) or a multiple of "
+                                 "truehd-restart= up to 65536 (got '{}')",
+                                 token);
+                    return false;
+                }
+                enc.major_sync_units = static_cast<int>(units);
+                continue;
+            }
+            if (name == "evo-frames") {
+                if (value == "all") {
+                    enc.evo_stride = 1;
+                } else if (value == "none") {
+                    enc.evo_stride = 0;
+                } else if (value == "first") {
+                    enc.evo_stride = -1;
+                } else if (value.starts_with("every:") && value.size() > 6 &&
+                           parse_u32_or(value.substr(6), 0) >= 1 &&
+                           parse_u32_or(value.substr(6), 0) <= 65536) {
+                    enc.evo_stride = static_cast<int>(parse_u32_or(value.substr(6), 0));
+                } else {
+                    fmt::println(stderr,
+                                 "error: truehd-evo-frames is all, every:N (N from 1 to 65536), "
+                                 "first or none (got '{}')",
+                                 token);
+                    return false;
+                }
+                continue;
+            }
             if (name == "fir-order") {
-                if (value.size() != 1 || value[0] < '0' || value[0] > '8') {
+                if (value.size() != 1 || value[0] < '0' ||
+                    value[0] > '0' + iclforge::apps::truehd_encode::kFirOrderMax) {
                     fmt::println(stderr, "error: truehd-fir-order is 0 to 8 (got '{}')", token);
                     return false;
                 }
@@ -2539,7 +2596,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     if (part == "off") {
                         gains[i] = 0.0;
                     } else if (parse_double(part, db) && std::isfinite(db) && db <= 0.0 &&
-                               db >= -60.0) {
+                               db >= iclforge::apps::truehd_encode::kDownmixGainFloorDb) {
                         gains[i] = std::pow(10.0, db / 20.0);
                     } else {
                         good = false;
@@ -3298,6 +3355,19 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.take_layout = std::string{value};
             continue;
         }
+        if (key == "codec" && value == "truehd") {
+            // A lossless take of what the device hears, written as a bare .thd: record only (a live
+            // session sends what it encodes to an output as it goes, and nothing here sends TrueHD).
+            if (command != "record") {
+                fmt::println(stderr,
+                             "error: {} does not code TrueHD; codec=truehd is for record, which "
+                             "writes a bare .thd",
+                             command);
+                return false;
+            }
+            out.take_truehd = true;
+            continue;
+        }
         if (key == "codec") {
             out.take_codec = plan::parse_codec(value);
             if (!out.take_codec.has_value()) {
@@ -3443,10 +3513,11 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "detail") {
-            if (value != "frames" && value != "blocks" && value != "evolution" &&
-                value != "structure" && value != "format") {
+            if (value != "frames" && value != "blocks" && value != "evolution" && value != "checks" &&
+                value != "structure" && value != "format" && value != "rate" &&
+                value != "matrix") {
                 fmt::println(stderr,
-                             "error: detail must be frames, blocks, evolution, structure or format "
+                             "error: detail must be frames, blocks, evolution, structure, format, checks, rate or matrix "
                              "(got '{}')",
                              token);
                 return false;
@@ -3484,6 +3555,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 return false;
             }
             out.trust_anchors.emplace_back(value);
+            continue;
+        }
+        if (key == "trust-key") {
+            if (value.empty()) {
+                fmt::println(stderr, "error: trust-key= needs a public key file path");
+                return false;
+            }
+            out.trust_keys.emplace_back(value);
             continue;
         }
         if (key == "pin") {
@@ -3668,7 +3747,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                                    signer_info_given;
         const bool checking_given = out.verify_content || out.check_content || out.unanchored_ok ||
                                     !out.trust_anchors.empty() || !out.pins.empty() ||
-                                    !out.expect_publisher_uuids.empty() ||
+                                    !out.trust_keys.empty() || !out.expect_publisher_uuids.empty() ||
                                     out.verify_time.has_value();
         if (signing_given && !signs_content) {
             fmt::println(stderr,
@@ -3680,7 +3759,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         if (checking_given && !checks_content) {
             fmt::println(stderr,
                          "error: verify-content, check-content, unanchored-ok, trust-anchor=, pin=, "
-                         "expect-publisher-uuid= and verify-time= check an AC-4 content "
+                         "trust-key=, expect-publisher-uuid= and verify-time= check an AC-4 content "
                          "signature: decode and ac4-verify take them");
             return false;
         }
@@ -3711,7 +3790,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (checks_content && !checking_asked && (checking_given || out.leaf_title.has_value())) {
             fmt::println(stderr,
-                         "error: trust-anchor=, pin=, expect-publisher-uuid=, unanchored-ok, "
+                         "error: trust-anchor=, pin=, trust-key=, expect-publisher-uuid=, unanchored-ok, "
                          "verify-time= and leaf-title= say how to check, and nothing is checked "
                          "unless verify-content or check-content asks for it");
             return false;
@@ -4265,7 +4344,7 @@ void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
                        vocals_name(output.karaoke_vocals), karaoke_levels_words(output));
     } else if (reproduced) {
         // The levels the decoder used: the stream's Lo/Ro surround level where it sent mixmdate,
-        // and -3 dB where it did not (planning/karaoke-eac3.md, D2).
+        // and -3 dB where it did not.
         const double slev = first.mixing.has_value()
                                 ? ac3::meta::coefficient(first.mixing->lorosurmixlev)
                                 : ac3::meta::level::kMinus3dB;

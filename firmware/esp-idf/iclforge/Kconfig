@@ -1,8 +1,8 @@
 menu "iclforge"
 
 # THE SENDSPIN PLAYER - include/iclforge/sendspin_host.hpp and
-# include/iclforge/burst_player.hpp, over libs/sendspin's player half
-# (planning/hearth-reference-player.md, B3). Off by default: a firmware that
+# include/iclforge/burst_player.hpp, over libs/sendspin's player half.
+# Off by default: a firmware that
 # only decodes from its own storage carries none of it.
 config ICLFORGE_SENDSPIN
     bool "Sendspin player"
@@ -45,7 +45,7 @@ config ICLFORGE_SENDSPIN_OPUS
         (docs/platforms/bare-metal/esp32-c6.md).
 
 # THE AC-4 DECODER - libs/ac4, and the player's
-# reading of AC-4 streams (src/ac4_bridge.hpp; planning/ac4.md, D14b). Off by
+# reading of AC-4 streams (src/ac4_bridge.hpp). Off by
 # default: a firmware that plays AC-3 and E-AC-3 carries none of it, and its
 # build is what it was without this option.
 config ICLFORGE_AC4
@@ -59,10 +59,10 @@ config ICLFORGE_AC4
 
         The decoder follows the component's decode arithmetic: single
         precision on a part with a floating-point unit, the fixed-point
-        tier on one without (ESP32-C3, ESP32-C6; planning/ac4.md, D14d).
+        tier on one without (ESP32-C3, ESP32-C6).
 
         The decoder holds 286 KB at 2.0, 0.7 MB at 5.1 and 1.5 MB at 5.1.4
-        on a 32-bit core in either tier (planning/ac4.md, D14f): about what
+        on a 32-bit core in either tier: about what
         the ESP32-S3 has free in internal RAM (277,400 bytes in the AC-3
         probe's configuration, 347,051 in the AC-4 probe's) and more than
         the ESP32-P4's internal RAM from 5.1 up, so a build that turns it
@@ -79,9 +79,33 @@ config ICLFORGE_AC4
         on an ESP32-S3, where its state goes to PSRAM
         (ICLFORGE_AC4_INTERNAL_BELOW). The ESP32-P4 and the ESP32-S3 have run
         it on a board; the ESP32-C6 builds it and refuses a play it has no
-        heap for (planning/ac4.md, D14c and D14d).
+        heap for.
 
-# Where an AC-4 play's allocations go (planning/ac4.md, D14c). An int rather
+# THE TRUEHD DECODER - libs/truehd, and the player's reading of TrueHD chunks
+# (src/truehd_stream.hpp). Off by default:
+# a firmware that plays AC-3, E-AC-3 and AC-4 carries none of it.
+config ICLFORGE_TRUEHD
+    bool "TrueHD decoder"
+    default n
+    help
+        Builds the TrueHD core, bitstream layer and decoder (libs/truehd,
+        without its encoder) into the component and lets the player decode
+        the Sendspin extension's TrueHD data type: one to 24 whole access
+        units a chunk.
+
+        Measured by firmware/truehd-probe, bit-exact against FFmpeg's PCM
+        on all three chips: 158,020 bytes of heap and 60,944 bytes of stack
+        for a decoder, and, as a share of one core, 0.13 (ESP32-P4, 360 MHz)
+        and 0.56 (ESP32-S3, 240 MHz) for 2.0 at 48 kHz, and 0.32 (P4) and
+        1.13 (S3, so not real time) for 5.1. The ESP32-C6 does 2.0 at
+        48 kHz at 0.34 and 5.1 at 0.80, with 25 to 56 KB free in a play,
+        so it does not fit beside Wi-Fi.
+
+        The task that decodes needs at least 64 KiB of stack. A board
+        states the channels it takes in the hello (max_coded_channels for
+        "truehd"), so a server cuts a stream with downmix substreams to them.
+
+# Where an AC-4 play's allocations go. An int rather
 # than a choice, so it reaches C++ as a plain constant.
 config ICLFORGE_AC4_INTERNAL_BELOW
     int "AC-4 play: allocations below this many bytes try internal RAM first"
@@ -114,14 +138,12 @@ config ICLFORGE_SENDSPIN_SUITE
     default 0
     range 0 1
     help
-        A client names one suite in client/init and a server supports both
-        (planning/hearth-sendspin-extension.md, row E3).
+        A client names one suite in client/init and a server supports both.
         25519_ChaChaPoly_SHA256 is software on every part;
         25519_AESGCM_SHA256 uses the part's AES accelerator where it has one.
 
-# UPDATES OVER THE NETWORK - include/iclforge/firmware.hpp and
-# planning/esp32-ota.md. Ints rather than bools, so they reach C++ as plain
-# constants.
+# UPDATES OVER THE NETWORK - include/iclforge/firmware.hpp. Ints rather than
+# bools, so they reach C++ as plain constants.
 config ICLFORGE_FIRMWARE_TRIAL_HOLD_S
     int "Seconds an updated image has to stay healthy before it is accepted"
     default 30
@@ -146,11 +168,10 @@ config ICLFORGE_FIRMWARE_FLASH_MODE_IDLE_S
     default 600
     range 30 86400
 
-# UPDATES FROM GITHUB RELEASES - include/iclforge/firmware_pull.hpp and
-# planning/esp32-ota.md (O10): a board reads a small signed index of its channel from a
-# GitHub release, and installs the image it names when there is a newer one. A pushed
-# image (PUT /firmware) is untouched by all of it. Off by default: it carries an HTTPS
-# client and a certificate bundle.
+# UPDATES FROM GITHUB RELEASES - include/iclforge/firmware_pull.hpp: a board reads a
+# small signed index of its channel from a GitHub release, and installs the image it
+# names when there is a newer one. A pushed image (PUT /firmware) is untouched by all
+# of it. Off by default: it carries an HTTPS client and a certificate bundle.
 config ICLFORGE_FIRMWARE_PULL
     bool "Updates pulled from GitHub releases"
     default n
@@ -196,8 +217,7 @@ config ICLFORGE_FIRMWARE_PULL_TEST_HTTP
         For the QEMU test, which serves the index and an image from a loopback server and has
         no clock. The signature is checked exactly as on a board. Never set for a board.
 
-# DIAGNOSTICS WITHOUT A CABLE - include/iclforge/log.hpp and
-# planning/esp32-ota.md (O4).
+# DIAGNOSTICS WITHOUT A CABLE - include/iclforge/log.hpp.
 config ICLFORGE_LOG_BYTES
     int "Bytes of recent console output kept for GET /log"
     default 16384 if SPIRAM

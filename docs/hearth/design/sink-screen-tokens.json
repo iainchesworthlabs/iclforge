@@ -1,5 +1,5 @@
 {
-  "comment": "The one place the Hearth sink screen's tokens are written (planning/hearth-sink-screen.md, Tokens and Layout; planning/hearth-android.md, D13). The Android app's Tokens.kt is generated from this file, and the checks hold the desktop's Signal palette (apps/shared/theme/assets/qml/Theme.qml) and the P4X panel's screen (firmware/hearth-sink/main/panel/lvgl/lyric_screen.cpp) to it. Change a value here, run tools/checks/sink_screen_tokens.py --write, and read what the check says of the others.",
+  "comment": "The one place the Hearth sink screen's tokens are written. The Android app's Tokens.kt is generated from this file, and the checks hold the desktop's Signal palette (apps/shared/theme/assets/qml/Theme.qml) and the P4X panel's screen (firmware/hearth-sink/main/panel/lvgl/lyric_screen.cpp) to it. Change a value here, run tools/checks/sink_screen_tokens.py --write, and read what the check says of the others.",
   "palette": "signal, dark: a sink is a thing in a dim room and always draws dark, whatever the OS theme is",
   "colours": {
     "bg": "151313",

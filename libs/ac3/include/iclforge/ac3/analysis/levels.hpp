@@ -9,8 +9,8 @@
 #include "iclforge/ac3/export.hpp"
 #include "iclforge/base/levels.hpp"
 
-// The level meter is iclforge::base's (iclforge/base/levels.hpp, since
-// planning/consolidation.md's C6), and its names are kept here for a release.
+// The level meter is iclforge::base's (iclforge/base/levels.hpp), and its
+// names are kept here for a release.
 // What is AC-3's is the acmod: A/52 Table 5.8's channel order, names and
 // directions, and a meter keyed on them.
 

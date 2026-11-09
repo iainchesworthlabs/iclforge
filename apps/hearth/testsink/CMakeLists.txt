@@ -1,11 +1,11 @@
-# hearth-testsink (planning/hearth-reference-player.md, The test sink): libs/sink as a program, with
+# hearth-testsink: libs/sink as a program, with
 # outputs that write a WAV file and decode a burst. The sink is libs/sink's; what is here is a static
 # library, so the loopback tests in iclforge-hearth-tests can run sinks in-process, and the executable,
 # which adds the command line. Never installed or packaged.
 add_library(hearth_testsink STATIC src/burst_output.cpp src/sink.cpp src/wav_output.cpp)
 target_include_directories(hearth_testsink PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(hearth_testsink PUBLIC cxx_std_23)
-# iclforge::ac4 for the extension role's AC-4 bursts (planning/ac4.md, D11): the
+# iclforge::ac4 for the extension role's AC-4 bursts: the
 # decoder, and the inspector's sync-frame scan in front of it.
 target_link_libraries(hearth_testsink PUBLIC iclforge::sink iclforge::sink_decode iclforge::sendspin
                                             iclforge::ac3 iclforge::ac4 iclforge::containers iclforge::lyrics)

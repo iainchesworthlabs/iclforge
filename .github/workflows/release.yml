@@ -345,7 +345,7 @@ jobs:
             "release-artifacts/iclforge-[0-9]*-Darwin.dmg|macOS universal disk image (package-macos-universal)"
             "release-artifacts/forge-gui-*.AppImage|Linux AppImage (linux-appimage)"
             "release-artifacts/*.apk|Android APK (build-android)"
-            # The sink firmware (package-esp32-firmware, planning/esp32-ota.md O8):
+            # The sink firmware (package-esp32-firmware):
             # each image's factory file stands for its set, which
             # check_firmware_package.py has already held whole. The 4 MB C6's
             # glob names the version's leading v so the 16 MB image cannot stand in.

@@ -21,14 +21,14 @@
 // the stream says what was coded, this says where it should come out, and
 // ac3/render/render.hpp turns one into the other a block at a time. It came
 // from the ESP-IDF component's player, and lives in the library so that the
-// desktop player and the test sink render with the boards' own code
-// (planning/hearth-reference-player.md, A1). It includes nothing
+// desktop player and the test sink render with the boards' own code.
+// It includes nothing
 // platform-specific, allocates nothing, and is tested on the host
 // (libs/render/tests/test_layout.cpp) - the part where a wrong index puts the
 // centre channel in a subwoofer.
 //
-// Two ways to say it, both in one string, because planning/esp32-player.md's
-// decision 7 wants names for the installations that have one and a list for
+// Two ways to say it, both in one string, because the player wants names for the
+// installations that have one and a list for
 // the ones that do not:
 //
 //   A NAME, "F.L.H": F full-bandwidth speakers on the listener's ring, L

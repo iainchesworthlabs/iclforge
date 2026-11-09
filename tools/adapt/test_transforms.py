@@ -239,7 +239,7 @@ class CMake(unittest.TestCase):
 class LayeringTable(unittest.TestCase):
     TABLE = (
         '{\n  "_comment": "The table. libraries: who may include whom. layout: how a path under '
-        "src/ is filed while the tree is re-laid out (planning/layout.md): `split` gives the "
+        "src/ is filed while the tree is re-laid out: `split` gives the "
         'libraries a directory holds. Both go when the re-layout is done.",\n'
         '  "libraries": {\n    "base": [],\n    "codec": ["base"]\n  },\n'
         '  "layout": {\n    "rename": {"ac3adm": "adm"},\n'

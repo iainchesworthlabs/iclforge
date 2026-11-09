@@ -64,7 +64,8 @@ readonly BASE_TARGETS=(fuzz_scan fuzz_ac3_decode fuzz_eac3_decode fuzz_wav_read
                        fuzz_ac4_decode fuzz_ac4_encode fuzz_content_signature
                        fuzz_ac4_content_signature fuzz_sendspin_json fuzz_sendspin_frames
                        fuzz_sendspin_handshake fuzz_sendspin_messages
-                       fuzz_truehd_parse fuzz_truehd_decode fuzz_truehd_encode fuzz_mat_unwrap)
+                       fuzz_truehd_parse fuzz_truehd_decode fuzz_truehd_encode fuzz_mat_unwrap
+                       fuzz_iamf_parse)
 
 adm_enabled() { [[ -n "${ICLFORGE_FUZZ_ADM:-}" ]]; }
 

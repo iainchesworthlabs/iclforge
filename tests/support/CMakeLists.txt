@@ -1,6 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::test_support - what every project's test binary is built with (planning/monorepo.md,
-# (e)): the CRT hook and the process seam below, the headers beside them (platform/process.hpp,
+# iclforge::test_support - what every project's test binary is built with: the CRT hook and the process seam below, the headers beside them (platform/process.hpp,
 # sanitized.hpp, ac4_stream_kinds.hpp, alsa_null_device.hpp) and the definitions that say where
 # the golden data is and how the library under test was built. Internal: built for the tests,
 # never installed.

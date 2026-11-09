@@ -59,7 +59,7 @@ set(ICLFORGE_BUILD_CAPI OFF CACHE BOOL "" FORCE)
 # nothing outside this tree (packaging/vcpkg-port/iclforge/vcpkg.json's "ac4" feature says
 # the same - "depends on nothing in iclforge::ac3"), so they cross-compile under the NDK with no
 # extra package friction. Nothing in this app's own target_link_libraries links them yet - a
-# later phase's application work (planning/ac4.md), not this one, which only has to keep the
+# later phase's application work, not this one, which only has to keep the
 # sources building under the NDK toolchain; tools/checks/test_ac4_build_configurations.py holds
 # this build to that ON default.
 

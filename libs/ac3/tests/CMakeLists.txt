@@ -116,7 +116,7 @@ target_include_directories(iclforge-ac3-tests PRIVATE "${_ac3_root}/src/encoder"
 # test_scalar_math.cpp includes iclforge/base/arithmetic/scalar_math.hpp and
 # test_fixed32*.cpp/test_mdct_fixed.cpp include iclforge/base/arithmetic/fixed32.hpp - the
 # shared arithmetic target (libs/base) both iclforge::ac3 and iclforge::ac4
-# use (planning/ac4.md, decision 31), worth holding to their own accuracy/
+# use, worth holding to their own accuracy/
 # correctness bounds rather than only through the fixture hashes that depend
 # on them.
 target_link_libraries(iclforge-ac3-tests PRIVATE iclforge::base_headers)

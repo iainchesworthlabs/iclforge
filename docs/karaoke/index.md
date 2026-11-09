@@ -74,9 +74,8 @@ reproduction uses are the stream's Lo/Ro mixing group (`lorocmixlev` and `lorosu
 the vocals from the surround speakers, as it does an AC-3 stream.
 
 **AC-4** has no karaoke mode: its specification has no `bsmod` value for it, so there is nothing
-to reproduce, and `forge` warns and ignores the choice on an AC-4 stream. [The options for carrying
-karaoke in AC-4](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-ac4-options.md)
-say what its presentations and objects could do; none is built.
+to reproduce, and `forge` warns and ignores the choice on an AC-4 stream. Carrying karaoke in an AC-4
+stream's presentations or objects is not built.
 
 ## Play it in Hearth
 
@@ -529,8 +528,8 @@ makes a 3/1 stream with (`L,C,R,Cs`, 320 kbit/s). A stream with one vocal has no
 
 This decodes the stream and encodes it again, which is a second generation of AC-3 for the backing.
 If you still have the files it was made from, give those to the Karaoke flow instead.
-A one-click "save my performance as a karaoke stream" in Hearth is not built: the plan holds it
-until this has been tried ([D12](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)).
+A one-click "save my performance as a karaoke stream" in Hearth is not built: it is held
+until this has been tried.
 A take made through open speakers has the backing in it as well as your voice, and is a recording of
 somebody else's work: keep it for yourself.
 
@@ -698,8 +697,7 @@ samples and the same lines as `forge decode` and Hearth do.
   player that does not reproduce it plays the vocals from the surrounds.
 - **A microphone on a board or on Android.** The microphone, the pitch score and the takes are in
   Hearth's desktop player and the browser demo ([Sing into a microphone](#sing-into-a-microphone)).
-  The board's part of the [plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
-  is not built.
+  The board's part of that is not built.
 
 ## How it is checked
 

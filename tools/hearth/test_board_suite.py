@@ -1,4 +1,4 @@
-"""Unit tests for board_suite.py, the board suite (planning/esp32-platform-profiles.md).
+"""Unit tests for board_suite.py, the board suite.
 
 stdlib unittest, as ci.yml's script-lint job runs it. The board is a stand-in: an HTTP server
 that answers GET /hardware, GET /status, GET /log and POST /play with what the real boards
@@ -57,7 +57,7 @@ class Behaviour:
         self.slots = kwargs.get("slots")
 
 
-# The slots a layout needs, for the layouts the rows name (planning/karaoke-p4x-panel.md): a name is
+# The slots a layout needs, for the layouts the rows name: a name is
 # its ring, its heights and its LFE feeds, and 9.1.6 is the sixteen a P4X's TDM frame carries.
 SLOTS = {"2.0": 2, "5.1": 6, "9.1.6": 16}
 
@@ -392,7 +392,7 @@ class Suite(unittest.TestCase):
                 "(board_suite.py run --record); a key added at the value it already had keeps the "
                 f"baseline: set profiles.{profile}.baseline_accepted in suite.json to "
                 f'{{"profile_hash": "{current}", "why": "..."}} '
-                "(planning/esp32-platform-profiles.md, 'Changing a profile')"
+                ""
             )
             self.assertIsNotNone(accepted, how)
             self.assertEqual(accepted.get("profile_hash"), current, how)

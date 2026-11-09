@@ -16,7 +16,7 @@
 #include "tiered/tables/qmf_tables_fixed.hpp"
 
 // One slot of the QMF analysis and synthesis (dsp/qmf.hpp) at Fixed32, with a block exponent
-// per slot (planning/ac4.md, D14d). The steps and their order are qmf_kernels.hpp's; what
+// per slot. The steps and their order are qmf_kernels.hpp's; what
 // differs is where the values sit in the format.
 //
 // Analysis. The window's five products per output are summed in 64 bits, QWIN in Q1.30

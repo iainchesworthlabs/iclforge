@@ -1,4 +1,4 @@
-// A singer's pitch for the browser decode demo (planning/karaoke-microphone.md, M7; D16): the same
+// A singer's pitch for the browser decode demo: the same
 // tracker, reference melody and scorer Hearth uses (libs/pitch), compiled into the demo's module so
 // that the page follows a microphone with the one implementation and not a second one in
 // JavaScript.

@@ -13,10 +13,22 @@ iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     test_karaoke_authoring.cpp
     test_karaoke_outputs.cpp
     test_lfe_pins.cpp
+    test_truehd_pcm_source.cpp
+    test_truehd_rate_model.cpp
+    test_truehd_stream_end.cpp
+    test_truehd_encode_settings.cpp
+    test_truehd_wrap.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/gui_diagnostics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_encode_settings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_presentations.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/karaoke_authoring.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/truehd_pcm_source.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/probe_truehd.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/truehd_stream.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/truehd_wrap.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/truehd_encode_core.cpp"
+    # The container readers the player finds a TrueHD track with (container_input.hpp).
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/container_input.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_encode_core.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_objects_core.cpp"
     # The table of a karaoke stream's parts, which karaoke_authoring.cpp and `forge project` share
@@ -26,11 +38,14 @@ target_include_directories(iclforge-forge-gui-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/project/src")
+target_compile_definitions(iclforge-forge-gui-tests PRIVATE
+    ICLFORGE_GUI_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 target_link_libraries(iclforge-forge-gui-tests
     PRIVATE
         iclforge::ac3
         iclforge::audio
         iclforge::containers
         iclforge::ac4
+        iclforge::truehd
         iclforge::lyrics
         iclforge::app_text_encoding)

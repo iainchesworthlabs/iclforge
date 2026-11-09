@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Provision hearth_sink over Improv Wi-Fi under QEMU, and hold it to its answers.
 
-planning/hearth-reference-player.md, B2. A board with no network listens for
+A board with no network listens for
 Improv Wi-Fi (https://www.improv-wifi.com/serial/) on its console, and a
 client there gives it an SSID and a passphrase:
 firmware/hearth-sink/main/provision.cpp answers, in the

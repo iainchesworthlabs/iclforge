@@ -1,4 +1,4 @@
-// iclforge::ac4::Encoder's immersive layouts end to end (planning/ac4.md, phase E8): 5.1.4
+// iclforge::ac4::Encoder's immersive layouts end to end: 5.1.4
 // and 5.0.4 in the immersive element of ETSI TS 103 190-2 V1.3.1 clause 6.2.4,
 // as DEE writes it, in SCPL, ASPX_SCPL and ASPX_ACPL_2 by the rate, and the
 // experimental 7.1.4 with the back pair and ASPX_ACPL_1. Each stream reads back
@@ -209,8 +209,8 @@ std::size_t index_of(const Decoded& d, Speaker speaker) {
 }
 
 // Each channel's own tone within 0.2 dB of unity, and every other tone 60 dB
-// under it there: planning/ac4.md, E3's exit, held to E8's layouts. `skip`
-// names channels held to other checks.
+// under it there. `skip` names
+// channels held to other checks.
 void check_routing(const std::vector<Channel>& channels, const Decoded& decoded,
                    std::span<const Speaker> skip = {}) {
     REQUIRE(decoded.speakers.size() == channels.size());

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Plays to hearth_sink's Sendspin player under QEMU from the host, and holds
-# what it played to a test sink's (planning/hearth-reference-player.md, B4).
+# what it played to a test sink's.
 #
 # The board boots sdkconfig.ci-sendspin's image with nothing to play, prints
 # its pairing token on the console, and waits for a server. The test server
@@ -123,7 +123,7 @@ done
 # The board's list of the servers it is paired with (GET /pairing): the test
 # server alone, by the name its hello gave and the server_id its report gives.
 # Then that one server forgotten by its server_id, which takes it off the list
-# and out of /status's count (planning/esp32-device-ui.md, Several servers).
+# and out of /status's count.
 server_id="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["server"]["id"])' "$out/report.json")" \
     || fail "the test server's report gives no server id"
 curl -fsS http://127.0.0.1:18080/pairing > "$out/pairing.json" || fail "GET /pairing failed"

@@ -8,7 +8,7 @@ import HearthTest
 import "HearthTestHelpers.js" as H
 
 // The lyrics of the Karaoke page and the singer view (LyricClock.qml,
-// LyricView.qml, LyricScreen.qml; planning/karaoke-design.md, K5).
+// LyricView.qml, LyricScreen.qml).
 //
 // The reader and the cursor are tested where they live; what is held here is
 // what a person sees from them: which word is in which of the three states and
@@ -302,8 +302,8 @@ TestCase {
         fuzzyCompare(wordItem(view, 2).fill, 1.0, 0.001);
     }
 
-    // A line that has been sung has a place for how it was sung (planning/karaoke-microphone.md,
-    // M5). This suite never turns a microphone on, so the place is there and holds nothing: no mark
+    // A line that has been sung has a place for how it was sung. This suite never turns a
+    // microphone on, so the place is there and holds nothing: no mark
     // appears for a singer who has not asked for one.
     function test_aSungLineHasAPlaceForItsMarkAndItIsEmptyWithTheMicrophoneOff() {
         const view = loaded(newView(), 6000);   // in the second line; the first is sung
@@ -430,7 +430,7 @@ TestCase {
         tryVerify(function() { return message.visible && message.text.indexOf("bare.lrc") >= 0; }, 5000);
     }
 
-    // --- a duet (planning/karaoke-phase2.md, W11b) ---------------------------
+    // --- a duet ---------------------------
 
     function writeDuet() {
         const file = TestServices.writeTextFile("duet.lrc", [

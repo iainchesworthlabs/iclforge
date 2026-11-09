@@ -1,4 +1,4 @@
-// The lyric screen. See lyric_screen.hpp and planning/karaoke-p4x-panel.md.
+// The lyric screen. See lyric_screen.hpp.
 //
 // The rows of a line (the lines before it and after it, the words of the one being sung) are LVGL
 // objects that are built when the line changes and left alone while it is sung: a frame changes the
@@ -47,7 +47,7 @@ using iclforge::lyrics::Stage;
 using iclforge::lyrics::StageMode;
 using iclforge::lyrics::StageOptions;
 
-// --- the design's tokens (planning/karaoke-p4x-panel.md, "The screen"): Hearth's Signature palette
+// --- the design's tokens: Hearth's Signature palette
 // in its dark mode.
 constexpr std::uint32_t kBg = 0x151313;
 constexpr std::uint32_t kSurface = 0x1D1A1A;
@@ -274,6 +274,8 @@ struct Signature {
     std::uint32_t room_key = 0;
     // The title card's words (what a rebuild draws), 0 for any other view.
     std::uint32_t card_generation = 0;
+    // The waiting screen is its clock saver, not the status page.
+    bool saver_clock = false;
 
     bool operator==(const Signature&) const = default;
 };
@@ -289,6 +291,9 @@ struct WordCell {
     // 0 not yet, 1 sung, 2 being sung: what is painted.
     int painted = -1;
 };
+
+// How long after the cover came off a waiting screen that begins still counts as having been dimmed as the stream ended.
+constexpr std::uint32_t kCarryMs = 1500;
 
 enum class Button : int { kAdjust, kPreferences, kDelayLess, kDelayMore, kSmaller, kLarger, kClose };
 
@@ -310,11 +315,22 @@ struct Screen {
     lv_obj_t* chip_name = nullptr;
     lv_obj_t* chip_line = nullptr;
     lv_obj_t* chip_delay = nullptr;
-    // The footer's line about the stream (decoded on this board, bitrate, who sends it) while a view with no
-    // lyrics shows, in the room the lyric chips leave.
+    // The footer's line about the stream (what it is, its bitrate, who sends it) while anything plays. Under a view with
+    // no lyrics it takes the columns the lyric chips would have (stream_x, stream_room); under lyrics it goes after the
+    // delay chip (stream_lyric_x, stream_lyric_room), and is left out where that leaves no room for a name.
     lv_obj_t* chip_stream = nullptr;
     std::string stream_text;
+    int stream_x = 0;
     int stream_room = 0;
+    int stream_lyric_x = 0;
+    int stream_lyric_room = 0;
+    bool stream_lyric_fits = false;
+    bool stream_at_lyric = false;
+    // What the player says of the stream, for that line: filled by the no-lyrics read when a view reads the player
+    // (g.now) and by read_now_stream() twice a second when none does.
+    NowStream stream;
+    bool stream_known = false;
+    std::uint64_t stream_read_us = 0;
     lv_obj_t* sheet = nullptr;
     lv_obj_t* sheet_delay = nullptr;
     lv_obj_t* sheet_size = nullptr;
@@ -359,7 +375,21 @@ struct Screen {
     bool dimmed = false;
     bool dim_off = false;
     bool dim_clear = false;
+    bool dim_waiting = false;
     int backlight = kBacklightNormalPercent;
+    // The waiting screen (nothing playing, nothing held): since when it has been the screen, and whether the screen was
+    // already dimmed or dark as it began. While its saver shows the
+    // clock the header, the footer and the hairline are put away and the stage is the whole glass.
+    bool idle_was = false;
+    bool idle_carried = false;
+    std::uint32_t idle_since_ms = 0;
+    // The last time the screen was under its cover. The board's state is read twice a second and the stream five times, so a
+    // stream's end shows the lit "no lyrics" page for a few frames before the waiting screen is known, and the screen "was
+    // dimmed as the stream ended" if it was within kCarryMs of that.
+    bool covered_seen = false;
+    std::uint32_t covered_ms = 0;
+    bool chrome_hidden = false;
+    lv_obj_t* header_rule = nullptr;
     lv_obj_t* dim_cover = nullptr;
     lv_obj_t* dim_text = nullptr;
     std::string dim_text_shown;
@@ -702,6 +732,8 @@ void build_dim_cover() {
     lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_CLICKABLE);
     g.dim_text = make_label(g.dim_cover, "", g.small, kMuted);
     lv_obj_set_width(g.dim_text, g.width - 2 * g.m.margin);
+    lv_obj_set_height(g.dim_text, lv_font_get_line_height(g.small.latin));
+    lv_label_set_long_mode(g.dim_text, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_pos(g.dim_text, g.m.margin, g.height - g.m.margin - lv_font_get_line_height(g.small.latin));
     lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
 }
@@ -709,25 +741,30 @@ void build_dim_cover() {
 // The cover and the backlight for what the no-lyrics screen is doing: lit, dimmed (the speakers view, left
 // alone: a black cover with one line, the backlight at its floor; the clock view, left alone: the backlight at
 // its floor and a clear cover, so that the time stays on the glass) or dark (the dark view: a black cover that
-// says nothing, the backlight off).
-void set_dimmed(iclforge::nowview::Dim dim) {
+// says nothing, the backlight off). The waiting screen's dim is the same cover with its own one line, and its clock saver
+// the clock's clear cover.
+void set_dimmed(iclforge::nowview::Dim dim, bool waiting) {
     using iclforge::nowview::Dim;
     const bool cover = dim != Dim::kNone;
     const bool off = dim == Dim::kDark;
     const bool clear = dim == Dim::kDimmed && g.np_clock;
-    if (cover == g.dimmed && off == g.dim_off && clear == g.dim_clear) {
+    waiting = waiting && cover;
+    if (cover == g.dimmed && off == g.dim_off && clear == g.dim_clear && waiting == g.dim_waiting) {
         return;
     }
     g.dimmed = cover;
     g.dim_off = off;
     g.dim_clear = clear;
+    g.dim_waiting = waiting;
     if (cover) {
         // The title card's dark screen names the song, the speakers' the stream and its room; the dark view's
         // and the clock's say nothing.
         const std::string_view said = g.np_card ? std::string_view(g.np_header)
                                                 : std::string_view(g.now.heading.data(), g.now.heading.size());
-        const std::string line =
-            off || clear ? std::string() : said.empty() ? std::string("Playing") : "Playing  -  " + std::string(said);
+        const std::string line = off || clear ? std::string()
+                                 : waiting    ? std::string("Waiting for something to play")
+                                 : said.empty() ? std::string("Playing")
+                                                : "Playing  -  " + std::string(said);
         if (line != g.dim_text_shown) {
             g.dim_text_shown = line;
             lv_label_set_text(g.dim_text, line.c_str());
@@ -760,6 +797,7 @@ void build_frame() {
     lv_obj_set_width(g.clock, clock_w);
     lv_obj_set_pos(g.clock, g.width - m.margin - clock_w, (m.header - line_h) / 2);
     lv_obj_t* const back = make_box(g.root);
+    g.header_rule = back;
     lv_obj_set_size(back, g.width, 2);
     lv_obj_set_pos(back, 0, m.header - 2);
     lv_obj_set_style_bg_opa(back, LV_OPA_COVER, 0);
@@ -828,12 +866,19 @@ void build_frame() {
         lv_obj_add_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
     }
     // From the name to the buttons, less a gap each side.
-    const int stream_x = wide ? 250 : m.margin + std::max(name_w, 0) + m.gap;
-    g.stream_room = std::max(0, prefs_x - 24 - stream_x);
+    g.stream_x = wide ? 250 : m.margin + std::max(name_w, 0) + m.gap;
+    g.stream_room = std::max(0, prefs_x - 24 - g.stream_x);
+    // Under lyrics the line and delay chips hold their columns (where they are shown), and the stream is named after them.
+    g.stream_lyric_x = g.chips ? delay_x + delay_w + 4 + 24 : g.stream_x;
+    g.stream_lyric_room = std::max(0, prefs_x - 24 - g.stream_lyric_x);
+    // The longest of the short names ("Dolby Digital Plus"): a footer with less room under lyrics than that (the kit's 1024 by
+    // 600, where the chips and the buttons leave none) has no line to show, and the player is not asked for one.
+    g.stream_lyric_fits = g.stream_lyric_room >= text_width("Dolby Digital Plus", g.small);
+    g.stream_at_lyric = false;
     g.chip_stream = make_label(footer, "", g.small, kMuted);
     lv_obj_set_width(g.chip_stream, std::max(g.stream_room, 1));
     lv_label_set_long_mode(g.chip_stream, LV_LABEL_LONG_MODE_CLIP);
-    lv_obj_set_pos(g.chip_stream, stream_x, label_y);
+    lv_obj_set_pos(g.chip_stream, g.stream_x, label_y);
     lv_obj_t* const prefs = make_button(footer, "Preferences", prefs_w, m.footer_button, Button::kPreferences, false);
     lv_obj_set_pos(prefs, prefs_x, button_y);
     lv_obj_t* const adjust = make_button(footer, "Adjust", adjust_w, m.footer_button, Button::kAdjust, false);
@@ -1053,6 +1098,25 @@ void build_message(const char* first, const char* second, int content_w) {
     }
 }
 
+// What the waiting screen says about the board's state: the pairing code while one shows, else who it is connected to
+// or paired with, else that it is waiting to be paired.
+std::string idle_status() {
+    if (!g.info.pairing_code.empty()) {
+        return "Pairing code " + g.info.pairing_code;
+    }
+    if (!g.info.server.empty() && g.info.connections > 0) {
+        return "Connected to " + g.info.server + ". Waiting for something to play.";
+    }
+    if (g.info.paired > 0) {
+        return "Paired with " + std::to_string(g.info.paired) + (g.info.paired == 1 ? " server" : " servers") +
+               ". Waiting for one to play.";
+    }
+    if (g.info.player) {
+        return "Waiting for a server to pair with.";
+    }
+    return "No Sendspin player in this build.";
+}
+
 void build_idle(int content_w) {
     lv_obj_t* const block = make_box(g.stage_box);
     lv_obj_set_width(block, content_w);
@@ -1073,19 +1137,7 @@ void build_idle(int content_w) {
     }
     make_label(block, where, g.context, kMuted);
 
-    std::string status;
-    if (!g.info.pairing_code.empty()) {
-        status = "Pairing code " + g.info.pairing_code;
-    } else if (!g.info.server.empty() && g.info.connections > 0) {
-        status = "Connected to " + g.info.server + ". Waiting for something to play.";
-    } else if (g.info.paired > 0) {
-        status = "Paired with " + std::to_string(g.info.paired) +
-                 (g.info.paired == 1 ? " server" : " servers") + ". Waiting for one to play.";
-    } else if (g.info.player) {
-        status = "Waiting for a server to pair with.";
-    } else {
-        status = "No Sendspin player in this build.";
-    }
+    const std::string status = idle_status();
     lv_obj_t* const line = make_label(block, status, g.context, g.info.pairing_code.empty() ? kText : kAccent);
     lv_label_set_long_mode(line, LV_LABEL_LONG_MODE_WRAP);
     lv_obj_set_width(line, content_w);
@@ -1121,7 +1173,7 @@ void build_plain(int content_w) {
     lv_obj_set_user_data(scroller, reinterpret_cast<void*>(2));  // placed already
 }
 
-// What a song with no lyrics shows (planning/p4x-now-playing.md): the view the board is set to, and where
+// What a song with no lyrics shows: the view the board is set to, and where
 // that cannot be drawn the one it falls back to. The title card needs a title the server has said and the
 // fonts can draw, and with none the speakers show in its place (never an empty card); the speakers need
 // the room the player plays to, and with none, or with the view off, the sentence the screen has always
@@ -1143,16 +1195,48 @@ NoLyrics no_lyrics_shown() {
     return NoLyrics::kSentence;
 }
 
+NowStyle now_style() {
+    return NowStyle{.text = kText,
+                    .accent = kAccent,
+                    .muted = kMuted,
+                    .faint = kFaint,
+                    .label = g.small.latin,
+                    .date = g.context.latin,
+                    .title = g.current.latin,
+                    .artist = g.context.latin,
+                    .margin = g.m.margin};
+}
+
+// The waiting screen's clock saver: the clock view on a stage that is the whole glass (set_chrome_hidden). False where
+// the clock's font did not come up, and the status page stands.
+bool build_saver_clock() {
+    if (!now_build_clock(g.stage_box, g.width, lv_obj_get_height(g.stage_box), now_style())) {
+        return false;
+    }
+    g.np_clock = true;
+    return true;
+}
+
+// The clock saver puts away what is not the time: the header, its hairline and progress, and the footer, and the stage
+// takes the glass, so that the time is in the middle of it. Undone before the status page is built again.
+void set_chrome_hidden(bool hidden) {
+    if (hidden == g.chrome_hidden) {
+        return;
+    }
+    g.chrome_hidden = hidden;
+    for (lv_obj_t* const object : {g.footer, g.header_rule, g.progress, g.title, g.clock}) {
+        if (hidden) {
+            lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    lv_obj_set_pos(g.stage_box, 0, hidden ? 0 : g.m.header);
+    lv_obj_set_size(g.stage_box, g.width, hidden ? g.height : g.height - g.m.header - g.m.footer);
+}
+
 void build_no_lyrics(int content_w) {
-    const NowStyle style{.text = kText,
-                         .accent = kAccent,
-                         .muted = kMuted,
-                         .faint = kFaint,
-                         .label = g.small.latin,
-                         .date = g.context.latin,
-                         .title = g.current.latin,
-                         .artist = g.context.latin,
-                         .margin = g.m.margin};
+    const NowStyle style = now_style();
     switch (no_lyrics_shown()) {
         case NoLyrics::kTitle:
             // The title's size is the lyric line's rule on its length (72 down to 34 px, then the singer's
@@ -1263,8 +1347,12 @@ void rebuild(const Signature& sig) {
     };
 
     if (sig.idle) {
-        g.name = "idle";
-        build_idle(content_w);
+        if (sig.saver_clock && build_saver_clock()) {
+            g.name = "idle-clock";
+        } else {
+            g.name = "idle";
+            build_idle(content_w);
+        }
     } else {
         switch (stage.mode) {
             case StageMode::kLine:
@@ -1430,15 +1518,26 @@ void update_header_and_footer(const Stage& stage) {
         lv_obj_set_width(g.progress, progress);
     }
 
-    // What the stream is: the most the footer has room for of "Decoded on this board - 768 kb/s - from Music
-    // Assistant" (or "PCM from ..." where the server decoded it). The clock view says nothing of it.
+    // What the stream is: the most the footer has room for of "Dolby TrueHD 7.1 - 5200 kb/s - from Music Assistant"
+    // (or "PCM from ..." where the server decoded it), under lyrics as under every other view. The clock view says
+    // nothing of it. Under lyrics the line goes after the chips, and where not even the codec's name fits it is left out
+    // (a name cut off is worse than none); under the views with no lyrics the shortest is cut off to its room.
+    const bool at_lyric = !g.np_active;
+    if (at_lyric != g.stream_at_lyric) {
+        g.stream_at_lyric = at_lyric;
+        lv_obj_set_x(g.chip_stream, at_lyric ? g.stream_lyric_x : g.stream_x);
+        lv_obj_set_width(g.chip_stream, std::max(at_lyric ? g.stream_lyric_room : g.stream_room, 1));
+    }
     std::string stream_line;
-    if (g.np_active && !g.np_clock) {
+    if (g.stream_known && !g.np_clock) {
+        const int room = at_lyric ? g.stream_lyric_room : g.stream_room;
         const std::string server = drawable_title(g.info.server);
-        const auto options = iclforge::nowview::stream_info_options(g.now.facts, g.now.kbps, server);
-        stream_line = options.back();
+        const auto options = iclforge::nowview::stream_info_options(g.stream.facts, g.stream.kbps, server);
+        if (!at_lyric) {
+            stream_line = options.back();
+        }
         for (const std::string& option : options) {
-            if (text_width(option, g.small) <= g.stream_room) {
+            if (text_width(option, g.small) <= room) {
                 stream_line = option;
                 break;
             }
@@ -1524,7 +1623,7 @@ bool screen_update() {
     // Idle: nothing held, and nothing playing.
     const bool idle = stage.mode == StageMode::kNoLyrics && !playing;
 
-    // The no-lyrics screen (planning/p4x-now-playing.md): the settings it follows, read every frame, and,
+    // The no-lyrics screen: the settings it follows, read every frame, and,
     // while the speakers are what it shows, what the player says about the stream five times a second.
     g.now_set = read_now_settings();
     const bool no_lyrics = stage.mode == StageMode::kNoLyrics && playing;
@@ -1546,6 +1645,13 @@ bool screen_update() {
             if (!read) {
                 g.now.heading.clear();
             }
+            // The footer names the stream from the same read.
+            g.stream_known = read;
+            if (read) {
+                g.stream.facts = g.now.facts;
+                g.stream.kbps = g.now.kbps;
+            }
+            g.stream_read_us = 0;
             g.now_known = room_chosen && read && !g.now.spots.empty();
             g.now_key = g.now_known ? now_room_key(g.now) : 0;
             // What the server says is playing, in the same read (the clock has no use for it); a change of the
@@ -1569,6 +1675,17 @@ bool screen_update() {
         g.now_read_us = 0;
         g.now_known = false;
         g.now_key = 0;
+        // Under lyrics, and under the no-lyrics sentence, no view reads the player, but a footer with room for it still
+        // names the stream: facts and bitrate only, twice a second.
+        if (playing && g.stream_lyric_fits) {
+            if (g.stream_read_us == 0 || now_us - g.stream_read_us >= 500'000U) {
+                g.stream_read_us = now_us;
+                g.stream_known = read_now_stream(g.stream);
+            }
+        } else {
+            g.stream_known = false;
+            g.stream_read_us = 0;
+        }
     }
     // Nothing the server said is shown by any other view, so none of it is kept as shown: the next time a
     // view wants it, it is read afresh.
@@ -1580,7 +1697,10 @@ bool screen_update() {
         g.card_detail.clear();
         compose_np_header();
     }
-    if (clock_chosen) {
+    // The time is read for the clock view, and for the waiting screen's clock saver (which is a plain dim until the time is
+    // known).
+    const bool wall_wanted = clock_chosen || (idle && g.now_set.idle_view == iclforge::nowview::IdleView::kClock);
+    if (wall_wanted) {
         if (g.wall_read_us == 0 || now_us - g.wall_read_us >= 500'000) {
             g.wall_read_us = now_us;
             g.wall = read_wall_clock();
@@ -1590,9 +1710,31 @@ bool screen_update() {
         g.wall = {};
     }
 
+    // The waiting screen: once the dim time has passed with nothing
+    // touched, and the board is set up, it dims, shows the clock or goes dark, as the person chose; a touch brings the
+    // status back. Decided here, before the rows are made, because the clock saver is a different set of rows. A screen
+    // that was dimmed or dark as the stream ended stays so (idle_carried), and the status page is not lit between two
+    // songs. The developer view and Preferences keep the screen lit while they are open.
+    const std::uint32_t now = now_ms();
+    if (idle && !g.idle_was) {
+        g.idle_since_ms = now;
+        g.idle_carried = g.dimmed || (g.covered_seen && now - g.covered_ms < kCarryMs);
+    }
+    g.idle_was = idle;
+    const std::uint32_t inactive = lv_display_get_inactive_time(g.disp);
+    iclforge::nowview::IdleScreen idle_screen;
+    if (idle && !dev_is_open() && !prefs_is_open()) {
+        idle_screen = iclforge::nowview::idle_state(
+            g.now_set.idle_view,
+            iclforge::nowview::board_set_up(!g.info.pairing_code.empty(), g.info.paired, g.info.connections),
+            g.wall.known, g.idle_carried, g.now_set.dim_after_minutes, inactive, now - g.idle_since_ms, g.now_set.night,
+            g.now_set.minute_of_day);
+    }
+
     Signature sig;
     sig.mode = stage.mode;
     sig.idle = idle;
+    sig.saver_clock = idle_screen.clock;
     sig.item = g.snap.item;
     sig.line = stage.mode == StageMode::kLine ? stage.line : 0;
     sig.word_timed = stage.mode == StageMode::kLine && stage.word_timed;
@@ -1611,10 +1753,11 @@ bool screen_update() {
     sig.card_generation = shown == NoLyrics::kTitle ? g.card_generation : 0;
     // The idle screen says what the board is: a change in it is a rebuild of the idle screen.
     static BoardInfo shown_info;
-    const bool info_changed = idle && !(shown_info == g.info);
+    const bool info_changed = idle && !sig.saver_clock && !(shown_info == g.info);
 
     if (!g.built || !(sig == g.sig) || info_changed) {
         shown_info = g.info;
+        set_chrome_hidden(sig.idle && sig.saver_clock);
         rebuild(sig);
         g.sig = sig;
         g.built = true;
@@ -1632,9 +1775,13 @@ bool screen_update() {
         } else if (g.np_meters) {
             // The meters stop and stop asking the player for its output while the screen is dimmed.
             g.filling = now_update_meters(now_us, g.dimmed);
+            now_update_meters_status(g.now);
         } else if (g.np_active && !g.np_card && !g.dimmed) {
             now_update_speakers(g.now, now_us);
         }
+    } else if (g.np_clock) {
+        // The waiting screen's clock saver.
+        now_update_clock(g.wall);
     }
     update_header_and_footer(idle ? Stage{} : stage);
     if (g.chip_name_text != g.info.name) {
@@ -1643,7 +1790,6 @@ bool screen_update() {
     }
 
     // The sheet: shown on a tap, put away after a few seconds with nothing touched.
-    const std::uint32_t now = now_ms();
     if (g.sheet_visible && now - g.sheet_shown_ms > kSheetIdleMs) {
         g.sheet_visible = false;
     }
@@ -1662,24 +1808,26 @@ bool screen_update() {
     // The dark view is dark from the moment a song with no lyrics begins, and a touch lights it for
     // iclforge::nowview::kDarkAwakeMs: dim_state() is the whole rule, tested on the host. The developer
     // view keeps the screen lit while it is open: it is read, not touched.
-    // The night schedule (planning/p4x-preferences.md) makes the no-lyrics view the dark view while it is in force,
-    // and the idle screen too when that setting is on: the idle screen then counts as showing from the moment the
-    // night begins, like the dark view.
-    const bool night_idle = idle && iclforge::nowview::night_covers_idle(g.now_set.night, g.now_set.minute_of_day);
-    const bool showing = g.np_active || dark_view || night_idle;
+    // The night schedule makes the no-lyrics view the dark view while it is in force. The
+    // waiting screen has its own rule (idle_state, above), which the night schedule's idle switch also reaches.
+    const bool showing = g.np_active || dark_view;
     if (showing && !g.np_was_showing) {
         g.np_since_ms = now;
     }
     g.np_was_showing = showing;
-    const std::uint32_t inactive = lv_display_get_inactive_time(g.disp);
     const std::uint32_t showing_ms = showing ? now - g.np_since_ms : 0;
-    iclforge::nowview::Dim dim = iclforge::nowview::dim_state(g.now_set.view, showing, g.now_set.dim_after_minutes,
-                                                              inactive, showing_ms, g.now_set.night,
-                                                              g.now_set.minute_of_day);
+    iclforge::nowview::Dim dim = idle ? idle_screen.dim
+                                      : iclforge::nowview::dim_state(g.now_set.view, showing, g.now_set.dim_after_minutes,
+                                                                     inactive, showing_ms, g.now_set.night,
+                                                                     g.now_set.minute_of_day);
     if (dev_is_open() || prefs_is_open()) {
         dim = iclforge::nowview::Dim::kNone;
     }
-    set_dimmed(dim);
+    set_dimmed(dim, idle);
+    if (g.dimmed) {
+        g.covered_seen = true;
+        g.covered_ms = now;
+    }
     // The developer view, when it is asked for, is on top of all this (a dimmed screen is dark under it
     // and a touch to open it has woken the screen).
     dev_update(now);

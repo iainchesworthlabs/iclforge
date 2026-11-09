@@ -19,7 +19,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 
-// A burst from its parts (planning/hearth-android.md, phase 0b): what a sink that bitstreams to a
+// A burst from its parts: what a sink that bitstreams to a
 // link has to do with a Sendspin burst chunk, which holds Pc, Pd and the payload in stream order
 // and none of the preamble's sync words, the word swap or the stuffing. The packers are the
 // oracle: every burst they write over real Dolby-encoder streams is taken apart into what a chunk
@@ -341,8 +341,8 @@ TEST_CASE("null_burst: a null-data burst of the period asked for, which a reader
     }
 }
 
-// The E-AC-3 burst vectors tools/sendspin/ma_role checks its Python burst builder against
-// (planning/hearth-sendspin-extension.md, Burst chunks): for each fixture, the payloads Hearth's
+// The E-AC-3 burst vectors tools/sendspin/ma_role checks its Python burst builder against:
+// for each fixture, the payloads Hearth's
 // server would put in `_iclforge_player@v1` chunks, taken from Eac3BurstPacker over the stream's
 // access units, as one line per burst: Pc, Pd and an FNV-1a digest of the payload. The committed
 // file is held to the packer here; ICLFORGE_BURST_VECTORS_OUT names where the hidden case

@@ -41,7 +41,7 @@ namespace {
 
 namespace dsp = iclforge::dsp::tiered;
 // the AC-4 core's own complex type (dsp/complex.hpp), not std::complex: every
-// function under test takes this type since D14a (planning/ac4.md).
+// function under test takes this type since D14a.
 using Complex = dsp::Complex<double>;
 
 // Every transform length of clause 5.5.3: the fifteen at 44.1 and 48 kHz, and

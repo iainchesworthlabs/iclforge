@@ -3,7 +3,7 @@
 
 Annex C reproduces a karaoke stream (bsmod 7 above 1/0) as L, C and R with the melody in the
 centre and the vocals at the stream's surround level. A/52 defines that reproduction for AC-3 and
-none for E-AC-3, and Dolby's own decoder applies it to both (planning/karaoke-eac3-findings.md).
+none for E-AC-3, and Dolby's own decoder applies it to both.
 This script is the repeatable form of that measurement: it writes a tone-per-channel WAV, encodes
 it with `forge` as AC-3 and as E-AC-3 flagged karaoke, decodes each with `forge decode karaoke`
 and with the Reference Player's `dlbac3dec` in line mode, and compares what each output channel

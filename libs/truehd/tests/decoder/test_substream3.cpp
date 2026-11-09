@@ -148,6 +148,7 @@ TEST_CASE("the sixteen-channel stream sits at substream 3's limits",
     context.min_chan = restart->min_chan;
     context.max_chan = restart->max_chan;
     context.max_matrix_chan = restart->max_matrix_chan;
+    context.object_matrices = restart->sync == kRestartSyncAtmos;
     const auto block = read_block_header(bits, context);
     REQUIRE(block.has_value());
     REQUIRE(block->matrices.has_value());
@@ -390,5 +391,54 @@ TEST_CASE("terminatorA right after the last block, and anything else there, are 
         CHECK(tail.terminator_a == 0);
         CHECK(tail.zero == 0);
         CHECK(tail.bits_max >= 20);
+    }
+}
+
+TEST_CASE("the unit a terminator word, or other data, came in after the last block is recorded",
+          "[truehd][decoder][terminators]") {
+    // The stream-end gate of qc (apps/shared/media/src/probe_truehd.hpp) judges these numbers: the
+    // decoder takes the same units whatever they say. Units are numbered from 1, as
+    // DecoderCounters::units counts them.
+    std::array<std::array<std::uint32_t, 8>, 2> raw{};
+    for (std::size_t i = 0; i < 8; ++i) {
+        raw[0][i] = 8 + static_cast<std::uint32_t>(i);
+        raw[1][i] = 8;
+    }
+    DecoderConfig lenient;
+    lenient.strictness = Strictness::kLenient;
+    const auto plain = unit_with(kRestartSyncStandard, 4, raw);
+    const auto word = unit_with(kRestartSyncStandard, 4, raw, 1, 0xD234E, 20);
+    const auto other = unit_with(kRestartSyncStandard, 4, raw, 1, 0x5A5A5U, 20);
+
+    SECTION("a word in the first of three units") {
+        Decoder decoder(lenient);
+        for (const auto* unit : {&word, &plain, &plain}) {
+            REQUIRE(decoder.decode(*unit).has_value());
+        }
+        const DecoderCounters& counters = decoder.counters();
+        CHECK(counters.units == 3);
+        CHECK(counters.tails[0].terminator_a == 1);
+        CHECK(counters.tails[0].last_word_unit == 1);
+        CHECK(counters.tails[0].zero == 2);
+        CHECK(counters.tails[0].last_other_unit == 0);
+    }
+    SECTION("a word in the last of three units") {
+        Decoder decoder(lenient);
+        for (const auto* unit : {&plain, &plain, &word}) {
+            REQUIRE(decoder.decode(*unit).has_value());
+        }
+        const DecoderCounters& counters = decoder.counters();
+        CHECK(counters.tails[0].terminator_a == 1);
+        CHECK(counters.tails[0].last_word_unit == counters.units);
+    }
+    SECTION("other data in the second of three units") {
+        Decoder decoder(lenient);
+        for (const auto* unit : {&plain, &other, &plain}) {
+            REQUIRE(decoder.decode(*unit).has_value());
+        }
+        const DecoderCounters& counters = decoder.counters();
+        CHECK(counters.tails[0].other == 1);
+        CHECK(counters.tails[0].last_other_unit == 2);
+        CHECK(counters.tails[0].last_word_unit == 0);
     }
 }

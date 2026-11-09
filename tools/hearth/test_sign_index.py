@@ -1,4 +1,4 @@
-"""Unit tests for sign_index.py, which signs a firmware update index (planning/esp32-ota.md, O10).
+"""Unit tests for sign_index.py, which signs a firmware update index.
 
 They make fresh throwaway keys with the `cryptography` package and check what was signed
 with index_verify.py, which verifies with its own arithmetic and nothing installed, so the

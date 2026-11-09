@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-// Where a singer's microphone comes from (planning/karaoke-microphone.md, MI1 to MI6): a seam over
+// Where a singer's microphone comes from: a seam over
 // iclforge::audio::Capture, so that the session built on it is tested without a device and a window
 // can be tested without a microphone.
 //
@@ -85,9 +85,9 @@ struct VoiceRecording {
 [[nodiscard]] std::expected<VoiceRecording, std::string> read_voice_file(
     const std::filesystem::path& path);
 
-// A recording as the microphone, for a capture that has no singer (`hearth --sing`; planning/
-// karaoke-microphone.md, MI2). Opening it opens no device, so the rule that only a person's press
-// opens a microphone is not bent: nothing here can hear a room.
+// A recording as the microphone, for a capture that has no singer (`hearth --sing`). Opening it
+// opens no device, so the rule that only a person's press opens a microphone is not bent: nothing
+// here can hear a room.
 //
 // It is sung along to the item as the item is HEARD, not started with it. A device's samples are
 // stamped with the time they were captured and the score places them by the heard position, so a

@@ -140,8 +140,7 @@ constexpr int kPollMs = 60;
 // two different things; `json` on the top-level map carries that document
 // whole. Deliberately short of every field iclforge.hearth.media/1 carries -
 // the deep per-object OAMD table and the per-frame EMDF/CRC dumps are "at
-// play time" or "detail" questions (planning/hearth-reference-player.md,
-// Media information) the Play page's own monitor and a future slice answer,
+// play time" or "detail" questions the Play page's own monitor and a future slice answer,
 // not the Media page's summary.
 
 [[nodiscard]] QString to_qstring(std::string_view text) {
@@ -490,8 +489,7 @@ constexpr int kPollMs = 60;
     return std::isfinite(db) ? QVariant{db} : QVariant::fromValue(nullptr);
 }
 
-// Each presentation as the decoder reads it (planning/ac4.md, Media
-// information), for the Media page's table and the AC-4 decoder page's
+// Each presentation as the decoder reads it, for the Media page's table and the AC-4 decoder page's
 // picker.
 [[nodiscard]] QVariantList ac4_presentations_to_list(
     std::span<const iclforge::ac4::PresentationInfo> presentations) {
@@ -832,7 +830,7 @@ constexpr int kPollMs = 60;
 }
 
 // The karaoke choice and the levels of its parts are the one decoder setting kept
-// across starts (planning/karaoke.md, P9; planning/karaoke-phase2.md, W10): a
+// across starts: a
 // singer who chose "no vocals" expects it still chosen, and the melody as quiet
 // as they left it. The constructor reads them into the settings it starts the
 // engine with, and setDecoderSettings() writes them back.
@@ -1012,6 +1010,29 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     return iclforge::truehd::Presentation::kBest;
 }
 
+// iclforge::hearth::TrackPreference as the Decoder page's TrueHD tab names it.
+[[nodiscard]] QString track_preference_name(iclforge::hearth::TrackPreference track) {
+    switch (track) {
+        case iclforge::hearth::TrackPreference::kBest:
+            return QStringLiteral("truehd");
+        case iclforge::hearth::TrackPreference::kCompressed:
+            return QStringLiteral("compressed");
+        case iclforge::hearth::TrackPreference::kAutomatic:
+        default:
+            return QStringLiteral("automatic");
+    }
+}
+
+[[nodiscard]] iclforge::hearth::TrackPreference track_preference_from_name(const QString& name) {
+    if (name == QLatin1String("truehd")) {
+        return iclforge::hearth::TrackPreference::kBest;
+    }
+    if (name == QLatin1String("compressed")) {
+        return iclforge::hearth::TrackPreference::kCompressed;
+    }
+    return iclforge::hearth::TrackPreference::kAutomatic;
+}
+
 [[nodiscard]] QString dual_mono_name(iclforge::hearth::DualMonoChoice choice) {
     switch (choice) {
         case iclforge::hearth::DualMonoChoice::kFirst:
@@ -1121,7 +1142,7 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     return iclforge::ac4::DrcMode::kDefault;
 }
 
-// Ac4Settings::immersive_layout (planning/ac4.md, I5): unset (the source's own
+// Ac4Settings::immersive_layout: unset (the source's own
 // coded layout) as "asCoded", and the five layouts Part 2's renderer folds an
 // immersive element to otherwise - the same names forge decode's own
 // speakers= takes. The stereo/mono targets DownmixTarget also has are not
@@ -1217,6 +1238,8 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     // TrueHD and MLP's own (DecoderTruehd.qml).
     map[QStringLiteral("truehdPresentation")] = truehd_presentation_name(settings.truehd.presentation);
     map[QStringLiteral("truehdLenient")] = settings.truehd.lenient;
+    // Which track of a file with several plays (DecoderTruehd.qml).
+    map[QStringLiteral("track")] = track_preference_name(settings.track);
     return map;
 }
 
@@ -1333,6 +1356,9 @@ void keep_output(QSettings& store, const KeptOutput& chosen) {
     }
     if (map.contains(QStringLiteral("truehdLenient"))) {
         out.truehd.lenient = map[QStringLiteral("truehdLenient")].toBool();
+    }
+    if (map.contains(QStringLiteral("track"))) {
+        out.track = track_preference_from_name(map[QStringLiteral("track")].toString());
     }
     return out;
 }
@@ -2176,7 +2202,7 @@ void HearthController::poll() {
     // --- the play monitor: Engine::meters() and Engine::unit_report(), ----
     // read every tick the same as status() above - both calls have existed
     // on Engine since A3 (slices 6 and 8); this is the first place in the
-    // tree that polls them (planning/hearth-reference-player.md, Monitor).
+    // tree that polls them.
     bool monitor_changed = false;
 
     QVariantList new_levels;

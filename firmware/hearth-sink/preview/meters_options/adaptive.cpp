@@ -1,4 +1,4 @@
-// The Meters view as an ADAPTIVE system (planning/p4x-meters-view.md, round 2): not one design but a rule that picks how the
+// The Meters view as an ADAPTIVE system: not one design but a rule that picks how the
 // channels are shown from the size of the screen and the number of outputs of the room, both of which the board knows from its
 // capabilities. Every representation sits under the same 31-band spectrum of the main mix:
 //

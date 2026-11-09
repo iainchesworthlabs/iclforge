@@ -1,6 +1,6 @@
 """Slice 0: an aiosendspin 10.2.1 server plays an E-AC-3 stream, undecoded, to hearth-testsink.
 
-The gate of planning/ma-atmos-e2e.md's Phase 0, on loopback with no board, Home Assistant or Music
+The gate of Phase 0, on loopback with no board, Home Assistant or Music
 Assistant: this server registers the `_iclforge_player@v1` role of tools/sendspin/ma_role, dials
 hearth-testsink, pairs by the sink's SP:0 token, and
 

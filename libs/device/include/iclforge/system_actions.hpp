@@ -11,7 +11,7 @@
 #include "iclforge/dev_view.hpp"
 #include "iclforge/settings_keys.hpp"
 
-// The System group of a board's Preferences (planning/p4x-preferences.md, E4): Restart, Reset
+// The System group of a board's Preferences: Restart, Reset
 // preferences, Factory reset, and the list of paired servers with a Forget on each. What the screen
 // says before each one, whether the board can do it now, how long a finger holds a button that cannot be
 // tapped by mistake, and what a row of the list says. Free of ESP-IDF and LVGL like dev_view.hpp: the

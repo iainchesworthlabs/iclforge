@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -69,6 +70,28 @@ TEST_CASE("a unit before the first major sync gives nothing and no error", "[tru
     auto again = decoder.decode(stereo_unit(false));
     REQUIRE(again.has_value());
     CHECK_FALSE(again->has_value());
+}
+
+TEST_CASE("reset() keeps the decoder's buffers and forgets everything else", "[truehd][decoder]") {
+    Decoder decoder;
+    auto first = decoder.decode(stereo_unit(true));
+    REQUIRE(first.has_value());
+    REQUIRE(first->has_value());
+    const std::int32_t* const buffer = (*first)->pcm.data();
+    const std::vector<std::int32_t> samples((*first)->pcm.begin(), (*first)->pcm.end());
+
+    decoder.reset();
+    CHECK(decoder.counters().units == 0);
+    CHECK_FALSE(decoder.major_sync().has_value());
+
+    // The same unit decodes to the same samples, in the same memory: nothing was allocated.
+    auto again = decoder.decode(stereo_unit(true));
+    REQUIRE(again.has_value());
+    REQUIRE(again->has_value());
+    CHECK((*again)->pcm.data() == buffer);
+    CHECK(std::vector<std::int32_t>((*again)->pcm.begin(), (*again)->pcm.end()) == samples);
+    CHECK(decoder.counters().units == 1);
+    CHECK(decoder.counters().restarts == 1);
 }
 
 TEST_CASE("strict decoding refuses a corrupt substream, lenient counts it", "[truehd][decoder]") {

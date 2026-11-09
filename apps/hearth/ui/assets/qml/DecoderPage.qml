@@ -4,9 +4,9 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Decoder tab (planning/hearth-design.md, "Speakers and decoder"): a
+// The Decoder tab: a
 // sub-switch between the AC-3/E-AC-3 decoder, the AC-4 decoder
-// (planning/ac4.md, I2) and the TrueHD and MLP decoder. It defaults to AC-3/E-AC-3, and turns to whichever
+// and the TrueHD and MLP decoder. It defaults to AC-3/E-AC-3, and turns to whichever
 // the playing item needs when that item changes, so the page open is the one
 // whose settings are being heard; the switch still shows either at any time.
 Item {

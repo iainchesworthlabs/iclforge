@@ -223,7 +223,7 @@ double db(double ratio) {
 }
 
 // Each channel's own tone within 0.2 dB of unity, and every other tone 60 dB
-// under it there: planning/ac4.md, E3's exit, held to 22.2's 24 channels.
+// under it there, held to 22.2's 24 channels.
 void check_routing(const std::vector<Channel>& channels, const Decoded& decoded,
                    double rate = 48000.0) {
     REQUIRE(decoded.speakers.size() == channels.size());

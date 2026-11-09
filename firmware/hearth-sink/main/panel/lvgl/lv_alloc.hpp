@@ -15,7 +15,7 @@
 //
 // What the screen copies from the player (the visible rows, a file with no times as plain text, the
 // title) lives as long as the item does. On a P4 that decodes AC-4 the internal RAM it would take is
-// the little the decoder leaves (1 to 11 KB, planning/karaoke-p4x-panel.md, Q3, Q10), and a plain
+// the little the decoder leaves (1 to 11 KB), and a plain
 // text of 12,000 bytes is more than that, so its bytes are asked of the PSRAM heap instead of
 // ESP-IDF's malloc, which tries internal RAM first for anything up to 16 KB.
 //

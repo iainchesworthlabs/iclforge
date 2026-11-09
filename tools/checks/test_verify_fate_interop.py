@@ -21,6 +21,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock as mock
+import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,6 +39,14 @@ def sample(name, **extra):
 SAMPLES = [sample("a.ac3", complete_bytes=64, min_snr_db=22.0),
            sample("b.eac3", max_diff_dbfs=-90.0),
            sample("c.eac3", compare=False)]
+
+
+class Response(io.BytesIO):
+    """What urlopen returns: a readable body and the headers the harness checks."""
+
+    def __init__(self, body, length=None):
+        super().__init__(body)
+        self.headers = {"Content-Length": str(len(body) if length is None else length)}
 
 
 class FakeRun:
@@ -126,7 +135,7 @@ class Harness(unittest.TestCase):
 
         def urlopen(url, timeout=None):
             fetched.append(url)
-            return io.BytesIO(DATA["a.ac3"])
+            return Response(DATA["a.ac3"])
         rc, out = self.run_main(FakeRun(), "--cache-dir", str(self.cache), urlopen=urlopen)
         self.assertEqual(rc, 0)
         self.assertEqual(fetched, [vfi.BASE_URL + "x/a.ac3"])
@@ -135,7 +144,7 @@ class Harness(unittest.TestCase):
     def test_upstream_change_is_a_hard_error(self):
         (self.cache / "a.ac3").unlink()
         def urlopen(url, timeout=None):
-            return io.BytesIO(b"tampered")
+            return Response(b"tampered")
         with self.assertRaisesRegex(SystemExit, "SHA-256 mismatch after a fresh download"):
             self.run_main(FakeRun(), "--cache-dir", str(self.cache), urlopen=urlopen)
 
@@ -148,7 +157,7 @@ class Harness(unittest.TestCase):
             made.append(Path(path))
             return path
         def urlopen(url, timeout=None):
-            return io.BytesIO(DATA[url.rsplit("/", 1)[1]])
+            return Response(DATA[url.rsplit("/", 1)[1]])
         with mock.patch.object(vfi.tempfile, "mkdtemp", mkdtemp):
             env = {k: v for k, v in os.environ.items() if k != "FATE_CACHE_DIR"}
             with mock.patch.dict(os.environ, env, clear=True):
@@ -174,6 +183,121 @@ class Harness(unittest.TestCase):
             self.assertRegex(s["sha256"], r"^[0-9a-f]{64}$")
             self.assertTrue("min_snr_db" in s or "max_diff_dbfs" in s
                             or s.get("compare") is False, s["path"])
+
+    def down(self, url, timeout=None):
+        raise urllib.error.URLError(TimeoutError("timed out"))
+
+    def run_down(self, *extra, urlopen=None, env=None):
+        """a.ac3 is missing from the cache and the archive does not answer."""
+        (self.cache / "a.ac3").unlink(missing_ok=True)
+        with mock.patch.object(vfi.time, "sleep", lambda s: None):
+            return self.run_main(FakeRun(), "--cache-dir", str(self.cache), *extra,
+                                 urlopen=urlopen or self.down, env=env)
+
+    def test_download_is_retried_then_succeeds(self):
+        (self.cache / "a.ac3").unlink()
+        calls = []
+
+        def urlopen(url, timeout=None):
+            calls.append(url)
+            if len(calls) < 3:
+                raise urllib.error.URLError(ConnectionResetError("reset"))
+            return Response(DATA["a.ac3"])
+        with mock.patch.object(vfi.time, "sleep", lambda s: None):
+            rc, out = self.run_main(FakeRun(), "--cache-dir", str(self.cache), urlopen=urlopen)
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(len(calls), 3)
+        self.assertIn("try 2 of 4", out)
+
+    def test_unreachable_archive_fails_unless_tolerated(self):
+        rc, out = self.run_down()
+        self.assertEqual(rc, 1)
+        self.assertIn("::error::FATE interop: the archive was unreachable; 1 of 3 samples were NOT "
+                      "checked (a.ac3), 2 were", out)
+
+    def test_unreachable_archive_tolerated_checks_what_is_cached(self):
+        fake = FakeRun()
+        (self.cache / "a.ac3").unlink()
+        with mock.patch.object(vfi.time, "sleep", lambda s: None):
+            rc, out = self.run_main(fake, "--cache-dir", str(self.cache),
+                                    "--tolerate-unreachable", urlopen=self.down)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("::warning::FATE interop: the archive was unreachable; 1 of 3", out)
+        self.assertEqual(sorted(fake.decoded_sizes), ["b.eac3", "c.eac3"])
+
+    def test_tolerance_comes_from_the_environment_too(self):
+        rc, _ = self.run_down(env={"FATE_TOLERATE_UNREACHABLE": "1"})
+        self.assertEqual(rc, 0)
+        rc, _ = self.run_down(env={"FATE_TOLERATE_UNREACHABLE": "0"})
+        self.assertEqual(rc, 1)
+
+    def test_one_dead_download_does_not_retry_every_sample(self):
+        for name in ("a.ac3", "b.eac3", "c.eac3"):
+            (self.cache / name).unlink(missing_ok=True)
+        calls = []
+
+        def urlopen(url, timeout=None):
+            calls.append(url)
+            raise urllib.error.URLError("down")
+        with mock.patch.object(vfi.time, "sleep", lambda s: None):
+            rc, _ = self.run_main(FakeRun(), "--cache-dir", str(self.cache),
+                                  "--tolerate-unreachable", urlopen=urlopen)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(calls), vfi.DOWNLOAD_ATTEMPTS)
+
+    def test_a_short_body_is_not_kept(self):
+        (self.cache / "a.ac3").unlink()
+
+        def urlopen(url, timeout=None):
+            return Response(DATA["a.ac3"][:10], length=len(DATA["a.ac3"]))
+        rc, _ = self.run_down(urlopen=urlopen)
+        self.assertEqual(rc, 1)
+        self.assertEqual(sorted(p.name for p in self.cache.iterdir()), ["b.eac3", "c.eac3"])
+
+    def cache_status(self, *extra, env=None):
+        """Run --cache-status; return (stdout lines as a dict, stderr)."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.ExitStack() as stack:
+            for p in (mock.patch.object(sys, "argv", ["x", "--cache-status", *extra]),
+                      mock.patch.object(vfi, "SAMPLES", SAMPLES),
+                      mock.patch.dict(os.environ, env or {}),
+                      contextlib.redirect_stdout(out), contextlib.redirect_stderr(err)):
+                stack.enter_context(p)
+            rc = vfi.main()
+        self.assertEqual(rc, 0)
+        return dict(line.split("=", 1) for line in out.getvalue().split()), err.getvalue()
+
+    def test_cache_status_complete_needs_every_sample_to_verify(self):
+        status, _ = self.cache_status("--cache-dir", str(self.cache))
+        self.assertEqual(status, {"have": "3", "total": "3", "complete": "true"})
+
+        (self.cache / "b.eac3").unlink()
+        status, _ = self.cache_status("--cache-dir", str(self.cache))
+        self.assertEqual(status, {"have": "2", "total": "3", "complete": "false"})
+
+    def test_cache_status_deletes_what_fails_its_pin_or_is_not_a_sample(self):
+        """A full set of files is not a complete cache if one is truncated, and
+        nothing that is not a verified sample may be left to be saved."""
+        (self.cache / "a.ac3").write_bytes(b"truncated")
+        (self.cache / "c.eac3.part").write_bytes(b"half")
+        (self.cache / "gone.eac3").write_bytes(b"pinned by an older revision")
+        status, err = self.cache_status("--cache-dir", str(self.cache))
+        self.assertEqual(status, {"have": "2", "total": "3", "complete": "false"})
+        self.assertEqual(sorted(p.name for p in self.cache.iterdir()), ["b.eac3", "c.eac3"])
+        self.assertIn("a.ac3 (fails its pin)", err)
+        self.assertIn("c.eac3.part (stray or half-written)", err)
+
+    def test_cache_status_of_a_missing_directory_is_empty_and_creates_nothing(self):
+        missing = self.tmp / "never-restored"
+        status, _ = self.cache_status(env={"FATE_CACHE_DIR": str(missing)})
+        self.assertEqual(status, {"have": "0", "total": "3", "complete": "false"})
+        self.assertFalse(missing.exists())
+
+    def test_cache_status_needs_a_directory(self):
+        env = {k: v for k, v in os.environ.items() if k != "FATE_CACHE_DIR"}
+        with (mock.patch.dict(os.environ, env, clear=True),
+              self.assertRaisesRegex(SystemExit, "--cache-status needs")):
+            self.cache_status()
 
 
 if __name__ == "__main__":

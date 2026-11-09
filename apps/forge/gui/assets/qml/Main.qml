@@ -1159,7 +1159,8 @@ ApplicationWindow {
         const path = url.toString().toLowerCase();
         if (path.endsWith("." + ProjectFile.suffix)) {
             window.openProjectFile(url);
-        } else if (path.endsWith(".ac3") || path.endsWith(".ec3")) {
+        } else if (path.endsWith(".ac3") || path.endsWith(".ec3") || path.endsWith(".thd") ||
+                   path.endsWith(".mlp")) {
             streamPlayerDialog.open();
             StreamPlayerController.openFile(url);
         } else {
@@ -1238,6 +1239,33 @@ ApplicationWindow {
     function captureProject() {
         const project = JSON.parse(JSON.stringify(window.projectBase));
         project.flow = window.tier;
+
+        // A TrueHD encode is a project of its own kind (codec "truehd"), when the workbench holds no
+        // source of its own: the Encode TrueHD dialog's WAV files with their offsets, its map as
+        // assignments, and verify, the downmix and the options it holds, as `forge project` runs them.
+        if (EncoderController.sourceModel.length === 0 && TruehdEncodeController.sourcePath.length > 0) {
+            const held = JSON.parse(ProjectFile.captureTruehd(TruehdEncodeController));
+            project.sources = held.sources;
+            const encode = Object.assign({}, project.encode || {});
+            encode.codec = "truehd";
+            encode.container = "elementary";
+            encode.options = {};
+            // A key of another version's, in the project before, goes back as it came.
+            encode.truehd = Object.assign({}, encode.truehd || {}, held.truehd);
+            for (const key of Object.keys(encode.truehd)) {
+                if (ProjectFile.truehdKeys().indexOf(key) >= 0 && held.truehd[key] === undefined) {
+                    delete encode.truehd[key];  // the dialog holds it, and it is at its default now
+                }
+            }
+            project.encode = encode;
+            delete project.assignments;
+            if (held.assignments !== undefined) {
+                project.assignments = held.assignments;
+            }
+            delete project.atmos;
+            delete project.objects;
+            return project;
+        }
 
         // A source that was in the file keeps the keys it had there, whatever they are.
         const before = {};
@@ -1342,6 +1370,12 @@ ApplicationWindow {
     function applyProject(project) {
         const notes = [];
         const encode = project.encode || {};
+        // A TrueHD project is the Encode TrueHD dialog's, and leaves the workbench as it is.
+        if (encode.codec === "truehd") {
+            notes.push.apply(notes, ProjectFile.applyTruehd(TruehdEncodeController, project));
+            truehdEncodeDialog.open();
+            return notes;
+        }
         // The codec and container first: the rest of the draft is shaped by them.
         notes.push.apply(notes, ProjectFile.applyEncode(EncoderController, encode, 0));
 
@@ -1668,6 +1702,14 @@ ApplicationWindow {
     // header comment.
     StreamPlayerDialog {
         id: streamPlayerDialog
+        // The player's own Encode TrueHD… button: the encode is a dialog of its own, and the header
+        // has no room for a fourth entry beside it (the Guided wizard's cards are laid out against it).
+        onEncodeTruehdRequested: truehdEncodeDialog.open()
+    }
+
+    // The TrueHD encode: a WAV to a bare .thd stream, the twin of `forge truehd-encode`.
+    TruehdEncodeDialog {
+        id: truehdEncodeDialog
     }
 
     // Reached from the header's About, and from Settings' About Forge….

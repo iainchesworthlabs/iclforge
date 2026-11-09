@@ -9,7 +9,7 @@
 #include "iclforge/now_view.hpp"
 #include "iclforge/wall_clock.hpp"
 
-// The board's screen (planning/karaoke-p4x-panel.md): the lyrics of the item playing, drawn with the
+// The board's screen: the lyrics of the item playing, drawn with the
 // colour moving as the sound does, and, when nothing is playing, what the board is and what it waits
 // for. A seam CMake resolves, like the sink and the source:
 //
@@ -36,7 +36,7 @@ struct PanelStats {
     bool touch = false;
     // Which screen is showing: "idle", "lyrics", "gap", "waiting", "plain", "nolyrics".
     const char* screen = "";
-    // The no-lyrics screen has dimmed, or is dark (planning/p4x-now-playing.md): a black cover is up.
+    // The no-lyrics screen has dimmed, or is dark: a black cover is up.
     bool dimmed = false;
     // The backlight the glass is given, percent: the person's brightness (80 unless they set it) while lit, the dimmed
     // floor (4, and never above the brightness) or off (0) in the dark view.
@@ -75,17 +75,19 @@ struct PanelStats {
 // Whether this build has a screen at all.
 [[nodiscard]] bool panel_built();
 
-// The screen for a song with no lyrics (planning/p4x-now-playing.md): which of the four views this build
+// The screen for a song with no lyrics: which of the four views this build
 // can draw, which one to show, and the minutes of nothing touched after which it dims (0 is never). The
 // board's stored settings (settings.hpp) are the caller's to keep; these change what the screen does, at
 // once and without a restart. Without a panel every one does nothing.
 [[nodiscard]] bool panel_has_view(iclforge::nowview::View view);
 void panel_set_view(iclforge::nowview::View view);
 void panel_set_dim_after(int minutes);
-// How the speakers view shows a level (iclforge::nowview::SpeakersStyle, planning/p4x-speakers-options.md).
+// How the speakers view shows a level (iclforge::nowview::SpeakersStyle).
 void panel_set_speakers_style(iclforge::nowview::SpeakersStyle style);
+// What the waiting screen does once the dim time has passed with nothing touched (iclforge::nowview::IdleView).
+void panel_set_idle_view(iclforge::nowview::IdleView view);
 
-// What a person chose for the screen (planning/p4x-preferences.md), followed at once: the backlight's lit level,
+// What a person chose for the screen, followed at once: the backlight's lit level,
 // percent from iclforge::nowview::kBrightnessMin to kBrightnessMax (the dimmed floor stays under it), and how the
 // clock view writes the time. Stored by the caller (settings.hpp). Without a panel, or with a glass whose
 // backlight cannot be dimmed (panel_display_caps().backlight), the brightness does nothing.

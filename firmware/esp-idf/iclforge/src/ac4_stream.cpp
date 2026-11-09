@@ -21,8 +21,8 @@ namespace iclforge {
 
 namespace {
 
-// The least heap any AC-4 decode has asked for: the 2.0 fixtures' peak since D14f (planning/
-// ac4.md), as player.cpp's own floor has it.
+// The least heap any AC-4 decode has asked for: the 2.0 fixtures' peak since D14f, as player.cpp's
+// own floor has it.
 constexpr std::size_t kHeapFloorBytes = 286365;
 
 // The A/52 audio coding mode the decoded channels make: what the report says of an AC-4 stream,

@@ -536,8 +536,7 @@ void station_adopt_built_in() {
     // The board builds on the desk take their network from a local sdkconfig
     // fragment, and an image CI publishes has none: without this a board
     // moved to a published image would boot with nowhere to join, fail its
-    // trial and go back (planning/esp32-ota.md, "A network built into the
-    // image").
+    // trial and go back.
     if (settings_set_network(CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID, CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD)) {
         std::printf("settings: stored the network this image was built with, so an image without one "
                     "still joins it\n");

@@ -14,8 +14,7 @@
 #include "queue.hpp"
 #include "transport.hpp"
 
-// The engine's settings (planning/hearth-reference-player.md, A3: "the
-// settings model"): what the Settings page's Playback and Network cards hold,
+// The engine's settings: what the Settings page's Playback and Network cards hold,
 // the queue kept for the next start, and the keys they are kept under.
 //
 // Keeping them is the window's: it stores its settings through QSettings

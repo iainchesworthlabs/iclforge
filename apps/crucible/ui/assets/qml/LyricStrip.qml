@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 import Crucible
 
-// Lyrics for the selected application (planning/karaoke-phase2.md, W13b, D9): import an `.lrc` and
+// Lyrics for the selected application: import an `.lrc` and
 // read the line being sung. The position is the application's media session where it publishes
 // one (the player's own, so a pause and a seek are followed), and start-and-nudge where it does
 // not: press Start as the song begins. CrucibleLyrics keeps which, and says so here in a sentence.

@@ -1,13 +1,14 @@
 #include "stream_tools.hpp"
 
+#include <fmt/base.h>
+#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
-#include <fmt/base.h>
-#include <fmt/format.h>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -21,18 +22,11 @@
 
 #include "../exit_codes.hpp"
 #include "../support.hpp"
-#include "truehd.hpp"
-#include "iclforge/ac3/core/types.hpp"
-#include "iclforge/ac4/core/toc.hpp"
-#include "iclforge/ac4/decoder/config.hpp"
-#include "iclforge/ac4/decoder/frame.hpp"
-#include "iclforge/ac4/decoder/presentation.hpp"
-#include "iclforge/ac4/encoder/config.hpp"
-#include "iclforge/ac4/io/elementary.hpp"
-#include "iclforge/ac4/decoder/decoder.hpp"
+#include "ac4_channels.hpp"
 #include "analysis.hpp"
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
+#include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
@@ -45,8 +39,15 @@
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
-#include "ac4_channels.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/decoder/config.hpp"
+#include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/ac4/decoder/frame.hpp"
+#include "iclforge/ac4/decoder/presentation.hpp"
+#include "iclforge/ac4/encoder/config.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
 #include "stream_playback.hpp"
+#include "truehd.hpp"
 
 namespace forge_cli::commands {
 
@@ -79,15 +80,12 @@ std::optional<LoadedStream> scan_loaded(std::vector<std::byte> bytes, std::strin
 
 namespace {
 
-// Why `command` does not do to a TrueHD or MLP stream what it does to an AC-3 or E-AC-3 one.
+// Why `command` does not do to a TrueHD or MLP stream what it does to an AC-3 or E-AC-3 one. (cut
+// and cat take one: truehd_cut.cpp. A cat whose later input is TrueHD behind an AC-3 first reaches
+// here and says why it cannot join them.)
 std::string_view truehd_reason(std::string_view command) {
-    if (command == "cut") {
-        return "a cut can start only at an access unit that carries a major sync, and this build "
-               "does not cut at those yet";
-    }
     if (command == "cat") {
-        return "a join needs the second stream to open with a major sync and to match the "
-               "first's shape, and this build does not join them yet";
+        return "a join takes streams of one codec, and the first input is not TrueHD or MLP";
     }
     return {};
 }
@@ -1265,8 +1263,9 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
         bitrate = to_ac4 ? 192 : 448;
     }
     if (is_truehd_stream(bytes)) {
-        return refuse_truehd("transcode", in_path);
+        return run_transcode_truehd(bytes, in_path, out_path, bitrate, layout, meta, *target_codec);
     }
+    warn_truehd_options_unused(meta, in_path);
     if (is_ac4_stream(bytes)) {
         return transcode_from_ac4(in_path, out_path, bitrate, layout, meta, *target_codec, bytes);
     }
@@ -1798,7 +1797,11 @@ int run_normalize(std::string_view in_path, std::string_view out_path, const Opt
 }
 
 int run_cut(std::string_view in_path, std::string_view out_path, std::string_view start_seconds,
-            std::string_view duration_seconds) {
+            std::string_view duration_seconds, const Options& meta) {
+    // A TrueHD or MLP stream is cut at a major sync, which truehd_cut.cpp does.
+    if (const auto bytes = read_all(in_path); is_truehd_stream(bytes)) {
+        return run_cut_truehd(bytes, in_path, out_path, start_seconds, duration_seconds, meta);
+    }
     const auto loaded = load_stream(in_path, "cut");
     if (!loaded.has_value()) {
         return loaded.error();
@@ -1876,10 +1879,15 @@ int run_cut(std::string_view in_path, std::string_view out_path, std::string_vie
     return 0;
 }
 
-int run_cat(std::string_view out_path, std::span<const std::string_view> in_paths) {
+int run_cat(std::string_view out_path, std::span<const std::string_view> in_paths,
+            const Options& meta) {
     if (in_paths.size() < 2) {
         fmt::println(stderr, "error: cat needs at least two inputs");
         return kExitUsage;
+    }
+    // The first input says which codec the join is of; truehd_cut.cpp joins TrueHD and MLP.
+    if (!is_stdio_path(in_paths.front()) && is_truehd_stream(read_all(in_paths.front()))) {
+        return run_cat_truehd(out_path, in_paths, meta);
     }
     // Unlike every other command here, this opens its output BEFORE reading
     // its inputs - one at a time, so only one input's bytes are resident at

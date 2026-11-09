@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check a signed firmware update index the way a board does (planning/esp32-ota.md, O10).
+"""Check a signed firmware update index the way a board does.
 
     python tools/hearth/index_verify.py --index hearth-update-beta.json \
         --sig hearth-update-beta.sig.json --anchors firmware/keys/trust.pem

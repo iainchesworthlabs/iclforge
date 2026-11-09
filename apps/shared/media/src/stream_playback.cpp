@@ -136,7 +136,7 @@ std::optional<iclforge::ac3::DecodedAccessUnit> held_back_unit(
     out.layout = programme.value_or(chanmap::expand(occupied));
     // The output stage has put its own channels in the lead when it holds fewer than the coded
     // bed's: a fold's one or two, or Annex C's reproduction's three or four (flush() applies it to
-    // a lone karaoke substream, planning/karaoke-eac3.md). Laying those over the coded layout would
+    // a lone karaoke substream). Laying those over the coded layout would
     // put the LFE in a surround, so they go out as they are, as a fold's do.
     const std::size_t coded_channels =
         static_cast<std::size_t>(iclforge::ac3::fullbw_channel_count(lead->acmod)) +

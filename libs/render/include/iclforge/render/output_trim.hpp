@@ -17,7 +17,7 @@
 //
 //   The listener's own table (speaker_trim.hpp): a level and a distance for each speaker role, kept on the board,
 //   resolved through the layout and the patch to the outputs.
-//   A server's settings (planning/hearth-sendspin-extension.md): a trim and a delay for each OUTPUT, which replace
+//   A server's settings: a trim and a delay for each OUTPUT, which replace
 //   the board's own whole while the server's settings stand - "a key left out takes the board's own value", and
 //   the board's own value is the table. So a server that sends trims and no delays leaves the delays to the
 //   table, and one that sends neither leaves the board as the listener set it.

@@ -7,6 +7,6 @@
 # lock. Regenerate with:
 #   python -m piptools compile --generate-hashes --strip-extras --allow-unsafe \
 #     --output-file=requirements-build-bootstrap.txt requirements-build-bootstrap.in
-pip==26.2.1
+pip==26.2.2
 setuptools>=70
 wheel

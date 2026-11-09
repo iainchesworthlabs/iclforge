@@ -1,0 +1,16 @@
+# Dependencies of esphome that the lock holds at a different version than esphome's own metadata
+# asks for, because the version it asks for carries disclosed advisories:
+#
+#   pillow    esphome 2026.10.2 pins pillow==12.3.0; 13.0.0 is the first release without the 40-odd
+#             advisories open against 12.3.0 (GitHub Dependabot alerts 13 to 54).
+#   filelock  esphome 2026.10.2 pins filelock==4.0.10; 4.2.1 is the first release without the 13
+#             advisories open against it (alerts 54 to 67); 4.2.9 is the newest.
+#
+# What the job runs is `esphome config` on firmware/esphome/tests/iclforge-test.yaml, which loads
+# no image, font or display component and is checked in CI on every change to the component, so a
+# version of either library that esphome has not itself released against would show up there as an
+# import or a validation error. Checked by hand on 2026-11-06: `esphome config` on that file is
+# valid with these versions. Remove an override when esphome's own pin reaches the version here
+# (both are inside the lock, so Dependabot keeps them current in the meantime).
+pillow==13.0.0
+filelock==4.2.9

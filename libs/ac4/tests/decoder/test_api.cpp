@@ -1,4 +1,4 @@
-// The AC-4 decoder's API in its final form (planning/ac4.md, phase D8),
+// The AC-4 decoder's API in its final form,
 // through its public headers alone, so that a shared build checks it against
 // the exported symbols: the configuration's syntax trace kept alive by the
 // decoder, set_output() and set_presentation() on a decoder that is playing,

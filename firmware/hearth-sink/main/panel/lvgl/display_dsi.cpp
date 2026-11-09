@@ -1,8 +1,8 @@
-// A MIPI DSI panel and its touch controller, on the ESP32-P4 (planning/karaoke-p4x-panel.md, "The
-// kit"): the 7-inch 1024 by 600 panel of Espressif's ESP32-P4X-Function-EV-Board, an EK79007 on two
+// A MIPI DSI panel and its touch controller, on the ESP32-P4: the 7-inch 1024 by 600 panel of
+// Espressif's ESP32-P4X-Function-EV-Board, an EK79007 on two
 // lanes, with a GT911 touch controller on the I2C bus the board shares with its codec.
 //
-// RUN on the kit, 2026-10-20 (chip v3.2, planning/karaoke-p4x-panel.md, "First run on the kit"):
+// RUN on the kit, 2026-10-20 (chip v3.2):
 // the bus opens, the EK79007 initialises, the GT911 answers (at 0x14: the vendor's own BSP tries
 // only 0x5D, which is why the factory demo aborts), the screen is as designed on the glass, and a
 // tap lands on every button of the controls sheet once the touch layer's axes are mirrored. Not

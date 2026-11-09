@@ -385,7 +385,7 @@ TEST_CASE("network sinks live: the sinks on this network are found, paired, play
 
 // ---- a karaoke stream on a board that decodes it ------------------------------------------------
 //
-// planning/karaoke-phase2.md, W7: a board that lists the karaoke keys is sent the stream as it is,
+// W7: a board that lists the karaoke keys is sent the stream as it is,
 // told how to reproduce it, and lays its speakers out from the reproduction. This is that against a
 // real board, hidden (it needs the board): it pairs the one sink named, sets it to a 3.0 layout (so
 // that the reproduced frame is not a fold, and the layout comes from ac3::output_mode()), plays a
@@ -540,7 +540,7 @@ void live_karaoke(const std::string& id, int seconds,
     REQUIRE(layout.has_value());
     REQUIRE(outputs >= layout->slots());
     // The board says it reproduces karaoke for this codec: a sink that lists none is taken for
-    // AC-3's alone (planning/karaoke-eac3.md, D6), and one that lists the codec is sent the stream
+    // AC-3's alone, and one that lists the codec is sent the stream
     // as it is, which is what this case is about.
     REQUIRE(support_facts.iclforge_support->reproduces_karaoke(type));
     // The programme's coded channels are the 3/2 bed and the LFE. A board that decodes fewer of this
@@ -733,8 +733,7 @@ void live_karaoke(const std::string& id, int seconds,
 }
 
 // An E-AC-3 programme of the same five tones and LFE: one independent substream flagged karaoke,
-// which a board that lists `eac3` among its karaoke codecs reproduces itself
-// (planning/karaoke-eac3.md, E4b).
+// which a board that lists `eac3` among its karaoke codecs reproduces itself.
 std::vector<std::vector<std::byte>> eac3_karaoke_units(int frames) {
     iclforge::ac3::eac3::FrameConfig bed;
     bed.sample_rate = iclforge::ac3::SampleRate::k48000;
@@ -800,7 +799,7 @@ TEST_CASE("network sinks live: an E-AC-3 karaoke stream is reproduced by the boa
 
 // ---- the lyrics of an item on a board that holds them --------------------------------------------
 //
-// planning/karaoke-phase2.md, W7d: a board that lists the lyric commands is sent the item's document
+// W7d: a board that lists the lyric commands is sent the item's document
 // and where the sound is in it, follows them on its own playout clock and reports the line. This is
 // that against a real board, hidden: it pairs the one sink named, plays a karaoke programme with a
 // lyrics file beside it (lines at 2, 5 and 8 seconds), and watches the line the board reports against

@@ -52,7 +52,7 @@
 # static one passes it on to its consumers as a link-only dependency, which they
 # need.
 #
-# AC-4 (decision 21, planning/ac4.md phase I4): embedded the same way
+# AC-4: embedded the same way
 # iclforge::ac3_static is - see EMBEDS below - so a
 # caller loading this one library gets AC-4 too. iclforge.h's AC-4 section is
 # declared either way (that header's own comment: this codebase selects a

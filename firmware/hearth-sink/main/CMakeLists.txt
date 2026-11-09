@@ -135,8 +135,9 @@ else()
 endif()
 
 # The Meters view's analysis (a 1,024- and a 512-point transform in float) and its drawing are the panel's heaviest loops, and the project's -Os does not
-# inline the transform's passes or unroll its loops: the kit measured 5 to 10 ms an update for about 100 kflops (planning/p4x-meters-view.md, "Kit
-# results"). meters_screen.cpp at -O2, as the component's player.cpp and burst_player.cpp are; and panel.cpp, where the player's tap
+# inline the transform's passes or unroll its loops: the kit measured 5 to 10 ms an update for
+# about 100 kflops. meters_screen.cpp at -O2, as the component's player.cpp and burst_player.cpp
+# are; and panel.cpp, where the player's tap
 # (iclforge/meters_tap.hpp, header-only, so its block() is compiled where the tap is made) runs inside the decode task's burst: the kit measured 370 to
 # 860 us a burst for it.
 if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
@@ -169,7 +170,7 @@ idf_component_register(
              esp_app_format espressif__mdns
              esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
 
-# The trust anchors a pull verifies a signed update index against (planning/esp32-ota.md, O10): a PEM file of
+# The trust anchors a pull verifies a signed update index against: a PEM file of
 # public certificates, embedded as it is. ICLFORGE_TRUST_ANCHORS_FILE (a cache variable, for CI's QEMU test,
 # whose throwaway CA is made before the build) wins over the project's ICLFORGE_EXAMPLE_TRUST_ANCHORS; with
 # neither the image carries an empty file, and says it cannot verify a pull. Copied to a name of its own so
@@ -192,7 +193,7 @@ if(CONFIG_ICLFORGE_FIRMWARE_PULL)
     target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--undefined=_binary_trust_anchors_pem_start")
 endif()
 
-# The panel's fonts, in the image (planning/karaoke-p4x-panel.md, D3): Archivo, which the apps bundle, and
+# The panel's fonts, in the image: Archivo, which the apps bundle, and
 # Noto Sans for Greek and Cyrillic and for Hebrew, under the SIL Open Font License (panel/fonts/*OFL.txt),
 # rasterised by LVGL's tiny_ttf from flash. In the
 # application rather than a partition of their own, so that an update over the network carries them.
@@ -250,8 +251,8 @@ if(ICLFORGE_MINIMAL_HOT_O2)
         COMPILE_OPTIONS "-O2")
 endif()
 
-# CI's rollback tests under QEMU need images that fail their trial
-# (planning/esp32-ota.md, "Tests"): ICLFORGE_FIRMWARE_TEST=unhealthy never
+# CI's rollback tests under QEMU need images that fail their trial:
+# ICLFORGE_FIRMWARE_TEST=unhealthy never
 # reports healthy and goes back at the deadline, and =panic panics as its
 # trial starts. A cache variable rather than Kconfig, so that each variant
 # recompiles this one file rather than the whole image; defined for every
@@ -271,8 +272,8 @@ set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
     "ICLFORGE_FIRMWARE_TEST_UNHEALTHY=${iclforge_firmware_test_unhealthy}"
     "ICLFORGE_FIRMWARE_TEST_PANIC_ON_TRIAL=${iclforge_firmware_test_panic}")
 
-# Which locked profile this image was built as (firmware/hearth-sink/profiles.json,
-# planning/esp32-platform-profiles.md): its id and a hash of what it locks, from
+# Which locked profile this image was built as (firmware/hearth-sink/profiles.json):
+# its id and a hash of what it locks, from
 # `tools/hearth/sink_profile.py identity <profile> --cmake`. GET /hardware reports both, so a
 # board says what it runs and the board suite can refuse one that runs another profile or a
 # scratch build. Cache variables for the reason ICLFORGE_FIRMWARE_TEST is one: a change

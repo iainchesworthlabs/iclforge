@@ -1,5 +1,5 @@
 """Compare a bare-metal probe run's PCM hashes with another run's, or with the
-pinned ones (planning/arithmetic-tiers.md).
+pinned ones.
 
 The probe prints one `<codec>.pcm_hash=<16 hex digits>` line per fixture it
 decodes: FNV-1a over every delivered sample's bit pattern, in delivery order.

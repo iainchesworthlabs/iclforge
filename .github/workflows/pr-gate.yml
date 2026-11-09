@@ -254,8 +254,8 @@ jobs:
     with:
       runner: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '["ubuntu-latest"]' || vars.GATE_RUNNER_JSON || '["ubuntu-latest"]' }}
 
-  # The ESP32 sinks' profile guard before the merge (planning/esp32-platform-profiles.md,
-  # "Where each check runs"): every profile is configured in the IDF container and held to
+  # The ESP32 sinks' profile guard before the merge: every profile is configured in the IDF
+  # container and held to
   # its definition, with no compile. Planned when firmware/hearth-sink, firmware/esp-idf or
   # the profile tools change, so a change to a locked key's default or a fragment, and two
   # pull requests that are each valid alone, are seen here and not first on main.
@@ -465,9 +465,16 @@ jobs:
       - name: Setup Python (for install-qt-action)
         uses: ./.github/actions/setup-embeddable-python
 
+      # `dir` is fixed, not the runner's workspace: install-qt-action puts it in
+      # its cache key, and this job lands on runners whose workspaces differ
+      # (D:\work\iclforge, C:\actions-runner\_work\iclforge), so a kit cached by
+      # one was a miss on the other. Each miss re-downloaded Qt (about 7 of the
+      # job's 21 minutes) and saved a 530 MB cache under the queue entry's own
+      # ref, which no other run can read.
       - name: Install Qt (prebuilt)
-        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
+          dir: C:\iclforge-ci
           version: ${{ needs.toolchain-versions.outputs.qt_version }}
           aqtsource: ${{ needs.toolchain-versions.outputs.aqt_source }}
           modules: qtquick3d qtshadertools qttasktree

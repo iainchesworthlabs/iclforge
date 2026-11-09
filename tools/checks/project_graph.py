@@ -4,7 +4,7 @@
 `check_layering.py` holds the tree to the table; the CI planners (`tools/ci/classify_changes.py`,
 `tools/ci/plan_gate.py`) ask it which project a changed path belongs to, which lanes that project
 is built and tested in, and which other projects an excused edge reaches into it from. They did
-this with directory lists of their own before (planning/monorepo.md, decision 12); a project is a
+this with directory lists of their own before; a project is a
 row of the table now, and a path the table does not know is an unknown path to the planners too.
 
     python3 tools/checks/project_graph.py affected <path>...    # the projects a change reaches

@@ -18,8 +18,7 @@
 //
 // Where a value differs by dialect (dialect.hpp), its function takes one: aiosendspin
 // 9.1.1, which Music Assistant speaks, differs from the specification in the code's
-// derivation label and length, the session id (no round) and what it wraps
-// (planning/hearth-sendspin-extension.md, C21 to C23).
+// derivation label and length, the session id (no round) and what it wraps.
 
 namespace iclforge::sendspin::pairing {
 

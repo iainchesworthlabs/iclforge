@@ -93,7 +93,7 @@ TestCase {
         waitForRendering(firmware);
     }
 
-    // The Firmware tab (planning/esp32-ota.md, O5) asks the selected sink's
+    // The Firmware tab asks the selected sink's
     // own web server, and with no sink selected there is none to ask: the
     // tab says it is asking, offers nothing, and its map stays empty.
     function findChild(item, name) {

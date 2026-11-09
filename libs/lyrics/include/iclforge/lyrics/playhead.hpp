@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <optional>
 
-// Where in an item the sound is, kept by something that is told where it was and when (planning/
-// karaoke-phase2.md, W7d: a sink that runs the lyrics on its own playout clock). The server sends
+// Where in an item the sound is, kept by something that is told where it was and when. The server
+// sends
 // anchors, each "the sound is at `position_ms` at `at_us`, and moves at `speed` times real time from
 // there": 1 while the item plays, 0 held. The playhead answers a position for any time on the same
 // clock, and the lyric cursor (lyrics.hpp) turns that position into a line and a word.

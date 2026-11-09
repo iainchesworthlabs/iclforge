@@ -1,6 +1,6 @@
 #pragma once
 
-// The preferences of a board: everything a person chooses once and leaves (planning/p4x-preferences.md), as a
+// The preferences of a board: everything a person chooses once and leaves, as a
 // registry that the screen, the REST listing (GET /preferences) and the web page all draw from. Adjust is for
 // the in-the-moment tweaks of the lyrics screen (delay, text size) and is not in here; the technical settings
 // (slot width, the second I2S line, the time server) stay with the developer view and the routes.
@@ -168,6 +168,9 @@ class Backend {
     // How the speakers view shows a level: a glow, or a glow that also makes each speaker's circle grow and shrink a little.
     [[nodiscard]] virtual nowview::SpeakersStyle speakers_style() const = 0;
     [[nodiscard]] virtual bool set_speakers_style(nowview::SpeakersStyle style) = 0;
+    // What the waiting screen (nothing playing, the board set up) does once the dim time has passed.
+    [[nodiscard]] virtual nowview::IdleView idle_view() const = 0;
+    [[nodiscard]] virtual bool set_idle_view(nowview::IdleView view) = 0;
 
     // Display: the backlight's lit level in percent (nowview::kBrightnessMin to kBrightnessMax), how the clock view
     // writes the time, and the night schedule (when the screen goes dark by the board's own time).
@@ -194,8 +197,8 @@ class Backend {
 
     // Sound: the test tone through the speakers one after another (identify_each), and the level and distance kept for
     // each speaker. The tone is the board's own, played through the output stage the music plays through; it is refused
-    // while something else has the sink, and it stops of its own accord after a minute at most (planning/
-    // hearth-speaker-trim-identify.md). A trim is read and written as the words of PUT /trim ("L level=-1.5
+    // while something else has the sink, and it stops of its own accord after a minute at most. A
+    // trim is read and written as the words of PUT /trim ("L level=-1.5
     // distance=2.4"): the tone and the numbers are applied by the Sendspin player, which this library knows nothing of.
     [[nodiscard]] virtual bool identify_running() const = 0;
     // Why the tone cannot start now ("A song is playing."), or empty when it can.
@@ -382,6 +385,15 @@ inline constexpr std::array<ChoiceDef, 6> kNowViewChoices{{
     {.id = "meters", .label = "Meters", .availability = &needs_meters},
     {.id = "dark", .label = "Dark", .availability = &needs_touch},
     {.id = "off", .label = "Off"},
+}};
+
+// What the waiting screen does after the dim time. Clock needs a clock; each of the rest is a dim or dark that a touch
+// ends, so the entry itself needs the touch.
+inline constexpr std::array<ChoiceDef, 4> kIdleViewChoices{{
+    {.id = "lit", .label = "Stay lit"},
+    {.id = "dim", .label = "Dim"},
+    {.id = "clock", .label = "Clock", .availability = &needs_clock},
+    {.id = "dark", .label = "Dark"},
 }};
 
 inline constexpr std::array<ChoiceDef, 2> kSpeakersStyleChoices{{
@@ -580,6 +592,15 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
     return style.has_value() && backend.set_speakers_style(*style);
 }
 
+[[nodiscard]] inline std::string get_idle_view(const Backend& backend) {
+    return nowview::idle_view_name(backend.idle_view());
+}
+
+[[nodiscard]] inline bool set_idle_view(Backend& backend, std::string_view word) {
+    const std::optional<nowview::IdleView> view = nowview::parse_idle_view(word);
+    return view.has_value() && backend.set_idle_view(*view);
+}
+
 // The speakers are what the Speakers, Title and Dark views show (the Title view stands on them until a server says a
 // title); the Clock view, the Meters view and the old sentence draw none.
 [[nodiscard]] inline std::string speakers_style_inert(const Backend& backend) {
@@ -595,6 +616,11 @@ inline constexpr std::array<ChoiceDef, 2> kOnOffChoices{{
 [[nodiscard]] inline std::string dim_after_inert(const Backend& backend) {
     if (backend.now_view() != nowview::View::kDark) {
         return {};
+    }
+    // The waiting screen counts its dim time from the same row; with that left lit the row has no work at all.
+    if (backend.idle_view() != nowview::IdleView::kLit) {
+        return "Not used by the Dark view for a song: a touch lights it for " + std::to_string(nowview::kDarkAwakeMs / 1000) +
+               " seconds, then it is dark again. The waiting screen still dims after this.";
     }
     return "Not used by the Dark view: a touch lights it for " + std::to_string(nowview::kDarkAwakeMs / 1000) +
            " seconds, then it is dark again.";
@@ -640,7 +666,7 @@ inline ResetReport reset_preferences(Backend& backend);
 
 namespace detail {
 
-// --- Network and System (E4, planning/p4x-preferences.md) ------------------------------------------------------------
+// --- Network and System (E4) ------------------------------------------------------------
 
 [[nodiscard]] inline Availability needs_network_choice(const BoardCaps& caps) {
     if (caps.network.choice()) {
@@ -786,7 +812,7 @@ inline constexpr std::array<ChoiceDef, 2> kIdentifyChoices{{
     return backend.set_speaker_trim_text(statements);
 }
 
-// Late night is the player's decoders' (planning/hearth-late-night.md): a board with no Sendspin player decodes no
+// Late night is the player's decoders': a board with no Sendspin player decodes no
 // Dolby stream, and PCM, which is all a player may be sent, carries no metadata to compress.
 [[nodiscard]] inline Availability needs_dolby_decoder(const BoardCaps& caps) {
     return caps.sendspin ? Availability::yes()
@@ -812,7 +838,7 @@ inline constexpr std::array<ChoiceDef, 2> kLateNightChoices{{
 
 }  // namespace detail
 
-inline constexpr std::array<Pref, 21> kRegistry{{
+inline constexpr std::array<Pref, 22> kRegistry{{
     {.id = "now-view",
      .group = Group::kDisplay,
      .label = "Screen without lyrics",
@@ -840,6 +866,19 @@ inline constexpr std::array<Pref, 21> kRegistry{{
      .inert = &detail::dim_after_inert,
      .get = &detail::get_dim_after,
      .set = &detail::set_dim_after,
+     .on_reset = OnReset::kReset},
+    {.id = "idle-view",
+     .group = Group::kDisplay,
+     .label = "When nothing is playing",
+     .note = "What the waiting screen does after the dim time. A touch brings it back.",
+     .kind = Kind::kChoice,
+     .apply = Apply::kLive,
+     .route = "/idle-view",
+     .default_word = "dim",
+     .choices = detail::kIdleViewChoices,
+     .availability = &detail::needs_screen_with_touch,
+     .get = &detail::get_idle_view,
+     .set = &detail::set_idle_view,
      .on_reset = OnReset::kReset},
     {.id = "speakers-style",
      .group = Group::kDisplay,

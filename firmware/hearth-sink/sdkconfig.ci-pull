@@ -1,4 +1,4 @@
-# An update pulled from a release under QEMU (planning/esp32-ota.md, "Tests"), after sdkconfig.ci-ota and
+# An update pulled from a release under QEMU, after sdkconfig.ci-ota and
 # sdkconfig.pull:
 #
 #   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-ota;sdkconfig.pull;sdkconfig.ci-pull"

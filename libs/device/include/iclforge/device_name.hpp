@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-// What a Hearth board may be called, and what a rename changes (planning/p4x-preferences.md, E4).
+// What a Hearth board may be called, and what a rename changes.
 //
 // THE NAME. One text of 1 to kMaxBytes bytes of UTF-8: what the board calls itself on the network (its
 // mDNS instance name and the `name` in its _sendspin._tcp record), in the hello it says to a Sendspin

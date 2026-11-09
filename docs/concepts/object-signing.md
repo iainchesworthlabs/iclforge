@@ -238,22 +238,77 @@ the app streams the unsigned `bed51`-equivalent, always safe on any receiver.
 
 ## Sibling: TrueHD Evolution
 
-This page is **E-AC-3 / EMDF** object signing. TrueHD has a check of its own on the **evolution frame**, the payload that carries
-Atmos object metadata, and nothing for it is built here: the TrueHD decoder carries the frame's bytes and reads none of them.
+TrueHD carries its object audio metadata in an **evolution frame** in the extra data of an access unit (TH spec §15.4, §16.1), and
+that frame has an `evo_protection()` field with the same shape as E-AC-3's EMDF one. `iclforge::truehd::signing`
+(`libs/truehd/include/iclforge/truehd/signing/evolution_signer.hpp`) gives it the capability set this page describes for E-AC-3: sign,
+verify against one key or a keyring, a key-free "is a tag present" check, and a gate that falls back to the bed. A TrueHD stream does
+not need any of it: a bed-only stream is valid with no evolution frame at all.
 
-Two accounts of that check exist, and neither has been tested against a stream. An earlier note in this project described a
-truncated HMAC-SHA-256 over the access unit and the evolution frame, verified optionally with an operator-supplied key. The owner's
-TrueHD specification (TH spec §16.3, §16.6 and §22, version 3.4 and later) describes the payload as the same `ContentSignature`
-container, serialised with Thrift and signed under the same `pace-ccjf1` scheme, as [AC-4's](#sibling-ac-4), and lists the container's
-field IDs, the digest scope and whether each frame carries its own signature as unconfirmed. The code follows the specification, the
-later of the two; which one real streams use is open question 1 of
-[`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md).
+```
+tag = HMAC-SHA-256( key, M ) [ : Np / 8 ]
+```
 
-If it is the container, the seam is already cut: everything in `iclforge::base::crypto` (SHA-1 and SHA-256, ECDSA P-256 with RFC 6979
-nonces, DER, X.509, PEM, chain validation, the Thrift reader and writer, `sign_content_digest` and `verify_content_signature`) knows no
-codec, and a TrueHD front end supplies only what `iclforge/ac4/io/content_signature.hpp` supplies for AC-4: where the blob sits in the
-stream and which bytes the digest covers. The same BYOK, opt-in and anchoring rules would apply. Either way it belongs to the TrueHD
-library and `iclforge::base::crypto`, not to `iclforge::ac3::signing`'s EMDF path, and decode without a key would stay unchecked.
+`Np` is the width of the primary protection field (1, 4 or 16 bytes, from its length code). **`M` is the whole access unit** with four
+regions zeroed and nothing else changed: the primary and secondary protection fields; the zero fill inside the evolution payload after
+the frame; the extra data's padding between the payload and its parity byte; and the parity byte. Everything else is covered: the
+unit's header word (its check nibble and length) and `input_timing`, the substream directory, the major sync with its CRC, every
+substream segment, and the evolution payload's version, key id, payload ids, configurations and bytes. So an edit to the object
+metadata, the major sync, the directory or the audio fails the tag, and an edit to the padding, the fill or the parity does not (it
+gives the extra data's own parity error). Signing writes the tag and recomputes the parity byte (TH spec §16.4); **no length, no payload
+size and no check nibble changes**, so a signed stream is exactly as long as the unsigned one. Nothing is carried from one unit to the
+next.
+
+- **Sign after the last edit.** Because the major sync is covered, `forge metadata` with a channel-meaning edit and `sign-objects`
+  together edit first and sign second; editing a signed stream without signing again leaves its tags failing (and `forge` says so).
+- **Sole container.** Because the fill and the padding are outside the message, a frame is signed and verified only when the extra data
+  holds nothing else: no bytes after the container inside the payload, zero padding after it. A frame with more than that is a mismatch
+  even when the digest matches, and **signing refuses such a frame** (it returns false and changes nothing, rather than write a tag
+  that would then fail). That is one more condition than an empty key, no readable frame and a primary length code of 0.
+- **No stream signature.** A cut or a joint at unit boundaries leaves every tag valid, and the audio between the tags is covered only
+  unit by unit. This is a property of a per-frame tag. TrueHD spec §16.3.3 still holds: no TrueHD stream carries a whole-stream content
+  signature, and this library does not add one; there is no plan to. AC-4 has one, and it is a separate scheme.
+
+**This is iclforge's own scheme.** The coverage follows what is observed of the tag in streams from the Dolby tools (it reaches the
+object metadata, the major sync and the unit header and directory, and not the padding, the fill or the parity). The algorithm and the
+key of those tags are not public and are not derived or searched for here, and the construction is HMAC (RFC 2104) and SHA-256 (FIPS
+180-4) under **your** key: the library never embeds, derives or searches for one (`SigningKey`, the same `signing-key=` file or
+`ICLFORGE_SIGNING_KEY[_FILE]` as for E-AC-3). It cannot make a tag a licensed decoder accepts, and a `kValid` says only that the tag
+matches the key you supplied.
+
+**What a licensed Dolby decoder does with it.** It holds other keys, so it reads these tags as failing, as it reads an unsigned
+stream's. With the Atmos flag set in the major sync it enforces the tag: **two failing evolution frames in a row end the output about
+one access unit early per report, one failing frame is tolerated, a valid frame between failures resets the count, and a stream with
+few or no evolution frames is not affected.** The bed that is played is a bit-exact prefix of the bed. That is how the decoder treats a
+tag it does not hold the key for, and it is the operator's choice whether to sign (for this library's own check and gate), to leave
+the stream unsigned, or to gate it: `gate-objects` removes the object layer from every unit whose tag does not verify, which leaves a
+stream with no failing frame by construction (tested), and the bed plays full length.
+
+**How strong the tag is.** The field is as wide as its length code says, and every stream observed has used one byte. A one-byte tag is
+accepted by a wrong key about once in 256 units, so on a stream of any length some unsigned or foreign frames pass by chance (2 of 63
+did on a real stream). It detects tampering and mix-ups; it does not authenticate, and the gate is no stronger than that per unit. The
+signer does not choose the width: it writes the tag into the field the unit has, and a wider field is a different stream variant for
+the writer of the stream to choose.
+
+| | Function (`iclforge::truehd::signing`) | `forge` |
+|---|---|---|
+| Sign, in place | `sign_evolution_unit`, `sign_evolution_stream` | `metadata <in> <out> sign-objects signing-key=<path>` (alone or with the channel-meaning edits, which come first); a stream written by an encoder that signs needs no second step |
+| Is a tag present, no key | `has_evolution_tag`, `count_evolution_tags` | `probe`: `protection tag present in N/M frame(s)`; JSON `truehd.evolution.protection.tagged_frames` |
+| Verify | `verify_evolution_unit`, `verify_evolution_stream` (`kNoContainer`, `kValid`, `kMismatch`) | `decode <in.thd> <out.wav> verify-objects signing-key=<path>`: a mismatch refuses the command |
+| Keyring | `verify_evolution_unit_any`, `verify_evolution_stream_any` | repeat `signing-key=`; the status line credits each key |
+| Licensed policy | `gate_evolution_stream` | `decode ... gate-objects signing-key=<path>` |
+
+`gate_evolution_stream` decides per access unit. A unit whose frame verifies is copied byte for byte; any other unit with extra data
+(unsigned, another key's, altered, unreadable) has its extra data rewritten to the padding-only form (header word zero and zero words;
+TH spec §16.2) and nothing else, so the substreams are untouched and the bed decodes bit-identically with no re-encode and no change of
+length. A gated unit's object channels (substream 3) have no metadata left to place them, so `gate-objects` refuses
+`truehd-presentation=all` when it gated anything; the other presentations read substreams 0 to 2. The gate fails closed: bytes that do
+not read as an access unit are an error, not a pass. `verify-objects` and `gate-objects` are not combinable, as for E-AC-3. Decode
+without either option reads no tag, as before.
+
+The container reading (`kEmdf` or `kSpec36`, ERRATA question 23) is still open; the tag's construction is the same under both and every
+function takes the reading as its last argument (`kEmdf` by default). `tools/references/truehd_evolution_signing.py` is an independent
+Python transcription; the C++ and Python signers write the same bytes (`libs/truehd/tests/signing/test_evolution_signer.cpp`). This is a
+new extension, not an interoperability claim.
 
 ## Sibling: AC-4
 
@@ -290,6 +345,20 @@ The rest follows this page's stance:
   UUID that is missing or that is none of them. Only a raw `.ac4` stream is signed: signing an MP4 is
   out of scope (section 8.3.2) and is refused by name.
 
+- **A bring-your-own-key signature is not Dolby's.** The signature chains to the certificates *you*
+  supply, so it proves one thing: the stream is the one whose holder of your key signed it, and not a
+  byte of it, or of the signer information, has changed since. It does **not** chain to Dolby's (or
+  PACE's) trust root, and this project ships no key, certificate or fingerprint of either, so a
+  licensed Dolby decoder, player or receiver that checks a content signature against Dolby's root
+  will not treat the stream as Dolby-authentic, and a signed file does not become "certified" by
+  being signed. What a verifier can conclude depends on what it trusts: with `trust-anchor=`,
+  `pin=` or `trust-key=` naming *your* signer it can say "valid" (your key signed this), with
+  nothing named it can only say `untrusted` (the file agrees with its own signature, which anyone
+  could have made with a key of their own). The signature carries no encryption and no protection
+  against copying; anyone who strips the trailer has an unsigned stream that plays the same, and
+  `no-signature` is how a verifier tells. Guard the private key as you would a code-signing key: the
+  library wipes its copies, but a key file, a process environment or a core dump is yours to protect.
+
 See [Signing](../library/signing.md#ac-4-content-signing) for the API, and `libs/ac4/ERRATA.md` for
 what was measured on a real signature and the questions still open.
 
@@ -300,7 +369,7 @@ Three policies for decode into multi-channel / objects, all shipped:
 | Mode | Intent | How |
 |---|---|---|
 | **Unchecked** (default) | FOSS-style: reconstruct objects without checking the tag | Omit both options |
-| **Verify** | Multi-key HMAC QC; mismatch **fails** the command | `verify-objects` with one or several `signing-key=`; `verify_atmos_stream_any` |
+| **Verify** | Multi-key HMAC QC; mismatch **fails** the command | `verify-objects` with one or several `signing-key=`; `verify_atmos_stream_any` (TrueHD: `verify_evolution_stream_any`) |
 | **Licensed** | AVR-like: match → reconstruct; mismatch / unsigned → **bed only**, decode continues | `gate-objects` with one or several `signing-key=`; `gate_atmos_stream` |
 
 Sign remains single-key (`sign-objects`). Keys are always operator-provisioned; nothing here forges

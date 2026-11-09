@@ -110,10 +110,10 @@ struct LayoutEvidence {
     std::string_view behind;
 };
 
-// planning/esp32-platform-profiles.md's baselines (the 2.0 rows on every profile; p4-rev3's
+// The measured baselines (the 2.0 rows on every profile; p4-rev3's
 // ac3-5.1-tdm16 row: AC-3 5.1 rendered onto 9.1.6, sixteen 32-bit TDM slots, 142 permille of a frame,
-// no underruns, on the kit, 2026-10-20), and planning/esp32-sink-compatibility-matrix.md, Matrix 1
-// (the S3 plays a 7.1.4 Atmos stream "at the line", 1.08 of real time with Wi-Fi up). No S3 or C6
+// no underruns, on the kit, 2026-10-20), and the S3 playing a 7.1.4 Atmos stream
+// "at the line", 1.08 of real time with Wi-Fi up. No S3 or C6
 // profile has a play wider than stereo in its suite, so theirs stop at 2.
 inline constexpr std::array<LayoutEvidence, 5> kLayoutEvidence{{
     {"s3-n16r8", 2, 12, "a 7.1.4 Atmos stream took 1.08 of real time on this board with Wi-Fi up"},

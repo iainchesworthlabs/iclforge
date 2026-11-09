@@ -1,4 +1,4 @@
-# The Sendspin player under QEMU (planning/hearth-reference-player.md, B4):
+# The Sendspin player under QEMU:
 #
 #   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin"
 #

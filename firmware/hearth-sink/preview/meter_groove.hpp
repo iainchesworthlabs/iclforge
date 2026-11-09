@@ -1,6 +1,7 @@
 #pragma once
 
-// A made-up groove for the Meters view's scenarios (planning/p4x-meters-view.md): a kick, a snare, hats, a bass, a pad and a lead that moves round the room,
+// A made-up groove for the Meters view's scenarios: a kick, a snare, hats, a bass, a pad and a
+// lead that moves round the room,
 // panned onto the outputs of whatever room is playing and written into the tap in blocks of 256 frames, as the player's decode task writes it, up to
 // the preview's own clock. Fixed, so that every scenario sees the same music; not a measurement of anything.
 

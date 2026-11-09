@@ -1,5 +1,5 @@
-// The two speed-ups of the spectral reconstruction (libs/ac4/src/decoder/pcm/asf_reconstruct.hpp;
-// planning/ac4.md, D14e) against what they replaced, to the bit: the table of scale factor gains
+// The two speed-ups of the spectral reconstruction (libs/ac4/src/decoder/pcm/asf_reconstruct.hpp)
+// against what they replaced, to the bit: the table of scale factor gains
 // against the std::pow the reconstruction made for every band of every frame, and the in-place
 // ungrouping of a frame of one long block against ungroup().
 

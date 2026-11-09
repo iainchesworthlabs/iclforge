@@ -29,6 +29,7 @@
 #include "freertos/task.h"
 
 #include "ac4_stream.hpp"
+#include "truehd_stream.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/dynamic_range.hpp"
@@ -72,7 +73,7 @@ using Location = iclforge::ac3::eac3::chanmap::Location;
 constexpr std::size_t kBlock = Playout::kBlockFrames;
 static_assert(kBlock == iclforge::ac3::kSamplesPerBlock, "the player writes the decoder's block");
 constexpr std::size_t kMaxSlots = OutputLayout::kMaxSlots;
-// A burst is always 1,536 samples (planning/hearth-sendspin-extension.md).
+// A burst is always 1,536 samples.
 constexpr std::uint64_t kBurstFrames = 1536;
 // An AC-4 chunk is one frame, which lasts what its frame rate says: 2,048 samples at frame rate 13
 // and 48 kHz, until the first decoded frame says.
@@ -254,6 +255,13 @@ struct BurstPlayer::Impl {
     std::uint32_t ac4_cost_samples = 0;
     // Late AC-4 chunks decoded for their state and not played.
     std::uint64_t late_kept_chunks = 0;
+    // The decoder of a TrueHD stream of chunks (whole access units, one to 24): made when one
+    // starts, kept from one such stream to the next and let go when another kind starts, as the
+    // AC-4 one is. A unit that gives nothing is played as silence by the stream itself.
+    std::unique_ptr<TruehdStream> truehd;
+    // This stream could not open its decoder, or has had a chunk refused: said once, and its
+    // chunks counted invalid.
+    bool truehd_failed = false;
     // The stream's frames that were never handed to the sink: where the timeline is anchored again
     // after the frames it last pushed (the chunks dropped for being late, the ones the decoder
     // waited an I-frame through or decoded and discarded), counted from the stream's first chunk.
@@ -484,6 +492,9 @@ struct BurstPlayer::Impl {
         if (ac4) {
             ac4->close();
         }
+        if (truehd) {
+            truehd->close();
+        }
     }
 
     // The sink opened for as many outputs as the routing and the identify
@@ -705,6 +716,9 @@ struct BurstPlayer::Impl {
         if (ac4) {
             ac4->reset();
         }
+        if (truehd) {
+            truehd->reset();
+        }
         reset_output();
     }
 
@@ -767,13 +781,23 @@ struct BurstPlayer::Impl {
         // CONFIG_ICLFORGE_AC4_INTERNAL_BELOW puts them for as long as the stream plays.
         const bool ac4_stream = kind == Stream::kBursts && data_type == ac::DataType::kAc4;
         const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
-        const DecoderNeed need = ac4_stream    ? DecoderNeed::kAc4
-                                 : opus_stream ? DecoderNeed::kOpus
+        // A TrueHD stream's is 158 KB and the stack to run it 64 KiB: it goes with the others when
+        // any other kind starts, and they go when it does.
+        const bool truehd_stream = kind == Stream::kBursts && data_type == ac::DataType::kTruehd;
+        const DecoderNeed need = ac4_stream      ? DecoderNeed::kAc4
+                                 : truehd_stream ? DecoderNeed::kTruehd
+                                 : opus_stream   ? DecoderNeed::kOpus
                                  : kind == Stream::kPcm ? DecoderNeed::kNone
                                                         : DecoderNeed::kAc3Family;
         const DecodersKept keep = decoders_kept(need, heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0);
         ac4_failed = false;
         ac4_frame_samples = 0;
+        truehd_failed = false;
+        if (!keep.truehd) {
+            truehd.reset();
+        } else if (!truehd) {
+            truehd = std::make_unique<TruehdStream>();
+        }
         if (!keep.ac3_family) {
             ac3_decoder.reset();
             eac3_decoder.reset();
@@ -1293,7 +1317,14 @@ struct BurstPlayer::Impl {
         static_cast<Impl*>(self)->ac4_deliver(block);
     }
 
-    void ac4_deliver(const Ac4Stream::Block& block) {
+    static void truehd_block(void* self, const TruehdStream::Block& block) {
+        static_cast<Impl*>(self)->ac4_deliver(block);
+    }
+
+    // `Block` is Ac4Stream's or TruehdStream's: a bed, one span of samples a channel, and the
+    // number of samples, which is all the renderer is given.
+    template <class Block>
+    void ac4_deliver(const Block& block) {
         if (!serving.fold && (!renderer_bed || !same_layout(*renderer_bed, block.bed))) {
             renderer.set_bed(block.bed);
             renderer_bed = block.bed;
@@ -1377,6 +1408,63 @@ struct BurstPlayer::Impl {
                             static_cast<int>(ac4->reason().size()), ac4->reason().data());
                 return false;
             case Ac4Stream::Result::kInvalid:
+                break;
+        }
+        return false;
+    }
+
+    // The TrueHD decoder made, when it is not: false, with the stream refused for good and its
+    // chunk counted invalid, when it cannot be.
+    [[nodiscard]] bool ensure_truehd_open() {
+        if (truehd->is_open()) {
+            return true;
+        }
+        if (truehd->open({.max_channels = config.max_truehd_channels,
+                          .sample_rate_hz = config.sample_rate})) {
+            return true;
+        }
+        truehd_failed = true;
+        std::printf("burst player: cannot decode this TrueHD stream: %.*s (heap free %u)\n",
+                    static_cast<int>(truehd->reason().size()), truehd->reason().data(),
+                    static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)));
+        invalid_chunks.fetch_add(1);
+        return false;
+    }
+
+    // One chunk of a TrueHD stream: one to 24 whole access units, each to a block of the layout.
+    // False when it was not whole units, which starts the decoder again. A unit the decoder could
+    // not read is played as silence by the stream, so the timeline is not broken by the join.
+    [[nodiscard]] bool decode_truehd(std::span<const std::byte> units) {
+        if (truehd_failed || !truehd) {
+            invalid_chunks.fetch_add(1);
+            return true;
+        }
+        if (!ensure_truehd_open()) {
+            return true;
+        }
+        switch (truehd->decode(units, &Impl::truehd_block, this)) {
+            case TruehdStream::Result::kDecoded: {
+                if (!have_decoder_report) {
+                    have_decoder_report = true;
+                    const TruehdStream::Report& report = truehd->report();
+                    decoder_report = ac::DecoderReport{.data_type = data_type,
+                                                       .acmod = report.acmod,
+                                                       .lfe = report.lfe,
+                                                       .substreams = 1,
+                                                       .objects = 0,
+                                                       .objects_placed = false,
+                                                       .dialnorm = 0.0};
+                }
+                return true;
+            }
+            case TruehdStream::Result::kWaiting:
+                return true;
+            case TruehdStream::Result::kRefused:
+                truehd_failed = true;
+                std::printf("burst player: refusing this TrueHD stream: %.*s\n",
+                            static_cast<int>(truehd->reason().size()), truehd->reason().data());
+                return false;
+            case TruehdStream::Result::kInvalid:
                 break;
         }
         return false;
@@ -1471,10 +1559,16 @@ struct BurstPlayer::Impl {
         // Too late to play any of it: dropped before it is decoded, and the
         // decoder starts again with the next.
         if (const std::optional<std::int64_t> next = playout->next_play_us(esp_timer_get_time())) {
+            // A TrueHD chunk lasts its units' samples (24 units, 20 ms, when full).
+            const std::uint64_t truehd_frames =
+                data_type == ac::DataType::kTruehd
+                    ? TruehdStream::chunk_samples(std::as_bytes(payload), config.sample_rate)
+                    : 0;
             const std::uint64_t frames =
                 data_type == ac::DataType::kAc4
                     ? (ac4_frame_samples != 0 ? ac4_frame_samples : kAc4FrameFrames)
-                    : kBurstFrames;
+                : truehd_frames != 0 ? truehd_frames
+                                     : kBurstFrames;
             const std::int64_t frame_us =
                 static_cast<std::int64_t>((frames * 1'000'000) / config.sample_rate);
             const std::int64_t end = local_us + frame_us;
@@ -1506,8 +1600,11 @@ struct BurstPlayer::Impl {
         const std::int64_t started = esp_timer_get_time();
         // An AC-4 chunk is one sync frame, whole: it is not cut into units as AC-3's and E-AC-3's
         // bursts are.
+        // A TrueHD chunk is whole access units, which its stream cuts and decodes in turn.
         const bool whole = data_type == ac::DataType::kAc4
                                ? decode_ac4(std::as_bytes(payload))
+                           : data_type == ac::DataType::kTruehd
+                               ? decode_truehd(std::as_bytes(payload))
                                : for_each_access_unit(std::as_bytes(payload),
                                                       [this](std::span<const std::byte> unit) {
                                                           decode_unit(unit);
@@ -2220,6 +2317,10 @@ bool BurstPlayer::active() const { return impl_->active.load(); }
 
 bool BurstPlayer::decodes_ac4() {
     return Ac4Stream::available();
+}
+
+bool BurstPlayer::decodes_truehd() {
+    return TruehdStream::available();
 }
 
 bool BurstPlayer::decodes_opus() {

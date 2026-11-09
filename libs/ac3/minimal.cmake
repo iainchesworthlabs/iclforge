@@ -178,7 +178,7 @@ endif()
 # whose FPU is single-precision at best, and the ESP32-S3 port did not fit in
 # internal SRAM until the decode path moved to float, so double is not a shape
 # a caller can configure it into. The fixed-point tier is the profile's other
-# legitimate shape - a part with no FPU at all (planning/arithmetic-tiers.md) -
+# legitimate shape - a part with no FPU at all -
 # and is the one value of ICLFORGE_DECODE_SCALAR honoured here.
 if(ICLFORGE_DECODE_SCALAR STREQUAL "fixed")
     set(_ac3_minimal_scalar_dir "fixed32")
@@ -254,8 +254,8 @@ target_compile_features(iclforge_ac3_minimal PUBLIC cxx_std_23)
 # stage by stage, and the ones it did not pay for are deliberately absent:
 # exponents.cpp and mantissas.cpp (under a tenth of a millisecond between
 # them). mdct.cpp was absent too (the float32 IMDCT ran in 3.40 ms either way)
-# until its transforms ran on the family's one FFT (planning/consolidation.md
-# decision 20), whose passes -Os leaves as calls: at -O2 the Cortex-M3 leg's
+# until its transforms ran on the family's one FFT, whose passes -Os leaves as calls: at -O2 the
+# Cortex-M3 leg's
 # float32 decode is within 0.4% of what it was on AC-3's own kernel, at -Os
 # 2 to 4% over, for about 9 KB of flash. What it bought at 240 MHz, per frame of the 5.1 Atmos fixture:
 # bit allocation 4.55 -> 2.09 ms, the JOC mixing 11.0 -> 8.2 ms, the

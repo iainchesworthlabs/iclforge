@@ -20,8 +20,7 @@
 #include <string>
 #include <string_view>
 
-// iclforge::hearth::SettingsStore over QSettings (planning/hearth-reference-
-// player.md, A5: "it stores its settings through QSettings"). The key
+// iclforge::hearth::SettingsStore over QSettings. The key
 // strings settings_model.cpp and pairing_store.cpp already compose
 // ("playback/gapless", "queue/1/path", "pairing/1/client", ...) are plain
 // QSettings keys, so this is a thin pass-through that does not have to know

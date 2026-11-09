@@ -86,7 +86,7 @@ $scanRoots = @($srcRoot)
 # older tag from before one of these existed, still has a valid libs/ to scan.
 # examples/ and tools/ were already clean when they were added here on
 # 2026-09-23 and cost nothing to hold; tests/ and bindings/python/ were cleaned to join
-# them. A library's own tests and fuzz targets are in libs/<lib>/ (planning/monorepo.md, C7-1),
+# them. A library's own tests and fuzz targets are in libs/<lib>/,
 # so libs/ holds what libs/, tests/ and fuzz/ held; external/ is the vendored code that was in
 # the sendspin library.
 foreach ($name in @('apps', 'firmware/baremetal', 'tests', 'external', 'examples', 'tools', 'bindings/python')) {

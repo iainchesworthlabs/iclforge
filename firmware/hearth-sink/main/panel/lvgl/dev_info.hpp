@@ -6,8 +6,8 @@
 #include "iclforge/dev_view.hpp"
 #include "iclforge/panel_stats.hpp"
 
-// What the developer view reads of the board and what it asks of it (dev_screen.cpp,
-// planning/karaoke-p4x-panel.md, "The developer view"). A seam of its own, like board_info.hpp, so
+// What the developer view reads of the board and what it asks of it (dev_screen.cpp).
+// A seam of its own, like board_info.hpp, so
 // that the view builds on a computer (preview/): the firmware's definitions are in dev_info.cpp
 // (and panel.cpp, which adds its own counters), over the settings, the network, the Sendspin player,
 // the heap and the console's log ring; the preview's are fixtures.

@@ -596,8 +596,7 @@ class InTheSuite(unittest.TestCase):
         self.assertEqual(rows["eac3-2.0-sendspin"], "sendspin")
         self.assertEqual(rows["ac3-2.0-refused"], "play")
         # As a user plays them: the E-AC-3 stream after the AC-3 one, in the same boot, which is
-        # where its Wi-Fi receive buffers used to fail to allocate (planning/esp32-platform-
-        # profiles.md, 'Sendspin rows').
+        # where its Wi-Fi receive buffers used to fail to allocate.
         self.assertLess(ids.index("ac3-2.0-sendspin"), ids.index("eac3-2.0-sendspin"))
 
     def test_a_row_without_the_test_server_is_refused_with_how_to_get_one(self) -> None:

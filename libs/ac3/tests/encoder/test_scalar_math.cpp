@@ -85,7 +85,7 @@ TEST_CASE("float scalar_exp clamps rather than overflowing", "[encoder][scalar_m
 
 TEST_CASE("float scalar_exp2 tracks std::exp2 over the arguments hf_generator reaches",
           "[encoder][scalar_math]") {
-    // hf_generator.cpp's dB conversions (planning/ac4.md, D14a) exponentiate a
+    // hf_generator.cpp's dB conversions exponentiate a
     // mean-of-logs difference in dB, capped by the fitted cubic's own range;
     // -125 to 128 spans it with margin either side of the clamps.
     double worst_rel = 0.0;

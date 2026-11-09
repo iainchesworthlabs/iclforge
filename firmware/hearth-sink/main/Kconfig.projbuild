@@ -1,6 +1,6 @@
 menu "iclforge hearth sink"
 
-# THE TRUST ANCHORS OF UPDATES FROM GITHUB RELEASES (planning/esp32-ota.md, O10): the public certificates a
+# THE TRUST ANCHORS OF UPDATES FROM GITHUB RELEASES: the public certificates a
 # pulled update's signed index has to chain to. A PEM file, relative to the project; embedded in the image.
 # Empty embeds none, which is a build that cannot verify a pull and says so. A project that runs its own
 # releases points this at its own CA (and ICLFORGE_FIRMWARE_UPDATE_BASE_URL at its own repository).
@@ -372,7 +372,7 @@ config ICLFORGE_EXAMPLE_WIFI_RETRIES
 
 # WIRED ETHERNET, next to the WiFi station and not instead of it: a board with an EMAC and a PHY
 # (the ESP32-P4X-Function-EV-Board's IP101GR) keeps the station for when the cable is out, and
-# main/net/dual/network.cpp chooses between the two (planning/esp32-board-bench.md). The defaults
+# main/net/dual/network.cpp chooses between the two. The defaults
 # are that board's; another P4 board with a PHY sets its own. The PHY driver is ESP-IDF's generic
 # 802.3 one, which is what the IDF example for this board uses.
 config ICLFORGE_EXAMPLE_NETWORK_ETHERNET
@@ -510,7 +510,7 @@ config ICLFORGE_EXAMPLE_DYNAMIC_RANGE
         compression settings for as long as it is on. It changes only streams
         whose encoder wrote the compression for it (compr words in AC-3 and
         E-AC-3, DRC decoder modes in AC-4), and never the level dialogue is
-        heard at. planning/hearth-late-night.md has the measurements.
+        heard at.
 
 config ICLFORGE_EXAMPLE_STEREO_FOLD
     int "Fold for a 2.0 layout: Lo/Ro (0) or Lt/Rt (1)"
@@ -549,8 +549,7 @@ config ICLFORGE_EXAMPLE_JOC_DOMAIN
 
 # AC-4, WHERE THE COMPONENT HAS IT (CONFIG_ICLFORGE_AC4, its Kconfig): a stream
 # that opens with an AC-4 sync word is read by the AC-4 decoder in place of the
-# AC-3 and E-AC-3 ones, whatever the source, and these say how. planning/ac4.md,
-# D14b.
+# AC-3 and E-AC-3 ones, whatever the source, and these say how.
 config ICLFORGE_EXAMPLE_AC4_CORE
     int "AC-4: core decoding (1) or full decoding (0)"
     depends on ICLFORGE_AC4
@@ -586,7 +585,7 @@ config ICLFORGE_EXAMPLE_DECODE_LANE
         independent stages: each channel's inverse transform and overlap-add, and a JOC
         reconstruction's bed analyses and objects. It is a task with its stack in PSRAM where
         there is PSRAM, at the decode task's priority. The PCM is the same bit for bit.
-        Measured on an ESP32-S3 (planning/esp32-714-realtime.md): objects 7.1.4 ... see the
+        Measured on an ESP32-S3: objects 7.1.4 ... see the
         board page for the figures.
 
         On by default only where there is PSRAM. Without it the task's stack (12 KB) and its
@@ -660,20 +659,19 @@ config ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM
         For a part whose internal RAM is what Wi-Fi leaves it: on an
         ESP32-S3 with Wi-Fi and the player up no internal block is over
         31,744 bytes, which is less than this option's 32,768-byte stack
-        and less than an AC-4 5.1 play with A-CPL needs (planning/ac4.md,
-        D14c). Needs CONFIG_SPIRAM and CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM;
+        and less than an AC-4 5.1 play with A-CPL needs. Needs CONFIG_SPIRAM and CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM;
         without PSRAM present the stack is internal as before. On by default
         for an ESP32-S3 image with PSRAM, whether or not it has AC-4: it was
         on only with AC-4 until 2026-10-12, when an HTTP POST /play on the
-        S3 release image, which has none, could not start its decode task
-        (planning/esp32-platform-profiles.md). The stack is then read
+        S3 release image, which has none, could not start its decode task.
+        The stack is then read
         through the data cache: measured on a board, a 2.0 A-SPX frame took
         5% longer and AC-3 and E-AC-3 frames the same
         (docs/platforms/bare-metal/esp32-s3.md, AC-4).
 
 # A PLAY'S START - PlayerConfig::hold_first_unit. The first access unit held
-# until the second has decoded, so the sink starts with two frames queued;
-# planning/esp32-714-realtime.md, decision 14, has why 7.1.4 over WiFi wants it.
+# until the second has decoded, so the sink starts with two frames queued,
+# which 7.1.4 over WiFi wants.
 config ICLFORGE_EXAMPLE_HOLD_FIRST_UNIT
     int "Hold a play's first unit until its second has decoded (1) or not (0)"
     default 0
@@ -778,7 +776,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
     help
         What the board's support object says about objects, so that a server which wants a
         stream's objects placed can send it PCM rendered on its own side when the stream has more
-        than this (planning/hearth-sendspin-extension.md): decoded on the board, a stream past it
+        than this: decoded on the board, a stream past it
         plays its bed alone. 0 is a statement, not an absence: the fixed-point decoder of an
         ESP32-C6 or ESP32-C3 plays the bed and reconstructs no objects. -1 states nothing, which a
         server reads as the board placing whatever the format carries; no build here uses it now.
@@ -813,8 +811,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
         4 objects) took 1.08 with 72 chunks late, objects-mdct 1.17 with 108 late, height 1.38 with
         190, and a 15-object DEE stream 2.27 (null sink, 2026-10-12). Over HTTP the same streams are
         0.15 to 0.25 lower, which is where 4 objects at 0.92 came from; that figure is not the
-        Sendspin path's. Without the lane 4 objects take 1.11 even over HTTP
-        (planning/esp32-714-realtime.md).
+        Sendspin path's. Without the lane 4 objects take 1.11 even over HTTP.
 
 # THE SENDSPIN PLAYER - main/sendspin.hpp, over the component's player
 # (CONFIG_ICLFORGE_SENDSPIN, in the component's own menu). A build with a
@@ -846,11 +843,13 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES
 config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES
     int "Stack for the Sendspin decode task, bytes"
     default 32768
-    range 12288 65536
+    range 12288 131072
     help
         As ICLFORGE_EXAMPLE_DECODE_STACK_BYTES, for the task that decodes a
         Sendspin stream's bursts: the decoder's frames are most of it. The
-        page's Sendspin section says what a run left spare.
+        page's Sendspin section says what a run left spare. A TrueHD decoder
+        reached 60,944 bytes on all three chips (firmware/truehd-probe), so
+        sdkconfig.truehd gives it 72 KiB.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
     int "Put the Sendspin decode task's stack in PSRAM when present (1) or internal SRAM (0)"
@@ -864,7 +863,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM
         the stack's default 32,768, so a stack in internal RAM fits only while
         what was allocated before it leaves a block that size: an image that
         started its player fitted by a few bytes, and did not after a few more
-        (the lyrics' document and anchors, planning/karaoke-phase2.md, W7d).
+        (the lyrics' document and anchors).
         In PSRAM it does not depend on that, and the internal RAM is free for
         the rest. Needs CONFIG_SPIRAM and
         CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
@@ -909,7 +908,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_AC4
         The support object states a width and a rate and no codec tool, so the figures are where
         the slowest stream a board is to be sent still keeps up. The ESP32-P4 keeps up with every
         stream it was measured on up to 5.1 (2.0 0.28 to 0.69, 5.1 0.62 to 0.91 with the second
-        core, planning/ac4.md D14g to D14i), so it lists AC-4 and states 6 channels, which leaves
+        core), so it lists AC-4 and states 6 channels, which leaves
         5.1.4 to the server. An ESP32-S3 with the decoder and the 64 KB data cache
         (sdkconfig.s3-fast and sdkconfig.s3-dcache, the s3-n16r8 profile) keeps up with every
         2.0 stream up to 25 frames a second over Sendspin, 0.48 to 0.59 of a frame at frame rate
@@ -946,6 +945,48 @@ config ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE
         number of frames a second sits (25 takes 23.976, 24 and 25, 30 takes 29.97 and 30), and
         a frame of a faster stream is refused by the board, which only a server that did not read
         the figure sends. The ESP32-P4 states none: its 29.97 stream took 0.38 of a frame.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD
+    int "List TrueHD among the Sendspin data types (1) or not (0)"
+    default 1 if IDF_TARGET_ESP32P4 && ICLFORGE_TRUEHD
+    default 0
+    range 0 1
+    help
+        Whether the board's support object lists `truehd`, so that a server sends it TrueHD as it
+        is (one to 24 whole access units a chunk, 20 ms of sound when full) and the board decodes
+        it, up to ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS channels. Needs
+        ICLFORGE_TRUEHD (sdkconfig.truehd); with it off the board lists none and a server decodes
+        TrueHD itself and sends PCM.
+
+        firmware/truehd-probe measured the decoder as a share of one core, 24-bit at 48 kHz, with
+        no network: the ESP32-P4 0.13 for 2.0 and 0.32 for 5.1, the ESP32-S3 0.56 for 2.0 and 1.13
+        for 5.1 (not real time), the ESP32-C6 0.34 and 0.80. The P4 lists it by default; the S3
+        played 2.0 with a burst of 0.83 of the chunk, over the 0.7 the plan asks for, so it does not
+        unless set by hand, and the C6 cannot: it has 53 KB of internal RAM free after start-up and no PSRAM,
+        against a 158 KB decoder and a 72 KiB stack.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS
+    int "Widest TrueHD presentation decoded in real time: channels (0 = no limit)"
+    default 6 if IDF_TARGET_ESP32P4
+    default 2
+    range 0 24
+    help
+        The channel count the support object states for `truehd` (max_coded_channels): 2.0 is 2,
+        5.1 is 6, 7.1 is 8. A server sends a stream with downmix substreams as the first substreams
+        that fit (the 2.0 or 5.1 presentation, cut from the stream), and any other as PCM it
+        decodes, so a unit with more reaches the decoder only from a server that did not read the
+        figure, which the board then refuses with a console line. The P4 states 6 until its 7.1
+        decode has been measured; the S3 states 2.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_DATA_RATE_KBPS
+    int "Fastest TrueHD stream taken: peak data rate, kbit/s (0 = no limit)"
+    default 0
+    range 0 100000
+    help
+        The rate the support object states for `truehd` (max_data_rate), compared by a server with
+        the peak the stream declares in its major sync. A board whose link or ring cannot hold a
+        stream's declared peak states it; a server sends the stream as PCM it decodes. None is
+        stated by default: the peaks of the probe's streams are well under a Wi-Fi link's.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"
@@ -1013,7 +1054,7 @@ endmenu
 
 menu "Panel (lyrics on a screen)"
 
-# The board's screen (planning/karaoke-p4x-panel.md). A directory CMake picks, like the sink and
+# The board's screen. A directory CMake picks, like the sink and
 # the source (main/CMakeLists.txt, main/panel/panel.hpp). Read from CMake, never from C++.
 choice ICLFORGE_EXAMPLE_PANEL
     prompt "Panel"
@@ -1083,8 +1124,7 @@ config ICLFORGE_EXAMPLE_PANEL_YIELD
         core (always: FreeRTOS here cannot move a task between cores), where
         it can only run while the decode task sleeps: 0.5 to 0.7 and 0.65 ms,
         but the view then misses 11 to 16 % of its steps and every other
-        view under JOC refreshes in twice the time (planning/p4x-meters-view.md,
-        "What the screen costs the audio path"). 0 leaves the screen as it
+        view under JOC refreshes in twice the time. 0 leaves the screen as it
         was. The audio comes first, so the default is 1.
 
 config ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
@@ -1208,7 +1248,7 @@ config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_MV
     default 2500
     range 500 3300
 
-# What a person chooses once and leaves (the Preferences screen, planning/p4x-preferences.md), as the board
+# What a person chooses once and leaves (the Preferences screen), as the board
 # has it before anyone has chosen: NVS holds the choice, and a QEMU run or a new board uses these. Read by every
 # build (settings.cpp) and acted on by the one with a panel.
 config ICLFORGE_EXAMPLE_BRIGHTNESS_PERCENT
@@ -1240,7 +1280,7 @@ config ICLFORGE_EXAMPLE_NIGHT_IDLE
     range 0 1
     help
         Whether the night schedule covers the screen shown between songs as well as the one shown while a song
-        with no lyrics plays. Off until the owner decides (planning/p4x-now-playing.md, "Open").
+        with no lyrics plays. Off until the owner decides.
 
 endmenu
 

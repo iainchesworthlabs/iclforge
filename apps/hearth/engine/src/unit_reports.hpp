@@ -6,9 +6,8 @@
 
 #include "stream_decoder.hpp"
 
-// What the unit playing now said about itself (planning/hearth-reference-
-// player.md, Media information: "per frame from DecodedFrame", and the
-// Monitor's object view), released when the device's clock reaches the unit.
+// What the unit playing now said about itself (Media information:
+// "per frame from DecodedFrame", and the Monitor's object view), released when the device's clock reaches the unit.
 //
 // The same arrangement as the meters (play_meters.hpp): the player keeps each
 // unit's report, stamped with the output frame its first played frame lands

@@ -11,8 +11,7 @@
 #include "iclforge/pitch/synth.hpp"
 #include "iclforge/pitch/tracker.hpp"
 
-// libs/pitch/src/tracker.cpp: the McLeod Pitch Method over a window, its decimator and its gates
-// (planning/karaoke-microphone.md, D7; findings F5).
+// libs/pitch/src/tracker.cpp: the McLeod Pitch Method over a window, its decimator and its gates.
 
 namespace {
 

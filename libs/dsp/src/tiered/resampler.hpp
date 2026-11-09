@@ -47,7 +47,7 @@
 // over four lanes in an order fixed in dsp/resampler_vector.hpp, so its output
 // is the same float on every platform; a converter at double, the encoder's
 // and the decoder's in the default build, sums double products of the double
-// table in the order of the taps, as it always did (planning/ac4.md, D14a4).
+// table in the order of the taps, as it always did.
 //
 // Where the table comes from. At double the filter designs its table when it
 // is made, with the C library's sin and sqrt, as it always has. At float the
@@ -62,11 +62,11 @@
 // from the heap (libs/dsp/src/tiered/resampler.cpp has the figures). The tables
 // hold phases 0 to up / 2: phase up - p is phase p read from its last coefficient
 // to its first, so that is half of each, 188 KB at 1001/960, and phase() says
-// which way to read (planning/ac4.md, D14a5). Any other ratio at float is
+// which way to read. Any other ratio at float is
 // designed when the filter is made, with the same functions, and kept the same
 // way.
 //
-// At Fixed32 (planning/ac4.md, D14d) the table is kept in Q1.30, the compiler's for the three
+// At Fixed32 the table is kept in Q1.30, the compiler's for the three
 // ratios as at float, and an output is the sum of the products of the coefficients and the
 // history's raw values in 64 bits, rounded once. The ESP32-C6 that tier is for has 512 KB of SRAM
 // shared with its Wi-Fi and no PSRAM: a table of up to kResamplerCopyLimit bytes is copied, as at

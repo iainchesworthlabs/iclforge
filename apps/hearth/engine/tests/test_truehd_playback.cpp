@@ -220,7 +220,7 @@ TEST_CASE("truehd playback: the hand-built streams the decoder reads play as the
 
 TEST_CASE("truehd playback: a unit is one block of its own length, 40, 80 or 160 samples",
           "[hearth][truehd]") {
-    // The block-size policy (planning/truehd-parity-hearth-player.md, H1): units are not repacked
+    // The block-size policy: units are not repacked
     // to the 256 the AC-3 path delivers, so that a unit's report, its position and a seek stay
     // exact; nothing after the decoder needs 256.
     for (const auto& [file, unit] : {std::pair{"truehd_st48_s24.thd", 40U},

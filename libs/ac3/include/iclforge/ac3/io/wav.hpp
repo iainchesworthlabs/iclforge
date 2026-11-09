@@ -8,8 +8,8 @@
 #include "iclforge/ac3/export.hpp"
 #include "iclforge/base/wav.hpp"
 
-// WAV reading and writing are iclforge::base's (iclforge/base/wav.hpp, since
-// planning/consolidation.md's C6), and their names are kept here for a release.
+// WAV reading and writing are iclforge::base's (iclforge/base/wav.hpp), and
+// their names are kept here for a release.
 // What is AC-3's is how a WAV's channels map onto A/52's coded order.
 
 namespace iclforge::ac3::io {

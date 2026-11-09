@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Update hearth_sink from a signed release under QEMU, and hold every step to the plan.
 
-planning/esp32-ota.md, "Updates from GitHub releases (O10)", "Tests": the ESP32-S3 is the only part
+The ESP32-S3 is the only part
 with a QEMU machine, so this is where a board reads an update index, checks its signature against
 the trust anchor built into its image, and installs the image it names, end to end, over QEMU's
 emulated Ethernet. The release is a loopback server on the host (QEMU's user network gives it to

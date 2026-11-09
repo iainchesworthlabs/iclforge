@@ -14,7 +14,7 @@
 // it too, libs/ac4/src/iclforge/ac4/detail/real.hpp).
 //
 // double: every build outside the ESP32 boards, and the reference every other tier is measured
-// against (planning/arithmetic-tiers.md).
+// against.
 
 namespace iclforge::dsp::tiered {
 
@@ -24,7 +24,7 @@ using Real = double;
 
 // Explicit instantiations a translation unit adds at double beside its
 // `template class Foo<Real>;` when Real is not double: the AC-4 encoder (libs/ac4/src/encoder)
-// always runs at double, decision 34 (planning/ac4.md), and the kernels
+// always runs at double, decision 34, and the kernels
 // are one set of objects the decoder and the encoder both call, so each one the encoder calls is
 // instantiated at both. Here Real is double, so the line above is already that
 // instantiation and a second one is ill-formed: this expands to nothing. It

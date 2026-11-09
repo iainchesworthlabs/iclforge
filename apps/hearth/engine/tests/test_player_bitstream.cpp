@@ -31,8 +31,10 @@
 #include "decoder_settings.hpp"
 #include "diagnostic_log.hpp"
 #include "engine_thread.hpp"
+#include "item_source.hpp"
 #include "pcm_sink.hpp"
 #include "player.hpp"
+#include "truehd_test_support.hpp"
 
 // iclforge::hearth::Player's bitstream output (apps/hearth/engine/src/player.cpp),
 // against a fake IEC 61937 link and a fake PCM device, each with a clock the
@@ -577,6 +579,9 @@ struct Library {
         Bytes bytes;
         std::uint64_t skip = 0;
         std::optional<std::uint64_t> play{};
+        // A remux: a TrueHD track first, which is the item, and `bytes` as the compressed track
+        // after it, which the item offers in its place.
+        Bytes truehd{};
     };
     std::map<std::string, File> files;
 
@@ -585,6 +590,14 @@ struct Library {
             const auto found = files.find(path);
             if (found == files.end()) {
                 return std::unexpected("no such file: " + path);
+            }
+            if (!found->second.truehd.empty()) {
+                LoadedItem remux{.source = std::make_shared<iclforge::hearth::MemoryByteSource>(
+                                     found->second.truehd),
+                                 .truehd = true};
+                remux.compressed_track = [bytes = found->second.bytes]()
+                    -> std::expected<LoadedItem, std::string> { return LoadedItem{.bytes = bytes}; };
+                return remux;
             }
             return LoadedItem{.bytes = found->second.bytes,
                               .skip_samples = found->second.skip,
@@ -2353,4 +2366,62 @@ TEST_CASE("bitstream: a link whose device goes away stops playback, and says so"
     const auto notes = rig.notes();
     CHECK(has_note(notes, "output lost: its device went away"));
     CHECK(has_note(notes, "output closed"));
+}
+
+// A remux has its TrueHD track first and a compressed one after it. This player decodes TrueHD and
+// cannot send it on as it is, so an output that takes the compressed stream is given that track
+// (TrackPreference::kAutomatic); one that does not is given the TrueHD, decoded.
+TEST_CASE("bitstream: a remux's compressed track goes to a receiver, and its TrueHD track to a speaker",
+          "[hearth][player][bitstream][truehd][track]") {
+    namespace th = iclforge::hearth::testing;
+    const th::MadeStream made = th::make_stream(2, 48000);
+    const Units units = ac3_units(5);
+    Library library;
+    library.files["remux.mkv"] = {.bytes = joined(units), .truehd = made.bytes};
+
+    SECTION("automatic: a receiver that takes AC-3 is sent the AC-3 track") {
+        Rig rig{library};
+        rig.player->queue().add(item("remux.mkv"));
+        rig.player->play();
+        CHECK(rig.player->transport().open_format().mode == OutputMode::kBitstream);
+        REQUIRE(rig.play_out());
+        CHECK(rig.pcm->opens == 0);
+        CHECK(rig.link->bursts == expected_bursts(units, BitstreamFormat::kAc3));
+        CHECK(rig.player->queue().items()[0].facts.codec == iclforge::hearth::ItemCodec::kAc3);
+    }
+    SECTION("automatic: an output that takes no bitstream plays the TrueHD, decoded") {
+        Rig rig{library};
+        rig.policy->bitstream_ac3 = false;
+        rig.player->queue().add(item("remux.mkv"));
+        rig.player->play();
+        REQUIRE(rig.play_out());
+        CHECK(rig.link->opens == 0);
+        CHECK(rig.pcm->opens == 1);
+        CHECK(rig.player->queue().items()[0].facts.codec == iclforge::hearth::ItemCodec::kTruehd);
+        REQUIRE(rig.player->history().size() == 1);
+        CHECK(rig.player->history()[0].frames == made.frames);
+    }
+    SECTION("best: the TrueHD track plays whatever the output takes") {
+        DecoderSettings settings;
+        settings.track = iclforge::hearth::TrackPreference::kBest;
+        Rig rig{library, true, settings};
+        rig.player->queue().add(item("remux.mkv"));
+        rig.player->play();
+        REQUIRE(rig.play_out());
+        CHECK(rig.link->opens == 0);
+        CHECK(rig.pcm->opens == 1);
+        CHECK(rig.player->queue().items()[0].facts.codec == iclforge::hearth::ItemCodec::kTruehd);
+    }
+    SECTION("compressed: the AC-3 track plays even where it is decoded here") {
+        DecoderSettings settings;
+        settings.track = iclforge::hearth::TrackPreference::kCompressed;
+        Rig rig{library, true, settings};
+        rig.policy->bitstream_ac3 = false;
+        rig.player->queue().add(item("remux.mkv"));
+        rig.player->play();
+        REQUIRE(rig.play_out());
+        CHECK(rig.link->opens == 0);
+        CHECK(rig.pcm->opens == 1);
+        CHECK(rig.player->queue().items()[0].facts.codec == iclforge::hearth::ItemCodec::kAc3);
+    }
 }

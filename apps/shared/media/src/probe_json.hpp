@@ -58,7 +58,7 @@ void write_stream(JsonSink& json, const ac3::io::ProbeReport& report);
 
 // An AC-4 stream, walked sync frame by sync frame: the counts, and the first
 // frame's table of contents, which stands for the stream's structure; then
-// planning/ac4.md's "Media information" over the whole stream.
+// the media information over the whole stream.
 struct Ac4Summary {
     std::size_t sync_frames = 0;
     std::size_t bytes = 0;

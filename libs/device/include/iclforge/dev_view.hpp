@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-// The ESP32-P4X panel's developer view (planning/karaoke-p4x-panel.md, "The developer view"): the
+// The ESP32-P4X panel's developer view: the
 // facts a developer wants of a board, as one plain struct, and the words and numbers the screen
 // shows for them. Three taps on the board's name in the footer open it, a tap closes it.
 //
@@ -268,7 +268,7 @@ struct Facts {
     unsigned long touch_reads = 0;
     unsigned long touch_failures = 0;
     unsigned long touch_points = 0;
-    // The Meters view, once it has been opened (planning/p4x-meters-view.md; GET /panel-stats has every figure): the rate it holds, the shape
+    // The Meters view, once it has been opened: the rate it holds, the shape
     // it takes ("grid 12": the representation and the outputs), the means of what an update costs, and what it missed.
     unsigned long meters_opens = 0;
     bool meters_showing = false;

@@ -20,7 +20,7 @@
 // are messages.hpp's.
 //
 // Hearth's server does not activate these roles for an aiosendspin 9.1.1 client, whose forms of
-// them differ (planning/hearth-sendspin-extension.md, C33 to C35), so only the specification's are
+// them differ, so only the specification's are
 // here.
 
 namespace iclforge::sendspin {

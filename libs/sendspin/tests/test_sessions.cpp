@@ -1557,7 +1557,7 @@ struct LegacyServer {
 TEST_CASE("sessions: to an aiosendspin 9.1.1 server a player is available from its activation",
           "[sendspin][sessions]") {
     // aiosendspin 9.1.1 takes available: false for an external source, and its own client reports
-    // available: true on activation (planning/hearth-sendspin-extension.md, C14).
+    // available: true on activation.
     LegacyServer server;
     CHECK(server.player.dialect() == iclforge::sendspin::Dialect::kAiosendspin911);
     const std::vector<std::string> states = server.of_type("client/state");
@@ -1577,7 +1577,7 @@ TEST_CASE("sessions: to an aiosendspin 9.1.1 server a player is available from i
 TEST_CASE("sessions: from an aiosendspin 9.1.1 server a player holds audio for its clock and drops replays",
           "[sendspin][sessions]") {
     // aiosendspin 9.1.1 starts a stream with the activation, and replays it from its start on the
-    // activation's first client/state (planning/hearth-sendspin-extension.md, C13).
+    // activation's first client/state.
     LegacyServer server;
     server.send_json(m::write_stream_start(
         {.server_transmitted = 0, .player = m::PlayerStream{.format = kPcm, .codec_header = {}}, .iclforge = std::nullopt}));
@@ -1827,8 +1827,8 @@ std::vector<Message> full_server_messages() {
         const std::string tag = dialect == Dialect::kSpecification ? ", spec" : ", 9.1.1";
         out.push_back({"server/state, 3 roles" + tag, m::write_server_state(state, dialect)});
         if (dialect == Dialect::kAiosendspin911) {
-            // Music Assistant's metadata also carries repeat and shuffle (planning/hearth-sendspin-extension.md,
-            // C38): the reader ignores them and a session counts them all the same.
+            // Music Assistant's metadata also carries repeat and shuffle: the reader ignores them
+            // and a session counts them all the same.
             std::string extended = m::write_server_state(state, dialect);
             const std::string anchor = R"("metadata":{)";
             const std::size_t at = extended.find(anchor);

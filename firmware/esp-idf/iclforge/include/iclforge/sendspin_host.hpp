@@ -19,8 +19,7 @@
 
 // A Sendspin player on a board: the WebSocket a server connects to, a
 // PlayerSession for each connection, admission between servers, pairing and
-// the records it leaves (planning/hearth-reference-player.md, B3;
-// planning/hearth-sendspin-extension.md). libs/sendspin's player half does the
+// the records it leaves. libs/sendspin's player half does the
 // protocol; this is what a board adds around it, and what libs/sink's
 // Sink class (libs/sink/src/sink.cpp) is on a computer.
 //
@@ -76,8 +75,8 @@ class SendspinEvents {
     virtual void on_settings_refused(const iclforge::sendspin::player::SettingsError& error) = 0;
 
     // metadata@v1, for a board whose hello lists the role: what the admitted server says is playing, as
-    // its server/state object carries it. `dialect` says how to read what the object leaves out
-    // (planning/hearth-sendspin-extension.md, C36): the specification's object is the whole state, and
+    // its server/state object carries it. `dialect` says how to read what the object leaves out:
+    // the specification's object is the whole state, and
     // aiosendspin 9.1.1's only what changed. Only the role's own object is delivered, and on the server's
     // task, so an implementation copies what it needs and returns.
     virtual void on_metadata(const iclforge::sendspin::messages::ServerState& /*state*/,
@@ -95,7 +94,7 @@ class SendspinEvents {
 };
 
 struct SendspinHostConfig {
-    // The Sendspin port (planning/hearth-sendspin-extension.md, row T4),
+    // The Sendspin port,
     // which the board's mDNS record advertises.
     std::uint16_t port = 8928;
     // esp_http_server's control socket for this instance: each server on a
@@ -149,8 +148,8 @@ struct SendspinStatus {
     // delay (iclforge::sendspin::ClockSync::rejected()).
     std::uint32_t clock_updates = 0;
     std::uint32_t clock_rejected = 0;
-    // The server holds a pairing this board no longer has
-    // (planning/hearth-sendspin-extension.md, C4): remove the board from the
+    // The server holds a pairing this board no longer has:
+    // remove the board from the
     // server before pairing it again.
     bool server_has_lost_pairing = false;
 
@@ -201,8 +200,8 @@ class SendspinHost final {
     [[nodiscard]] bool start(SendspinHostConfig config, SendspinEvents& events);
     void stop();
 
-    // The board is going away for an update or a restart
-    // (planning/esp32-ota.md): every connection past its handshake is told
+    // The board is going away for an update or a restart:
+    // every connection past its handshake is told
     // so with client/goodbye restart, and its server dials again once the
     // board is back. Then the server stops, as stop() stops it. Waits up to
     // `wait_ms` for the goodbyes to go out on the server's task. Safe from

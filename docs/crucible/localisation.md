@@ -184,7 +184,7 @@ where there was one. `LUPDATE_OPTIONS -no-obsolete` on the `qt_add_translations(
 translation memory: git history is the memory, and the dead-entry rule below wants the files
 clean after every regeneration.
 
-Each of the six files carries 428 messages, none marked `unfinished`, `vanished` or `obsolete`,
+Each of the six files carries 437 messages, none marked `unfinished`, `vanished` or `obsolete`,
 and the six hold the same set of (context, source) pairs. That is the state the gate below
 enforces, so a regeneration that adds a string leaves the tree red until the new entry is
 filled.

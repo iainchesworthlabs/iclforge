@@ -4,7 +4,7 @@
 #include <span>
 
 // The raw AC-4 frame inside one sync frame, without allocating: what the Sendspin player's AC-4
-// path takes from a burst chunk (planning/ac4.md, I6).
+// path takes from a burst chunk.
 //
 // A sync frame is (ETSI TS 103 190-1 Annex G.4.1, IEC 61937-14 Annex A) the sync word 0xAC40, or
 // 0xAC41 where a CRC word follows the frame, then frame_size in 16 bits - 0xFFFF escaping to 24

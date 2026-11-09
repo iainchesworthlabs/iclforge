@@ -287,8 +287,8 @@ int read_bitrate_indicator(Reader& r) {
 
 std::optional<int> bitrate_kbps(int indicator) {
     // Table 90's own brate_ind column, 0 to 11, indexed directly: a constexpr
-    // array in flash rather than a function-local static hash map (planning/
-    // ac4.md, D14a's memory rules - a guarded static that also has to hash
+    // array in flash rather than a function-local static hash map (the
+    // decoder's memory rules: a guarded static that also has to hash
     // and heap-allocate on a part that can least afford either).
     constexpr std::array<int, 12> kTable = {16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112};
     if (indicator < 0 || indicator >= static_cast<int>(kTable.size())) {

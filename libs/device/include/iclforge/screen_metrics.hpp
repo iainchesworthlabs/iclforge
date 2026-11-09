@@ -1,7 +1,7 @@
 #pragma once
 
-// The sizes a board's sheets are drawn at, derived from the display they are drawn on and not written for one panel
-// (planning/p4x-preferences.md): margins, gaps, the height of a button, the size of the type, the footer's height.
+// The sizes a board's sheets are drawn at, derived from the display they are drawn on and not written for one panel:
+// margins, gaps, the height of a button, the size of the type, the footer's height.
 // A screen that was 1024 by 600 pixels of the P4X kit's panel is now also 800 by 480, 480 by 320 and 320 by 240, and a
 // board with a different panel has its sizes from this without a line of its own.
 //

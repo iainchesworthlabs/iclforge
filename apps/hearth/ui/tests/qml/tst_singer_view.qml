@@ -9,8 +9,7 @@ import "HearthTestHelpers.js" as H
 
 // What the singer view (LyricScreen.qml, F11) lets a room do without leaving it, beyond the
 // vocals and the transport K5 gave it (tst_karaoke_lyrics.qml): move the item by pressing the
-// bar or with the arrow keys, see what plays next, and open the queue and pick from it
-// (planning/karaoke.md, "Found while building": seeking and a queue in the singer view).
+// bar or with the arrow keys, see what plays next, and open the queue and pick from it.
 //
 // Played on the fake device room, in real time: two generated karaoke streams of ten seconds.
 TestCase {

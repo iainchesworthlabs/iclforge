@@ -11,8 +11,8 @@
 
 class QThread;
 
-// The operating system's media sessions, polled off the window's thread (planning/karaoke-phase2.md,
-// D9). Reading them is an inter-process call (media_session.hpp), so it runs on a thread of its
+// The operating system's media sessions, polled off the window's thread. Reading them is an
+// inter-process call (media_session.hpp), so it runs on a thread of its
 // own, on a timer, and what it read comes back to the window's thread as one list. Nothing polls
 // while nothing wants the answer: setWanted(false) stops the timer, which is the state of every
 // run in which no lyrics were imported.

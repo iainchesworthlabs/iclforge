@@ -11,7 +11,7 @@ old_spelling -> new_spelling is derived from the move map, never written twice.
 
 Used by layout_dryrun.py (the size estimates), by n1b_apply.py (the executor) and by n1b_cmake.py.
 
-The libraries of the split are the ones planning/layout.md names: arithmetic, base, dsp, objects,
+The libraries of the split are the ones the re-layout names: arithmetic, base, dsp, objects,
 render, iec61937 and ac3 (what was src/forge), beside the AC-4 four and the rest.
 tools/checks/layering.json holds the same assignment of src/forge files for the dependency check;
 test_layoutdef.py keeps the two equal.
@@ -26,7 +26,7 @@ from n1b_lib import Repo
 FAMILY = "iclforge"
 
 # --- the split of src/forge (L2, L3) ------------------------------------------------------------
-# The in-tree cuts (planning/layout.md, stage S1; cuts.py) leave these files behind, so the rules
+# The in-tree cuts leave these files behind, so the rules
 # name them: core/layout.hpp        Location, Layout (from core/eac3_tables.hpp)         -> base
 # core/downmix_target.hpp DownmixTarget (from decoder/output.hpp)             -> base
 # render/pcm_block.hpp   PcmBlock, BlockSink (from decoder/decoder.hpp)       -> render
@@ -100,7 +100,7 @@ def spelling_of(path: str) -> str | None:
     if "/include/" in g:
         return g.split("/include/", 1)[1]
     # a library's internal headers, which iclforge::base_headers puts on the include path
-    # (src/base/internal, planning/consolidation.md's closing of C6)
+    # (src/base/internal, the closing of C6)
     if "/internal/iclforge/" in g:
         return "iclforge/" + g.split("/internal/iclforge/", 1)[1]
     m = _CONVERSION_TAIL.match(g)
@@ -271,8 +271,8 @@ PACKAGE_TREES = (
     "packaging/",
 )
 KEEP_PACKAGE_PATHS = ("packaging/winget/",)
-# Files outside the trees above, named one by one. The cask is renamed with the formula
-# (planning/ac4.md, decision 41): its file is named for the program it installs, not for a brand.
+# Files outside the trees above, named one by one. The cask is renamed with the formula:
+# its file is named for the program it installs, not for a brand.
 PACKAGE_FILES = {
     "cmake/ac3forgeConfig.cmake.in": "cmake/iclforgeConfig.cmake.in",
     "esphome/tests/ac3forge-test.yaml": "esphome/tests/iclforge-test.yaml",

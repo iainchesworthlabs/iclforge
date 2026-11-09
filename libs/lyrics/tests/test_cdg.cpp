@@ -13,7 +13,7 @@
 
 #include "iclforge/lyrics/cdg.hpp"
 
-// libs/lyrics/src/cdg.cpp: the picture of a CD+G file (planning/karaoke-phase2.md, W13f). Files are
+// libs/lyrics/src/cdg.cpp: the picture of a CD+G file. Files are
 // built here by hand, one 24-byte packet at a time, so that every instruction is held to the
 // arithmetic of the format and not to a file that was only ever read.
 

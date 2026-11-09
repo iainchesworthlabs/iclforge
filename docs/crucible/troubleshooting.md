@@ -95,6 +95,11 @@ measurement has been made.
 1.5 Mb/s or more — below that the object metadata no longer fits in a single block and the encoder
 refuses.
 
+The pinned **TrueHD 5.1** mode has no low-latency form. Its encoder waits for 128 access units
+(about 107 ms) before it sends the first burst, then sends 20 ms bursts, so it adds at least that
+much to the E-AC-3 figures above. That is arithmetic from the encoder's interval, not a
+measurement.
+
 ## Linux: it configured against ALSA and refused to build
 
 Working as intended. Crucible cannot use the ALSA backend at all — no per-application tap — and
@@ -129,6 +134,11 @@ the receiver's own EDID — for an Atmos receiver, `[PCM, DTS, AC3, EAC3, TrueHD
 Nothing needs configuring by hand on a receiver that advertises its codecs; the earlier
 belief that a `iec958Codecs` rule had to be written for WirePlumber turned out not to apply
 to one that does.
+
+That list naming TrueHD is what lets Crucible offer the pinned TrueHD 5.1 mode on that sink; on
+Windows the endpoint has to accept the MAT format in exclusive mode, which is the driver's answer
+and not a list. On macOS an endpoint never reads as taking TrueHD, and a pin on that mode falls
+back with the reason line saying so. No path has been played into a receiver yet.
 
 ## Linux: an endpoint that cannot carry a bitstream is offered one
 

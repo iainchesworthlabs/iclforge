@@ -17,8 +17,8 @@
 // A test sink's output for player@v1: each stream decoded (PCM, FLAC or Opus) to a float WAV file
 // in the output directory, with a play-time log beside it. The log's lines are
 // `local_time_us,first_frame,frames` for each chunk, and `clear,<frames>` where stream/clear
-// dropped what was buffered, so a group's alignment reads straight off two sinks' logs
-// (planning/hearth-reference-player.md, The test sink). With no directory it decodes and counts.
+// dropped what was buffered, so a group's alignment reads straight off two sinks' logs.
+// With no directory it decodes and counts.
 //
 // Not thread-safe: the sink calls it from the session's callbacks, under the session's lock.
 

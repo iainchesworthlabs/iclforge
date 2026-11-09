@@ -5,8 +5,8 @@
 
 // ---------------------------------------------------------------------------
 // The AVX2 body of libs/truehd/src/encoder/coding.cpp's coded_bits, the count of the bits a block
-// of residuals takes under one coding, which is 42 % of the instructions of a 5.1 encode
-// (planning/truehd-parity-performance.md, section 4). Dispatched behind
+// of residuals takes under one coding, which is 42 % of the instructions of a 5.1 encode.
+// Dispatched behind
 // iclforge::internal::cpu::has_avx2() at the one call site, declared with plain signatures so that
 // coding.cpp, compiled without any AVX2 flag, can call it across the object-library boundary
 // without seeing an intrinsic: the mechanism libs/ac3/src/internal/avx2 uses for the MDCT.

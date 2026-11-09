@@ -120,14 +120,14 @@ class ConservativeDefaultTest(unittest.TestCase):
         self.assertEqual(gate.classify(["", "  ", "\n"]), dict.fromkeys(gate.LANES, True))
 
     def test_unmapped_top_level_directory_lights_every_lane(self):
-        hits = gate.classify(["planning/some-notes.txt"])
+        hits = gate.classify(["scratch/some-notes.txt"])
         self.assertEqual(hits, dict.fromkeys(gate.LANES, True))
 
     def test_one_unmapped_path_among_many_still_lights_everything(self):
         # A mostly-recognisable PR with one path this script has no rule for
         # must not fall back to "only what matched" - the unmapped path is
         # exactly the case the fallback exists for.
-        hits = gate.classify(["apps/demos/android/app/build.gradle.kts", "planning/notes.txt"])
+        hits = gate.classify(["apps/demos/android/app/build.gradle.kts", "scratch/notes.txt"])
         self.assertEqual(hits, dict.fromkeys(gate.LANES, True))
 
     def test_force_all_ignores_the_path_list_entirely(self):
@@ -209,7 +209,7 @@ class SatellitesDirectTest(unittest.TestCase):
         self.assertEqual(lit(hits, *ALL_LANES), {"windows", "linux", "macos"})
 
     def test_the_conservative_cases_still_light_everything(self):
-        for paths in ([], ["planning/notes.txt"], [".github/workflows/ci.yml"]):
+        for paths in ([], ["scratch/notes.txt"], [".github/workflows/ci.yml"]):
             with self.subTest(paths=paths):
                 self.assertEqual(self.classify(*paths), dict.fromkeys(gate.LANES, True))
 
@@ -309,7 +309,7 @@ class EspComponentStagingTest(unittest.TestCase):
 
 
 class ProjectTableTest(unittest.TestCase):
-    """The lanes come from the rows of tools/checks/projects.json (planning/monorepo.md, C7-6)."""
+    """The lanes come from the rows of tools/checks/projects.json."""
 
     def test_the_lanes_are_the_tables_and_the_two_that_gate_nothing(self):
         self.assertEqual(gate.LANES, (*gate.TABLE.lanes, "ci_self", "docs"))

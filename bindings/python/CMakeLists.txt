@@ -59,6 +59,15 @@ if(TARGET iclforge::ac4)
 else()
     target_sources(_iclforge PRIVATE src/iclforge_ext/ac4/absent/ac4_module.cpp)
 endif()
+# TrueHD and MLP (iclforge::truehd): probe, scan, seek and lossless decode. A target only when
+# ICLFORGE_BUILD_TRUEHD is on, so a trimmed build without it gets the absent variant and no
+# `iclforge.truehd`.
+if(TARGET iclforge::truehd)
+    target_link_libraries(_iclforge PRIVATE iclforge::truehd)
+    target_sources(_iclforge PRIVATE src/iclforge_ext/truehd/present/truehd_module.cpp)
+else()
+    target_sources(_iclforge PRIVATE src/iclforge_ext/truehd/absent/truehd_module.cpp)
+endif()
 # Timed lyrics (iclforge::lyrics, the reader Hearth, Crucible and the sink firmware use): an
 # internal static library, standard library only, left out of the minimum-footprint profiles.
 # Linked into the extension, which is not an installed library, so what the C API's install rules

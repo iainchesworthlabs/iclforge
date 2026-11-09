@@ -1,4 +1,4 @@
-"""Unit tests for layoutdef.py, where every path goes in the layout of planning/layout.md.
+"""Unit tests for layoutdef.py, where every path goes in the re-laid-out tree.
 
 stdlib `unittest`, and no test reads the real tree: the cases are paths written out here, so a file
 added to main cannot fail one. They pin the rules stage S2 will run: where each library's files go,

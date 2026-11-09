@@ -968,6 +968,7 @@
     </message>
     <message>
         <location filename="../qml/DecoderTruehd.qml" line="59"/>
+        <location filename="../qml/DecoderTruehd.qml" line="129"/>
         <source>Plays</source>
         <translation>שפּילט</translation>
     </message>
@@ -1018,27 +1019,48 @@
         <translation>טאָלעראַנט</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="110"/>
+        <location filename="../qml/DecoderTruehd.qml" line="111"/>
+        <location filename="../qml/DecoderTruehd.qml" line="132"/>
+        <source>Track</source>
+        <translation>שפּור</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="116"/>
+        <source>A file can hold a TrueHD track and an AC-3, E-AC-3 or AC-4 track, as a Blu-ray remux does. Hearth decodes the TrueHD itself and cannot send it on as it is yet. Automatic plays the AC-3, E-AC-3 or AC-4 track where the output takes that as a bitstream, a receiver, and the TrueHD track everywhere else. TrueHD always plays the TrueHD, and Compressed always the other track. A change applies from the next item.</source>
+        <translation>א טעקע קען אַנטהאַלטן א TrueHD שפּור און א AC-3, E-AC-3 אָדער AC-4 שפּור, ווי א Blu-ray רעמיקס. Hearth דעקאָדירט דעם TrueHD אַליין און קען אים נאָך נישט שיקן ווי ער איז. אויטאָמאַטיש שפּילט די AC-3, E-AC-3 אָדער AC-4 שפּור וווּ דער אויסגאַנג נעמט עס אָן ווי א ביטשטראָם, ווי א ריסיווער, און די TrueHD שפּור אומעטום אַנדערש. TrueHD שפּילט תּמיד די TrueHD שפּור, און קאָמפּרעסירט תּמיד די אַנדערע שפּור. א ענדערונג גילט פון דעם קומענדיקן אייטעם.</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="135"/>
+        <source>Automatic</source>
+        <translation>אויטאָמאַטיש</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <source>Compressed</source>
+        <translation>קאָמפּרעסירט</translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderTruehd.qml" line="146"/>
         <source>Level</source>
         <translation>ניוואָ</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="116"/>
+        <location filename="../qml/DecoderTruehd.qml" line="152"/>
         <source>The stream&apos;s dialogue normalisation and dynamic range words are read and shown, and nothing applies them: the level is the stream&apos;s own. The output is float32 through the operating system&apos;s mixer, which is not a bit-exact path.</source>
         <translation>די ווערטער פֿאַר דיאַלאָג־נאָרמאַליזירונג און דינאַמישן באַרייך פֿון סטרים ווערן געלייענט און געוויזן, און גאָרנישט נוצט זיי אָן: דער ניוואָ איז דער פֿון סטרים אַלײן. דער אַרויסגאַנג איז float32 דורך דעם מיקסער פֿון דער אָפּעראַציע־סיסטעם, וואָס איז נישט קיין ביט־גענויער וועג.</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="128"/>
+        <location filename="../qml/DecoderTruehd.qml" line="164"/>
         <source>This stream</source>
         <translation>דער דאָזיקער סטרים</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="131"/>
+        <location filename="../qml/DecoderTruehd.qml" line="167"/>
         <source>Nothing TrueHD is playing.</source>
         <translation>קיין TrueHD שפּילט ניט.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/DecoderTruehd.qml" line="137"/>
+        <location filename="../qml/DecoderTruehd.qml" line="173"/>
         <source>%1 · %2 kHz · %n substream(s) of %3 channels</source>
         <translation>
             <numerusform>%1 · %2 kHz · %n סאַבסטרים פֿון %3 קאַנאַלן</numerusform>
@@ -1046,17 +1068,18 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="138"/>
+        <location filename="../qml/DecoderTruehd.qml" line="174"/>
         <source>MLP</source>
         <translation>MLP</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="138"/>
+        <location filename="../qml/DecoderTruehd.qml" line="136"/>
+        <location filename="../qml/DecoderTruehd.qml" line="174"/>
         <source>TrueHD</source>
         <translation>TrueHD</translation>
     </message>
     <message>
-        <location filename="../qml/DecoderTruehd.qml" line="148"/>
+        <location filename="../qml/DecoderTruehd.qml" line="184"/>
         <source>A decoder can join it about every %1 ms; a seek decodes from the join point before the place asked for.</source>
         <translation>אַ דעקאָדער קען זיך אײַנשליסן בערך יעדע %1 ms; אַ זוך דעקאָדירט פֿון דעם אײַנשליס־פּונקט פֿאַר דעם געבעטענעם אָרט.</translation>
     </message>
@@ -6118,17 +6141,17 @@ Drop AC-3, E-AC-3, AC-4, TrueHD or MLP files (raw, MP4, Matroska or MPEG-TS) or 
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1643"/>
+        <location filename="../../src/hearth_controller.cpp" line="1671"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation>דער דאָזיקער בוי טראָגט נישט קיין אײַנגעבויטע נאָטיצן־טעקע (:/notices/NOTICES.txt איז נישט אַרײַנקאָמפּילירט געוואָרן); די NOTICES.txt לעבן דער אַפּליקאַציע און דער LICENSE פֿון דעם רעפּאָזיטאָריע זאָגן וואָס עס קומט מיט.</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2842"/>
+        <location filename="../../src/hearth_controller.cpp" line="2870"/>
         <source>saved to %1</source>
         <translation>אָפּגעהיט אין %1</translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2845"/>
+        <location filename="../../src/hearth_controller.cpp" line="2873"/>
         <source>could not write %1: %2</source>
         <translation>האָט נישט געקענט שרײַבן %1: %2</translation>
     </message>

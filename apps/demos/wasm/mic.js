@@ -1,4 +1,4 @@
-// A singer's microphone for the decode demo (planning/karaoke-microphone.md, M7; D16).
+// A singer's microphone for the decode demo.
 //
 //   getUserMedia (the browser's own echo cancellation on: U6) -> an AudioWorklet that hands over
 //   each render quantum -> the library's tracker, compiled into this page's module

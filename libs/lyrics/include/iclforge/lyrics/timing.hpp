@@ -8,8 +8,7 @@
 
 #include "iclforge/lyrics/lyrics.hpp"
 
-// Giving lyrics their times, and writing them down (planning/karaoke-phase2.md, W6 and
-// planning/karaoke-phase2-findings.md, "W3: word timing"): what a tap editor edits and saves.
+// Giving lyrics their times, and writing them down: what a tap editor edits and saves.
 //
 // The editor has two passes over one stream. Lines: a key press stamps the next line's start as the
 // stream plays, which alone turns an untimed lyric into a line-timed file. Words: each line's words

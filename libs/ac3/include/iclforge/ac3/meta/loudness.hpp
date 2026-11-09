@@ -8,9 +8,9 @@
 #include "iclforge/base/loudness.hpp"
 
 // Programme loudness to ITU-R BS.1770-4, and the dialnorm (§5.4.2.8) that
-// follows from it. The meter is iclforge::base's (iclforge/base/loudness.hpp,
-// since planning/consolidation.md's C6); what is AC-3's is how its channels are
-// weighted - by acmod, or by E-AC-3 channel-map location - and dialnorm.
+// follows from it. The meter is iclforge::base's (iclforge/base/loudness.hpp);
+// what is AC-3's is how its channels are weighted - by acmod, or by E-AC-3
+// channel-map location - and dialnorm.
 //
 // A/52 defines dialnorm as how far "the average dialogue level is below
 // digital 100 percent" and never says how to measure it — the standard is

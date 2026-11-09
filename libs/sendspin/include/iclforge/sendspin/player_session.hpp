@@ -27,15 +27,14 @@
 #include "iclforge/sendspin/transport.hpp"
 
 // One connection from a Sendspin client with the player role to a server: the player half of
-// libs/sendspin (planning/hearth-reference-player.md, A4), as the test sink and hearth_sink use
+// libs/sendspin, as the test sink and hearth_sink use
 // it.
 //
 // The session runs the handshake as the Noise responder, answers server/hello with its
 // client/hello, checks each server/activate as messaging.md's admissibility rules say,
 // synchronises its clock once activated, reports client/state, and hands the player@v1 stream
 // and the server's commands to its listener. With an aiosendspin 9.1.1 server, which it
-// recognises from Noise message 1, it speaks 9.1.1's forms
-// (planning/hearth-sendspin-extension.md, Music Assistant and aiosendspin 9.1.1).
+// recognises from Noise message 1, it speaks 9.1.1's forms.
 //
 // A pairing activation runs one attempt of the method it names (pairing_flow::ClientPairing).
 // From that activation until the next, or until the re-handshake after a pairing, the session
@@ -47,7 +46,7 @@
 // before acting on it, refuses one the owner rejects, and leaves when displace() says another
 // server has taken the client.
 //
-// _iclforge_player@v1 (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1) runs
+// _iclforge_player@v1 runs
 // as player@v1 does, when the player lists it: its stream, its burst chunks on the same clock,
 // its commands and its state object. A chunk of a data type other than the stream's, or one
 // whose header does not fit its payload, goes to the listener to be counted in invalid_chunks.
@@ -267,16 +266,14 @@ class PlayerSession {
     [[nodiscard]] std::optional<handshake::PskCategory> psk_category() const { return category_; }
     // The server named a PSK this player does not hold, and the handshake completed under the
     // Sentinel: the server holds a pairing the player has lost. Against aiosendspin 9.1.1 the
-    // server then fails the handshake, and the player's owner reports it
-    // (planning/hearth-sendspin-extension.md, C4).
+    // server then fails the handshake, and the player's owner reports it.
     [[nodiscard]] bool fell_back() const { return fell_back_; }
     [[nodiscard]] const std::string& server_name() const { return server_name_; }
     [[nodiscard]] const std::vector<messages::Activity>& activities() const { return activities_; }
     [[nodiscard]] const std::vector<std::string>& active_roles() const { return active_roles_; }
     [[nodiscard]] bool clock_converged() const { return clock_.converged(); }
     // The clock the session keeps with its server, for an owner that reports when it played
-    // something on the server's timeline (a board's play times, planning/hearth-reference-player.md
-    // B3).
+    // something on the server's timeline (a board's play times).
     [[nodiscard]] const ClockSync& clock() const { return clock_; }
     [[nodiscard]] bool streaming() const { return stream_.has_value(); }
     // An _iclforge_player@v1 stream is running.

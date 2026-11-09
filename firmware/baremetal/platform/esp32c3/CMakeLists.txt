@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # The ESP32-C3 shape of the minimum-footprint probe: the fixed-point tier's
-# part (planning/arithmetic-tiers.md, Phase D).
+# part.
 #
 # An ESP-IDF project driven by idf.py, the same shape as the esp32s3 sibling
 # beside it and for the same reasons - that file carries the arguments this one

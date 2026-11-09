@@ -5,8 +5,7 @@
 #include <span>
 #include <vector>
 
-// A synthetic singing voice with a known pitch (planning/karaoke-microphone.md, Q1: no recording is
-// bundled, so the tests' content is generated and the generator is the record of what is in it).
+// A synthetic singing voice with a known pitch.
 // A source-filter voice: harmonics whose amplitudes fall with the harmonic number, a vibrato,
 // jitter, portamento between notes, three formants and breath noise, shaped by a 20 ms attack and
 // release, with room noise at a chosen signal-to-noise ratio. Deterministic for a seed, and

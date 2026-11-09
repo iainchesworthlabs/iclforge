@@ -7,7 +7,7 @@
 #include "iclforge/lyrics/lyrics.hpp"
 
 // The legacy text encodings a lyrics file can be read in, and the platform's conversion of them to
-// UTF-8 (planning/karaoke-formats-options.md, D16).
+// UTF-8.
 //
 // libs/lyrics holds no table of any page (it is linked into firmware, and the tables of Shift-JIS,
 // GBK and Big5 are tens of kilobytes each): it asks the program for a decoder, and only for text

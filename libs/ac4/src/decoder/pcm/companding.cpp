@@ -74,8 +74,8 @@ template <typename R>
 // in the last bit on some inputs, a gain that differs in its last bit scales
 // the slot's samples by a different float, and the synthesis bank spreads the
 // difference over the frame, so that the host, the Cortex-M3 leg and the
-// ESP32s each gave a PCM of their own for a companded stream (planning/ac4.md,
-// D14a4). A slot with no level gets no gain, as pow gives it.
+// ESP32s each gave a PCM of their own for a companded stream. A slot with no level gets no gain,
+// as pow gives it.
 [[nodiscard]] Energy gain_of(Energy level) noexcept {
     return dsp::tiered::pow_of(level, (Energy{1} - kAlpha) / kAlpha);
 }

@@ -20,9 +20,9 @@ openssl x509 -in firmware/keys/trust.pem -noout -subject -issuer -dates -fingerp
     -ext basicConstraints,keyUsage
 ```
 
-A board does not judge the anchor's own dates ([the design](../../planning/esp32-ota.md#trust-and-signing)), so
+A board does not judge the anchor's own dates, so
 2034 is not a deadline for boards in the field. It does bound the leaves, which cannot outlive their CA.
 
 The two leaves that chain to this CA, `Hearth Firmware Stable` and `Hearth Firmware Beta`, are made and renewed
-as [the EJBCA guide](../../planning/hearth-firmware-signing-ejbca.md) describes. Changing this file changes what
+under it. Changing this file changes what
 new builds trust, so a change here is a change to review.

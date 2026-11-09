@@ -55,7 +55,7 @@ class Imdct {
     void inverse(std::span<const Real> spectrum, std::span<Real> out);
     void inverse(std::span<const Real> spectrum, std::span<Real> out, std::span<Complex> scratch);
 
-    // At Fixed32 (planning/ac4.md, D14d): `spectrum` holds the lines of the double decoder
+    // At Fixed32: `spectrum` holds the lines of the double decoder
     // times 2^-exponent, and `out` receives the samples at the fixed tier's time-domain scale
     // (dsp/scalar_traits.hpp, kTimeShift). The block takes an exponent of its own: its lines
     // are shifted together until the largest is in [4, 8), the transform sheds bits only where

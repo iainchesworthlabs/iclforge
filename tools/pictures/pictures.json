@@ -134,11 +134,11 @@
     },
     "897f47c14": {
       "commit": "897f47c1462b340de675feb498668dcae4000494",
-      "what": "the tree panel_preview was built from: the commit whose preview draws the Meters view, each chart a canvas, in every room at every size and checks it (planning/p4x-meters-view.md), 2026-10-26"
+      "what": "the tree panel_preview was built from: the commit whose preview draws the Meters view, each chart a canvas, in every room at every size and checks it, 2026-10-26"
     },
     "f3fe720e2": {
       "commit": "f3fe720e2f193f2f88906825effc8e0555985965",
-      "what": "the tree panel_preview was built from: the commit that made the speakers follow every 100 ms level window against the room's own loudest, added the pulse style, and put Speakers style in the Preferences sheet (planning/p4x-speakers-options.md), 2026-10-25"
+      "what": "the tree panel_preview was built from: the commit that made the speakers follow every 100 ms level window against the room's own loudest, added the pulse style, and put Speakers style in the Preferences sheet, 2026-10-25"
     },
     "4ed3e7a60": {
       "commit": "4ed3e7a6073359e9122239dcedcfc32087839b81",
@@ -155,6 +155,10 @@
     "3a06cdad6": {
       "commit": "3a06cdad62c2ab5bc353eb1066eea562a6c78e7b",
       "what": "the tree panel_preview was built from: the Speaker layout sheet with High and In the ceiling for the heights (quick picks, build yours, the room beside the buttons, a footer that stays on the glass), 2026-10-26"
+    },
+    "49104d85e": {
+      "commit": "49104d85eeb284a34fb226642502f70a2de2a6d1",
+      "what": "Release build on Windows: cl.exe, Qt from C:/Repos/common/qt/6.12.0/msvc2022_64, taken 2026-10-31 or after"
     }
   },
   "pictures": [
@@ -1003,7 +1007,7 @@
       "env": {
         "ICLFORGE_SIGNING_KEY_FILE": "{media}/demo-signing.key"
       },
-      "build": "b4083ba0f",
+      "build": "49104d85e",
       "note": "Taken over a scripted machine (--app) on a settings store of its own, so the room draws a monogram for each application and not its icon, and the machine's own applications, sound output and settings are not in it. The window and the engine are the program's own."
     },
     {

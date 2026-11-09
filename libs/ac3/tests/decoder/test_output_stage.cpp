@@ -537,8 +537,8 @@ TEST_CASE("mix_levels resolves both generations' downmix syntax", "[decoder][out
     mix.lfemixlevcod = std::nullopt;
     CHECK_FALSE(iclforge::ac3::mix_levels(std::optional{mix}).lfe_mix_level_db.has_value());
     // No mixmdate at all falls back on -3 dB for the centre and -3 dB for the surrounds, which is what
-    // Dolby's decoder folds such a stream at (measured, planning/karaoke-eac3-findings.md), and not on
-    // AC-3's -4.5 and -6 dB, nor on zero (planning/karaoke-eac3.md, D10). Lt/Rt keeps -3 dB.
+    // Dolby's decoder folds such a stream at (measured), and not on
+    // AC-3's -4.5 and -6 dB, nor on zero. Lt/Rt keeps -3 dB.
     const auto none = iclforge::ac3::mix_levels(std::optional<iclforge::ac3::meta::MixMetadata>{});
     CHECK(none.loro_clev == iclforge::ac3::meta::level::kMinus3dB);
     CHECK(none.loro_slev == iclforge::ac3::meta::level::kMinus3dB);
@@ -1169,9 +1169,9 @@ TEST_CASE("karaoke: the LFE is kept and follows Rk", "[decoder][output][karaoke]
     REQUIRE(channels.size() == 4);
     CHECK(static_cast<double>(channels[0][0]) ==
           Catch::Approx(kSlev / (1.0 + kSlev)).margin(1e-6));  // V1 reached Lk
-    // The LFE is in none of Annex C's equations, so it takes the scale-down the three sums took
-    // (D8, planning/karaoke-eac3.md): its level against L, C and R is as the mix put it, which is
-    // what Dolby's decoder gives by scaling nothing.
+    // The LFE is in none of Annex C's equations, so it takes the scale-down the three sums took:
+    // its level against L, C and R is as the mix put it, which is what Dolby's decoder gives by
+    // scaling nothing.
     CHECK(static_cast<double>(channels[3][0]) ==
           Catch::Approx(0.25 / (1.0 + kSlev)).margin(1e-9));  // the LFE
 
@@ -1870,7 +1870,7 @@ std::vector<double> response(const ac3::OutputConfig& config, ac3::Acmod acmod, 
 
 TEST_CASE("karaoke choice: the names iclforge::ac3 takes are the base library's, not copies",
           "[decoder][output][karaoke]") {
-    // E1 (planning/karaoke-eac3.md): one definition in iclforge/base/karaoke.hpp, which an AC-4
+    // E1: one definition in iclforge/base/karaoke.hpp, which an AC-4
     // mapping and the wire's converters read too; the AC-3 names are re-exports of it.
     static_assert(std::is_same_v<ac3::KaraokeReproduction, iclforge::base::KaraokeReproduction>);
     static_assert(std::is_same_v<ac3::KaraokeVocals, iclforge::base::KaraokeVocals>);

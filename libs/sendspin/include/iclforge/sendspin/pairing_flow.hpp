@@ -20,8 +20,7 @@
 
 // Sendspin's pairing flows (pairing.md): the Pairing PSK Flow, the Dynamic Pairing Code Flow
 // with its rounds, and the Static Pairing Code Flow with its window, from the client's side
-// (ClientPairing) and the server's (ServerPairing), in both dialects
-// (planning/hearth-sendspin-extension.md, C20 to C27).
+// (ClientPairing) and the server's (ServerPairing), in both dialects.
 //
 // Each object is one pairing attempt on one connection. It is given the pairing messages the
 // peer sends and the operator's or device's actions, and answers with the message texts to

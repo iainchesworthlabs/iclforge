@@ -17,7 +17,7 @@
 #include "iclforge/ac4/encoder/encoder.hpp"
 
 // iclforge::ac4::Encoder (libs/ac4/src/encoder) over the configurations and input it takes, read
-// back by the decoder (planning/ac4.md, the encoder's ladder, items 1 and 8).
+// back by the decoder.
 //
 // The first bytes choose the configuration - the channel layout, mono to
 // 7.1, phase E8's immersive layouts and 22.2, sample rate, bit rate, I-frame

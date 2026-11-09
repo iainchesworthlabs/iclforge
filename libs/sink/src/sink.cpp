@@ -269,6 +269,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         reported_decoder_.reset();
         const std::string_view codec = stream.data_type == ac::DataType::kAc3    ? "AC-3 "
                                        : stream.data_type == ac::DataType::kEac3 ? "E-AC-3 "
+                                       : stream.data_type == ac::DataType::kTruehd ? "TrueHD "
                                                                                  : "AC-4 ";
         // "to 7.1.4" when the program renders to a layout, and nothing when it does not (it hands the
         // bytes on, as the Android app does).
@@ -766,7 +767,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         config.supported_roles = {std::string(ac::kRole), "player@v1"};
         ac::Support support;
         support.data_types = data_types;
-        support.sample_rates = {48000};
+        support.sample_rates = options_.sample_rates;
         support.outputs.count = options_.output_count;
         support.outputs.bit_depth = 32;
         support.outputs.bit_depths = {32};
@@ -795,6 +796,9 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         }
         if (options_.max_frame_rate != 0) {
             support.max_frame_rate.fill(options_.max_frame_rate);
+        }
+        if (options_.max_data_rate != 0) {
+            support.max_data_rate.fill(options_.max_data_rate);
         }
         support.lyrics_max_bytes = options_.lyrics_max_bytes;
         support.requests = options_.requests;

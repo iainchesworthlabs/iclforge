@@ -229,7 +229,7 @@ SessionOutput PlayerSession::on_message(std::span<const std::uint8_t> message, s
         return {};
     }
     if (id == message_id::kIclforgeBurst) {
-        // As player@v1's audio (planning/hearth-sendspin-extension.md, Burst chunks).
+        // As player@v1's audio.
         if (!iclforge_active() || !burst_stream_ || external_source_ || clock_.updates() == 0) {
             return {};
         }
@@ -257,8 +257,7 @@ SessionOutput PlayerSession::on_message(std::span<const std::uint8_t> message, s
         }
         return {};
     }
-    // No rule covers an unknown binary ID; it is ignored
-    // (planning/hearth-sendspin-extension.md, Q2).
+    // No rule covers an unknown binary ID; it is ignored.
     return {};
 }
 

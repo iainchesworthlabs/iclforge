@@ -3,7 +3,7 @@
 // What is held here is what the panel would show: a title card that keeps the last track's artist, loses
 // its title on a pause, or runs the song's clock from the wrong moment is a screen that says what nobody
 // said. The two servers it meets send metadata@v1 differently (the specification a whole state each
-// time, aiosendspin 9.1.1 only what changed: planning/hearth-sendspin-extension.md, C36), and each test
+// time, aiosendspin 9.1.1 only what changed), and each test
 // names the one it is about.
 
 #include <catch2/catch_test_macros.hpp>

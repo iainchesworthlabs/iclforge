@@ -23,6 +23,10 @@ namespace ac = sendspin::player;
             return audio::BitstreamFormat::kAc3;
         case ac::DataType::kEac3:
             return audio::BitstreamFormat::kEac3;
+        case ac::DataType::kTruehd:
+            // The sink packs a chunk's access units into a MAT burst (libs/sink), and the backend
+            // opens the eight-channel track for it through the bridge's openLink().
+            return audio::BitstreamFormat::kMat;
         case ac::DataType::kAc4:
             break;
     }
@@ -142,6 +146,13 @@ std::vector<sendspin::player::DataType> SharedAudio::routes() const {
         if (device.supports_eac3_passthrough &&
             std::ranges::find(types, sendspin::player::DataType::kEac3) == types.end()) {
             types.push_back(sendspin::player::DataType::kEac3);
+        }
+        // TrueHD only where the route takes the eight-channel track: the bridge's isLinkSupported()
+        // said yes. A server then sends its access units; where it does not, it sends PCM (the
+        // fallback chain), and nothing is transcoded.
+        if (device.supports_mat_passthrough &&
+            std::ranges::find(types, sendspin::player::DataType::kTruehd) == types.end()) {
+            types.push_back(sendspin::player::DataType::kTruehd);
         }
     }
     return types;

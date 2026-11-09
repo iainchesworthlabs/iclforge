@@ -14,7 +14,7 @@
 #include "iclforge/base/loudness.hpp"
 #include "iclforge/base/speaker.hpp"
 
-// planning/consolidation.md's C6 moved the level and loudness meters to base, keyed on a channel
+// The consolidation moved the level and loudness meters to base, keyed on a channel
 // count, a weight per channel or a list of speakers, and left AC-3's acmod and channel-map forms in
 // ac3 as constructors over them. Each base form has to measure exactly what the AC-3 form it
 // stands beside does.

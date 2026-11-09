@@ -149,5 +149,3 @@ the sink's is refused while a server's is on.
 
 - [An ESP32-P4 sink](sink-esp32-p4.md) (its screen and Preferences, [Adjust and Preferences](sink-esp32-p4.md#adjust-and-preferences)),
   [An ESP32-S3 sink](sink-esp32-s3.md) and [An ESP32-C6 sink](sink-esp32-c6.md).
-- [planning/hearth-speaker-trim-identify.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-speaker-trim-identify.md)
-  has the design, the memory, the cost and what is left to check on a board.

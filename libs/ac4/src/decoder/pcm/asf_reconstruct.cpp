@@ -267,7 +267,7 @@ ParseResult reconstruct_track_floating(const SfInfo& info, const SfData& data, c
     return {};
 }
 
-// The fixed-point tier's reconstruction (planning/ac4.md, D14d): the same Pseudocodes 21 to 23,
+// The fixed-point tier's reconstruction: the same Pseudocodes 21 to 23,
 // each line's value sign(q) |q|^(4/3) 2^((sf - 100) / 4) formed as a mantissa and a power of two
 // (dsp::tiered::MantExp) and the noise fill's levels from the bands' exact energies, by MantExp's
 // own log2 and exp2. The track is walked twice with the same arithmetic: once for the largest

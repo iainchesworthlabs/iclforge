@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "../support.hpp"
+#include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/major_sync.hpp"
+#include "probe_truehd.hpp"
 #include "truehd_meaning.hpp"
 
 namespace iclforge::apps {
@@ -57,8 +59,14 @@ struct CoreStrip {
 // counts them and goes on). `loss` takes the units a lenient decode lost after the first one
 // decoded: bytes the reader skipped (the decoder is told, lost_data()), units it could not read,
 // and units that waited for a restart header (`decode strict` makes them an input fault).
+//
+// `objects_dir` and `adm_out` (TH spec v3.9 §15; provisional, libs/truehd/ERRATA.md entry 61): with
+// truehd-presentation=all, `objects_dir` takes each channel of substream 3 as a mono WAV and
+// `adm_out` an ADM master with the beds and the dynamic objects of the stream's object audio
+// metadata; with another presentation `adm_out` is that presentation's bed alone.
 int run_decode_truehd(std::span<const std::byte> stream, std::string_view in_path,
-                      std::string_view out_path, const Options& meta, DecodeLoss& loss);
+                      std::string_view out_path, const Options& meta, DecodeLoss& loss,
+                      std::string_view objects_dir = {}, std::string_view adm_out = {});
 
 // Describes the stream in `in_path` and checks every access unit's header, directory, parity and
 // CRC bytes. Exit 1 when any of them fails.
@@ -119,18 +127,8 @@ struct PresentationLoudness {
     std::optional<double> true_peak_dbtp = std::nullopt;
 };
 
-// TH spec §18: the stream must be sendable within the declared peak data rate and 75 ms. The
-// declared rate is MajorSync::peak_data_rate_bps(), bits per second as TH spec v3.9 section 4.4
-// gives it (ERRATA.md question 12), and the model is the encoder's: a unit starts to arrive when its
-// slot opens, when the previous unit has arrived and one unit duration after the previous started,
-// and takes bytes x 8 / rate to arrive.
-struct RateReport {
-    std::uint64_t declared_bps = 0;
-    std::uint64_t max_unit_rate_bps = 0;  // the largest unit's bytes over its own duration
-    double worst_latency_ms = 0.0;        // from a unit's slot opening to its last byte
-    double latency_limit_ms = 75.0;
-    std::uint64_t violations = 0;  // units whose latency is over the limit
-};
+// TH spec §18's data rate model and its report: apps/shared/media/src/probe_truehd.hpp.
+using RateReport = iclforge::apps::truehd_probe::RateReport;
 
 struct TruehdMeasurement {
     std::vector<PresentationLoudness> presentations;        // as asked, in the order asked
@@ -181,14 +179,55 @@ int run_qc_truehd(std::span<const std::byte> stream, std::string_view in_path, c
 // (L R C LFE Ls Rs Lrs Rrs). "-" as the output is a bare stream on stdout.
 int run_truehd_encode(std::string_view in_path, std::string_view out_path, const Options& meta);
 
+// `cut` and `cat` of TrueHD or MLP elementary streams (truehd_cut.cpp). A cut starts at the first access
+// unit that carries a major sync at or after the requested time, says which time it used, and keeps
+// whole units; a join refuses an input that does not open with a major sync or whose shape differs.
+// Bytes are never changed (libs/truehd/ERRATA.md, entry 80; provisional until owner question 14).
+int run_cut_truehd(std::span<const std::byte> stream, std::string_view in_path,
+                   std::string_view out_path, std::string_view start_seconds,
+                   std::string_view duration_seconds, const Options& meta);
+int run_cat_truehd(std::string_view out_path, std::span<const std::string_view> in_paths,
+                   const Options& meta);
+
+// `transcode` of a TrueHD or MLP stream to AC-3 or E-AC-3 (truehd_transcode.cpp): the decode of
+// the presentation truehd-presentation= names, encoded as the target codec's WAV encode does, so
+// that layout, bitrate and metadata options mean what they mean there. Refused for AC-4. The stream's
+// dialogue norm is not carried (provisional, libs/truehd/ERRATA.md questions 51 to 55).
+int run_transcode_truehd(std::span<const std::byte> stream, std::string_view in_path,
+                         std::string_view out_path, std::uint32_t bitrate,
+                         std::string_view layout, const Options& meta,
+                         iclforge::ac3::plan::Codec target);
+
+// The dialogue norm a TrueHD stream stores for the presentation `presentation` names ("" or "best"
+// is the largest the stream has), as an AC-3 or E-AC-3 dialnorm (1 to 31): the 6 and 8 channel
+// fields as they are, the 2 channel field less 6 (libs/truehd/ERRATA.md, questions 51 to 55).
+// Nothing for a stream that stores none (a field of 0, as FFmpeg's streams have) or for MLP.
+[[nodiscard]] std::optional<int> stored_dialnorm(std::span<const std::byte> stream,
+                                                 std::string_view presentation);
+
+// `silence` and `sine` with a .thd output (truehd_synth.cpp): a generated signal coded by the
+// lossless encoder. `layout` is mono, stereo, 51 or 71 (stereo when empty); the AC-3 bit rate and
+// metadata options are refused.
+int run_truehd_synth(std::string_view out_path, std::uint32_t seconds, bool sine,
+                     std::uint32_t freq_hz, std::uint32_t amplitude_pct, std::string_view layout,
+                     const Options& meta);
+// `truehd-atmos`: the channels of a WAV as the objects of a TrueHD Atmos stream, in substream 3 with
+// the 7.1 bed in substreams 0 to 2 and the objects' metadata (`paths_path`, a scene file as
+// atmos-encode takes it, or a fan of static positions) in the evolution frames. The first channel is
+// the LFE unless truehd-objects-lfe=off; the bed is truehd-bed= or the objects rendered to 7.1. Bare
+// .thd, or wrapped as .mkv, .mp4 or .ts like truehd-encode. Provisional (libs/truehd/ERRATA.md
+// entries 61 to 64).
+int run_truehd_atmos(std::string_view objects_path, std::string_view out_path,
+                     std::string_view paths_path, const Options& meta);
+
 // Says that `command` does not read TrueHD or MLP, and why when `reason` is given, and returns
 // kExitUsage.
 int refuse_truehd(std::string_view command, std::string_view in_path,
                   std::string_view reason = {});
 
 // --- options a TrueHD run does not apply -----------------------------------------------------------
-// PROVISIONAL, until the owner answers question 7 of planning/truehd-parity-forge.md (and the entry
-// in libs/truehd/ERRATA.md): an option that a run on TrueHD or MLP does not apply is refused by name
+// PROVISIONAL, until the owner answers the open question on it (and the entry in
+// libs/truehd/ERRATA.md): an option that a run on TrueHD or MLP does not apply is refused by name
 // with a usage error, as E-AC-3 refuses verify-content, and is never accepted and dropped. A
 // verification flag (verify-content, check-content, verify-objects, syntax-trace= and the like) must
 // never succeed without verifying. The only options warned about instead are the choices between
@@ -199,7 +238,11 @@ int refuse_truehd(std::string_view command, std::string_view in_path,
 // ("truehd-presentation=", "verify"); quiet and verbose are always applied. Returns kExitOk, or
 // names every other option the line carries (Options::given) on stderr and returns kExitUsage.
 [[nodiscard]] int check_options_applied(const Options& meta,
-                                        std::initializer_list<std::string_view> applied);
+                                        std::span<const std::string_view> applied);
+[[nodiscard]] inline int check_options_applied(const Options& meta,
+                                               std::initializer_list<std::string_view> applied) {
+    return check_options_applied(meta, std::span<const std::string_view>(applied.begin(), applied.size()));
+}
 
 // The warning a command that also reads other streams gives when truehd-presentation= or
 // truehd-check= is given and `stream_path` is not TrueHD or MLP: neither can change anything there.

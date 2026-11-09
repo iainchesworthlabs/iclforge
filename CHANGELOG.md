@@ -4038,7 +4038,6 @@ The sections below contain the complete change list and fixes.
   the first slots of its A-SPX input, whose history moves at the next frame's start. The first frame no longer computes the tables in software
   floating point, so the Cortex-M3 probe's instructions a frame fall to 6.7 M to 43.0 M at fixed and 25.2 M to 161.8 M at `float`; the images grow
   by the tables, to 801,812 and 750,276 bytes. The AC-4 probe names the frame, the stage and the live size classes at each fixture's peak.
-  [`planning/ac4.md`, D14f](planning/ac4.md#d14f-the-decoders-memory) has each step's figures.
 - **AC-4 plays faster on the ESP32-S3 and the ESP32-P4, with the PCM unchanged (phase D14g).** A decoder given an executor
   (`DecoderConfig::executor`, `iclforge::ac4::Executor`) runs each channel's inverse transform and QMF analysis, A-SPX's elements,
   A-CPL's slots and decorrelators, the downmix's outputs and each output's synthesis and converter on two threads; the ESP32 player's

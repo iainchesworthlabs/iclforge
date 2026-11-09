@@ -381,14 +381,20 @@ template <typename T>
 // Not [[nodiscard]] - see set_property's own comment just above: the same
 // two revert paths call this as a best-effort "did it settle back" check
 // with no further action to take either way.
+//
+// `channels`, when not 0, must match too. A linear PCM format ID names a great many formats, so
+// for a sink that retunes a device to one (the MAT link, passthrough.cpp) the ID and the rate
+// can already be the current ones before the change has happened.
 inline bool wait_for_physical_format(AudioStreamID stream, AudioFormatID format_id,
-                                     Float64 sample_rate, std::chrono::milliseconds timeout) {
+                                     Float64 sample_rate, std::chrono::milliseconds timeout,
+                                     UInt32 channels = 0) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     const auto addr = address(kAudioStreamPropertyPhysicalFormat);
     do {
         const auto current = get_property<AudioStreamBasicDescription>(stream, addr);
         if (current && current->mFormatID == format_id &&
-            std::abs(current->mSampleRate - sample_rate) < 1.0) {
+            std::abs(current->mSampleRate - sample_rate) < 1.0 &&
+            (channels == 0 || current->mChannelsPerFrame == channels)) {
             return true;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds{10});

@@ -201,6 +201,8 @@ struct Demuxed {
 class ICLFORGE_CONTAINERS_EXPORT Reader {
    public:
     using FrameFn = std::function<void(std::span<const std::byte>)>;
+    // A frame and the offset in the pushed input at which its bytes lie.
+    using FrameAtFn = std::function<void(std::span<const std::byte>, std::uint64_t)>;
 
     explicit Reader(const ReadOptions& options = {});
     Reader(Reader&&) noexcept;
@@ -213,6 +215,13 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
     // element may span any number of them.
     [[nodiscard]] std::expected<void, DemuxError> push(std::span<const std::byte> chunk,
                                                        const FrameFn& on_frame);
+
+    // push(), and each frame comes with the offset in the input (the chunks pushed so far,
+    // end to end) of its first byte. A frame is always one run of bytes in the input, laced or
+    // not, so a caller that keeps the offsets and lengths can read the frames again later
+    // without parsing the file.
+    [[nodiscard]] std::expected<void, DemuxError> push_at(std::span<const std::byte> chunk,
+                                                          const FrameAtFn& on_frame);
 
     // Call once, when the input ends: the verdict on the file as a whole.
     // Reports kTruncated only if it stopped before a track was ever
@@ -230,6 +239,9 @@ class ICLFORGE_CONTAINERS_EXPORT Reader {
     [[nodiscard]] const ReadTrack& track() const;
     [[nodiscard]] bool track_found() const;
     [[nodiscard]] std::size_t frames_read() const;
+    // The other tracks the Tracks element declared, as Demuxed::skipped lists them. Complete once
+    // track_found() is true.
+    [[nodiscard]] const std::vector<SkippedTrack>& skipped() const;
 
    private:
     std::unique_ptr<detail::ReaderState> state_;

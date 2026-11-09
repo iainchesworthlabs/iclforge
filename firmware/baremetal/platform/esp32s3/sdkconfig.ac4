@@ -1,4 +1,4 @@
-# The AC-4 decoder's probe on the ESP32-S3 (planning/ac4.md, D14c), over sdkconfig.defaults:
+# The AC-4 decoder's probe on the ESP32-S3, over sdkconfig.defaults:
 #
 #   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ac4" idf.py build
 #   tools/checks/run_esp32s3_probe.sh --ac4              # the same, under QEMU, and gated
@@ -21,7 +21,7 @@ CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 # AC-4 play on this part (its sdkconfig.psram, CONFIG_ICLFORGE_AC4_INTERNAL_BELOW), which
 # the probe has no player to set and takes for the whole run. Under ESP-IDF's default of
 # 16 KB the decoder's blocks of 8 to 16 KB took internal RAM to 1.3 KB free at 5.1.4, and
-# 248 to 264 KB of it at 2.0; at 512 it keeps 3 to 14 KB there (planning/ac4.md, D14c).
+# 248 to 264 KB of it at 2.0; at 512 it keeps 3 to 14 KB there.
 # QEMU emulates the octal PSRAM (idf.py qemu passes is_octal for CONFIG_SPIRAM_MODE_OCT),
 # so CI runs the shape a board runs.
 CONFIG_SPIRAM=y

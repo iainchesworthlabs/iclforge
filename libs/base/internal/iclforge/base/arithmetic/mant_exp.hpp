@@ -8,7 +8,7 @@
 #include "iclforge/base/arithmetic/fixed32.hpp"
 
 // A value as a signed 32-bit mantissa and a power of two, for the AC-4 decoder's fixed-point
-// tier (planning/ac4.md, D14d): the energies, gains and scale factors of A-SPX, the transient
+// tier: the energies, gains and scale factors of A-SPX, the transient
 // ducker's and the companding's levels, a prediction's covariances, which span a range no
 // absolute fixed-point format holds. A-SPX's signal scale factors alone run from 2^-96 to
 // 2^96 in the double decoder, and a quiet subband's energy is below Fixed32's 2^-24 where a

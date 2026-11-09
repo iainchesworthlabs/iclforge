@@ -6,8 +6,8 @@
 
 #include "iclforge/pitch/tracker.hpp"
 
-// A reference melody: what a singer's pitch is compared with (planning/karaoke-microphone.md, D9;
-// findings F4). It is a contour on a fixed grid, so that a reference from a decoded guide-melody
+// A reference melody: what a singer's pitch is compared with. It is a contour on a fixed grid, so
+// that a reference from a decoded guide-melody
 // channel and a reference from MIDI notes are the same thing to the scorer.
 //
 // Standard library only.

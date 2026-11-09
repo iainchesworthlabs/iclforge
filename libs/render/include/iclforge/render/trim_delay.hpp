@@ -13,7 +13,7 @@
 // each output a patch writes (ac3/render/routing.hpp), the speaker-level and
 // speaker-distance settings an AVR's speaker setup has.
 //
-// Speaker management only, as planning/hearth-reference-player.md scopes it:
+// Speaker management only:
 // no measurement, no equalisation, no filter beyond the renderer's crossover.
 //
 // The delay lines are the caller's storage, sized with storage_floats() and

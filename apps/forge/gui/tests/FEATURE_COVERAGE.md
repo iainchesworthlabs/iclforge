@@ -3,8 +3,8 @@
 What every user-facing feature of the Forge GUI (`apps/forge/gui/assets/qml`, driven by
 `EncoderController`, `QcController`, `ObjectDecodeController`,
 `StreamPlayerController`, `LanguageManager`) is exercised by. Two sets of tests
-hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (36 suites, 222
-test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (four files, 45
+hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (38 suites, 238
+test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (six files, 51
 cases, tagged `[gui]` and built into `iclforge-forge-gui-tests`). All the QML suites run the
 real controllers, not mocks.
 
@@ -131,7 +131,7 @@ reach without a device.
 
 ## AC-4 (encode, QC, player, object page)
 
-These controls arrived with AC-4 (planning/ac4.md, I3), after the tst_e2e_*
+These controls arrived with AC-4, after the tst_e2e_*
 suites, so **Before** reads "new".
 
 | Feature | Before | Now | Test case(s) |
@@ -163,7 +163,7 @@ suites, so **Before** reads "new".
 
 ## AC-4 objects
 
-The Objects tab's switch under the AC-4 codec (planning/ac4.md, I5b), which writes the
+The Objects tab's switch under the AC-4 codec, which writes the
 objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 
 | Feature | Before | Now | Test case(s) |
@@ -210,6 +210,45 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | QC report data / preset constants | logic | logic | QcPanel::test_measuringRealFileIsAsyncAndReportsRealData, test_presetSelectionNarrowsToTheChosenPresetsRealNumbers |
 | The dialog shows the measurement: the summary line and one programme card | logic | logic | QcPanel::test_dialogRendersTheRealMeasurement |
 | Gate meter pass/fail visuals and accessibility | logic | logic | QcPanel::test_gateMeter*, Accessibility::test_qcGateMeter* |
+
+## TrueHD and MLP (player, QC and encode)
+
+The player reads these files a window at a time (`src/truehd_pcm_source.hpp`), never a whole decode:
+a two-hour film at 48 kHz and eight channels is about 11 GB. The Qt-free cases hold the samples to
+FFmpeg's decode (the SHA-256 of `testdata/truehd/manifest.json`); the Qt Quick suite holds the
+controllers and the dialogs. Nothing is pressed in these rows: the tests call the controllers and
+`openDroppedFile`, and the pickers' name filters are not exercised (as for AC-4 above).
+
+| Feature | Before | Now | Test case(s) |
+|---|---|---|---|
+| The windows of a TrueHD or MLP file add up to FFmpeg's decode (4 fixtures, 3 window sizes) | new | logic | iclforge-forge-gui-tests [gui][truehd]: the TrueHD player's windows add up to FFmpeg's decode |
+| A seek lands on the sample asked for (forward over restarts, back, mid-unit, at and past the end) | new | logic | [gui][truehd]: a seek in a TrueHD stream lands on the sample asked for; a seek past the last restart of a stream with few of them |
+| The length stops where the stream does: the last unit's padding is not delivered (44.1 kHz fixture, 15 samples) | new | logic | [gui][truehd]: the padding of the last unit is not part of the stream the player delivers |
+| A TrueHD track in Matroska, MP4 or a Blu-ray transport stream delivers the bare stream's samples (FFmpeg's SHA-256), with the same speakers, length and seeks | new | logic | [gui][truehd][container]: a TrueHD track in Matroska, MP4 or a Blu-ray transport stream plays as the bare stream does |
+| An MP4 edit list's priming is skipped and its end cut; a seek counts from the trimmed start | new | logic | [gui][truehd][container]: an MP4 edit list's priming is not delivered and its end is cut |
+| A container with no TrueHD track is reported as such, so the other readers take it | new | logic | [gui][truehd][container]: a container with no TrueHD track is left to the readers of the other codecs |
+| Open stream: a TrueHD `.mkv`, `.mp4` and `.m2ts` give the TrueHD summary line (naming the container), the speakers and the length | new | logic | TrueHd::test_aTrueHdTrackInAContainerOpensInThePlayer |
+| A file that is not a stream, or is missing, is refused with a sentence | new | logic | [gui][truehd]: a file that is not a TrueHD stream is refused with a sentence |
+| The exported WAV is the 24-bit WAV `forge decode` writes (header, mask 0x60F, samples) | new | logic | [gui][truehd]: the exported WAV is the 24-bit WAV forge decode writes |
+| Open stream: the summary line, the speakers, the length; MLP says so | new | logic | TrueHd::test_openingATrueHdStreamReportsItsFormatAndSpeakers, test_anMlpStreamSaysSo |
+| Seek while paused; Play (starts, or names the output it could not open) | new | logic (hardware) | TrueHd::test_seekWhilePausedMovesPositionOnATrueHdStream, test_playingATrueHdStreamStartsOrNamesTheOutputItCouldNotOpen |
+| Export decoded WAV from the player | new | logic | TrueHd::test_exportingAnTrueHdStreamWritesAWavWithoutError |
+| A dropped or launched `.thd` or `.mlp` opens the player, not the WAV source loader | new | logic | TrueHd::test_aDroppedTrueHdFileOpensThePlayer |
+| The Open stream and QC pickers offer `*.thd *.mlp`; Open stream also offers a "TrueHD in a container" filter | new | none | No case: the tests set the picker's `selectedFile`, so a name filter is not exercised. |
+| QC: one programme for each presentation, with the stored dialogue norm beside the measurement | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate |
+| QC: the integrity gate passes a good stream and fails two streams joined end to end | new | logic | TrueHd::test_qcOfATrueHdStreamMeasuresEachPresentationAndPassesTheGate, test_qcOfAStreamJoinedEndToEndFailsTheIntegrityGate |
+| QC of an AC-3 stream has no integrity row | new | logic | TrueHd::test_qcOfAnAc3StreamHasNoIntegrityGate |
+| `forge-gui --smoke-open <stream>` opens a TrueHD file in the player | new | CI step | `forge-gui --smoke-open apps/forge/gui/tests/fixtures/truehd_m51_s24.thd shot.png` (run by hand for this change: exit 0) |
+| "Encode TrueHD…" → Choose WAV → Encode: a bare `.thd` that opens in the player as TrueHD of the WAV's length and passes QC | new | logic | TruehdEncode::test_aWavIsCodedVerifiedAndTheStreamOpensInThePlayerAndPassesQc |
+| The command line the dialog is the twin of names the files and the options ticked; an output is made `.thd` | new | logic | TruehdEncode::test_theCommandLineNamesTheFilesAndTheOptionsChosen, test_chooseSourceProposesAnOutputBesideItAndOutputsAreMadeThd |
+| A file that is not a WAV is refused with a sentence and nothing is written | new | logic | TruehdEncode::test_aFileThatIsNotAWavIsRefusedAndNothingIsWritten |
+| The output's name picks the container: `.mkv`, `.mp4`, `.m2ts`, `.ts` are kept in any case, anything else is made `.thd`; each container is written and the summary names it; each hands back the stream that went in | new | logic | TruehdEncode::test_aContainerNameIsKeptAndAnyOtherIsMadeThd, test_eachContainerIsWrittenAndNamedInTheSummary; test_truehd_wrap.cpp ("each container hands back the TrueHD stream it was given") |
+| "More options…": the `truehd-` options of the command line (restart, major sync, peak rate, bitrate, FIR order, downmix gains, rate check, matrix, stereo mode) go into the command line shown, a value the command line would refuse is refused with its sentence and stops the encode, and an option reaches the encoder | new | logic | TruehdEncode::test_theOptionsAreInTheCommandLineAndABadOneIsRefused, test_anOptionChangesWhatTheEncoderWrites, test_thePanelShowsAndSetsTheOptions; test_truehd_encode_settings.cpp |
+| "Several sources…": more than one WAV (`src=`), the map saying where each channel of each source goes (`map=`, TrueHD's channel names) and a start offset per source (`offset=`) go into the command line shown, a map or an offset the command line would refuse is refused with a sentence and stops the encode, and the stream is coded from the placed channels | new | logic | TruehdEncode::test_severalSourcesNeedAMapAndTheCommandLineCarriesThem, test_twoWavsAreCodedAsOneStreamAndAnOffsetLengthensIt, test_theSourcesPanelShowsAndSetsTheSources |
+| The dialog is saved as a project of codec truehd and comes back: the WAV files with their offsets (`offsetSeconds`), the map as `assignments`, verify, the downmix and the options (`encode.truehd`: restart, peakRate, rateCheck, bitrate, majorSync, firOrder, matrix, stereoMode, downmixGains); a project with fewer settings clears the last one's, and a key of another version's goes back as it came. `forge project` prints the dialog's line and writes the same bytes | new | logic | TruehdEncode::test_aTrueHdSessionIsSavedAsAProjectAndComesBack, test_severalSourcesTheirOffsetsAndTheOptionsAreSavedAndComeBack; iclforge-forge-cli-tests [cli][project][truehd] |
+| "Channel meaning…": the 13 channel meaning options (dialogue norm, mix level, source format, control bit per presentation, the two DRC start-up gains) go into the command line shown, a value the command line would refuse is refused under its field with its sentence and stops the encode, and an empty field is written as zero | new | logic | TruehdEncode::test_theChannelMeaningIsInTheCommandLineAndABadValueIsRefused, test_theChannelMeaningPanelShowsAndSetsTheFields; test_truehd_encode_settings.cpp [meaning] |
+| The channel meaning reaches the stream: QC reads back the dialogue norm each presentation stores; the summary says it is provisional | new | logic | TruehdEncode::test_theChannelMeaningIsWrittenIntoTheStream; test_truehd_encode_settings.cpp (the major sync of the stream the encode writes) |
+| The WAV and output pickers of the encode dialog, the Stop button | new | none | No case: the tests set the source and the output through the controller, and the run is short. |
 
 ## Objects (authoring) and object inspector
 

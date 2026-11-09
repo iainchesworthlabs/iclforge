@@ -38,8 +38,7 @@
 // SMP (clause 5.2), S-CPL between the inverse transform and the analysis
 // (5.3, pcm/immersive.hpp), A-SPX with its gains (4.8.3.11), A-CPL (5.5) and
 // A-JCC (5.6, pcm/ajcc.hpp), in full or core decoding (4.7). What it does not
-// decode yet it refuses with DecodeError::kUnsupported and the phase of
-// planning/ac4.md that brings it.
+// decode yet it refuses with DecodeError::kUnsupported.
 //
 // Every codec mode passes through the QMF banks, SIMPLE included, as Figure
 // 9 draws it, so the decoder's delay is one for all of them: d_pcm, the QMF

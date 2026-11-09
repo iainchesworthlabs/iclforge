@@ -15,8 +15,8 @@
 #include "../lyrics_reader.hpp"
 #include "lv_alloc.hpp"
 
-// What the lyric screen needs to know of the board beyond the lyrics (planning/karaoke-p4x-panel.md,
-// "The screen", S1): its name and address, the network and the server, and whether anything is
+// What the lyric screen needs to know of the board beyond the lyrics: its name and address, the
+// network and the server, and whether anything is
 // playing. A seam of its own so that the screen builds on a computer (preview/): the firmware's
 // definitions are in panel.cpp, over the settings, the network and the Sendspin player.
 
@@ -48,7 +48,7 @@ struct BoardInfo {
 // Called a couple of times a second.
 [[nodiscard]] BoardInfo read_board_info();
 
-// What the speakers view draws while a stream plays and no lyrics are held (planning/p4x-now-playing.md):
+// What the speakers view draws while a stream plays and no lyrics are held:
 // the room the layout in force describes, the last 100 ms of each output's level, and the line over it.
 // The containers are LVGL's (PSRAM on the firmware): the one NowPlaying the screen keeps is filled in
 // place five times a second, and its capacity stays, so that a read allocates nothing from the heap
@@ -70,8 +70,18 @@ struct NowPlaying {
 // Fills `out` from the player, called five times a second. False when no stream is playing.
 [[nodiscard]] bool read_now_playing(NowPlaying& out);
 
+// What the footer says of the stream while a view that does not read the whole of NowPlaying shows (the lyric screens,
+// and the no-lyrics sentence): the decoder's facts and the coded bitrate, with no room, no levels and no heading, so a
+// read is a lock and a copy. Called twice a second (the bitrate is measured over windows of a second, so a slower read
+// would only delay it). False when no stream is playing.
+struct NowStream {
+    iclforge::nowview::StreamFacts facts;
+    int kbps = 0;
+};
+[[nodiscard]] bool read_now_stream(NowStream& out);
+
 // The levels of the last 100 ms window alone, which the speakers view reads itself every frame and follows when
-// the window is a new one (planning/p4x-speakers-options.md): a lock and two short arrays, no heap. `serial`
+// the window is a new one: a lock and two short arrays, no heap. `serial`
 // moves by one for each window the player closes, so that the view knows how long it has been since the last.
 // False when no stream is playing or no window has closed yet.
 struct NowLevels {
@@ -82,8 +92,8 @@ struct NowLevels {
 };
 [[nodiscard]] bool read_now_levels(NowLevels& out);
 
-// What the server says is playing (metadata@v1), for the title card and the speakers' header
-// (planning/p4x-now-playing.md, stage 2): the player's store copied in place five times a second, the
+// What the server says is playing (metadata@v1), for the title card and the speakers' header:
+// the player's store copied in place five times a second, the
 // strings only when the store's own revision moved, into containers that keep their capacity.
 struct NowTitle {
     // The server has said a title.
@@ -112,6 +122,7 @@ struct NowSettings {
     iclforge::nowview::View view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
     iclforge::nowview::SpeakersStyle speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
+    iclforge::nowview::IdleView idle_view = iclforge::nowview::kDefaultIdleView;
     // The night schedule, and the board's local minute of the day while the schedule is on and the time is known
     // (nothing otherwise: a board that does not know the time is never dark by accident).
     iclforge::nowview::NightSchedule night;

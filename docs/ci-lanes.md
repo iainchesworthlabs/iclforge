@@ -217,7 +217,7 @@ silent and wrong while a false build only costs a few minutes:
 - **An empty file list** - a `gh api` hiccup, a range GitHub will not list in full (3,000 files or
   more), or no `verified` ref yet. Same rule `code` already applies for the same reason.
 - **A path the classifier does not recognise** - a new top-level directory, or an existing one
-  like `assets/`, `examples/`, `overrides/` or `planning/` that has never been given a lane. One
+  like `assets/`, `examples/` or `overrides/` that has never been given a lane. One
   unmapped path anywhere in the change is enough; the fallback does not degrade to "build only
   what matched".
 - **The nightly `schedule` run or a manual `workflow_dispatch`** - passed as `--force-all` from

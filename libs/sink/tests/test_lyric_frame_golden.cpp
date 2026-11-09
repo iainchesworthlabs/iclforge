@@ -16,7 +16,7 @@
 #include "iclforge/lyrics/stage.hpp"
 #include "iclforge/sink/lyric_frame.hpp"
 
-// The conformance fixtures of planning/hearth-sink-screen.md, framed at fixed positions and held to
+// The conformance fixtures, framed at fixed positions and held to
 // the checked-in frames (lyric-frames/golden.txt): the karaoke examples, a file timed as lines, a
 // plain one, lines of 18, 36, 44, 54 and 55 characters, a gap of 3.9 s and of 4.0 s, Hebrew and
 // Yiddish in UTF-8 and UTF-16, Arabic, Japanese, Cyrillic and Greek. The Android app's instrumented

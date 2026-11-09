@@ -181,7 +181,7 @@ option(ICLFORGE_BUILD_MPEGTS "Build the standalone MPEG-TS container writer (lib
 # it unconditionally.
 option(ICLFORGE_BUILD_AC4 "Build the AC-4 codec: the bitstream inspector, the decoder and the encoder (libs/ac4)" ON)
 
-# The TrueHD and MLP codec (libs/truehd, iclforge::truehd, planning/truehd.md): the bitstream layer and
+# The TrueHD and MLP codec (libs/truehd, iclforge::truehd): the bitstream layer and
 # the lossless decoder. It links iclforge::base and nothing else, so it defaults ON like iclforge::iab.
 option(ICLFORGE_BUILD_TRUEHD "Build the TrueHD and MLP codec: the bitstream layer and the decoder (libs/truehd)" ON)
 
@@ -244,7 +244,7 @@ if(ICLFORGE_MINIMAL_DECODER AND ICLFORGE_MINIMAL_ENCODER)
         "hold both at once.")
 endif()
 
-# The AC-4 decoder inside the same profile (planning/ac4.md, D14b): the
+# The AC-4 decoder inside the same profile: the
 # library's decode-only archive (libs/ac4/minimal.cmake: the inspector, the core
 # and the decoder) built with the profile's own compile options, and no encoder -
 # the encoder is built for no ESP32 part (decision 34). It is an option of its
@@ -259,6 +259,20 @@ if(ICLFORGE_MINIMAL_AC4 AND NOT ICLFORGE_MINIMAL_DECODER)
     message(FATAL_ERROR
         "ICLFORGE_MINIMAL_AC4 adds the AC-4 decoder to the minimum-footprint decoder profile, "
         "and needs ICLFORGE_MINIMAL_DECODER=ON (a full build has ICLFORGE_BUILD_AC4).")
+endif()
+
+# The TrueHD decoder, in the same profile and for the same reason: libs/truehd/minimal.cmake builds
+# what a decode reads (the core, the major sync, the access unit and the decoder) and no encoder, with
+# the profile's compile options. An option of its own, since ICLFORGE_BUILD_TRUEHD also builds the
+# encoder and what the CLI links. Off by default; firmware/esp-idf/iclforge/CMakeLists.txt sets it
+# from CONFIG_ICLFORGE_TRUEHD.
+option(ICLFORGE_MINIMAL_TRUEHD
+    "Minimum-footprint decoder profile only: also build the TrueHD core, bitstream layer and decoder (no encoder)"
+    OFF)
+if(ICLFORGE_MINIMAL_TRUEHD AND NOT ICLFORGE_MINIMAL_DECODER)
+    message(FATAL_ERROR
+        "ICLFORGE_MINIMAL_TRUEHD adds the TrueHD decoder to the minimum-footprint decoder profile, "
+        "and needs ICLFORGE_MINIMAL_DECODER=ON (a full build has ICLFORGE_BUILD_TRUEHD).")
 endif()
 
 # Where a frame's time goes, on a target that cannot run Tracy. Routes the
@@ -284,8 +298,8 @@ endif()
 # The scalar the decoders carry their coefficients in, for every codec: double is the default and
 # stays it for every ordinary build (the gold references, the quality trend and the cross-platform
 # bitstream hashes are all stated in that arithmetic); float is the single-precision-FPU parts';
-# fixed is iclforge::internal::Fixed32, Q7.24 in an int32, for parts with no FPU
-# (planning/arithmetic-tiers.md). Each codec takes its decode-scalar-<tier>/ variant directory from
+# fixed is iclforge::internal::Fixed32, Q7.24 in an int32, for parts with no FPU.
+# Each codec takes its decode-scalar-<tier>/ variant directory from
 # ICLFORGE_DECODE_SCALAR_TIER, so the three spellings are float64, float32 and fixed32 everywhere.
 # A CACHE variable, so an ESP-IDF project or a preset that set it first keeps its value.
 set(ICLFORGE_DECODE_SCALAR "double" CACHE STRING
@@ -465,7 +479,7 @@ option(ICLFORGE_BUILD_CAPI "Build the C API over the encode/decode core (libs/ca
 # drives the configure for `pip install`/cibuildwheel - see bindings/python/CMakeLists.txt.
 option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (bindings/python/)" OFF)
 
-# Hearth, the desktop reference player (planning/hearth-reference-player.md): libs/sendspin and
+# Hearth, the desktop reference player: libs/sendspin and
 # apps/hearth (the engine, the window, the test sink and server). ON by default: every leg of
 # build-and-test's own matrix (_build.yml) has built and tested it since A7, so a plain local
 # configure now matches what CI already proves rather than needing -DICLFORGE_BUILD_HEARTH=ON by
@@ -526,8 +540,8 @@ add_subdirectory(libs/device)
 if((NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER) OR ICLFORGE_SENDSPIN_PLAYER_ONLY)
     add_subdirectory(libs/lyrics EXCLUDE_FROM_ALL)
 endif()
-# A singing voice's pitch, a reference melody and a score of one against the other (planning/karaoke-
-# microphone.md): standard library only, for Hearth, the browser and the sink firmware alike. The
+# A singing voice's pitch, a reference melody and a score of one against the other: standard
+# library only, for Hearth, the browser and the sink firmware alike. The
 # minimum-footprint profile carries none, and it is built when a program or its tests link it.
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     add_subdirectory(libs/pitch EXCLUDE_FROM_ALL)
@@ -576,7 +590,7 @@ endif()
 # The TrueHD and MLP codec, a peer of iclforge::ac3 and iclforge::ac4 that links only iclforge::base:
 # the bitstream layer and the decoder (libs/truehd). Gated by ICLFORGE_BUILD_TRUEHD (default ON, see
 # the option() above).
-if(ICLFORGE_BUILD_TRUEHD)
+if(ICLFORGE_BUILD_TRUEHD OR ICLFORGE_MINIMAL_TRUEHD)
     add_subdirectory(libs/truehd)
 endif()
 
@@ -612,13 +626,13 @@ if(ICLFORGE_BUILD_CAPI)
     add_subdirectory(libs/capi)
 endif()
 
-# iclforge::sendspin (planning/hearth-sendspin-extension.md) - gated by ICLFORGE_BUILD_HEARTH, the
+# iclforge::sendspin - gated by ICLFORGE_BUILD_HEARTH, the
 # option above. Never installed or exported, like iclforge::audio.
 if(ICLFORGE_BUILD_HEARTH)
     add_subdirectory(libs/sendspin)
 endif()
 
-# iclforge::sink (planning/hearth-android.md, D3): the sink a program runs, over libs/sendspin's player
+# iclforge::sink: the sink a program runs, over libs/sendspin's player
 # half, which was hearth-testsink's. It listens and advertises, so a board's build (the player half
 # alone, which brings its own WebSocket and mDNS) and a fuzz build (the core alone) leave it out.
 # EXCLUDE_FROM_ALL, like iclforge::lyrics: it is built when a program or its tests link it.
@@ -653,8 +667,8 @@ if(ICLFORGE_BUILD_PYTHON)
 endif()
 
 # What forge's `lyrics-encoding=` and the Forge GUI's Lyrics row read a code page with: the
-# operating system's conversion, as the decoder libs/lyrics asks a program for
-# (planning/karaoke-formats-options.md, D16). Before both programs, which link it, and when the
+# operating system's conversion, as the decoder libs/lyrics asks a program for.
+# Before both programs, which link it, and when the
 # tests are on, whichever programs are: the GUI's Qt-free test binary (apps/forge/gui/tests)
 # links it on every leg, including one that builds neither program.
 if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS)
@@ -669,7 +683,7 @@ if(ICLFORGE_BUILD_GUI)
     add_subdirectory(apps/forge/gui)
 endif()
 
-# Hearth's applications, the test sink so far (planning/hearth-reference-player.md). Not in a
+# Hearth's applications, the test sink so far. Not in a
 # board's build, which takes libs/sendspin's player half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY,
 # set by firmware/esp-idf/iclforge/CMakeLists.txt) and has no iclforge::ac3 for the applications to link.
 if(ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_HEARTH_APPS AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
@@ -693,7 +707,7 @@ if(ICLFORGE_BUILD_CRUCIBLE AND (WIN32 OR APPLE OR LINUX))
     add_subdirectory(apps/crucible)
 endif()
 
-# The tests, a binary per project (planning/monorepo.md, (e)): tests/ first, for the test-support
+# The tests, a binary per project: tests/ first, for the test-support
 # library every binary links, then the tests/ beside each program and each library, after every
 # target they link. `cmake --build ... --target iclforge-tests` builds them all.
 if(ICLFORGE_BUILD_TESTS)
@@ -715,11 +729,18 @@ if(ICLFORGE_BUILD_TESTS)
     add_subdirectory(apps/shared/preferences/tests)
     add_subdirectory(apps/shared/theme/tests)
     add_subdirectory(apps/shared/project/tests)
-    add_subdirectory(apps/forge/gui/tests)
+    # The forge-gui and Crucible engine tests link iclforge::truehd unconditionally (the GUI and Crucible
+    # decode TrueHD through it, as forge and Hearth do), so a library-only build with the codec off,
+    # config-linux-gcc-no-truehd, leaves them out rather than fail to generate.
+    if(ICLFORGE_BUILD_TRUEHD)
+        add_subdirectory(apps/forge/gui/tests)
+    endif()
     if(ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_HEARTH_APPS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
-    add_subdirectory(apps/crucible/engine/tests)
+    if(ICLFORGE_BUILD_TRUEHD)
+        add_subdirectory(apps/crucible/engine/tests)
+    endif()
     foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 truehd iab adm capi sendspin sink)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")

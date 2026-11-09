@@ -1,5 +1,5 @@
 // The REST control surface, and the web UI it serves. See
-// ../include/iclforge/control.hpp and planning/esp32-device-ui.md.
+// ../include/iclforge/control.hpp.
 
 #include "iclforge/control.hpp"
 
@@ -432,7 +432,7 @@ struct Control::Impl {
 
     static Impl* self(httpd_req_t* req) { return static_cast<Impl*>(req->user_ctx); }
 
-    // Flash mode (planning/esp32-ota.md): nothing plays and no setting
+    // Flash mode: nothing plays and no setting
     // changes until the board restarts. True, having answered, when the
     // request is refused for it.
     static bool refused_in_flash_mode(httpd_req_t* req) {
@@ -493,6 +493,8 @@ struct Control::Impl {
             "screen; PUT one\n"
             "GET  /speakers-style  glow or pulse on a board with a screen: how its speakers show a level; "
             "PUT one\n"
+            "GET  /idle-view     lit, dim, clock or dark on a board with a screen: what the waiting screen does "
+            "after the dim time; PUT one\n"
             "GET  /brightness    10 to 100: the percent the backlight is at while the screen is lit, "
             "on a board with a screen; PUT one\n"
             "GET  /clock-format  24 or 12 hours, then seconds when they are shown (12 seconds), on a "
@@ -601,8 +603,7 @@ struct Control::Impl {
                 append_bool(out, "objects", info->objects);
                 append_bool(out, "objects_rendered", info->objects_rendered);
                 append_number(out, "slots", static_cast<unsigned long long>(info->slots));
-                // How this play serves the layout (planning/esp32-device-ui.md,
-                // "The output layout").
+                // How this play serves the layout.
                 append_key(out, "layout");
                 append_json_string(out, info->layout.data());
                 append_key(out, "render");
@@ -1064,6 +1065,34 @@ struct Control::Impl {
         }
         if (!h.set_speakers_style(nowview::detail::trimmed(body))) {
             return send_text(req, "409 Conflict", "that style could not be stored\n");
+        }
+        return send_text(req, "200 OK", "ok; the screen follows at once\n");
+    }
+
+    static esp_err_t on_idle_view_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.idle_view) {
+            return send_text(req, "404 Not Found", "this board has no screen\n");
+        }
+        std::string text = h.idle_view();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_idle_view_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        const std::string body = read_body(req);
+        if (!nowview::parse_idle_view(body)) {
+            return send_text(req, "400 Bad Request", "PUT /idle-view wants lit, dim, clock or dark\n");
+        }
+        if (!h.set_idle_view) {
+            return send_text(req, "409 Conflict", "this board has no screen\n");
+        }
+        if (!h.set_idle_view(nowview::detail::trimmed(body))) {
+            return send_text(req, "409 Conflict", "that screen could not be stored\n");
         }
         return send_text(req, "200 OK", "ok; the screen follows at once\n");
     }
@@ -1667,6 +1696,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/dim-after", .method = HTTP_PUT, .handler = &Impl::on_dim_after_put},
         {.uri = "/speakers-style", .method = HTTP_GET, .handler = &Impl::on_speakers_style_get},
         {.uri = "/speakers-style", .method = HTTP_PUT, .handler = &Impl::on_speakers_style_put},
+        {.uri = "/idle-view", .method = HTTP_GET, .handler = &Impl::on_idle_view_get},
+        {.uri = "/idle-view", .method = HTTP_PUT, .handler = &Impl::on_idle_view_put},
         {.uri = "/brightness", .method = HTTP_GET, .handler = &Impl::on_brightness_get},
         {.uri = "/brightness", .method = HTTP_PUT, .handler = &Impl::on_brightness_put},
         {.uri = "/clock-format", .method = HTTP_GET, .handler = &Impl::on_clock_format_get},

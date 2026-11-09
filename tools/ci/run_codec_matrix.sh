@@ -785,7 +785,7 @@ else
     run atmos-adm atmos_adm_fixture.wav atmos_adm.ec3 256
     run decode atmos_adm.ec3 atmos_adm.wav
     run_ffmpeg_check atmos_adm.ec3
-    # codec=ac4 (planning/ac4.md, I5): the same ADM master to an AC-4 A-JOC object substream
+    # codec=ac4: the same ADM master to an AC-4 A-JOC object substream
     # (coding=, default ajoc), then back out through decode's own objects_dir/adm_out - the round
     # trip the phase's exit criterion names. Neither ffprobe (no AC-4 decoder) nor
     # run_ac4_frames_check (defined later in this file, in the plain-AC-4 section below) is
@@ -814,7 +814,7 @@ else
     run atmos-iab atmos_iab_fixture.iab atmos_iab.ec3 256
     run decode atmos_iab.ec3 atmos_iab.wav
     run_ffmpeg_check atmos_iab.ec3
-    # codec=ac4, coding=direct (planning/ac4.md, I5): the direct-coded option atmos-adm's own AC-4
+    # codec=ac4, coding=direct: the direct-coded option atmos-adm's own AC-4
     # leg above does not take, over an IAB source instead of ADM - see that leg's own comment for
     # why there is no run_ac4_frames_check/run_ffmpeg_check this early in the file.
     run atmos-iab atmos_iab_fixture.iab atmos_iab.ac4 256 codec=ac4 coding=direct
@@ -1176,7 +1176,7 @@ cmp -s atmos_4.ec3 remux_atmos.ec3 || {
 }
 run_ffmpeg_check remux_atmos.ec3
 
-# --- AC-4 (planning/ac4.md, phases E1 to E5) ----------------------------------
+# --- AC-4 ----------------------------------
 # FFmpeg has no AC-4 decoder, so its part here is framing: its raw AC-4 and mov
 # demuxers must find as many frames as forge's own decoder decodes from what
 # ac4-encode wrote. The audio itself is scored by tools/checks/score_ac4_encode.py
@@ -1208,7 +1208,7 @@ for kbps in 192 384; do
 done
 run ac4-encode "$FIXTURES/reference_51.wav" ac4_51_256.mp4 256 dialnorm=auto
 run_ac4_frames_check ac4_51_256.mp4
-# 5.1.4 (planning/ac4.md, phase E8/I5): the immersive element, ASPX_ACPL_2 below 480 kbps as DEE's
+# 5.1.4: the immersive element, ASPX_ACPL_2 below 480 kbps as DEE's
 # own streams are. eac3_514.wav (the eac3-sine/decode loop's own "514" leg) is reused as a real
 # 10-channel source the same way atmos-cbi's own leg below does - a channel COUNT match is all
 # this smoke-coverage script needs; tools/checks/score_ac4_encode.py scores the actual audio.
@@ -1216,7 +1216,7 @@ run ac4-encode eac3_514.wav ac4_514_256.ac4 256
 run_ac4_frames_check ac4_514_256.ac4 -f ac4
 run decode ac4_514_256.ac4 i5_ac4_514.wav
 run probe ac4_514_256.ac4
-# Objects (planning/ac4.md, phase I5): experimental=objects/objects=<scene>, E9's own CLI surface
+# Objects: experimental=objects/objects=<scene>, E9's own CLI surface
 # (apps/forge/cli/src/commands/ac4_encode_objects.cpp), A-JOC by default and direct-coded as the explicit
 # second leg - then back through decode's objects_dir, unconditionally available (unlike adm_out,
 # which needs -DICLFORGE_BUILD_ADM=ON and is covered by the atmos-adm/atmos-iab AC-4 legs above).
@@ -1237,7 +1237,7 @@ run ac4-encode "$FIXTURES/reference_stereo.wav" ac4_objects_direct.ac4 128 exper
     objects=ac4_objects_scene_direct.txt
 run_ac4_frames_check ac4_objects_direct.ac4 -f ac4
 run decode ac4_objects_direct.ac4 ac4_objects_direct.wav ac4_objects_direct_dir
-# atmos-encode codec=ac4 (planning/ac4.md, phase I5b): a WAV file's channels as AC-4 objects, the
+# atmos-encode codec=ac4: a WAV file's channels as AC-4 objects, the
 # command the Forge GUI's encoder page echoes. A-JOC in a raw stream and direct-coded in an MP4
 # file (atmos-encode writes the MP4 itself), each read back by ffprobe's demuxer and by decode.
 run atmos-encode bootstrap_51.wav atmos_enc_ajoc.ac4 256 6 codec=ac4
@@ -1400,7 +1400,7 @@ run ac4-encode "$FIXTURES/reference_51.wav" ac4_51_25.mp4 256 frame-rate=25 loro
     drc=music-standard drc-portable-headphones=speech
 run_ac4_frames_check ac4_51_25.mp4
 
-# --- AC-4 through the rest of forge (planning/ac4.md, phase I1) ---------------
+# --- AC-4 through the rest of forge ---------------
 # Every other command that reads or writes AC-4, on the streams ac4-encode
 # wrote above; tools/checks/check_matrix_coverage.py holds each one to a leg
 # here. FFmpeg checks what it can read: the AC-3 and E-AC-3 a transcode writes
@@ -1469,7 +1469,7 @@ run_ac4_fmp4_check i1_ac4_fmp4 ac4_51_192.ac4
 run fmp4 ac4_stereo_2997.mp4 i1_ac4_fmp4_2997 20
 run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
 
-# --- TrueHD and MLP (iclforge::truehd, planning/truehd.md) ----------------------------------------
+# --- TrueHD and MLP (iclforge::truehd) -------------------------------------------------------------
 # The lossless codec makes every check here exact: a decode is the source sample for sample or it
 # is wrong, so these are comparisons of bytes, not SNR floors. FFmpeg's strict decode is the
 # independent oracle (CONTRIBUTING.md's "Oracles", #2): the PCM forge writes must equal the PCM
@@ -1642,26 +1642,22 @@ for fixture in truehd_st48_s24.thd truehd_st96_s24.thd truehd_st192_s24.thd true
     fi
 done
 
-# Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage), where
-# cut and cat once stopped with AC-3's sync error (exit 2); the other
+# Refusals. Every command that does not read TrueHD says so by name and exits 1 (kExitUsage); the other
 # transports' profiles do not apply to it; and an option a TrueHD run does not apply is refused, not
 # dropped (a verification flag above all, which must never exit 0 without verifying). play and
 # monitor refuse too (audio_io.cpp, live_audio.cpp) but need an audio backend to get that far, which
 # this job has not got. Each line names the command and the exit status it gave.
 count=$((count + 1))
-echo "[$count] truehd is refused by cut, cat, transcode and fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata, normalize and qc refuse E-AC-3's options)"
+echo "[$count] truehd is refused by fmp4, by the dvb and atsc ts profiles, and when an option is not applied (metadata, normalize and qc refuse E-AC-3's options; cut, cat and transcode read TrueHD now, and decode applies verify-objects and channels=2)"
 th_in=th_truehd_st48_s24.thd
-for refused in "cut $th_in th_refused.thd 0.05 0.1" \
-    "cat th_refused.thd $th_in $th_in" \
-    "metadata $th_in th_refused.thd dialnorm=27" \
+for refused in "metadata $th_in th_refused.thd dialnorm=27" \
     "normalize $th_in th_refused.thd dialnorm=27" \
-    "transcode $th_in th_refused.ac3 192" \
     "qc $th_in layout=rendered" "fmp4 $th_in th_refused_fmp4 24" \
     "ts $th_in th_refused.ts dvb" "ts $th_in th_refused.ts atsc" \
     "remux th_truehd_st48_s24.mkv th_refused.ts dvb" \
     "decode $th_in th_refused.wav verify-content" "decode $th_in th_refused.wav check-content" \
-    "decode $th_in th_refused.wav verify-objects" "decode $th_in th_refused.wav syntax-trace=th_refused.trace" \
-    "decode $th_in th_refused.wav channels=2" "decode $th_in th_refused.wav programme=3" \
+    "decode $th_in th_refused.wav syntax-trace=th_refused.trace" \
+    "decode $th_in th_refused.wav programme=3" \
     "levels $th_in programme=1" "loudness $th_in programme=1" \
     "mkv $th_in th_refused.mkv mainid=1" "mp4 $th_in th_refused.mp4 asvc=1" \
     "ts $th_in th_refused.ts programme=1" "spdif $th_in th_refused.wav mainid=1"; do
@@ -1677,7 +1673,7 @@ for refused in "cut $th_in th_refused.thd 0.05 0.1" \
     }
 done
 
-# --- decode strict (planning/ac4.md, option D) --------------------------------------------------------
+# --- decode strict --------------------------------------------------------
 # A decode that loses frames exits 0 and warns; with `strict` it writes what it could decode and exits 2
 # when a frame or unit was lost after the first one decoded. An AC-3 stream with a damaged frame
 # (concealed under conceal=), and a TrueHD stream with bytes in the middle that are not a unit (a lenient
@@ -1723,7 +1719,7 @@ cmp -s strict_junk.wav strict_junk_strict.wav || {
     exit 1
 }
 
-# --- TrueHD encoding (iclforge::truehd::Encoder, planning/truehd.md phase T2a) -------------------
+# --- TrueHD encoding (iclforge::truehd::Encoder) --------------------------------------------------
 # FFmpeg makes the sources, a different sine in each channel, with the speaker mask of the layout
 # (forge reads the channels' meaning from it: 7.1 is FL FR FC LFE BL BR SL SR, which forge codes as
 # L R C LFE Lrs Rrs Ls Rs; ERRATA 33 says how FFmpeg orders such a stream). Every stream is
@@ -1964,6 +1960,76 @@ for refused in "truehd-encode te_st48_s24.wav te_refused.mlp" "truehd-encode te_
     set -e
     [[ "$refused_status" -eq 1 ]] || {
         echo "forge $refused should exit 1 (usage), exited $refused_status" >&2
+        exit 1
+    }
+done
+
+# --- TrueHD Atmos (forge truehd-atmos, libs/truehd/ERRATA.md entries 61 to 64) --------------------
+# 12 object channels (the LFE first) and a 7.1 bed, coded as substream 3 and substreams 0 to 2. FFmpeg
+# reads substreams 0 to 2 and leaves substream 3 alone, so its strict decode is the bed forge decodes
+# (best presentation), in its own channel order; forge's decode of all four substreams is the objects
+# it was given, byte for byte. No decoder outside this repository reads substream 3.
+thd_sines ta_objects.wav 48000 12 7.1.4 pcm_s24le
+thd_sines ta_bed.wav 48000 8 7.1 pcm_s24le
+printf '0 0.0  0.9 0.5 0.0  1.0 0.0\n0 1.0  0.1 0.5 0.0  1.0 0.0\n' >ta_paths.txt
+run_truehd_atmos_case() { # name [forge options...]
+    local name="ta_$1"
+    shift
+    run truehd-atmos ta_objects.wav "$name.thd" verify "$@"
+    run probe "$name.thd"
+    count=$((count + 1))
+    echo "[$count] truehd atmos $name: ffmpeg reads the 7.1 bed, forge reads the bed and the objects"
+    truehd_ffmpeg_pcm "$name.thd" -f truehd >"$name.ffmpeg.s32"
+    run decode "$name.thd" "$name.bed.wav"
+    truehd_reorder_pcm "$name.bed.wav" "0|1|2|3|6|7|4|5" >"$name.bed.s32"
+    cmp -s "$name.bed.s32" "$name.ffmpeg.s32" || {
+        echo "forge's decode of $name.thd's bed differs from ffmpeg's strict decode" >&2
+        exit 1
+    }
+    run decode "$name.thd" "$name.all.wav" truehd-presentation=all
+    ffmpeg -v error -y -i ta_objects.wav -f s32le "$name.objects.src.s32"
+    ffmpeg -v error -y -i "$name.all.wav" -f s32le "$name.objects.dec.s32"
+    cmp -s "$name.objects.src.s32" "$name.objects.dec.s32" || {
+        echo "forge's decode of $name.thd's objects differs from the WAV they came from" >&2
+        exit 1
+    }
+}
+run_truehd_atmos_case fan
+run_truehd_atmos_case path ta_paths.txt
+run_truehd_atmos_case bed truehd-bed=ta_bed.wav
+run_truehd_atmos_case all_objects truehd-objects-lfe=off truehd-restart=8
+
+# The objects of a stream: the channels as WAVs, placed on a layout, and the bed alone as an ADM master
+# where ADM is built.
+count=$((count + 1))
+echo "[$count] truehd atmos objects_dir and truehd-render= read substream 3's object layer"
+rm -rf ta_objects_dir
+run decode ta_fan.thd ta_fan.objects.wav ta_objects_dir truehd-presentation=all
+[[ -f ta_objects_dir/object_11.wav ]] || {
+    echo "decode did not write the object channels of ta_fan.thd" >&2
+    exit 1
+}
+run decode ta_fan.thd ta_fan.rendered.wav truehd-presentation=all truehd-render=L,R,C,LFE,Ls,Rs,Lrs,Rrs
+cmp -s ta_fan.bed.wav ta_fan.rendered.wav || {
+    echo "the render of ta_fan.thd's objects is not its bed" >&2
+    exit 1
+}
+
+# What substream 3 cannot carry is a usage or input error.
+count=$((count + 1))
+echo "[$count] truehd-atmos refuses one channel, another rate, a bed of the wrong shape and objects without substream 3"
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1" -c:a pcm_s24le ta_mono.wav
+for refused in "truehd-atmos ta_mono.wav ta_refused.thd" "truehd-atmos te_st48_s24.wav ta_refused.wav" \
+    "truehd-atmos ta_objects.wav ta_refused.thd truehd-bed=te_st48_s24.wav" \
+    "decode te_st48_s24.thd ta_refused.wav ta_refused_dir" \
+    "decode te_m71_48_s24.thd ta_refused.wav ta_refused_dir truehd-presentation=all"; do
+    set +e
+    # shellcheck disable=SC2086
+    "$CLI" $refused >/dev/null 2>&1
+    refused_status=$?
+    set -e
+    [[ "$refused_status" -eq 1 || "$refused_status" -eq 2 ]] || {
+        echo "forge $refused should exit 1 or 2, exited $refused_status" >&2
         exit 1
     }
 done

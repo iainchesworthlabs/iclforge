@@ -1,7 +1,7 @@
 #pragma once
 
-// What the panel follows of the board's settings (planning/p4x-preferences.md): the screen without lyrics, when it dims,
-// how the speakers are drawn, the backlight's lit level, how the clock is written and the night schedule. Each is set
+// What the panel follows of the board's settings: the screen without lyrics, when it dims,
+// how the speakers are drawn, what the waiting screen does, the backlight's lit level, how the clock is written and the night schedule. Each is set
 // by a setter of the preferences' backend, which a tap on the Preferences sheet reaches **on the panel's own task**
 // (while it holds the lock that guards LVGL) and a PUT reaches on the control surface's, and each is read by the
 // panel's task, a frame at a time.
@@ -33,6 +33,7 @@ class PanelFollow {
     void set_view(nowview::View view) noexcept { view_.store(static_cast<int>(view)); }
     void set_dim_after(int minutes) noexcept { dim_after_minutes_.store(minutes); }
     void set_speakers_style(nowview::SpeakersStyle style) noexcept { speakers_style_.store(static_cast<int>(style)); }
+    void set_idle_view(nowview::IdleView view) noexcept { idle_view_.store(static_cast<int>(view)); }
     void set_clock_format(wallclock::ClockFormat format) noexcept {
         clock_format_.store(wallclock::clock_format_stored(format));
     }
@@ -52,6 +53,9 @@ class PanelFollow {
     [[nodiscard]] int dim_after_minutes() const noexcept { return dim_after_minutes_.load(); }
     [[nodiscard]] nowview::SpeakersStyle speakers_style() const noexcept {
         return static_cast<nowview::SpeakersStyle>(speakers_style_.load());
+    }
+    [[nodiscard]] nowview::IdleView idle_view() const noexcept {
+        return static_cast<nowview::IdleView>(idle_view_.load());
     }
     [[nodiscard]] int brightness() const noexcept { return brightness_.load(); }
     [[nodiscard]] wallclock::ClockFormat clock_format() const noexcept {
@@ -74,6 +78,7 @@ class PanelFollow {
     std::atomic<int> view_{static_cast<int>(nowview::kDefaultView)};
     std::atomic<int> dim_after_minutes_{nowview::kDefaultDimMinutes};
     std::atomic<int> speakers_style_{static_cast<int>(nowview::kDefaultSpeakersStyle)};
+    std::atomic<int> idle_view_{static_cast<int>(nowview::kDefaultIdleView)};
     std::atomic<int> brightness_{nowview::kDefaultBrightness};
     std::atomic<int> clock_format_{0};
     std::atomic<std::int32_t> night_{nowview::night_stored(nowview::NightSchedule{})};

@@ -7,7 +7,7 @@
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/timing.hpp"
 
-// libs/lyrics/src/timing.cpp: what a tap editor edits and saves (planning/karaoke-phase2.md, W6).
+// libs/lyrics/src/timing.cpp: what a tap editor edits and saves.
 // The writer is held to the reader (a file written reads back as what was written), and the editing
 // functions to the invariants the reader itself keeps.
 

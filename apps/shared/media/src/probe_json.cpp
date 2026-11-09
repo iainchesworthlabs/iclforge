@@ -541,7 +541,7 @@ void write_ac4_object_entries(JsonSink& json,
 }
 
 // oamd_common_data() (§6.2.8.1), as an ac4_substream_info_ajoc() embeds it and as an
-// oamd_substream() carries it - additive to the probe schema (planning/ac4.md, I5): the top-level
+// oamd_substream() carries it - additive to the probe schema: the top-level
 // fields in full, and a presence flag for each of the three optional nested groups (trim,
 // bed_render_info, headphone), whose own many sub-fields stay text-only for now.
 void write_ac4_oamd_common(JsonSink& json, const iclforge::ac4::OamdCommonData& common) {
@@ -654,7 +654,7 @@ void write_ac4_group_substream(JsonSink& json, const iclforge::ac4::GroupSubstre
     json.end_object();
 }
 
-// --- What the decoder reports (planning/ac4.md, "Media information") ------
+// --- What the decoder reports ------
 
 void write_speakers(JsonSink& json, std::string_view name,
                     std::span<const iclforge::ac4::Speaker> speakers) {

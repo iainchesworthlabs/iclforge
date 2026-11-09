@@ -13,7 +13,7 @@
 #include "performance.hpp"
 
 // apps/hearth/engine/src/performance.*: a singer's performance placed in an item and scored against
-// a reference melody (planning/karaoke-microphone.md, M4). No device: the voice is synthetic, and
+// a reference melody. No device: the voice is synthetic, and
 // the position and the capture times are made here.
 
 namespace {

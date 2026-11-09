@@ -122,10 +122,10 @@ void add_truehd_kernels(std::vector<KernelResult>& results,
             }
         }
         std::array<std::int32_t, kBlock * kStride> rows{};
-        std::array<std::uint16_t, kBlock> bypass{};
+        std::array<std::uint64_t, kBlock> bypass{};
         const auto run = [&] {
             iclforge::BitReader reader(bits);
-            return kn::read_residuals(reader, kBlock, 0, kChannels - 1, plans.data(), 0, nullptr,
+            return kn::read_residuals(reader, kBlock, 0, kChannels - 1, plans.data(), 0, nullptr, nullptr,
                                       rows.data(), kStride, bypass.data());
         };
         if (!run()) {
@@ -201,7 +201,7 @@ void add_truehd_kernels(std::vector<KernelResult>& results,
         const std::array<std::uint8_t, 6> channel = {0, 1, 2, 3, 4, 5};
         const std::array<std::int32_t, 6> pair = {16384, -8192, 0, 0, 0, 0};
         const std::array<std::int32_t, 6> wide = {1000, -2000, 3000, -4000, 5000, -6000};
-        const std::array<std::uint16_t, kBlock> bypass{};
+        const std::array<std::uint64_t, kBlock> bypass{};
         results.push_back(time_kernel("truehd_matrix_pair", [&] {
             rows = base;
             kn::apply_matrix(kBlock, 2, channel.data(), pair.data(), 0, 0xFFFFFFFFU, false, 0,

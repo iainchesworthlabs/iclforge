@@ -1099,6 +1099,18 @@ harmonics followed by digital silence, silence). `fuzz_mat_unwrap` has MAT burst
 spdif` made, in both word orders, and the three demuxers have TrueHD and MLP wrapped by `forge mp4`,
 `mkv` and `ts`. None of it comes from a disc.
 
+The IAMF corpus (`fuzz_iamf_parse`) is made by `iclforge-iamf-seed-tool`
+(`libs/containers/tests/iamf/`), which `generate-seeds.sh` runs when it is beside forge, with the
+module's own writers and nothing else. Each programme is a few frames of a few dozen samples,
+written twice, as a raw OBU stream (`.obu`) and as an ISO-BMFF file (`.mp4`), because the harness
+reads one input both ways and a seed of one framing is a rejection to the other reader: a 7.1.4 PCM
+programme at 16 bits, and at 24 bits with trimming and Temporal Delimiters; object programmes with
+a still object, a moving one and a coupled pair, in the polar, 8-bit Cartesian and 16-bit
+Cartesian codings; the polar one again as an initialization segment and two movie fragments; and
+Opus, AAC-LC and FLAC programmes whose packets are filler of the shape 3.13 allows. 17 files, 0.3
+to 10 KB. `libs/containers/tests/iamf/test_iamf_seeds.cpp` holds each to being read by its own
+framing's reader.
+
 Every seed is there for a reason: a directory is reduced with the engine's merge mode, which keeps
 one file for each set of branches the target reaches (`tools/fuzz/run.sh merge fuzz_truehd_decode
 <directory>` writes the kept files to the corpus directory). `generate-seeds.sh` writes the

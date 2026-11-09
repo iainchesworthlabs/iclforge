@@ -1,9 +1,8 @@
 // @ts-check
 'use strict';
 
-// What the page shows for GET /hardware - planning/esp32-device-ui.md's "What
-// `/hardware` adds": fetched once when the page loads rather than polled
-// every second, and tried again at the next successful status poll if the
+// What the page shows for GET /hardware: fetched once when the page loads rather
+// than polled every second, and tried again at the next successful status poll if the
 // first attempt failed.
 
 const { test, expect } = require('./fixtures');

@@ -182,6 +182,16 @@ std::expected<LoadedItem, std::string> load(const std::string& path) {
 
 namespace mt = iclforge::test::multi_track;
 
+// The stream an item holds, whether it holds it in memory or reads it from a source.
+std::vector<std::byte> stream_of(const LoadedItem& item) {
+    if (!item.source) {
+        return item.bytes;
+    }
+    std::vector<std::byte> out(static_cast<std::size_t>(item.source->size()));
+    out.resize(item.source->read(0, out));
+    return out;
+}
+
 // A TrueHD file FFmpeg made (testdata/truehd), read whole.
 std::vector<std::byte> truehd_fixture(const std::string& name) {
     std::ifstream in(std::string{ICLFORGE_GOLDEN_TRUEHD_DIR} + "/" + name, std::ios::binary);
@@ -384,7 +394,9 @@ TEST_CASE("item loader: a file with TrueHD first plays the TrueHD track, and say
             const auto loaded = load(path);
             REQUIRE(loaded.has_value());
             CHECK(loaded->truehd);
-            CHECK(loaded->bytes == truehd_stream);
+            CHECK(stream_of(*loaded) == truehd_stream);
+            // A Matroska or MP4 track is read where it lies; a transport stream is read whole.
+            CHECK((loaded->source != nullptr) == (remux.kind != ContainerKind::kMpegTs));
             CHECK(loaded->container.kind == remux.kind);
             if (remux.kind == ContainerKind::kMpegTs) {
                 CHECK(loaded->container.stream_type == 0x83);
@@ -421,7 +433,8 @@ TEST_CASE("item loader: a file whose only audio is TrueHD is played, as TrueHD",
         const auto loaded = load(path);
         REQUIRE(loaded.has_value());
         CHECK(loaded->truehd);
-        CHECK(loaded->bytes == truehd_stream);
+        CHECK(stream_of(*loaded) == truehd_stream);
+        CHECK((loaded->source != nullptr) == (remux.kind != ContainerKind::kMpegTs));
     }
 }
 
@@ -483,5 +496,62 @@ TEST_CASE("item loader: a file with E-AC-3 first still plays the E-AC-3 track",
         const auto loaded = load(folder.write(remux.file_name, remux.build(tracks)));
         REQUIRE(loaded.has_value());
         CHECK(loaded->bytes == eac3);
+    }
+}
+
+// The compressed track of a remux is offered beside the TrueHD one, for an output that takes it as
+// it is (Session::open's TrackPreference). Nothing is read for it until it is asked for.
+TEST_CASE("item loader: a remux offers its compressed track, and a file without one offers none",
+          "[hearth][item-loader][track]") {
+    const Folder folder;
+    const std::vector<std::byte> truehd_stream = truehd_fixture("truehd_m51_s24.thd");
+    const std::vector<std::byte> eac3 = eac3_stream(kFrames);
+    const auto truehd_units = mt::split_truehd(truehd_stream);
+    const auto scanned = iclforge::ac3::io::scan(eac3);
+    REQUIRE(scanned.has_value());
+    const std::array<mt::Track, 2> remux_tracks{
+        mt::Track{.codec = mt::Codec::kTruehd, .units = truehd_units},
+        mt::Track{.codec = mt::Codec::kEac3, .units = scanned->access_units}};
+    const std::array<mt::Track, 1> truehd_only{
+        mt::Track{.codec = mt::Codec::kTruehd, .channels = 2, .units = truehd_units}};
+
+    for (const Remux& remux : kRemuxes) {
+        CAPTURE(remux.file_name);
+        const auto both = load(folder.write(remux.file_name, remux.build(remux_tracks)));
+        REQUIRE(both.has_value());
+        REQUIRE(both->compressed_track);
+        const auto other = both->compressed_track();
+        REQUIRE(other.has_value());
+        CHECK_FALSE(other->truehd);
+        CHECK(other->bytes == eac3);
+        CHECK_FALSE(other->compressed_track);
+
+        // A Session asked for the compressed track plays it, and one not asked plays the TrueHD.
+        const iclforge::hearth::ItemLoader loader = [&both](const std::string&) {
+            return std::expected<LoadedItem, std::string>{*both};
+        };
+        auto best = iclforge::hearth::Session::open("remux", loader);
+        REQUIRE(best.has_value());
+        CHECK(best->truehd());
+        CHECK(best->has_compressed_track());
+        auto compressed = iclforge::hearth::Session::open(
+            "remux", loader, std::nullopt, {}, iclforge::hearth::TrackPreference::kCompressed);
+        REQUIRE(compressed.has_value());
+        CHECK_FALSE(compressed->truehd());
+        CHECK_FALSE(compressed->has_compressed_track());
+        CHECK(compressed->facts().codec == iclforge::hearth::ItemCodec::kEac3);
+
+        const auto alone =
+            load(folder.write(std::string{"alone-"} + remux.file_name, remux.build(truehd_only)));
+        REQUIRE(alone.has_value());
+        CHECK(alone->truehd);
+        // A transport stream does not say what else it holds until it is read, so it offers the
+        // lookup and the lookup fails; the item stays TrueHD.
+        if (remux.kind == ContainerKind::kMpegTs) {
+            REQUIRE(alone->compressed_track);
+            CHECK_FALSE(alone->compressed_track().has_value());
+        } else {
+            CHECK_FALSE(alone->compressed_track);
+        }
     }
 }

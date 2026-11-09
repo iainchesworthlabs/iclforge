@@ -1,5 +1,5 @@
 // Pseudocode 85's pre-flattening gains of the AC-4 SBR high-frequency generator, held to the code
-// they replaced (planning/ac4.md, D14e): the generator keeps the cubic fit's vectors between calls
+// they replaced: the generator keeps the cubic fit's vectors between calls
 // and the reference makes them afresh each frame, and the two give the same BITS at the decoder's
 // scalar and at double.
 //

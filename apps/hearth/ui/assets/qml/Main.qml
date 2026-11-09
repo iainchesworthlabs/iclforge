@@ -4,9 +4,9 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The window (planning/hearth-reference-player.md, A5): a header with the
+// The window: a header with the
 // six-page switch, one page at a time in the body, and the transport bar
-// pinned to the bottom on every page, the way planning/hearth-design.md's
+// pinned to the bottom on every page, the way the design's
 // artboards show it. All six pages are built to the design; Network is A6's
 // first slice (discovery and pairing, not yet groups or a sink's own
 // settings).
@@ -14,8 +14,7 @@ ApplicationWindow {
     id: window
     width: 1280
     height: 800
-    // The design's own minimum (planning/hearth-design.md, "Play ·
-    // minimum size, 960 x 620").
+    // The design's own minimum.
     minimumWidth: 960
     minimumHeight: 620
     visible: true

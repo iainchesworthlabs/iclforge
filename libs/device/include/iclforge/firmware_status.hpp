@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-// GET /firmware's body (planning/esp32-ota.md, "Routes"): what the board runs,
+// GET /firmware's body: what the board runs,
 // what it would go back to, how an update or a trial is going and how the last
 // one ended, and the facts a tool checks before it sends an image - the slot
 // size, the flash size and the partition table as the board has it.

@@ -741,8 +741,7 @@ commit SHA already in quality-history, not a separate data source.
 
 `_fixed`-suffixed checks are the gate run against a decoder built with
 `-DICLFORGE_DECODE_SCALAR=fixed` - Q7.24 integer arithmetic under a block
-exponent, the tier for a part with no FPU
-([`planning/arithmetic-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md)).
+exponent, the tier for a part with no FPU.
 It differs from the double decode at 121 dB and above on the gold streams
 (`tools/checks/check_decode_scalar_snr.py`, held to 110 in the same pass), which is as
 far below this gate's coding noise as the float32 decode's 139, so the same

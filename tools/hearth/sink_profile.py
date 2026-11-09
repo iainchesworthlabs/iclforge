@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The locked build profiles of hearth_sink's ESP32 boards (planning/esp32-platform-profiles.md).
+"""The locked build profiles of hearth_sink's ESP32 boards.
 
     python tools/hearth/sink_profile.py list
     python tools/hearth/sink_profile.py defaults s3-n16r8 [--overlay NAME ...] [--wifi FILE]
@@ -30,7 +30,7 @@ fails when
 `snapshot` is how a profile's locked values are written: the keys its
 fragments set, and the keys its `watch` patterns match, at the values the
 build resolved. A profile changes in a pull request that runs it, reads what
-changed and attaches a board run (the planning note's "Changing a profile").
+changed and attaches a board run.
 
 Standard library only, as the CI container's Python has nothing else.
 """
@@ -212,8 +212,7 @@ def check_change(
       the guard says `<absent>` for it, which is a removal or a typo.
 
     A symbol whose presence cannot be told from the profile's locked values and target is not
-    reported: the configured build's own guard decides those (planning/esp32-platform-profiles.md,
-    'Where each check runs')."""
+    reported: the configured build's own guard decides those."""
     findings: list[Finding] = []
     now = kconfig_symbols(head)
     before = set(kconfig_symbols(base)) if base is not None else set()
@@ -233,9 +232,8 @@ def check_change(
                     "kconfig",
                     f"{path}: {key} is new and the guard watches it, and it is in "
                     f"{', '.join(absent_in)}, which neither lock nor free it: lock its value in "
-                    "profiles.json (the hash moves: baselines are re-recorded or accepted, "
-                    "planning/esp32-platform-profiles.md 'Changing a profile'), or name it in "
-                    "`free`",
+                    "profiles.json (the hash moves: baselines are re-recorded or accepted), "
+                    "or name it in `free`",
                 )
             )
     for ident, spec in sorted(data.get("profiles", {}).items()):
@@ -697,7 +695,6 @@ DOC_FILES = (
     "firmware/esp-idf/iclforge/README.md",
     "docs/hearth/*.md",
     "docs/platforms/bare-metal/esp32-*.md",
-    "planning/esp32-*.md",
     "apps/demos/wasm/tests/device-ui/payloads/README.md",
 )
 

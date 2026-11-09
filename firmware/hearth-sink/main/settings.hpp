@@ -4,7 +4,7 @@
 // joins, what it is called on that network, how wide its DAC's slots are and
 // whether a second I2S line is wired are all properties of the BOARD, and
 // changing any of them by rebuilding and reflashing is the thing B2 exists to
-// stop (planning/hearth-reference-player.md).
+// stop.
 //
 // So they live in NVS, in one namespace, read once at boot and written when
 // something changes them. Kconfig still supplies every default, which is what
@@ -81,19 +81,22 @@ struct Settings {
     // the one with both (net/dual/network.cpp).
     NetworkPreference network_preference = NetworkPreference::automatic;
     // What a board with a screen shows while a song with no lyrics plays, and the minutes of nothing
-    // touched after which that screen dims (0 is never): planning/p4x-now-playing.md. Read by every
+    // touched after which that screen dims (0 is never). Read by every
     // build and acted on by the one with a panel (panel/lvgl).
     iclforge::nowview::View now_view = iclforge::nowview::kDefaultView;
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
-    // How the speakers view shows a level: glow or pulse (planning/p4x-speakers-options.md).
+    // How the speakers view shows a level: glow or pulse.
     iclforge::nowview::SpeakersStyle speakers_style = iclforge::nowview::kDefaultSpeakersStyle;
-    // What a person chose for the screen of a board that has one (planning/p4x-preferences.md): the backlight when
+    // What the waiting screen (nothing playing, the board set up) does after the dim time with nothing touched: stay lit,
+    // dim, show the clock or go dark.
+    iclforge::nowview::IdleView idle_view = iclforge::nowview::kDefaultIdleView;
+    // What a person chose for the screen of a board that has one: the backlight when
     // lit, percent, and how the clock view writes the time. Read by every build and acted on by the one with a panel.
     int brightness_percent = iclforge::nowview::kDefaultBrightness;
     iclforge::wallclock::ClockFormat clock_format;
     // Go dark between two times by the board's own time (iclforge::nowview::NightSchedule).
     iclforge::nowview::NightSchedule night;
-    // The time (planning/p4x-now-playing.md, stage 3), on every board that has a network. The zone the time is
+    // The time, on every board that has a network. The zone the time is
     // shown in, as a POSIX string (iclforge/wall_clock.hpp); empty when none is set, and the time is then UTC.
     // A board has no zone database, so this is the zone itself.
     std::array<char, iclforge::wallclock::kTimeZoneMaxBytes + 1> time_zone{};
@@ -117,8 +120,8 @@ struct Settings {
     // the player applies it to every stream, after the decode and before the DAC. Read by every build, acted
     // on by the one with a Sendspin player.
     iclforge::render::speaker_trim::SpeakerTrimTable speaker_trim;
-    // How much of a Dolby stream's dynamic range the listener wants (iclforge/ac3/decoder/dynamic_range.hpp,
-    // planning/hearth-late-night.md): standard is the decode this board always made, late night is
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/ac3/decoder/dynamic_range.hpp):
+    // standard is the decode this board always made, late night is
     // the stream's own compression on top of it. Read by every build and acted on by the one that
     // decodes (the Sendspin player), at the start of the next stream. The image's own answer is
     // CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE, standard unless a build says otherwise.
@@ -154,6 +157,7 @@ void settings_load();
 [[nodiscard]] bool settings_set_now_view(iclforge::nowview::View view);
 [[nodiscard]] bool settings_set_dim_after(int minutes);
 [[nodiscard]] bool settings_set_speakers_style(iclforge::nowview::SpeakersStyle style);
+[[nodiscard]] bool settings_set_idle_view(iclforge::nowview::IdleView view);
 [[nodiscard]] bool settings_set_brightness(int percent);
 [[nodiscard]] bool settings_set_clock_format(iclforge::wallclock::ClockFormat format);
 [[nodiscard]] bool settings_set_night(const iclforge::nowview::NightSchedule& night);

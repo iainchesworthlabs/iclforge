@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Network page's left column (planning/hearth-design.md, "Network"): every
+// The Network page's left column: every
 // Sendspin player this computer has found, plus the groups it has made from
 // them, shown above the sinks (network-group.png). Shared by every Network
 // sub-view (pairing, the group editor, and later a sink's own settings) -

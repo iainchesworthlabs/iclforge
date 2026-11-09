@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-// A take: a singer's voice kept as a file (planning/karaoke-microphone.md, M6; D11, D13).
+// A take: a singer's voice kept as a file.
 //
 // What is written is the **dry voice**: the microphone's own samples mixed to one channel, at the
 // rate the device delivers, as lossless FLAC at 24 bits. Not the backing, so the recording contains

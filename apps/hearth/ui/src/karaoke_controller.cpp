@@ -26,7 +26,7 @@
 
 namespace iclforge::hearth::ui {
 
-// The reader and the cursor are libs/lyrics' (planning/karaoke-phase2.md, W13a), which Hearth's
+// The reader and the cursor are libs/lyrics', which Hearth's
 // window shares with the other programs that read lyrics.
 using iclforge::lyrics::find_cdg_file;
 using iclforge::lyrics::find_lyrics_file;

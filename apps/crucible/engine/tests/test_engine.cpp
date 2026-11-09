@@ -229,7 +229,7 @@ TEST_CASE("crucible engine: start brings the output up on the endpoint the polic
         const std::lock_guard<std::mutex> lock(sink->mutex);
         CHECK(sink->started);
         CHECK(sink->device_id == "avr");
-        CHECK(sink->eac3);
+        CHECK(sink->format == BurstFormat::kEac3);
     }
 
     engine.stop();

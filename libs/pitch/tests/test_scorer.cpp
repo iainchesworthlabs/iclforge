@@ -11,8 +11,7 @@
 #include "iclforge/pitch/synth.hpp"
 #include "iclforge/pitch/tracker.hpp"
 
-// libs/pitch/src/scorer.cpp: the pitch score of a singer's contour against a reference
-// (planning/karaoke-microphone.md, D10).
+// libs/pitch/src/scorer.cpp: the pitch score of a singer's contour against a reference.
 
 namespace {
 

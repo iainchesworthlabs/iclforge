@@ -42,6 +42,7 @@ const char* iclforge_status_message(iclforge_status_t status) {
             return "AC-4 substream needs an I-frame not yet seen";
         case ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG: return "invalid AC-4 encoder configuration";
         case ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT: return "invalid AC-4 encoder input";
+        case ICLFORGE_ERROR_AC4_SIGNING: return "AC-4 content signature could not be made";
         case ICLFORGE_ERROR_LYRICS_UNREADABLE: return "not lyrics";
         case ICLFORGE_ERROR_TRUEHD_TRUNCATED: return "truncated TrueHD data";
         case ICLFORGE_ERROR_TRUEHD_BAD_SYNC: return "no TrueHD major sync or access unit";
@@ -70,6 +71,22 @@ const char* iclforge_status_message(iclforge_status_t status) {
         case ICLFORGE_ERROR_TRUEHD_ENCODE_INTERNAL: return "internal TrueHD encoder error";
     }
     return "unknown status";
+}
+
+const char* iclforge_ac4_signature_outcome_name(iclforge_ac4_signature_outcome_t outcome) {
+    switch (iclforge_c::stored_value(outcome)) {
+        case ICLFORGE_AC4_SIGNATURE_VALID: return "valid";
+        case ICLFORGE_AC4_SIGNATURE_UNTRUSTED: return "untrusted";
+        case ICLFORGE_AC4_SIGNATURE_NONE: return "no-signature";
+        case ICLFORGE_AC4_SIGNATURE_UNREADABLE: return "unreadable";
+        case ICLFORGE_AC4_SIGNATURE_CHAIN_REJECTED: return "chain-rejected";
+        case ICLFORGE_AC4_SIGNATURE_INVALID: return "signature-invalid";
+        case ICLFORGE_AC4_SIGNATURE_CONTENT_ALTERED: return "content-altered";
+        case ICLFORGE_AC4_SIGNATURE_METADATA_ALTERED: return "metadata-altered";
+        case ICLFORGE_AC4_SIGNATURE_REFUSED_BY_POLICY: return "refused-by-policy";
+        default: break;
+    }
+    return "unknown";
 }
 
 int iclforge_latency_total_samples(const iclforge_latency_t* latency) {

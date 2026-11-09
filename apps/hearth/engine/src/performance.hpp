@@ -12,8 +12,8 @@
 #include "iclforge/pitch/scorer.hpp"
 #include "iclforge/pitch/tracker.hpp"
 
-// A singer's performance against a reference melody (planning/karaoke-microphone.md, M4: the
-// microphone session's engine half). It owns no device and no thread: the caller hands it two
+// A singer's performance against a reference melody. It owns no device and no thread: the caller
+// hands it two
 // things, and reads back what the singer did.
 //
 //   anchor()  where in the item the sound being heard is, at a time on the steady clock. The

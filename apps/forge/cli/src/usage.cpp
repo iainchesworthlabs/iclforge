@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 156> kOptionTokens{{
+constexpr std::array<OptionToken, 166> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -57,6 +57,7 @@ constexpr std::array<OptionToken, 156> kOptionTokens{{
     {"content-key=", "the operator's private key for the AC-4 content signature (PEM or DER, P-256)"},
     {"content-chain=", "the certificates that vouch for content-key=: a bundle, or repeat it"},
     {"trust-anchor=", "a certificate to trust as the top of a content-signature chain; repeat for more"},
+    {"trust-key=", "a P-256 public key (PEM or DER) to trust to sign content: a chain whose signing certificate carries it is anchored; repeat for more"},
     {"pin=", "a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) fingerprint, trusted wherever it appears in the chain"},
     {"leaf-title=", "the title the signing certificate must carry (default Code/Content Signer), or any"},
     {"signed-date=", "the date a content signature records, YYYY-MM-DDTHH:MM:SS UTC (default now, which is what CS spec 5.3 asks for; another date is warned about)"},
@@ -101,7 +102,7 @@ constexpr std::array<OptionToken, 156> kOptionTokens{{
     {"numblkscod=", "atmos* encode: 0-3 (default 3), §E2.3.1.4 short syncframes of 1/2/3/6 blocks"},
     {"search=", "AC-3 encode, and eac3-encode under CBR: bit-allocation search, off (default)"},
     {"fgaincod=", "encode: auto (default) or 0..7, §7.2.2.4 fast gain pinned for the whole encode"},
-    {"verify", "eac3-encode and truehd-encode: decode every access unit as it's encoded and diff against it"},
+    {"verify", "eac3-encode, truehd-encode and truehd-atmos: decode every access unit as it's encoded and diff against it"},
     {"channels=", "decode/monitor: 2 or 1 apply the §7.8 output stage; as-coded (default) is a no-op; "
                   "decode of AC-4: 5.1 folds a 7.X stream to 5.X"},
     {"ltrt-phase=", "decode/monitor: off skips §7.8.2's real 90° surround phase shift"},
@@ -111,12 +112,21 @@ constexpr std::array<OptionToken, 156> kOptionTokens{{
     {"decoding=", "decode of AC-4: full (default) or core, the immersive element's 5.X.2 core"},
     {"speakers=", "decode of AC-4: 5.1, 5.1.2, 5.1.4, 7.1, 7.1.2 or 7.1.4, an immersive element's layout"},
     {"truehd-presentation=", "decode, levels and loudness of TrueHD or MLP: the substreams to read, best (the default), 2ch, 6ch, 8ch or all; qc: the presentation the preset gates judge, best, 2ch, 6ch or 8ch"},
+    {"truehd-render=", "decode of a TrueHD Atmos stream with truehd-presentation=all: place the objects on this speaker layout (a name such as 7.1 or 7.1.4, or a list such as L,R,C,LFE,Ls,Rs,Lrs,Rrs) and write the speaker feeds as the output WAV instead of the channels of substream 3 (provisional)"},
+    {"truehd-bed=", "truehd-atmos: the 7.1 bed as a WAV (L R C LFE Ls Rs Lrs Rrs, the objects' length and rate); without it the bed is the objects placed on 7.1 by the renderer"},
+    {"truehd-objects-lfe=", "truehd-atmos: on (the default) takes the first channel of the objects WAV as the LFE, off makes every channel an object"},
     {"truehd-check=", "decode, levels and loudness of TrueHD or MLP: strict (the default) stops at the first failed check; lenient counts them"},
+    {"truehd-reading=", "decode of TrueHD or MLP, for scoring a provisional reading: the other reading of a point the specification leaves open, seed-shr7-32, zero-histories, shift-by-position or fold-by-position (ERRATA.md question 101); not given, the library's reading"},
     {"truehd-downmix=", "truehd-encode: none (the default; the first two channels are substream 0 as they are) or standard (a stereo and 5.1 downmix, undone exactly by the later substreams)"},
     {"truehd-downmix-gains=", "truehd-encode: four gains in dB, 0 to -60 or off, for C, Ls and Rs, LFE, and Lrs and Rrs folded into the downmix (default -3,-3,off,-3)"},
     {"truehd-restart=", "truehd-encode: access units between restart headers, 1 or 8 to 4096 (default 128)"},
     {"truehd-peak-rate=", "truehd-encode: the rate the stream is declared not to exceed, kbit/s (default 18000)"},
     {"truehd-rate-check=", "truehd-encode: strict (the default) refuses a stream that cannot be sent within the peak rate; lenient writes it and counts"},
+    {"truehd-rate-mode=", "truehd-atmos: strict (the default) refuses a stream that does not fit; shape lets the object channels of substream 3 give up low bits, one at a time, in the restart intervals that do not fit (the 7.1 bed is never touched; provisional, lossy for the objects)"},
+    {"truehd-shape-bits=", "truehd-atmos with truehd-rate-mode=shape: the most low bits an interval's objects give up, 0 to 16 (default 8)"},
+    {"truehd-bitrate=", "truehd-encode, truehd-atmos: hold the stream to this bitrate over any 75 ms, kbit/s, 1000 to 100000 (default the declared peak rate); probe detail=rate: run the arrival model at it"},
+    {"truehd-major-sync=", "truehd-encode, truehd-atmos: access units between major syncs, 0 (one at every restart header, the default) or a multiple of truehd-restart="},
+    {"truehd-evo-frames=", "truehd-atmos: which metadata frames (one every 1536 samples) get an evolution frame: all (the default), every:N, first or none. A stream is unsigned, and a licensed decoder that reads two evolution frames in a row with a wrong tag reports an error"},
     {"truehd-fir-order=", "truehd-encode: the largest FIR prediction order tried, 0 (off) to 8 (the default)"},
     {"truehd-matrix=", "truehd-encode: on (the default) or off, decorrelating channel pairs with a primitive matrix"},
     {"truehd-stereo-mode=", "truehd-encode: stereo (the default), ltrt or headphone, the 2 channel mode the stream declares"},
@@ -181,13 +191,13 @@ constexpr std::array<OptionToken, 156> kOptionTokens{{
                                 "name=, dialnorm=, gains=, emdf= and the rest (see 'help "
                                 "ac4-encode')"},
     {"conceal=","decode/monitor: repeat or mute, §7.10 error concealment for a bad frame"},
-    {"src=", "an additional input source; repeat for more than one"},
+    {"src=", "an additional input source; repeat for more than one (truehd-encode too, with map=)"},
     {"lyrics=", "encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, .ass, .kar) to write beside "
                 "the stream as its own UTF-8 .lrc"},
     {"lyrics-encoding=", "encode/eac3-encode/ac4-encode/lyrics-to-lrc: the code page a lyrics file is in "
                          "when it is not UTF-8 or UTF-16 (windows-1252, shift-jis, gbk, big5, ...)"},
     {"overwrite=", "lyrics-to-lrc: 1 replaces the output file where there is one"},
-    {"map=", "where each source channel goes"},
+    {"map=", "where each source channel goes (truehd-encode: TrueHD channel names, e.g. 0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs)"},
     {"offset=", "<sourceIndex>:<seconds> leading silence for that source"},
     {"capture2=", "live: a second capture device, clock-conformed to the first"},
     {"container=", "record/live: raw, mkv, ts, spdif or fmp4"},
@@ -209,7 +219,7 @@ constexpr std::array<OptionToken, 156> kOptionTokens{{
                "transcoding to AC-3 or falling back to decoded PCM"},
     {"preset=", "qc: gate the measurement against a named delivery spec"},
     {"json=", "probe: emit the JSON document instead of the human table"},
-    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure or format"},
+    {"detail=", "probe: frames or blocks - add per-access-unit/per-block detail; TrueHD: evolution, structure, format or rate"},
     {"fallback-51", "fmp4: also write the object-stripped 5.1 companion rendition"},
     {"insert", "metadata: add a field the stream does not carry (compr=, compr2=, bsmod=, "
                "dsurmod=) instead of refusing it - E-AC-3 independent substreams only, and "
@@ -549,10 +559,14 @@ void print_truehd_topic() {
     fmt::println("       truehd-downmix=none|standard,");
     fmt::println("       truehd-downmix-gains=<C,Ls/Rs,LFE,Lrs/Rrs in dB>,");
     fmt::println("       truehd-restart=<access units>, truehd-peak-rate=<kbit/s>,");
-    fmt::println("       truehd-rate-check=strict|lenient, truehd-fir-order=0..8,");
+    fmt::println("       truehd-rate-check=strict|lenient, truehd-bitrate=<kbit/s>,");
+    fmt::println("       truehd-major-sync=<access units>, truehd-fir-order=0..8,");
+    fmt::println("       truehd-evo-frames=all|every:N|first|none (truehd-atmos),");
     fmt::println("       truehd-matrix=on|off and truehd-stereo-mode=stereo|ltrt|headphone;");
     fmt::println("       'verify' decodes every access unit as it is coded and compares it with");
-    fmt::println("       the input.");
+    fmt::println("       the input. src=, map= and offset= place the channels of several WAVs by");
+    fmt::println("       TrueHD channel name (map=0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs); the");
+    fmt::println("       places must make one channel assignment, and no place is named twice.");
     fmt::println("       truehd-encode also writes the stream's channel meaning (TH spec 14) into");
     fmt::println("       every major sync, per presentation: truehd-dialnorm-2ch|6ch|8ch=,");
     fmt::println("       truehd-mix-level-2ch|6ch|8ch=, truehd-source-format-6ch|8ch=,");
@@ -578,8 +592,11 @@ void print_truehd_topic() {
     fmt::println("       stream declares) and meters each presentation, shows the dialogue norm");
     fmt::println("       it carries beside the measurement, and judges preset= on the presentation");
     fmt::println("       truehd-presentation= names (the largest by default); exit 6 when a gate");
-    fmt::println("       fails. cut, cat, transcode, fmp4, play and monitor do not read TrueHD or");
-    fmt::println("       MLP and say so.");
+    fmt::println("       fails. monitor plays the decode of the presentation truehd-presentation=");
+    fmt::println("       names. cut starts at the first access unit with a major sync at or after");
+    fmt::println("       the time asked and says the time it used; cat joins streams of one shape,");
+    fmt::println("       each opening with a major sync, and no byte is changed. fmp4 and play do");
+    fmt::println("       not read TrueHD or MLP and say so.");
 }
 
 void print_ac4_decode_topic() {
@@ -776,10 +793,12 @@ void print_probe_topic() {
     fmt::println("       each presentation (id, name, language, level, channels, substreams)");
     fmt::println("       and the selected one's dialnorm, loudness, DRC modes, dialogue");
     fmt::println("       enhancement and stereo downmix values.");
-    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the rate,");
+    fmt::println("       For TrueHD and MLP it reports the codec, the access-unit count, the duration,");
+    fmt::println("       the rate and the bit rate it measures (TH spec section 18), the restart spacing,");
     fmt::println("       the substreams and their channels, and how many segments pass their");
-    fmt::println("       parity and CRC; detail=frames and detail=blocks are refused for it, since");
-    fmt::println("       it has no such dump, and detail=evolution, structure and format are its own.");
+    fmt::println("       parity and CRC; detail=blocks is refused for it, since it has no blocks to");
+    fmt::println("       dump, detail=frames lists every access unit, and detail=evolution, structure,");
+    fmt::println("       format and checks are its own.");
 }
 
 void print_mkv_topic() {
@@ -1011,12 +1030,18 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  delta=off         skip §7.2.2.6 delta bit allocation - the corrections "
                      "chosen per run from the real coefficients and the second fit that weighs "
                      "them - wherever this command encodes; eac3-encode's [tools] argument has "
-                     "the bare nodelta token. The encoders' first effort level "
-                     "(planning/arithmetic-tiers.md): what a part with little time for the "
+                     "the bare nodelta token. The encoders' first effort level: "
+                     "what a part with little time for the "
                      "search gives up, measured on the ESP32-S3 page");
         fmt::println("  sign-objects      atmos/atmos-path/atmos-encode/atmos-cbi: write a keyed EMDF "
-                     "object signature (needs signing-key=); see docs/concepts/object-signing.md");
-        fmt::println("  verify-objects    decode/monitor: check each frame's EMDF object signature "
+                     "object signature (needs signing-key=); truehd-atmos and metadata on a "
+                     "TrueHD stream: sign its evolution frames (iclforge's own tag, not Dolby's). "
+                     "A truehd-atmos stream carries the Atmos flag (0x1000) either way, so a "
+                     "licensed decoder checks its frames and logs \"Consecutive Evo frames fail "
+                     "security check\" for tags that are not its own; see "
+                     "docs/concepts/object-signing.md");
+        fmt::println("  verify-objects    decode/monitor (and decode of TrueHD): check each frame's "
+                     "object signature "
                      "against signing-key= instead of just playing it - a mismatch refuses the "
                      "command; omitted (the default) decodes signed and unsigned streams alike, "
                      "unchecked");
@@ -1032,7 +1057,7 @@ void print_option_blocks(std::uint32_t mask) {
     }
     if ((mask & topic::kMulti) != 0) {
         fmt::println("");
-        fmt::println("source options (encode/eac3-encode/atmos-encode/live; any order, after "
+        fmt::println("source options (encode/eac3-encode/atmos-encode/truehd-encode/live; any order, after "
                      "the positional arguments):");
         fmt::println("  src=<path>        an additional input source; repeat for more than one");
         fmt::println("  map=<spec>        {}", plan::kAssignmentSyntax);
@@ -1139,6 +1164,13 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  detail=structure  TrueHD and MLP: the major sync's extension, the restart");
         fmt::println("                    headers, a decode check, what follows each last block");
         fmt::println("  detail=format     both; metadata only, no content");
+        fmt::println("  detail=matrix     TrueHD: every matrix section and output_shift of the block");
+        fmt::println("                    headers, all substreams, uncapped (a decode)");
+        fmt::println("  detail=checks     TrueHD and MLP: decode the stream for the lossless check of every");
+        fmt::println("                    restart interval (the cost of a decode); exit 1 when one fails");
+        fmt::println("  detail=rate       TrueHD: per restart interval the bitrate, the largest unit's rate and");
+        fmt::println("                    the least headroom of the 75 ms arrival model (truehd-bitrate=");
+        fmt::println("                    sets the rate it runs at)");
     }
     if ((mask & topic::kContentSignature) != 0) {
         fmt::println("");
@@ -1161,6 +1193,8 @@ void print_option_blocks(std::uint32_t mask) {
                      "for more (or ICLFORGE_CONTENT_CHAIN_FILE)");
         fmt::println("  trust-anchor=<path>   a certificate to trust as the top of the chain; repeat "
                      "for more");
+        fmt::println("  trust-key=<path>      a P-256 public key (PEM or DER) to trust to sign; a chain "
+                     "whose signing certificate carries it is anchored; repeat for more");
         fmt::println("  pin=<hex>         a certificate by SHA-1 (40 hex) or SHA-256 (64 hex) "
                      "fingerprint, trusted wherever it appears in the chain");
         fmt::println("  leaf-title=<text|any>  the title the signing certificate must carry (default "

@@ -38,11 +38,11 @@ Not part of the project's own build and run by no CI job: it needs LVGL's source
 firmware configure fetches. The pictures in `docs/hearth/screenshots/p4-panel-*.png` are this
 program's output converted to PNG.
 
-`speakers_options/` is a project of its own for the speakers view (planning/p4x-speakers-options.md): the old glow, the
+`speakers_options/` is a project of its own for the speakers view: the old glow, the
 responsive glow and the pulse style drawn over a synthetic groove in 2.0, 5.1, 7.1.4 and 9.1.6 as stills and frame
 sequences, with the pixels each flushes counted, and `speakers_tune`, which chooses the glow's constants without LVGL.
 
-`meters_options/` is a project of its own for the Meters view (planning/p4x-meters-view.md): `meters_options` draws the first round's
+`meters_options/` is a project of its own for the Meters view: `meters_options` draws the first round's
 three variants and `meters_adaptive` the rule that picks a representation from the display's size and the room's outputs (every size
 class in every room, as stills and frame sequences, with the pixels each flushes counted at three sizes of LVGL's invalid-area table), and
 `meters_tune` holds the spectrum analysis (`iclforge/dsp/spectrum.hpp`, the code a board runs) to a sine, to noise and to one long FFT and
@@ -57,7 +57,7 @@ the pointer, not by calling LVGL; the answer's `events` are the touches made. `p
 firmware's own `iclforge::prefs::to_json` over the preview's backend, so a script reads the same state here and on a board.
 
 `tools/hearth/screen_script.py` is the driver. A **script** is a few lines of taps and expectations
-(`scripts/*.screen`, grammar in the tool's header and in `planning/screen-test-harness.md`):
+(`scripts/*.screen`, grammar in the tool's header):
 
 ```
 board p4-rev3-kit
@@ -79,4 +79,4 @@ ctest --test-dir build-preview --output-on-failure                           # t
 `tools/hearth/test_screen_script.py` (the CI "Oracle unit tests" step) holds the grammar and the runner with a stand-in
 preview and a stand-in board, and runs every script on the real screen code when `ICLFORGE_PANEL_PREVIEW` names a built
 `panel_preview`. The same script can also be run on a board in step with the preview (`--board`, a lease, `probe` for a
-read-only look first): see `planning/screen-test-harness.md`, "Hardware in the loop". That path has not yet been run on a board.
+read-only look first). That path has not yet been run on a board.

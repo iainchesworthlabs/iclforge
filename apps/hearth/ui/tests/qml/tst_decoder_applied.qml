@@ -207,7 +207,7 @@ TestCase {
     }
 
     // AC-4's sub-page writes the fields it shares with this one through its
-    // own controls ("One control for both formats", planning/ac4.md), and
+    // own controls ("One control for both formats"), and
     // has no operating mode of its own to write: its dynamic range is its own
     // (decision 12), so "mode" is left as it was.
     function test_ac4SubPageSharesTheDownmixAndNotTheMode() {

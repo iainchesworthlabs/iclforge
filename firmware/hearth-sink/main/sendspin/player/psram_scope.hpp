@@ -1,7 +1,6 @@
 #pragma once
 
-// Allocations made by one task for a while, taken from PSRAM when the part has it (planning/
-// karaoke-phase2.md, W7d: a lyric document).
+// Allocations made by one task for a while, taken from PSRAM when the part has it.
 //
 // A parsed lyric document is many small blocks (a line, a word, a string each), which a part's
 // allocator keeps in internal RAM whatever the total: CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL sends

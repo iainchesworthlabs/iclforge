@@ -10,7 +10,7 @@
 
 #include "iclforge/dsp/detail/complex.hpp"
 
-// The one FFT of the family (planning/consolidation.md decision 20): the passes of a Stockham
+// The one FFT of the family: the passes of a Stockham
 // autosort transform, decimation in frequency, one function for each radix and direction, with
 // nothing a pass does decided at run time. AC-4's plan for every length 2^a 3^b 5^c
 // (libs/dsp/src/tiered/fft.hpp) runs them, and so does every transform of AC-3 and dsp at a
@@ -22,7 +22,7 @@
 // and q < s, where w^(pk) is the factor the plan holds for the pass (twiddles[p r + k]),
 // conjugated in the inverse direction. The radix and the direction are template arguments, so
 // the butterfly is straight-line code on the registers, which on a core with a single-precision
-// FPU and no out-of-order issue is a factor of three or more (planning/ac4.md, D14e).
+// FPU and no out-of-order issue is a factor of three or more.
 //
 // The value and the factor have types of their own, V and W. AC-4's plan has both its scalar;
 // AC-3's MDCT runs double, float, four transforms side by side in an AVX2 register (V f64x4, W

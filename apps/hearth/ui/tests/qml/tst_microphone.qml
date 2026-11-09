@@ -6,7 +6,7 @@ import HearthTest
 
 import "HearthTestHelpers.js" as H
 
-// The microphone card of the Karaoke page (MicrophoneCard.qml; planning/karaoke-microphone.md, M4):
+// The microphone card of the Karaoke page (MicrophoneCard.qml):
 // what it promises and that its answers reach the controller.
 //
 // This suite never opens a person's microphone: the one it has is a script (TestServices.

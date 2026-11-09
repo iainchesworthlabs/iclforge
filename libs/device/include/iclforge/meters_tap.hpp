@@ -1,6 +1,7 @@
 #pragma once
 
-// What the Meters view takes from the player's audio path, and nothing else (planning/p4x-meters-view.md): a mono mix of the rendered outputs
+// What the Meters view takes from the player's audio path, and nothing else: a mono mix of the
+// rendered outputs
 // in a ring of 16-bit samples that a panel task reads every 50 ms, and each output's peak over 50 ms. It is a BlockTap the player calls once a
 // block (256 frames) while the screen wants it, and is otherwise never called.
 //

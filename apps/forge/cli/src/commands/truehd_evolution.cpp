@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -16,6 +17,7 @@
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/evolution.hpp"
+#include "iclforge/truehd/signing/evolution_signer.hpp"
 #include "json_sink.hpp"
 
 namespace forge_cli::commands {
@@ -100,6 +102,13 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
     if (frame == nullptr) {
         return;
     }
+    // Whether the frame carries a tag, answered without a key (the field is not all zero). Present,
+    // never valid: only decode verify-objects with signing-key= says that.
+    if (iclforge::truehd::signing::has_evolution_tag(
+            extra.bytes, std::string_view(reading) == "spec36" ? th::EvolutionReading::kSpec36
+                                                               : th::EvolutionReading::kEmdf)) {
+        ++tagged_;
+    }
     ++frames_read_;
     for (const th::EvolutionPayload& payload : frame->payloads) {
         ++payload_ids_[payload.id];
@@ -119,6 +128,20 @@ void EvolutionSurvey::add(std::uint64_t unit_index, const th::AccessUnit& unit) 
     if (!decoded) {
         ++oamd_unread_;
         return;
+    }
+    // The timing of the update blocks, as `forge decode` places them.
+    const std::optional<std::uint64_t> payload_offset =
+        frame->find(th::kEvolutionPayloadOamd)->config.sample_offset;
+    ++payload_offsets_[payload_offset ? static_cast<std::int64_t>(*payload_offset) : -1];
+    if (!decoded->blocks.empty()) {
+        ++update_offsets_[decoded->blocks.front().sample_offset];
+    }
+    const std::int64_t base = static_cast<std::int64_t>(payload_offset.value_or(0)) +
+                              (decoded->blocks.empty() ? 0 : decoded->blocks.front().sample_offset);
+    for (const oba::UpdateBlock& block : decoded->blocks) {
+        ++offset_factors_[block.block_offset_factor];
+        ++ramps_[block.ramp_duration];
+        ++starts_in_unit_[base + 32 * static_cast<std::int64_t>(block.block_offset_factor)];
     }
     const oba::Program& program = decoded->program;
     ProgramTally tally;
@@ -225,6 +248,8 @@ void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     };
     codes("primary_codes", primary_codes_);
     codes("secondary_codes", secondary_codes_);
+    // Key-free: frames whose primary protection field is not all zero. Present, not authenticated.
+    json.member("tagged_frames", tagged_);
     json.member("verified", false);
     json.end_object();
     json.member("signature_verified", false);
@@ -258,6 +283,26 @@ void EvolutionSurvey::write_json(iclforge::apps::JsonSink& json) const {
     }
     json.end_array();
     json.member("other_program_frames", oamd_other_programs_);
+    json.key("timing");
+    json.begin_object();
+    const auto values = [&json](std::string_view name,
+                                const std::map<std::int64_t, std::uint64_t>& tally) {
+        json.key(name);
+        json.begin_array();
+        for (const auto& [value, count] : tally) {
+            json.begin_object();
+            json.member("value", value);
+            json.member("count", count);
+            json.end_object();
+        }
+        json.end_array();
+    };
+    values("payload_sample_offsets", payload_offsets_);
+    values("update_sample_offsets", update_offsets_);
+    values("block_offset_factors", offset_factors_);
+    values("ramp_durations", ramps_);
+    values("block_starts_in_unit", starts_in_unit_);
+    json.end_object();
     json.end_object();
     json.key("cadence");
     json.begin_object();
@@ -338,7 +383,37 @@ void EvolutionSurvey::print_text() const {
             continuation(
                 fmt::format("  and {} frame(s) of further programs", oamd_other_programs_));
         }
+        // value (xcount), as many as fit a line; a payload sent no sample offset is -1, shown as
+        // "none"
+        const auto histogram = [](const std::map<std::int64_t, std::uint64_t>& tally,
+                                  std::string_view minus_one = "-1") {
+            constexpr std::size_t kShown = 12;
+            std::string out;
+            std::size_t shown = 0;
+            for (const auto& [value, count] : tally) {
+                if (shown++ == kShown) {
+                    out += fmt::format(", and {} more", tally.size() - kShown);
+                    break;
+                }
+                out +=
+                    fmt::format("{}{} (x{})", out.empty() ? "" : ", ",
+                                value < 0 ? std::string(minus_one) : std::to_string(value), count);
+            }
+            return out.empty() ? std::string("none") : out;
+        };
+        continuation(
+            fmt::format("update timing, in samples: payload offset {}; first block's offset {}; "
+                        "offset factor {}; ramp {}",
+                        histogram(payload_offsets_, "none"), histogram(update_offsets_),
+                        histogram(offset_factors_), histogram(ramps_)));
+        continuation(
+            fmt::format("  block starts in its access unit (payload offset + first block's offset "
+                        "+ 32 x factor): {}",
+                        histogram(starts_in_unit_)));
     }
+    continuation(fmt::format("protection tag present in {}/{} frame(s), answered without a key "
+                             "(present, not verified)",
+                             tagged_, frames_read_));
     continuation("not verified: the protection bytes and any signature");
     if (detail_enabled_) {
         detail_.print_text();

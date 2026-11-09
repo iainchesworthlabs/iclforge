@@ -79,11 +79,12 @@ Station 3's line names the mode Crucible chose and why:
 | **Atmos** (E-AC-3 JOC) | an endpoint takes E-AC-3 exclusively **and** a signing key is loaded | objects, intact |
 | **DD+ 5.1** | as above, but no signing key | panned onto the bed |
 | **DD 5.1** (AC-3) | an endpoint takes AC-3 but not E-AC-3 | panned onto the bed |
+| **TrueHD 5.1** | only when you pin it, and an endpoint takes TrueHD as a bitstream | panned onto the bed, lossless from 24-bit values, no objects |
 | **PCM surround** | an endpoint offers 6 or 8 channels and no bitstream format | encoded, then decoded and rendered |
 | **Headphones** | the endpoint has a spatial format enabled and a signing key is loaded | objects handed to the OS renderer |
 | **Stereo** | nothing above applies | encoded, then decoded, folded down |
 
-Two of these need saying plainly.
+Three of these need saying plainly.
 
 **Without a signing key you get DD+ 5.1, not Atmos.** Placements still pan, but height does
 nothing. That is deliberate: a decoder that validates the tag can refuse an unsigned object
@@ -94,8 +95,81 @@ exposes one a third party can hand Atmos objects to. On those platforms the head
 decodes and folds instead. It also needs a signing key, because the decoder rebuilds objects only
 from a signed stream; without one the stream is a 5.1 bed and stereo is the fold.
 
+**TrueHD 5.1 is chosen by pinning it, and not every endpoint offers it.** The automatic choice
+never picks it, because no receiver has read a TrueHD stream from Crucible. It sends the same 5.1 bed as
+DD+ 5.1, encoded losslessly and carried as MAT bursts, and it carries no objects whatever key is
+loaded. Lossless starts at 24-bit integers: Crucible's mix is floating point, it is rounded to the
+nearest 24-bit value (a tie goes to the even one), and the stream decodes to exactly those values
+and no further back. The mode also needs an audio backend that can carry MAT, which is eight
+channels at 192 kHz: ALSA's can, PipeWire's can, on a sink whose codec list names TrueHD, and
+WASAPI's can, on an endpoint that accepts Microsoft's MAT 1.0 format in exclusive mode; Core
+Audio's is written but unproven: it reads as taking TrueHD where an output offers eight channels
+of 16-bit linear PCM at that rate, which Apple documents no use of for this, so a receiver may
+read the link as eight-channel PCM and play the burst as loud noise: pin it with the volume
+down. A pin on a mode no endpoint carries falls back to the automatic
+choice with the reason line saying so. The engine side is
+tested over scripted devices, bit for bit, and the library's backends have been built and tested
+without a receiver: nothing has been played into one, so whether an endpoint accepts the stream or
+a receiver locks on it is not known.
+Its LFE channel is the sum of the LFE channels of the 5.1 and 7.1 applications that are in the bed,
+at unity: the engine hands the encoder that sum beside its fifteen objects (`AtmosEncoder::encode_frame`'s
+`lfe` span), and the leg reads the encoder's bed. It is silent when no bed application renders a
+surround signal, since an object's LFE is dropped, as a downmix drops it, and a stereo
+application has none. The bed's LFE is not bass-managed or level-shifted on the way.
+
+**What the TrueHD leg costs.** The encoder holds a restart interval (128 access units, 107 ms of
+audio), and a further 90 access units (75 ms) whose arrival times wait for the units after them, and
+emits what it holds in batches, so most frames cost almost nothing and about one in three carries
+the whole encode. The hidden test case `[truehd_cost]` times it over the repository's 5.1 programme
+material, 1536-sample frames, in a Release build. On a Windows desktop the mean is 2.3 ms and the
+worst frame 10 ms. On a Raspberry Pi 4B (4 cores, 1.8 GB, Debian 13, GCC 14), at the commit before
+the encoder held the further 75 ms, the mean was 9.2 ms, which is about 29 % of one core held for as
+long as the mode runs, the median 0.11 ms, and the worst frame 36.1 ms against the 32 ms a frame
+lasts. So the Pi has the cores for the mode, and one frame in about three takes slightly longer than
+its own length. That frame is followed by two that cost almost nothing, and
+the engine paces itself on the taps, not on the encoder, so the spike delays one batch of bursts by
+a few milliseconds and does not by itself drop audio. It has not been run with live taps on the Pi.
+
+What does put the stream at risk is how far ahead of the device the bursts are. The leg hands the sink
+a batch of five or six bursts (100 or 120 ms of audio) every third or fourth frame (96 or 128 ms), and
+nothing holds any back, so the sink has about no audio in hand when the next batch arrives. The
+hidden case `[truehd_headroom]` feeds the leg at real-time pace and plays what reaches the sink out
+the way a device would, one burst in 20 ms from the first. On a Windows desktop, in three runs of
+2.5 s, it found a gap of 70 to 90 ms at the start, while the first batch is a single burst, and one
+gap of up to 5 ms in each run after the first second. On the Pi, with the encoder holding the further
+75 ms (mean 9.2 ms, worst frame 36.7 ms), three runs of 78 frames each found the same 74 ms gap at
+the start and one or two gaps after the first second, the deepest of 25 ms. A late batch is a gap in
+the stream, and what a receiver does with a gap that short is only known by playing it one. This is
+a model of the sink, not a reading of a device, and a slower machine only moves the gaps about and
+makes them longer: the cause is that no lead is kept.
+
+So the leg keeps one. It holds the first bursts back until at least 150 ms of them (eight bursts,
+`OutputStageConfig::truehd_prefill_ms`) are in hand, hands the sink all it holds at once, and from then
+on hands each burst over as it is made. The device is then never waiting on the next batch: the lead is
+150 ms or more at the start and moves up and down by a batch from there. This is done in Crucible's output
+stage, above the sink, so it is the same on PipeWire, ALSA and WASAPI, and the PCM modes and the other
+bitstream modes are not touched. **What it costs is start-up delay in this mode and no other.** Sound
+reaches the receiver later than it would by the time it takes the leg to make the pre-roll, which on a Windows desktop
+was about 190 ms: the first hand-over, twelve bursts, went at 334 ms into the run where a single burst
+went at 147 ms without it. A switch into TrueHD, a restart of the engine and a change of endpoint each
+pay it once, since each starts the leg afresh. The case
+`truehd leg: the pre-roll leaves the device no gap at the pace the engine feeds it` plays the leg at the
+engine's nominal pace through the same model of a device and requires no gap and at least 60 ms of
+audio in hand throughout with the pre-roll, and the gaps without it; `[truehd_headroom]` runs the same
+thing in wall clock, on the machine the question is about, with and without the pre-roll. Set
+`truehd_prefill_ms` to 0 to hand every burst over as it comes.
+
+On the Raspberry Pi 4B (the build above, no receiver), three runs of `[truehd_headroom]` with the
+pre-roll found no gap in any, and the sink held at least 73, 107 and 107 ms of audio when a batch
+arrived after the first second. The first hand-over was twelve bursts at 352 ms into the run. With no
+pre-roll the same runs had five or six gaps each, the longest 75 to 76 ms, one to three of them after
+the first second, and the sink fell as far as 11 ms short. The cost is unchanged: mean 9.2 ms, median
+0.11 ms, worst frame 36.5 ms against the 32 ms a frame lasts. The reading from a receiver is still to
+come, and says whether 150 ms is more than it needs.
+
 The modes are tried in the order of the table, and Crucible takes the first that some endpoint
-can carry. It writes E-AC-3 and AC-3 only, and has no AC-4 or TrueHD mode.
+can carry; TrueHD 5.1 is left out of that order and is only ever pinned. Crucible writes E-AC-3
+and AC-3, and TrueHD when pinned. It has no AC-4 mode.
 
 You can **pin** a mode to stop Crucible changing its mind, and **choose the endpoint** you hear
 it on rather than letting the policy pick. An impossible pin leaves the automatic choice standing
@@ -112,8 +186,8 @@ The page has five blocks.
 | Block | What it holds |
 |---|---|
 | **01 SIGNAL PATH** | the two-device idea in one paragraph |
-| **02 WHAT YOU HEAR IT AS** | the mode and why it was chosen, and the **Pin** list: Automatic, Atmos, Dolby Digital Plus 5.1, Dolby Digital 5.1, PCM surround, Headphones (where an OS renderer exists) and Stereo |
-| **03 ENDPOINTS** | what the last probe found on each render endpoint: whether it takes E-AC-3 and AC-3 as a bitstream, how many PCM channels, whether spatial sound is on. **Hear it here** chooses that endpoint and **Automatic** hands the choice back. **Send applications here** makes it the default output |
+| **02 WHAT YOU HEAR IT AS** | the mode and why it was chosen, and the **Pin** list: Automatic, Atmos, Dolby Digital Plus 5.1, Dolby Digital 5.1, TrueHD 5.1, PCM surround, Headphones (where an OS renderer exists) and Stereo |
+| **03 ENDPOINTS** | what the last probe found on each render endpoint: whether it takes E-AC-3, AC-3 and TrueHD as a bitstream, how many PCM channels, whether spatial sound is on. **Hear it here** chooses that endpoint and **Automatic** hands the choice back. **Send applications here** makes it the default output |
 | **04 WHERE APPLICATIONS PLAY** | the current default output, the button that moves it to the silent device or restores it, **Open Sound settings**, and **Re-probe** |
 | **05 CODEC PATH** | **Bypass the codec on headphones and PCM**. Off, headphones, PCM and stereo play a decode of the E-AC-3 stream, so what you hear went through the codec. On, headphones render the engine's own objects, and PCM and stereo take its 5.1 bed |
 

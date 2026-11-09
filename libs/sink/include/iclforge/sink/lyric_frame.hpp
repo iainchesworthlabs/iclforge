@@ -10,8 +10,7 @@
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 
-// What a screen draws of a song's words at one moment, as values with the text in them
-// (planning/hearth-android.md, phase 2; planning/hearth-sink-screen.md, S2 to S8).
+// What a screen draws of a song's words at one moment, as values with the text in them.
 //
 // lyrics::Stage names indices into a document and keeps no text, which suits a board that holds the
 // document once and draws from it. An Android view is on the other side of JNI and holds no
@@ -53,7 +52,7 @@ struct LyricFrame {
     bool timed = false;
     std::optional<std::int64_t> length_ms{};
     // The sink holds no document for the item and the server's metadata@v1 says where it is:
-    // `position_ms` is that progress then, and `length_ms` its duration (D7, planning/hearth-android.md),
+    // `position_ms` is that progress then, and `length_ms` its duration,
     // for the header's time. Written to the JSON only when set, so a frame from a document is the
     // line it was.
     bool has_progress = false;
@@ -90,7 +89,7 @@ struct LyricFrame {
 };
 
 // The rows a screen is given: one line before the current one and three after it (the panel draws two
-// after on its small scale, a TV draws all three; planning/hearth-sink-screen.md, Layout). One place,
+// after on its small scale, a TV draws all three). One place,
 // so that the app, its instrumented tests and the checked-in frames ask for the same.
 inline constexpr lyrics::StageOptions kScreenStageOptions{.lines_before = 1, .lines_after = 3};
 

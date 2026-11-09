@@ -1,9 +1,12 @@
 #include "truehd_meaning.hpp"
 
+#include <fmt/base.h>
 #include <fmt/format.h>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "json_sink.hpp"

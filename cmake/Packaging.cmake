@@ -81,8 +81,7 @@ if(WIN32)
         # The label is "forge-gui" and not a product name because that is what
         # the Linux launcher's Name= already says: the two menus name the same
         # application and should not disagree, and choosing a new published
-        # name for it is not this file's decision to take
-        # (planning/recasting.md).
+        # name for it is not this file's decision to take.
         #
         # forge-gui alone in that list, because it is the only windowed
         # application the installer carries (the Crucible is kept out of this
@@ -139,9 +138,9 @@ if(WIN32)
         endif()
 
         # .ac3/.ec3 open in hearth, the reference player (Hearth phase A7 -
-        # this used to point at forge-gui; planning/hearth-reference-player.md's
-        # A7 asked which application is the default handler, decided with
-        # the user as switching it here). forge-gui falls back to being the
+        # this used to point at forge-gui; A7 asked which application is the
+        # default handler, decided with the user as switching it here).
+        # forge-gui falls back to being the
         # opener only in a build that has no hearth at all, so a
         # GUI-only package still associates something rather than leaving
         # Explorer with no entry.
@@ -379,7 +378,7 @@ a PipeWire node Crucible creates while it runs.")
         # hearth, the desktop reference player (Hearth phase A7): its own
         # package, since like Crucible it is its own download
         # everywhere else - and unlike Crucible, this one ships DEB, RPM and
-        # TGZ in CI (planning/hearth-reference-player.md's own A7 text),
+        # TGZ in CI,
         # with no local-only caveat, because there is no test-signed driver
         # or PipeWire dependency holding it back the way Crucible's own
         # comment further down explains for that component's RPM.

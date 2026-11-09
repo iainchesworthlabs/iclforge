@@ -2,6 +2,15 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "core/huffman.hpp"
@@ -10,7 +19,11 @@
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/truehd/core/crc.hpp"
+#include "iclforge/truehd/core/error.hpp"
+#include "iclforge/truehd/core/format.hpp"
 #include "iclforge/truehd/core/syntax.hpp"
+#include "iclforge/truehd/io/access_unit.hpp"
+#include "iclforge/truehd/io/major_sync.hpp"
 
 namespace iclforge::truehd {
 
@@ -29,7 +42,8 @@ constexpr int kMaxMlpMatrixChannel = 5;
 constexpr int kMaxHuffLsbs = 24;  // TH spec §8.3
 constexpr int kMaxHuffLsbsAtmos = 31;
 constexpr std::size_t kMaxBlockDataBits = 16000;  // TH spec §8.1
-constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-14 (ERRATA.md)
+constexpr std::uint64_t kLabLogSamples = 600000;  // the lab's section and block logs stop here
+constexpr int kMatrixShift = kernels::kMatrixShift;  // the coefficients are scaled to 2^-15 (ERRATA.md entry 60)
 constexpr int kObjectSubstream = 3;
 // TH spec §3.5, §16.5: terminatorA, 0xD234E or 0x348D3, is followed by the 12-bit zero_samples
 // count (§16.5.4: a field, its width not isolated). DEE writes it after the segments of substreams
@@ -66,21 +80,30 @@ struct ChannelState {
 struct MatrixPlan {
     int out = 0;
     bool lsb_bypass = false;
+    int bypass_bits = 1;  // the bits a sample the bypass reads: field_2b in an object section
     int noise_shift = 0;  // matrix_noise_shift, sent under restart sync 0x31EB (TH spec §10.2)
     int count = 0;
     // The row columns the matrix reads and the coefficients for them, scaled to 2^-14: the matrix
     // channels, then the two noise channels (columns kMaxChannels and kMaxChannels + 1).
     std::array<std::uint8_t, kRowStride> channel{};
     std::array<std::int32_t, kRowStride> coeff{};
+    // The object-audio matrices' running coefficients, slopes and ramp (ERRATA.md entry 69).
+    kernels::ObjectMatrixState object;
 };
 
 struct SubstreamState {
     bool running = false;
+    // Where the last block header's bits lie in the segment: what the block header CRC covers.
+    std::size_t block_header_first_bit = 0;
+    std::size_t block_header_end_bit = 0;
     RestartHeader restart;
     BlockContext context;
+    // The object-audio matrices last sent: a section that sends no headers reuses them.
+    MatrixSet object_last;
+    bool object_have = false;
     int block_size = kDefaultBlockSize;
     int matrix_count = 0;
-    std::array<MatrixPlan, kMaxMatrices> matrices{};
+    std::array<MatrixPlan, kMaxObjectMatrices> matrices{};
     std::array<std::int8_t, kMaxChannels> output_shift{};
     // The matrix channel each output channel takes: ch_assign read the way TH spec §7.4 words it,
     // `ch_assign[matrix channel]` being the output channel (ERRATA.md entry 42).
@@ -90,6 +113,12 @@ struct SubstreamState {
     // TH spec §7.3: the fold of the output of the restart interval so far, and whether it holds
     // anything.
     std::uint32_t interval_fold = 0;
+    unsigned object_updates = 0;  // matrix sections the interval's blocks carried (lab log)
+    std::uint32_t peak_coded = 0;  // largest |sample| of the coded channels (lab log)
+    std::uint32_t peak_bed = 0;
+    std::uint32_t peak_out = 0;
+    // Lab: the fold of each matrix channel alone, after the matrices (0-11) and before (12-23).
+    std::array<std::uint32_t, 24> column_fold{};
     bool interval_open = false;
     // TH spec §17.2, §17.3: the running state of the noise generator, loaded from the restart
     // header and carried across the blocks of the restart interval. Generator 0 steps it a sample;
@@ -173,6 +202,10 @@ struct Decoder::Impl {
 
     [[nodiscard]] bool strict() const noexcept { return config.strictness == Strictness::kStrict; }
 
+    // What a new decoder holds, kept in the memory this one already has: no allocation, so it
+    // cannot fail and a device that has no second copy of the buffers to spare can restart a stream.
+    void clear() noexcept;
+
     [[nodiscard]] std::expected<AccessUnit, Error> parse_unit(std::span<const std::byte> data);
     void accept_major_sync(const MajorSync& incoming);
     [[nodiscard]] int substreams_wanted(int available) const noexcept;
@@ -188,9 +221,13 @@ struct Decoder::Impl {
     void record_tail(int index, BitReader reader, std::size_t left);
     [[nodiscard]] std::expected<void, Error> apply_block_header(
         SubstreamState& state, const BlockHeaderSpec& header) const;
+    // Appends a block header's matrices and output shifts to counters.block_header_log.
+    void log_block_header(int index, unsigned block, int sample_in_unit, bool restart,
+                          const BlockHeaderSpec& header, const RestartHeader& restart_header);
     [[nodiscard]] std::expected<void, Error> decode_block(int index, SubstreamState& state,
-                                                          BitReader& reader, int position,
-                                                          bool emit);
+                                                          BitReader& reader,
+                                                          std::span<const std::byte> payload,
+                                                          int position, bool emit);
 };
 
 std::expected<AccessUnit, Error> Decoder::Impl::parse_unit(std::span<const std::byte> data) {
@@ -309,14 +346,65 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
 
     // TH spec §7.3: this header carries the check of the interval that ends here.
     if (state.running && state.interval_open) {
+        if (index == kObjectSubstream &&
+            counters.object_checks_kept < DecoderCounters::kObjectChecksKept) {
+            counters.object_check_stored[counters.object_checks_kept] = header->lossless_check;
+            counters.object_check_folded[counters.object_checks_kept] =
+                lossless_check_of(state.interval_fold);
+            for (std::size_t col = 0; col < state.column_fold.size(); ++col) {
+                counters.object_column_bytes[counters.object_checks_kept][col] =
+                    lossless_check_of(state.column_fold[col]);
+            }
+            ++counters.object_checks_kept;
+        }
+        if (index == kObjectSubstream &&
+            counters.object_interval_log.size() < DecoderCounters::kObjectIntervalsKept) {
+            const bool passed = lossless_check_of(state.interval_fold) == header->lossless_check;
+            counters.object_interval_log.push_back(static_cast<std::uint8_t>(
+                (passed ? 1U : 0U) | (std::min(state.object_updates, 127U) << 1U)));
+            DecoderCounters::ObjectIntervalFacts facts;
+            facts.matrices = static_cast<std::uint8_t>(state.matrix_count);
+            for (int m = 0; m < state.matrix_count; ++m) {
+                facts.max_noise_shift = std::max<std::uint8_t>(
+                    facts.max_noise_shift,
+                    static_cast<std::uint8_t>(state.matrices[static_cast<std::size_t>(m)].noise_shift));
+            }
+            const auto bits_of = [](std::uint32_t v) {
+                std::uint8_t bits = 0;
+                while (v != 0) {
+                    ++bits;
+                    v >>= 1U;
+                }
+                return bits;
+            };
+            facts.coded_bits = bits_of(state.peak_coded);
+            facts.bed_bits = bits_of(state.peak_bed);
+            facts.out_bits = bits_of(state.peak_out);
+            if (counters.object_interval_facts.empty()) {
+                counters.object_quant_step = state.quant_step;
+                counters.object_output_shift = state.output_shift;
+            }
+            facts.samples_so_far = static_cast<std::uint32_t>(counters.object_first_out.size() / 12);
+            counters.object_interval_facts.push_back(facts);
+        }
         if (lossless_check_of(state.interval_fold) == header->lossless_check) {
             ++counters.lossless_checks_ok;
+            ++counters.lossless_ok_by_substream[static_cast<std::size_t>(index)];
         } else {
             ++counters.lossless_check_failures;
+            ++counters.lossless_failed_by_substream[static_cast<std::size_t>(index)];
             if (strict()) {
                 state.running = false;
+                // The substream is named: the object substream's check fails on real streams while
+                // its reconstruction is incomplete (ERRATA.md entry 69), the others' do not. The
+                // detail of an Error is a literal, so there is one for each substream.
+                static constexpr std::array<std::string_view, kMaxSubstreams> kDetail{
+                    "lossless check of the restart interval of substream 0",
+                    "lossless check of the restart interval of substream 1",
+                    "lossless check of the restart interval of substream 2",
+                    "lossless check of the restart interval of substream 3"};
                 return std::unexpected(make_error(ErrorKind::kBadLosslessCheck,
-                                                  "lossless check of the restart interval"));
+                                                  kDetail[static_cast<std::size_t>(index)]));
             }
         }
     }
@@ -327,15 +415,18 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // residuals of its IIR filter across it, so a stream whose first block after a restart is
     // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
     // not running (the first restart, or the first after an error) starts from zero.
-    const auto previous = state.channels;
-    const bool carry_history = state.running;
-    state = SubstreamState{};
+    // The new state is built on the heap, with the histories copied across, and moved in: a
+    // SubstreamState on the stack, and a copy of the old channels beside it, took 31 KB of it
+    // (PREfast's C6262, alerts 9861 and 9862).
+    const bool carry_history = state.running && !config.readings.zero_histories_at_restart;
+    auto fresh = std::make_unique<SubstreamState>();
     if (carry_history) {
         for (std::size_t c = 0; c < kMaxChannels; ++c) {
-            state.channels[c].fir_history = previous[c].fir_history;
-            state.channels[c].iir_history = previous[c].iir_history;
+            fresh->channels[c].fir_history = state.channels[c].fir_history;
+            fresh->channels[c].iir_history = state.channels[c].iir_history;
         }
     }
+    state = *fresh;
     state.running = true;
     state.restart = *header;
     state.output_source = output_source;
@@ -346,6 +437,13 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // matrices have no coefficients for the noise channels (ERRATA.md entry 32): the noise they
     // draw is generator 1's (§17.3).
     state.context.noise_type = header->noise_type();
+    // TH spec §10.2.1a: restart sync 0x31EC has the object-audio matrix section.
+    state.context.object_matrices = header->sync == kRestartSyncAtmos;
+    // ERRATA.md entry 69: the object matrices draw generator 1's noise, `field_m4` their shift.
+    if (header->sync == kRestartSyncAtmos) {
+        state.context.noise_type = true;
+    }
+    state.object_have = false;  // a restart resets the coding parameters, the matrices included
     state.context.presence_flags = presence::kAll;
     state.noise_seed = header->noisegen_seed;
     ++counters.restarts;
@@ -371,6 +469,7 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
     }
     if (left >= 20 && is_terminator_a(reader.peek(20))) {
         ++tail.terminator_a;
+        tail.last_word_unit = counters.units;
         return;
     }
     if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
@@ -378,9 +477,11 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
         marker.skip(left - static_cast<std::size_t>(kEndMarkerBits));
         if (is_terminator_a(marker.read(kTerminatorABits))) {
             ++tail.end_marker;
+            tail.last_word_unit = counters.units;
             return;
         }
     }
+    const BitReader reader_at_start = reader;
     bool zero = true;
     for (std::size_t remaining = left; remaining > 0 && zero;) {
         const auto chunk = static_cast<int>(std::min<std::size_t>(32, remaining));
@@ -388,6 +489,15 @@ void Decoder::Impl::record_tail(int index, BitReader reader, std::size_t left) {
         remaining -= static_cast<std::size_t>(chunk);
     }
     ++(zero ? tail.zero : tail.other);
+    if (!zero) {
+        tail.last_other_unit = counters.units;
+        tail.last_other_word = 0;
+        if (left >= static_cast<std::size_t>(kEndMarkerBits)) {
+            BitReader end_word = reader_at_start;
+            end_word.skip(left - static_cast<std::size_t>(kEndMarkerBits));
+            tail.last_other_word = end_word.read(kEndMarkerBits);
+        }
+    }
 }
 
 std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& state,
@@ -405,24 +515,57 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
     }
     if (header.matrices) {
         state.matrix_count = header.matrices->count;
+        const bool object = restart.sync == kRestartSyncAtmos;
         for (int m = 0; m < header.matrices->count; ++m) {
             const MatrixSpec& spec = header.matrices->items[static_cast<std::size_t>(m)];
             MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
+            // The object matrices keep their running coefficients and deltas between sections
+            // (ERRATA.md entry 69).
+            const kernels::ObjectMatrixState running = plan.object;
             plan = MatrixPlan{};
             plan.out = spec.out_ch;
             plan.lsb_bypass = spec.lsb_bypass;
-            plan.noise_shift = spec.noise_shift;
+            plan.bypass_bits = object ? std::max<int>(spec.field_2b, 1) : 1;
+            plan.noise_shift = object ? spec.field_m4 : spec.noise_shift;
+            if (object) {
+                plan.object = running;
+                kernels::ObjectMatrixState& run = plan.object;
+                const MatrixSet& set = *header.matrices;
+                if (set.coeffs_sent) {
+                    run.coeff = {};
+                    const int up = kernels::kObjectShift - spec.frac_bits + spec.f_shift;
+                    for (int c = 0; c < restart.matrix_channels(); ++c) {
+                        const auto index = static_cast<std::size_t>(c);
+                        if (spec.present[index]) {
+                            run.coeff[index] = spec.coeff[index] * (1 << std::max(up, 0));
+                        }
+                    }
+                }
+                if (!set.extension) {
+                    run.slope = {};
+                } else if (set.deltas_sent) {
+                    run.slope = {};
+                    for (int c = 0; c < restart.matrix_channels(); ++c) {
+                        const auto index = static_cast<std::size_t>(c);
+                        if (spec.present[index] && spec.ext_width != 0) {
+                            run.slope[index] = spec.ext_value[index];
+                        }
+                    }
+                }
+                run.extension = set.extension;
+                run.scale = spec.ext_field2 - spec.f_shift + spec.frac_bits;
+            }
             // The coefficients go to the matrix channels, then to the two noise channels (TH spec
             // §17.2), whose samples are in the last two columns of a row.
             for (int c = 0; c < restart.matrix_channels() + kNoiseChannels; ++c) {
                 const auto index = static_cast<std::size_t>(c);
-                if (spec.present[index] && spec.coeff[index] != 0) {
+                if (spec.present[index] && (object || spec.coeff[index] != 0)) {
                     const auto slot = static_cast<std::size_t>(plan.count++);
                     const int column = c < restart.matrix_channels()
                                            ? c
                                            : kMaxChannels + (c - restart.matrix_channels());
                     plan.channel[slot] = static_cast<std::uint8_t>(column);
-                    plan.coeff[slot] = spec.coeff[index] * (1 << (kMatrixShift - spec.frac_bits));
+                    plan.coeff[slot] = spec.coeff[index] * (1 << std::max(kMatrixShift - spec.frac_bits + spec.f_shift, 0));
                 }
             }
         }
@@ -485,7 +628,9 @@ std::expected<void, Error> Decoder::Impl::apply_block_header(SubstreamState& sta
 }
 
 std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState& state,
-                                                       BitReader& reader, int position, bool emit) {
+                                                       BitReader& reader,
+                                                       std::span<const std::byte> payload,
+                                                       int position, bool emit) {
     const RestartHeader& restart = state.restart;
     const int block = state.block_size;
     const int min_chan = restart.min_chan;
@@ -498,14 +643,14 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         std::fill_n(rows_base, static_cast<std::size_t>(block) * kRowStride, 0);
     }
 
-    // TH spec §8.1: the length of the sample data, to be checked after it. ERRATA.md entry 21
-    // (provisional): the length counts from the start of its own 16 bit field, as FFmpeg's decoder
-    // counts it, so a block of n bits of samples carries n + 16.
+    // TH spec §8.1: the length of the sample data, to be checked after it. It counts the bits of
+    // sample_data() and not its own 16 (the Dolby decoder reports 0xE4 for a count that includes
+    // them), and the block header CRC that follows the data covers the block header.
     std::size_t expected_bits = 0;
     std::size_t data_start = 0;
     if (restart.data_check_present) {
         expected_bits = reader.read(16);
-        data_start = reader.bit_position() - 16;
+        data_start = reader.bit_position();
         if (expected_bits > kMaxBlockDataBits) {
             return std::unexpected(
                 make_error(ErrorKind::kBadBlockData, "block_data_bits above 16000 (TH spec §8.1)"));
@@ -531,20 +676,25 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             plan.bias -= std::int64_t{1} << (lsb_bits - 1);
         }
     }
-    std::array<std::uint8_t, kMaxMatrices> bypass_matrix{};
+    std::array<std::uint8_t, kMaxObjectMatrices> bypass_matrix{};
+    std::array<std::uint8_t, kMaxObjectMatrices> bypass_bits{};
     int bypass_count = 0;
     for (int m = 0; m < state.matrix_count; ++m) {
-        if (state.matrices[static_cast<std::size_t>(m)].lsb_bypass) {
+        const MatrixPlan& matrix_plan = state.matrices[static_cast<std::size_t>(m)];
+        if (matrix_plan.lsb_bypass) {
+            bypass_bits[static_cast<std::size_t>(bypass_count)] =
+                static_cast<std::uint8_t>(matrix_plan.bypass_bits);
             bypass_matrix[static_cast<std::size_t>(bypass_count++)] = static_cast<std::uint8_t>(m);
         }
     }
 
     // The residuals, and the bits that put back the LSBs a matrix dropped.
-    std::array<std::uint16_t, kMaxBlockSize> bypass{};
+    std::array<std::uint64_t, kMaxBlockSize> bypass{};
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_residuals");
         if (!kernels::read_residuals(reader, block, min_chan, max_chan, plans.data(), bypass_count,
-                                     bypass_matrix.data(), rows_base, kRowStride, bypass.data())) {
+                                     bypass_matrix.data(), bypass_bits.data(), rows_base,
+                                     kRowStride, bypass.data())) {
             return std::unexpected(make_error(ErrorKind::kBadBlockData,
                                               "a Huffman code no codebook has (TH spec App. C)"));
         }
@@ -562,7 +712,15 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                                "block data is not block_data_bits long (TH spec §8.1)"));
             }
         }
-        reader.skip(8);  // block_data_crc: not checked (ERRATA.md)
+        const auto sent = static_cast<std::uint8_t>(reader.read(8));
+        if (sent != block_header_crc(payload, state.block_header_first_bit,
+                                     state.block_header_end_bit)) {
+            ++counters.check_failures;
+            if (strict()) {
+                return std::unexpected(make_error(ErrorKind::kBadBlockData,
+                                                   "block header CRC does not hold (TH spec §8.1)"));
+            }
+        }
     }
 
     // The inverse prediction filters (TH spec §9.4, §9.5), channel by channel.
@@ -597,7 +755,7 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
         ICLFORGE_ZONE_SCOPED_N("truehd_noise");
         if (!state.context.noise_type) {
             kernels::generate_noise(block, state.noise_seed, restart.noise_shift, rows_base,
-                                    kRowStride, kMaxChannels);
+                                    kRowStride, kMaxChannels, config.readings.seed_shr7_32_bit);
         } else if (!state.noise_filled) {
             state.noise_seed =
                 detail::fill_noise_buffer(state.noise_seed, noise_size, state.noise_buffer.data());
@@ -613,8 +771,16 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     std::copy_n(rows_base, static_cast<std::size_t>(block) * kRowStride, matrix_base);
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_matrices");
+        const bool object = state.context.object_matrices;
+        const int rate_shift = major_sync ? std::max(rate_factor(major_sync->ratebits()), 0) : 0;
+        const int unit_size = 40 << rate_shift;
+        // The ramp of the object matrices' slopes grows by 0x666 >> r, four times, a sample
+        // (ERRATA.md entry 69): 6552 at 48 kHz, 3276 at 96 kHz and 1636 at 192 kHz, where the
+        // access unit holds 40, 80 and 160 samples. The two higher steps are PROVISIONAL: no
+        // stream at those rates exists to check them (SUBSTREAM3.md section 6).
+        const int ramp_step = object_ramp_step(rate_shift);
         for (int m = 0; m < state.matrix_count; ++m) {
-            const MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
+            MatrixPlan& plan = state.matrices[static_cast<std::size_t>(m)];
             const std::uint32_t keep =
                 plan.out <= max_chan
                     ? ~((std::uint32_t{1} << state.quant_step[static_cast<std::size_t>(plan.out)]) -
@@ -631,9 +797,65 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
                 noise.first = first + noise.stride * static_cast<unsigned>(position);
                 noise.mask = static_cast<unsigned>(noise_size - 1U);
             }
-            kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
-                                  plan.out, keep, plan.lsb_bypass, m, bypass.data(), matrix_base,
-                                  kRowStride, noise);
+            if (object) {
+                kernels::apply_object_matrix(block, position == 0, position + block == unit_size,
+                                             ramp_step, plan.count, plan.channel.data(),
+                                             plan.object, plan.out, keep, plan.lsb_bypass, m,
+                                             bypass.data(), matrix_base, kRowStride, noise);
+            } else {
+                kernels::apply_matrix(block, plan.count, plan.channel.data(), plan.coeff.data(),
+                                      plan.out, keep, plan.lsb_bypass, m, bypass.data(),
+                                      matrix_base, kRowStride, noise);
+            }
+        }
+    }
+
+    if (index == kObjectSubstream) {
+        for (int i = 0; i < block; ++i) {
+            const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
+            for (int c = 0; c < out_channels; ++c) {
+                const auto magnitude = [](std::int32_t v) {
+                    return static_cast<std::uint32_t>(v < 0 ? -static_cast<std::int64_t>(v) : v);
+                };
+                auto& coded = c >= state.context.min_chan ? state.peak_coded : state.peak_bed;
+                coded = std::max(coded, magnitude(rows_base[at + c]));
+                state.peak_out = std::max(state.peak_out, magnitude(matrix_base[at + c]));
+            }
+        }
+    }
+    if (index == kObjectSubstream && counters.object_checks_kept < 10) {
+        auto& stats = counters.object_stats;
+        for (int i = 0; i < block; ++i) {
+            const std::int32_t* const coded = rows_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            const std::int32_t* const out = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            for (int ch = 0; ch < out_channels; ++ch) {
+                const auto c = static_cast<std::size_t>(ch);
+                const bool first = stats.samples == 0 && i == 0;
+                stats.coded_min[c] = first ? coded[ch] : std::min(stats.coded_min[c], coded[ch]);
+                stats.coded_max[c] = first ? coded[ch] : std::max(stats.coded_max[c], coded[ch]);
+                stats.out_min[c] = first ? out[ch] : std::min(stats.out_min[c], out[ch]);
+                stats.out_max[c] = first ? out[ch] : std::max(stats.out_max[c], out[ch]);
+                if (!first) {
+                    stats.coded_changes[c] += coded[ch] != stats.coded_last[c] ? 1U : 0U;
+                    stats.out_changes[c] += out[ch] != stats.out_last[c] ? 1U : 0U;
+                }
+                stats.coded_last[c] = coded[ch];
+                stats.out_last[c] = out[ch];
+            }
+            ++stats.samples;
+        }
+    }
+    if (index == kObjectSubstream) {
+        // Lab: the output samples from `record_from` on, up to 51,200 of them, by matrix channel.
+        for (int i = 0; i < block; ++i) {
+            if (counters.object_samples_total + static_cast<std::uint64_t>(i) < config.lab.record_from ||
+                counters.object_first_out.size() / 12 >= 51200) {
+                continue;
+            }
+            const std::int32_t* const out = matrix_base + static_cast<std::ptrdiff_t>(i) * kRowStride;
+            for (int ch = 0; ch < 12; ++ch) {
+                counters.object_first_out.push_back(ch < out_channels ? out[ch] : 0);
+            }
         }
     }
 
@@ -645,10 +867,77 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
             pcm.data() + static_cast<std::ptrdiff_t>(position) * out_channels;
         state.interval_fold = kernels::assign_output(
             block, out_channels, state.output_source.data(), state.output_shift.data(), matrix_base,
-            kRowStride, emit ? pcm_base : nullptr, state.interval_fold);
+            kRowStride, emit ? pcm_base : nullptr, state.interval_fold,
+            config.readings.output_shift_by_position, config.readings.fold_by_position);
+        if (index == kObjectSubstream && counters.object_checks_kept < DecoderCounters::kObjectChecksKept) {
+            for (int i = 0; i < block; ++i) {
+                const std::ptrdiff_t at = static_cast<std::ptrdiff_t>(i) * kRowStride;
+                for (int c = 0; c < 12 && c < out_channels; ++c) {
+                    const auto shift = state.output_shift[static_cast<std::size_t>(c)];
+                    const auto apply = [&](std::int32_t sample) {
+                        return static_cast<std::uint32_t>(
+                            shift >= 0 ? static_cast<std::int32_t>(static_cast<std::uint32_t>(sample)
+                                                                   << shift)
+                                       : sample >> -shift);
+                    };
+                    state.column_fold[static_cast<std::size_t>(c)] = lossless_fold_step(
+                        state.column_fold[static_cast<std::size_t>(c)], apply(matrix_base[at + c]),
+                        static_cast<unsigned>(c));
+                    state.column_fold[static_cast<std::size_t>(12 + c)] = lossless_fold_step(
+                        state.column_fold[static_cast<std::size_t>(12 + c)], apply(rows_base[at + c]),
+                        static_cast<unsigned>(c));
+                }
+            }
+        }
     }
     state.interval_open = true;
     return {};
+}
+
+void Decoder::Impl::log_block_header(int index, unsigned block, int sample_in_unit, bool restart,
+                                     const BlockHeaderSpec& header,
+                                     const RestartHeader& restart_header) {
+    DecoderCounters::BlockHeaderLog entry;
+    entry.unit = counters.units - 1U;  // counters.units counts the unit being decoded
+    entry.substream = static_cast<std::uint8_t>(index);
+    entry.block = static_cast<std::uint16_t>(block);
+    entry.sample_in_unit = static_cast<std::uint16_t>(sample_in_unit);
+    entry.restart = restart;
+    entry.matrix_channels = static_cast<std::uint8_t>(restart_header.matrix_channels());
+    entry.ch_assign = restart_header.ch_assign;
+    if (header.output_shift) {
+        entry.has_output_shift = true;
+        entry.output_shift = *header.output_shift;
+    }
+    if (header.matrices) {
+        const MatrixSet& set = *header.matrices;
+        entry.has_matrices = true;
+        entry.extension = set.extension;
+        entry.coeffs_sent = set.coeffs_sent;
+        entry.deltas_sent = set.deltas_sent;
+        for (unsigned m = 0; m < set.count; ++m) {
+            const MatrixSpec& spec = set.items[m];
+            DecoderCounters::BlockHeaderLog::Matrix row;
+            row.out = spec.out_ch;
+            row.frac_bits = spec.frac_bits;
+            row.lsb_bypass = spec.lsb_bypass;
+            row.noise_shift = spec.noise_shift;
+            row.f_shift = spec.f_shift;
+            row.field_2b = spec.field_2b;
+            row.field_m4 = spec.field_m4;
+            row.ext_width = spec.ext_width;
+            row.ext_field2 = spec.ext_field2;
+            row.coeff = spec.coeff;
+            row.ext_value = spec.ext_value;
+            for (std::size_t c = 0; c < spec.present.size(); ++c) {
+                if (spec.present[c]) {
+                    row.mask |= 1U << c;
+                }
+            }
+            entry.matrices.push_back(row);
+        }
+    }
+    counters.block_header_log.push_back(std::move(entry));
 }
 
 std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
@@ -682,8 +971,15 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     BitReader reader(payload);
     SegmentResult result;
     bool first_block = true;
+    unsigned blocks_in_segment = 0;  // blocks of this segment read so far (for the block header log)
+    std::string segment_trace;  // lab: where each block of the segment starts and ends
     state.noise_filled = false;
     while (true) {
+        bool block_header = false;  // lab: what this block's header carried
+        bool block_carries = false;
+        bool block_extension = false;
+        std::uint8_t block_matrices = 0;
+        bool restart_here = false;  // this block carries a restart header
         if (reader.read(1) != 0) {
             if (reader.read(1) != 0) {
                 if (auto started = begin_restart(index, state, reader, payload); !started) {
@@ -691,6 +987,7 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     return std::unexpected(started.error());
                 }
                 result.restarted = true;
+                restart_here = true;
             } else if (!state.running) {
                 result.waiting = true;
                 return result;
@@ -699,20 +996,106 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                     ErrorKind::kBadBlockData,
                     "the directory promises a restart header the segment lacks (TH spec §6.2)"));
             }
+            state.context.object_previous = state.object_have ? &state.object_last : nullptr;
+            const std::size_t header_start = reader.bit_position();
+            state.block_header_first_bit = header_start;
+            segment_trace += "[block starts at " + std::to_string(header_start) + "]";
             auto header = read_block_header(reader, state.context);
+            state.block_header_end_bit = reader.bit_position();
             if (!header) {
+                if (index == kObjectSubstream && counters.object_error_context.empty()) {
+                    // Lab: where in the segment the object block header failed, and the state it
+                    // was read against (counts and widths only).
+                    std::string text = "unit " + std::to_string(counters.units) + ": block header at bit " + std::to_string(header_start) +
+                                       ", failed at bit " + std::to_string(reader.bit_position()) +
+                                       ", flags " + std::to_string(state.context.presence_flags) +
+                                       ", previous matrices " +
+                                       std::to_string(state.context.object_previous != nullptr
+                                                          ? state.context.object_previous->count
+                                                          : -1) +
+                                       ", widths";
+                    if (state.context.object_previous != nullptr) {
+                        for (unsigned m = 0; m < state.context.object_previous->count; ++m) {
+                            text += " " + std::to_string(state.context.object_previous->items[m].ext_width);
+                        }
+                    }
+                    text += ", error \"";
+                    text.append(header.error().detail);
+                    text += "\"; blocks of the segment: ";
+                    text += segment_trace;
+                    counters.object_error_context = std::move(text);
+                }
                 state.running = false;
                 return std::unexpected(header.error());
+            }
+            if (header->matrices && state.context.object_matrices) {
+                state.object_last = *header->matrices;
+                state.object_have = header->matrices->count > 0;
+                if (header->matrices->count > 0) {
+                    ++state.object_updates;
+                }
+                if (header->matrices->count > 0 && counters.object_samples_total < kLabLogSamples) {
+                    DecoderCounters::ObjectSection section;
+                    section.sample = static_cast<std::uint32_t>(counters.object_samples_total);
+                    section.extension = header->matrices->extension;
+                    for (unsigned m = 0; m < header->matrices->count; ++m) {
+                        const MatrixSpec& spec = header->matrices->items[m];
+                        DecoderCounters::ObjectMatrixHeader row;
+                        row.out = spec.out_ch;
+                        row.frac_bits = spec.frac_bits;
+                        row.f_shift = spec.f_shift;
+                        row.field_2b = spec.field_2b;
+                        row.field_m4 = spec.field_m4;
+                        row.ext_width = spec.ext_width;
+                        for (int c = 0; c < kMaxChannels; ++c) {
+                            row.coeff[static_cast<std::size_t>(c)] = spec.coeff[static_cast<std::size_t>(c)];
+                            row.ext_value[static_cast<std::size_t>(c)] = spec.ext_value[static_cast<std::size_t>(c)];
+                            if (spec.present[static_cast<std::size_t>(c)]) {
+                                row.mask |= static_cast<std::uint16_t>(1U << c);
+                            }
+                        }
+                        section.items.push_back(row);
+                    }
+                    counters.object_sections.push_back(std::move(section));
+                }
+                if (header->matrices->count > 0 && counters.object_first_matrices.empty()) {
+                    for (unsigned m = 0; m < header->matrices->count; ++m) {
+                        const MatrixSpec& spec = header->matrices->items[m];
+                        DecoderCounters::ObjectMatrixHeader row;
+                        row.out = spec.out_ch;
+                        row.frac_bits = spec.frac_bits;
+                        row.f_shift = spec.f_shift;
+                        row.field_2b = spec.field_2b;
+                        row.field_m4 = spec.field_m4;
+                        for (int c = 0; c < kMaxChannels; ++c) {
+                            row.coeff[static_cast<std::size_t>(c)] =
+                                spec.coeff[static_cast<std::size_t>(c)];
+                            if (spec.present[static_cast<std::size_t>(c)]) {
+                                row.mask |= static_cast<std::uint16_t>(1U << c);
+                            }
+                        }
+                        counters.object_first_matrices.push_back(row);
+                    }
+                }
             }
             if (auto applied = apply_block_header(state, *header); !applied) {
                 state.running = false;
                 return std::unexpected(applied.error());
             }
+            if (config.lab.log_block_headers && (header->matrices || header->output_shift)) {
+                log_block_header(index, blocks_in_segment, result.samples, restart_here, *header,
+                                 state.restart);
+            }
+            block_header = true;
+            block_carries = header->matrices.has_value();
+            block_matrices = header->matrices ? static_cast<std::uint8_t>(header->matrices->count) : 0;
+            block_extension = header->matrices && header->matrices->extension;
             if (header->matrices) {
                 ++counters.matrix_headers;
-                for (int m = 0; m < header->matrices->count; ++m) {
+                const auto& matrices = *header->matrices;
+                for (int m = 0; m < matrices.count; ++m) {
                     counters.lsb_bypass_matrices +=
-                        header->matrices->items[static_cast<std::size_t>(m)].lsb_bypass ? 1U : 0U;
+                        matrices.items[static_cast<std::size_t>(m)].lsb_bypass ? 1U : 0U;
                 }
             }
         } else if (!state.running) {
@@ -722,8 +1105,13 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             return std::unexpected(make_error(
                 ErrorKind::kBadBlockData,
                 "the directory promises a restart header the segment lacks (TH spec §6.2)"));
+        } else {
+            // A block without a header: the data check's CRC covers no bits.
+            state.block_header_first_bit = reader.bit_position();
+            state.block_header_end_bit = state.block_header_first_bit;
         }
         first_block = false;
+        ++blocks_in_segment;
 
         if (reader.overflowed()) {
             state.running = false;
@@ -742,12 +1130,59 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                 make_error(ErrorKind::kBadParameter,
                            "more than 255 samples in an access unit (TH spec §3.3)"));
         }
-        if (auto decoded = decode_block(index, state, reader, result.samples, emit); !decoded) {
+        if (index == kObjectSubstream && state.context.object_matrices &&
+            counters.object_samples_total < kLabLogSamples) {
+            DecoderCounters::ObjectBlock block;
+            block.sample = static_cast<std::uint32_t>(counters.object_samples_total);
+            block.size = static_cast<std::uint16_t>(state.block_size);
+            block.header = block_header;
+            block.carries = block_carries;
+            block.matrices = block_matrices;
+            block.extension = block_extension;
+            counters.object_blocks.push_back(block);
+        }
+        const std::size_t block_start = reader.bit_position();
+        if (auto decoded = decode_block(index, state, reader, payload, result.samples, emit);
+            !decoded) {
+            if (index == kObjectSubstream && counters.object_error_context.empty()) {
+                int bypassing = 0;
+                for (int m = 0; m < state.matrix_count; ++m) {
+                    bypassing += state.matrices[static_cast<std::size_t>(m)].lsb_bypass ? 1 : 0;
+                }
+                counters.object_error_context =
+                    "unit " + std::to_string(counters.units) + ": block data at bit " + std::to_string(block_start) + " failed at bit " +
+                    std::to_string(reader.bit_position()) + ", size " +
+                    std::to_string(state.block_size) + ", matrices " +
+                    std::to_string(state.matrix_count) + " of which " + std::to_string(bypassing) +
+                    " with bypass, channels " + std::to_string(state.context.min_chan) + " to " +
+                    std::to_string(state.context.max_chan) + " of " +
+                    std::to_string(state.context.max_matrix_chan + 1) + ", error \"" +
+                    std::string(decoded.error().detail) +
+                    "\"; data check " + std::to_string(state.restart.data_check_present ? 1 : 0) +
+                    "; channels:";
+                for (int ch = state.context.min_chan; ch <= state.context.max_chan; ++ch) {
+                    const ChannelState& channel = state.channels[static_cast<std::size_t>(ch)];
+                    counters.object_error_context +=
+                        " [" + std::to_string(ch) + ": type " + std::to_string(channel.huff_type) +
+                        " lsbs " + std::to_string(channel.huff_lsbs) + " offset " +
+                        std::to_string(channel.huff_offset) + " step " +
+                        std::to_string(state.quant_step[static_cast<std::size_t>(ch)]) +
+                        " fir " + std::to_string(channel.fir.order) + " iir " +
+                        std::to_string(channel.iir.order) + "]";
+                }
+                counters.object_error_context += "; blocks of the segment: " + segment_trace;
+            }
             state.running = false;
             return std::unexpected(decoded.error());
         }
         result.samples += state.block_size;
+        if (index == kObjectSubstream) {
+            counters.object_samples_total += static_cast<std::uint64_t>(state.block_size);
+        }
+        const std::size_t data_end = reader.bit_position();
         const bool last = reader.read(1) != 0;
+        segment_trace += " size " + std::to_string(state.block_size) + " data ends " +
+                         std::to_string(data_end) + (last ? " last" : " not last") + ";";
         if (reader.overflowed()) {
             state.running = false;
             return std::unexpected(
@@ -842,7 +1277,8 @@ std::expected<std::optional<DecodedAccessUnit>, Error> Decoder::decode(
     }
     ++impl.counters.units_decoded;
     DecodedAccessUnit decoded;
-    decoded.sample_rate = impl.major_sync->sample_rate();
+    // A unit decoded, so a restart header, which a major sync carries, has been accepted.
+    decoded.sample_rate = impl.major_sync ? impl.major_sync->sample_rate() : 0;
     if (last.padding_samples > last.samples) {
         lost_data();
         return std::unexpected(
@@ -875,9 +1311,25 @@ void Decoder::lost_data() noexcept {
     }
 }
 
-void Decoder::reset() {
-    const DecoderConfig config = impl_->config;
-    impl_ = std::make_unique<Impl>(config);
+void Decoder::Impl::clear() noexcept {
+    counters = DecoderCounters{};
+    major_sync.reset();
+    // Rebuilt where they stand: a substream's state is several kilobytes, and a temporary of it
+    // on the stack is what a small task stack cannot take.
+    for (SubstreamState& substream : substreams) {
+        std::destroy_at(&substream);
+        std::construct_at(&substream);
+    }
+    std::ranges::fill(rows, 0);
+    std::ranges::fill(matrixed, 0);
+    std::ranges::fill(pcm, 0);
+    extra_data.clear();
+    layout_eight.clear();
+    layout_six.clear();
+}
+
+void Decoder::reset() noexcept {
+    impl_->clear();
 }
 
 }  // namespace iclforge::truehd

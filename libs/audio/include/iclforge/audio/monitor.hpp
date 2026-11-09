@@ -45,8 +45,8 @@ struct MonitorStats {
 };
 
 // Where the device has got to in what it has been given, as it says rather
-// than as the submitting side counts: what a meter released at play time needs
-// (planning/hearth-reference-player.md, Monitor), and what tells a caller
+// than as the submitting side counts: what a meter released at play time needs,
+// and what tells a caller
 // running slightly ahead of real time how far ahead it is.
 //
 // Every figure is in sample-frames and counts from the last start() or

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Hearth phase A7's macOS leg (planning/hearth-reference-player.md): a custom
+  Hearth phase A7's macOS leg: a custom
   Info.plist, the same reason and shape as apps/forge/gui/packaging/macos/Info.plist.in - CMake's
   own default template carries no CFBundleDocumentTypes/
   UTExportedTypeDeclarations, and supplying a template of our own means

@@ -1,7 +1,7 @@
 // @ts-check
 'use strict';
 
-// The flash budget planning/esp32-device-ui.md sets for the page (decision 18):
+// The flash budget for the page:
 // the page and its script together, as the firmware embeds them. LF
 // line endings too (.gitattributes pins them), so a Windows checkout embeds,
 // budgets and maps coverage onto the same bytes CI does.
@@ -12,10 +12,9 @@
 //
 // 28,672 since Hearth B3: the Sendspin player's section - the server, the
 // link, the clock, how late the stream plays, underruns, a level per output,
-// a pairing code and the three pairing actions. planning/esp32-device-ui.md,
-// decision 18, has the image sizes behind it: the budget is a statement about
-// keeping the page small enough to read and serve from flash rather than
-// about running out of room.
+// a pairing code and the three pairing actions. The budget is a statement
+// about keeping the page small enough to read and serve from flash rather
+// than about running out of room.
 //
 // 45,056 since the redesign: Hearth's own look - its palette in both schemes,
 // section rules, segmented controls for the slot width and the named
@@ -31,15 +30,14 @@
 // required". Raised with room for the settings that follow (a per-speaker trim, a zone picker) rather than to fit one change;
 // decision 22's third re-derivation has the images, slot by slot.
 //
-// 65,536 since the zone list of the Time section (61,440 with the section alone) (a board's time zone, time server and whether it asks one: planning/p4x-now-playing.md,
-// stage 3), which every board that has a network has; 57,344 since the firmware section (decision 29): both slots, a trial, an
+// 65,536 since the zone list of the Time section (61,440 with the section alone) (a board's time zone, time server and whether it asks one), which every board that has a network has; 57,344 since the firmware section (decision 29): both slots, a trial, an
 // upload and the last update; an upload from a file with the bytes sent
 // shown; Restart and Roll back behind the dialog, which now asks before
 // anything that cannot be taken back. Decision 22's second re-derivation has
 // the images.
 //
 // 69,632 since the Speakers section (a level and a distance for each speaker, a test tone out of each, and what the
-// build can do about a delay: planning/p4x-preferences.md), which every board with a Sendspin player has: a table
+// build can do about a delay), which every board with a Sendspin player has: a table
 // of the layout's speakers, two fields and a button a row, and three buttons. About 4.7 KB; the images have room.
 
 const fs = require('fs');

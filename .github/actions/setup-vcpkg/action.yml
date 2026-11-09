@@ -34,7 +34,7 @@ runs:
     # A full clone: manifest mode with no builtin-baseline resolves the baseline
     # from the checkout's history, which a --depth 1 clone does not have. Then
     # reset to the pin so a rebuild months from now installs the same Catch2.
-    - name: Clone and bootstrap vcpkg
+    - name: Clone vcpkg
       shell: bash
       # inputs.vcpkg-commit read through env: rather than interpolated
       # straight into the script text - every caller today passes a literal
@@ -65,12 +65,74 @@ runs:
         git -C "$VCPKG_DIR" fetch --tags origin
         git -C "$VCPKG_DIR" checkout --force "$VCPKG_COMMIT"
         if [ "$RUNNER_OS" = "Windows" ]; then
-          "$VCPKG_DIR/bootstrap-vcpkg.bat" -disableMetrics
           echo "VCPKG_ROOT=$(cygpath -w "$VCPKG_DIR")" >> "$GITHUB_ENV"
         else
-          "$VCPKG_DIR/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$VCPKG_DIR" >> "$GITHUB_ENV"
         fi
+
+    # The vcpkg tool binary. bootstrap-vcpkg.{sh,bat} downloads it from
+    # github.com/microsoft/vcpkg-tool/releases on every run, with a retry that
+    # gives up after about eight seconds, and until now nothing cached it: the
+    # download cache below is not configured yet when the bootstrap runs, and
+    # it holds ports' sources, not this binary. One 504 from that URL
+    # therefore failed every job that uses this action (2026-11-09: Linux GCC,
+    # Windows MSVC and FATE Interop together). So the binary is cached on its
+    # own, keyed by OS, arch and the vcpkg-tool release tag the checkout pins
+    # (scripts/vcpkg-tool-metadata.txt) - one small entry per platform per
+    # release, with no restore-keys fallback, because only the pinned tag's
+    # binary is the right one. vcpkg-tool.sh holds the logic and the reasoning:
+    # the verification of a cached binary, and the bootstrap run under a retry
+    # with a real back-off on a miss.
+    #
+    # The tag and SHA-512 come out of the checkout (an input-pinned commit of
+    # this organisation's vcpkg fork) and are checked against a strict pattern
+    # before they reach an output, so nothing attacker-reachable decides the
+    # key or what a step runs. ACTION_PATH goes through env: with the rest, for
+    # the same template-injection reason as the commit above.
+    - name: Work out the vcpkg tool cache key
+      id: tool-plan
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        export VCPKG_DIR="${RUNNER_TEMP}/vcpkg"
+        export TOOL_CACHE_DIR="$HOME/.cache/vcpkg/tool"
+        bash "$ACTION_PATH/vcpkg-tool.sh" plan
+
+    - name: Restore the vcpkg tool
+      id: tool-restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/vcpkg/tool
+        key: ${{ steps.tool-plan.outputs.key }}
+
+    - name: Install the vcpkg tool
+      id: tool
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        TOOL_TAG: ${{ steps.tool-plan.outputs.tag }}
+        TOOL_SHA512: ${{ steps.tool-plan.outputs.sha512 }}
+        TOOL_CACHE_HIT: ${{ steps.tool-restore.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        export VCPKG_DIR="${RUNNER_TEMP}/vcpkg"
+        export TOOL_CACHE_DIR="$HOME/.cache/vcpkg/tool"
+        bash "$ACTION_PATH/vcpkg-tool.sh" install
+
+    # Saved here, right after the download, not by a post-job step: actions/cache's
+    # own save runs only when the whole job succeeds, and a job that downloaded the
+    # tool and then failed on something else would throw it away. continue-on-error:
+    # twenty jobs that all missed save the same key at once and all but one are told
+    # it exists; a cache that cannot be saved must never be what fails the job.
+    - name: Save the vcpkg tool
+      if: steps.tool.outputs.fetched == 'true'
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/vcpkg/tool
+        key: ${{ steps.tool-plan.outputs.key }}
 
     # vcpkg rejects an MSYS-style path (/c/...) for these, so hand it a native
     # Windows path. The cache action below still needs the bash-style path,

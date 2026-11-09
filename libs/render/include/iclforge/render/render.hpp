@@ -107,7 +107,7 @@ class LayoutRenderer {
     // stays empty, crossover_hp_/crossover_lp_ are never resized, and this
     // costs three empty vector headers rather than filter state for slots
     // nothing uses - the ESP32-S3 WiFi shape's internal heap has been seen
-    // with under 1 KB free during a 7.1.4 play (planning/esp32-714-realtime.md),
+    // with under 1 KB free during a 7.1.4 play,
     // and a fixed per-instance cost paid by every layout regardless of
     // whether it is small-aware would eat straight into that. sample_rate_hz
     // defaults to the boards' only rate. crossover_hz is taken as given here;

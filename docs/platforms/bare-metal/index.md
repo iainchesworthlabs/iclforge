@@ -3,16 +3,14 @@
 Five targets, one profile: `iclforge::ac3_minimal`, the minimum-footprint build of the codec — one
 static library, no exceptions, no RTTI, decode-only or encode-only, and none of the direct-form
 transform tables. What differs between the targets is the part and, on parts with no
-floating-point unit, the arithmetic tier the decoder runs in
-([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md)).
+floating-point unit, the arithmetic tier the decoder runs in.
 
 AC-4 is built from its own libraries (`libs/ac4`), the decoder only:
 no bare-metal build has the AC-4 encoder. The [Cortex-M3](cortex-m3.md#status) leg probes it, and the
 [ESP32-P4](esp32-p4.md#ac-4) decodes it behind `CONFIG_ICLFORGE_AC4`, to 5.1 in real time. The
 [ESP32-S3](esp32-s3.md#ac-4) decodes it with its state in PSRAM, under QEMU in CI and on a board,
 where 2.0 keeps up (phase D14c). The [ESP32-C6](esp32-c6.md#ac-4) and the ESP32-C3 build it in the
-fixed-point tier (phase D14d of
-[`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s));
+fixed-point tier;
 a decode does not fit a C6 beside WiFi, and on a board the play is refused.
 A Hearth sink built with the decoder takes AC-4 in a Sendspin group on the P4 and the S3
 ([Hearth](../../hearth/index.md#esp32-sinks)); the published P4 and S3 sink images have the decoder, the C6's has it off.
@@ -29,8 +27,7 @@ The variant table keeps codec support, Hearth support, distribution and evidence
 Whether a part is viable at all comes down to floating point, not RAM — the comparison across the
 wider ESP32 family, why the ESP32-P4 was declined as an S3 *replacement*, and the complementary
 C6 / S3 / P4 sink modules on one dual-ES9080 PCB, are on
-[ESP32-C3 → Why this part](esp32-c3.md#why-this-part-and-not-another-esp32-variant) and
-[`planning/esp32-sink-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md).
+[ESP32-C3 → Why this part](esp32-c3.md#why-this-part-and-not-another-esp32-variant).
 
 ## Which page
 

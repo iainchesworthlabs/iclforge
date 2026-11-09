@@ -11,8 +11,7 @@
 #include "mat_status.hpp"
 #include "queue.hpp"
 
-// Which output Hearth plays through, on which endpoint, and why
-// (planning/hearth-reference-player.md, A3).
+// Which output Hearth plays through, on which endpoint, and why.
 //
 // Pure: it takes what a probe found and what the user asked for, and names a
 // mode, an endpoint and a one-line reason. Nothing here opens a device, which
@@ -28,8 +27,7 @@
 // usable".
 //
 // The other difference is that Hearth has to answer the sink-following gaps
-// the appliance plan left open (planning/player-appliance.md, "What UX9
-// needs"), and three of the six are settled by the shape of this function
+// the appliance plan left open, and three of the six are settled by the shape of this function
 // rather than by its contents:
 //
 //   * Gap 1, the default endpoint never probed. There is no "the default is

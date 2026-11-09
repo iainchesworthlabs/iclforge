@@ -220,14 +220,14 @@ int run_words(const std::vector<std::string>& words) {
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 49> kCommands{{
-    {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
+constexpr std::array<Command, 50> kCommands{{
+    {"silence", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
          const auto seconds = x.whole_seconds(2, 5);
          return seconds ? run_silence(x.str(1), *seconds, x.u32(3, 192)) : kExitUsage;
      }},
-    {"sine", 2, "<out.ac3> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]", "",
+    {"sine", 2, "<out.ac3|out.thd> [seconds] [bitrate_kbps] [freq_hz] [amp_pct] [layout]", "",
      topic::kLayout | topic::kMeta,
      Needs::kNothing,
      [](const Args& x) {
@@ -412,6 +412,24 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStdio | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_truehd_encode(x.str(1), x.str(2), x.meta); }},
+    {"truehd-atmos", 3, "<objects.wav|master.adm.wav> <out.thd|out.mkv|out.mp4|out.ts> [paths.txt]",
+     "2 to 16 channels of 24 bit PCM at 48, 96 or 192 kHz (the two higher rates are provisional: "
+     "no Dolby tool has been shown to read the object metadata there, the bed is 7.1 at all "
+     "three, and the metadata frame stays 1536 samples), or an ADM master (BW64; needs -DICLFORGE_BUILD_ADM=ON, "
+     "its LFE first and then its beds and objects, on the paths it gives them), as the object channels "
+     "of a TrueHD Atmos stream: "
+     "substream 3 (restart sync 0x31EC), the first channel the LFE (truehd-objects-lfe=off: all "
+     "objects), beside a 7.1 bed in substreams 0 to 2 (truehd-bed=<7.1 WAV>, or the objects "
+     "placed on 7.1 by the renderer from the same metadata) and the objects' positions in the "
+     "evolution frames of the access units, one frame every 1536 samples. paths.txt is atmos-path's "
+     "scene file for the objects after the LFE; the others stand in an even fan around the room. "
+     "Decoding it with truehd-presentation=all gives the object channels back, bit for bit, and "
+     "the best presentation the bed. Nothing outside this project reads substream 3, so the stream "
+     "is provisional and unsigned, and a licensed decoder may not accept it (libs/truehd/ERRATA.md "
+     "entries 61 to 64). The other truehd-* options are truehd-encode's",
+     topic::kStdio | topic::kTruehd | topic::kObjects,
+     Needs::kNothing,
+     [](const Args& x) { return run_truehd_atmos(x.str(1), x.str(2), x.str(3), x.meta); }},
     {"ac4-sign", 3, "<in.ac4> <out.ac4> content-key=<path> content-chain=<path> [publisher-uuid=<uuid>]",
      "append a content signature (ECDSA P-256, Thrift-serialised, with the certificate chain) after "
      "the last sync frame of a raw AC-4 stream, making a signed copy. The key and chain are the "
@@ -443,7 +461,10 @@ constexpr std::array<Command, 49> kCommands{{
      "for E-AC-3 Atmos, D10's decoded objects for AC-4. adm_out (needs -DICLFORGE_BUILD_ADM=ON): "
      "write a Dolby Atmos Master ADM Profile BW64 there (for E-AC-3 its objects; for AC-4, "
      "every bed and dynamic object with its own decoded Annex F properties) - bed/LFE channels "
-     "pinned to their speaker, dynamic objects positioned by their own timeline. strict: exit 2, "
+     "pinned to their speaker, dynamic objects positioned by their own timeline. For TrueHD, "
+     "truehd-presentation=all gives objects_dir each channel of substream 3 and adm_out its beds "
+     "and objects (provisional, libs/truehd/ERRATA.md entry 61), and another presentation gives "
+     "adm_out its bed alone. strict: exit 2, "
      "after writing what could be decoded, when any frame or unit was lost after the first one "
      "decoded (an AC-4 frame waiting for an I-frame, a concealed frame, a TrueHD unit a lenient "
      "decode dropped); without it such a decode exits 0 and warns",
@@ -460,7 +481,7 @@ constexpr std::array<Command, 49> kCommands{{
      "track; table or documented JSON",
      topic::kStdio | topic::kProbe,
      Needs::kNothing, [](const Args& x) { return run_probe(x.str(1), x.meta); }},
-    {"transcode", 3, "<in.ac3|in.ec3|in.ac4> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
+    {"transcode", 3, "<in.ac3|in.ec3|in.ac4|in.thd|in.mlp> <out.ac3|out.ec3|out.ac4> [bitrate_kbps] [layout]",
      "decode and re-encode, carrying dialnorm, compr and the mix metadata across - the "
      "DD+-to-DD path for optical and AC-3-only HDMI sinks - or between AC-4 and AC-3 or "
      "E-AC-3 either way: an AC-4 presentation, chosen as decode chooses one, becomes the "
@@ -490,18 +511,22 @@ constexpr std::array<Command, 49> kCommands{{
      topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) { return run_normalize(x.str(1), x.str(2), x.meta); }},
-    {"cut", 3, "<in.ac3|in.ec3> <out.ac3|out.ec3> [start_seconds] [duration_seconds]",
-     "extract on access-unit boundaries; nothing is re-encoded", topic::kStreamTools,
+    {"cut", 3, "<in.ac3|in.ec3|in.thd|in.mlp> <out> [start_seconds] [duration_seconds]",
+     "extract on access-unit boundaries; nothing is re-encoded. A TrueHD or MLP stream is "
+     "cut from the first access unit with a major sync at or after the start, and the time "
+     "used is printed",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
-     [](const Args& x) { return run_cut(x.str(1), x.str(2), x.str(3), x.str(4)); }},
-    {"cat", 4, "<out.ac3|out.ec3> <in1> <in2> [in3...]",
+     [](const Args& x) { return run_cut(x.str(1), x.str(2), x.str(3), x.str(4), x.meta); }},
+    {"cat", 4, "<out> <in1> <in2> [in3...]",
      "join streams end to end (output FIRST, since the input list is variadic); refuses "
-     "inputs whose codec, rate, layout or substream shape differ",
-     topic::kStreamTools,
+     "inputs whose codec, rate, layout or substream shape differ, and, for TrueHD or MLP, an "
+     "input that does not open with a major sync",
+     topic::kStreamTools | topic::kTruehd,
      Needs::kNothing,
      [](const Args& x) {
          const auto inputs = x.tail(2);
-         return run_cat(x.str(1), inputs);
+         return run_cat(x.str(1), inputs, x.meta);
      }},
     {"levels", 2, "<in.wav|in.ac3|in.ec3|in.ac4|in.thd|in.mlp|in.mkv|in.mp4|in.ts>",
      "per-channel peak/RMS report; an AC-4 presentation as coded; TrueHD and MLP as decoded "

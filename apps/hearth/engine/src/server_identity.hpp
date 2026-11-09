@@ -6,8 +6,8 @@
 #include "iclforge/sendspin/noise.hpp"
 #include "settings_model.hpp"
 
-// This computer's Sendspin server identity (planning/hearth-reference-player.md,
-// A6), kept in the settings so that it is the same on every start. A sink binds
+// This computer's Sendspin server identity, kept in the settings so that it is the same on every
+// start. A sink binds
 // each pairing record to the server identity that made it (connection.md, E8)
 // and refuses that record's long-term PSK from any other identity, with no
 // fallback to the Sentinel: an identity made afresh on each start would leave

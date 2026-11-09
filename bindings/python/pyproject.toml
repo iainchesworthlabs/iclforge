@@ -62,11 +62,15 @@ ICLFORGE_BUILD_ADM = "OFF"
 # manylinux/musllinux/macOS/Windows images never install - see that option's own comment.
 ICLFORGE_BUILD_HEARTH = "OFF"
 # The AC-4 library (libs/ac4) defaults ON - ON here too since
-# plan phase I4 binds them (planning/ac4.md): the wheel carries iclforge.ac4 (iclforge::ac4::Decoder/
+# plan phase I4 binds them: the wheel carries iclforge.ac4 (iclforge::ac4::Decoder/
 # iclforge::ac4::Encoder bound directly, bindings/python/src/iclforge_ext/ac4/present/ac4_module.cpp), the same
 # "wheel always carries the full surface" reasoning as the matroska/mp4/mpegts/signing targets
 # below.
 ICLFORGE_BUILD_AC4 = "ON"
+# ON here too (it is the default): the wheel carries iclforge.truehd, the TrueHD and MLP lossless
+# decoder with a stream's scan, bound directly onto iclforge::truehd
+# (bindings/python/src/iclforge_ext/truehd/present/truehd_module.cpp).
+ICLFORGE_BUILD_TRUEHD = "ON"
 # ON since Python bindings completeness: the wheel carries the container muxers/demuxers
 # (iclforge.containers) and object signing (iclforge.signing) - the
 # "no containers, no signing" gap its record used to name.

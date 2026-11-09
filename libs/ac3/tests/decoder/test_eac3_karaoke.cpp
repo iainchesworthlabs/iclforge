@@ -19,13 +19,12 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 
-// Karaoke in E-AC-3 (planning/karaoke-eac3.md, D1 to D3).
+// Karaoke in E-AC-3.
 //
 // A/52 carries a karaoke stream's signalling in E-AC-3 field for field - bsmod 7 above 1/0 in
 // Table E1.2's infomdate group, whose meaning Annex E takes from Table 5.7 - and defines no
 // reproduction for it. Dolby's own decoder reproduces Annex C's for one independent substream, and
-// the ratios below are what it did on streams of this shape (planning/karaoke-eac3-findings.md,
-// measured 2026-10-12 with the Dolby Reference Player's dlbac3dec in line mode): V1 into L and V2
+// the ratios below are what it did on streams of this shape: V1 into L and V2
 // into R at the stream's Lo/Ro surround level (-3 dB when mixmdate is absent, E-AC-3's default),
 // the melody in the centre at the same gain as L and R, the LFE untouched in its ratio to them.
 // The AC-3 decoder's own reproduction has its tests in test_output_stage.cpp; what is held here is
@@ -373,8 +372,8 @@ TEST_CASE("E-AC-3 karaoke: only a programme the stream calls karaoke is reproduc
 TEST_CASE("E-AC-3 fold: a stream with no mixmdate folds at -3 dB, centre and surrounds, as Dolby's does",
           "[eac3][decoder][fold]") {
     // Not karaoke (bsmod 0) and no mixing group: the ordinary Lo/Ro fold of a 3/2 programme.
-    // Annex E has no cmixlev or surmixlev to read, and Dolby's decoder folds it at -3 dB and -3 dB
-    // (planning/karaoke-eac3.md, D10): the centre and each surround reach their side at 0.7071 of
+    // Annex E has no cmixlev or surmixlev to read, and Dolby's decoder folds it at -3 dB and -3 dB:
+    // the centre and each surround reach their side at 0.7071 of
     // the front channel's gain, where AC-3's -4.5 and -6 dB defaults would give 0.5957 and 0.5.
     const ac3::eac3::AccessUnitConfig config{
         .independent = karaoke_bed(ac3::Acmod::k3_2, false, std::nullopt,

@@ -1,6 +1,6 @@
 #pragma once
 
-// The screen a panel shows while a song with no lyrics plays (planning/p4x-now-playing.md): which
+// The screen a panel shows while a song with no lyrics plays: which
 // view the owner chose, when it dims, and the words it says about the stream. Standard library only, so
 // that the host tests it (libs/device/tests/test_now_view.cpp): the words are what PUT /now-playing and
 // PUT /dim-after take and GET /status's screen reports, and what NVS holds is a number that must never
@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace iclforge::nowview {
@@ -24,7 +25,7 @@ enum class View : std::uint8_t {
     kClock = 2,     // the time (needs a clock the board has to be given)
     kOff = 3,       // the screen this replaced: one sentence
     kDark = 4,      // nothing lit: the backlight off while a song has no lyrics, a touch lights the speakers for a while
-    kMeters = 5,    // an instrument: a spectrum of the main mix, and meters of the room's channels (planning/p4x-meters-view.md)
+    kMeters = 5,    // an instrument: a spectrum of the main mix, and meters of the room's channels
 };
 
 inline constexpr View kDefaultView = View::kSpeakers;
@@ -82,7 +83,7 @@ namespace detail {
 
 // --- the speakers' style --------------------------------------------------------------------------------
 
-// How the speakers view shows a level (planning/p4x-speakers-options.md). The stored values are these
+// How the speakers view shows a level. The stored values are these
 // numbers: never renumbered, never reused.
 enum class SpeakersStyle : std::uint8_t {
     kGlow = 0,   // each speaker glows with its level: the fill and a halo in steps
@@ -248,7 +249,7 @@ inline constexpr int kDefaultNightTo = 7 * 60;
 // server told it). From and to are minutes after midnight; a window that ends before it starts crosses midnight
 // (22:00 to 07:00), and one that ends where it starts is empty, which is never dark: a person who wanted the whole
 // day would pick the dark view. `idle` says that the idle screen, between songs, is covered too: not decided by
-// the owner (planning/p4x-now-playing.md, "Open"), so it is a separate setting and off.
+// the owner, so it is a separate setting and off.
 struct NightSchedule {
     bool enabled = false;
     int from_min = kDefaultNightFrom;
@@ -294,7 +295,7 @@ inline constexpr int kNightStepMinutes = 15;
 }
 
 // Whether the idle screen (between songs, nothing held) is darkened as well: the schedule is in force and its
-// `idle` setting says the idle screen is covered. Off until the owner decides (planning/p4x-now-playing.md, "Open").
+// `idle` setting says the idle screen is covered. Off until the owner decides.
 [[nodiscard]] constexpr bool night_covers_idle(const NightSchedule& night, std::optional<int> minute_of_day) {
     return night.idle && night_active(night, minute_of_day);
 }
@@ -438,10 +439,111 @@ inline constexpr int kNightStepMinutes = 15;
     return dimmed(true, minutes, quiet) ? Dim::kDimmed : Dim::kNone;
 }
 
+// --- the waiting screen -------------------------------------------------------------------------------------------
+
+// What the screen does once it has waited for something to play, with nothing touched, for the dim time (PUT /idle-view).
+// The waiting screen is the one a set-up board shows between servers' streams: its name, address and "Waiting for
+// something to play". The stored values are these numbers: never renumbered, never reused.
+enum class IdleView : std::uint8_t {
+    kLit = 0,    // stays as it is: the screen this replaced, lit for hours
+    kDim = 1,    // a black cover with one line, the backlight at its floor
+    kClock = 2,  // the time, the backlight at its floor (a dim, where no time is known, until a time server answers)
+    kDark = 3,   // nothing lit: the backlight off
+};
+
+inline constexpr IdleView kDefaultIdleView = IdleView::kDim;
+
+[[nodiscard]] constexpr const char* idle_view_name(IdleView view) {
+    switch (view) {
+        case IdleView::kLit:
+            return "lit";
+        case IdleView::kClock:
+            return "clock";
+        case IdleView::kDark:
+            return "dark";
+        case IdleView::kDim:
+            break;
+    }
+    return "dim";
+}
+
+// One of the four words, with or without a line ending after it.
+[[nodiscard]] constexpr std::optional<IdleView> parse_idle_view(std::string_view text) {
+    text = detail::trimmed(text);
+    for (const IdleView view : {IdleView::kLit, IdleView::kDim, IdleView::kClock, IdleView::kDark}) {
+        if (text == idle_view_name(view)) {
+            return view;
+        }
+    }
+    return std::nullopt;
+}
+
+// A stored number, or nothing for one this build does not know (a partition written by another build).
+[[nodiscard]] constexpr std::optional<IdleView> idle_view_from_stored(std::int32_t value) {
+    if (value >= static_cast<std::int32_t>(IdleView::kLit) && value <= static_cast<std::int32_t>(IdleView::kDark)) {
+        return static_cast<IdleView>(value);
+    }
+    return std::nullopt;
+}
+
+// Whether the board is set up, so that a waiting screen is the board resting and not the board asking for something: no
+// pairing code on show, and a server paired with it or connected to it. A board still to be paired keeps its screen lit
+// and saying so.
+[[nodiscard]] constexpr bool board_set_up(bool pairing_code_shown, unsigned paired, unsigned connections) {
+    return !pairing_code_shown && (paired > 0 || connections > 0);
+}
+
+// What the waiting screen is doing with the glass: how it is dimmed, and whether the time is what it shows through a dim.
+struct IdleScreen {
+    Dim dim = Dim::kNone;
+    bool clock = false;
+
+    friend constexpr bool operator==(const IdleScreen&, const IdleScreen&) = default;
+};
+
+// The waiting screen's rule. `view` is what the person chose, `set_up` is board_set_up(), `clock_known` that a time
+// server has answered (the clock saver is a plain dim until it has), and `minutes` the dim time. `inactive_ms` is the time
+// since anything touched the glass, `showing_ms` the time since the waiting screen began to show.
+//
+// It is lit for the dim time from the last touch, or from when it began to show if nothing has touched the glass since,
+// and then it is the view chosen. It counts from when it began so that a stream that ends on a panel nobody has touched
+// for hours does not start dimmed, except when the screen was already dimmed or dark as the stream ended (`carried`): then
+// it stays so until a touch, and the status does not flash on between two songs of a playlist. A touch lights it, and the
+// dim time begins again. A dim time of never keeps it lit, but not a carried screen, which a touch is the only end of.
+//
+// The night schedule's idle switch makes it the dark view while the night is in force, as it does for any view.
+[[nodiscard]] constexpr IdleScreen idle_state(IdleView view, bool set_up, bool clock_known, bool carried, int minutes,
+                                              std::uint32_t inactive_ms, std::uint32_t showing_ms,
+                                              const NightSchedule& night = {},
+                                              std::optional<int> minute_of_day = std::nullopt) {
+    if (night_covers_idle(night, minute_of_day)) {
+        return {dark_state(inactive_ms, showing_ms), false};
+    }
+    if (!set_up || view == IdleView::kLit) {
+        return {};
+    }
+    const bool touched_since_it_began = inactive_ms < showing_ms;
+    const std::uint32_t quiet = carried ? inactive_ms : (touched_since_it_began ? inactive_ms : showing_ms);
+    const bool saved = (carried && !touched_since_it_began) || dimmed(true, minutes, quiet);
+    if (!saved) {
+        return {};
+    }
+    switch (view) {
+        case IdleView::kDark:
+            return {Dim::kDark, false};
+        case IdleView::kClock:
+            return {Dim::kDimmed, clock_known};
+        case IdleView::kDim:
+        case IdleView::kLit:
+            break;
+    }
+    return {Dim::kDimmed, false};
+}
+
 // --- what the stream is called ------------------------------------------------------------------------
 
 // kUnknown is a coded stream before its first unit has decoded.
-enum class Codec : std::uint8_t { kPcm, kAc3, kEac3, kAc4, kUnknown };
+enum class Codec : std::uint8_t { kPcm, kAc3, kEac3, kAc4, kTruehd, kUnknown };
 
 // What the decoder found in the stream, as the player reports it (the sink's DecoderReport).
 struct StreamFacts {
@@ -454,6 +556,9 @@ struct StreamFacts {
     bool lfe = false;
     // Objects the stream carries.
     int objects = 0;
+    // The channels the decoder produced, the LFE among them; 0 where it does not say. A layout acmod cannot name (TrueHD
+    // 7.1) is said from this, and acmod stays what the other codecs' layouts are said from.
+    int channels = 0;
 
     friend constexpr bool operator==(const StreamFacts&, const StreamFacts&) = default;
 };
@@ -466,6 +571,8 @@ struct StreamFacts {
             return "Dolby Digital Plus";
         case Codec::kAc4:
             return "Dolby AC-4";
+        case Codec::kTruehd:
+            return "Dolby TrueHD";
         case Codec::kUnknown:
             return "Coded audio";
         case Codec::kPcm:
@@ -487,7 +594,11 @@ struct StreamFacts {
     if (!facts.have_decoder || facts.codec == Codec::kPcm) {
         return out;
     }
-    if (facts.acmod == 0) {
+    if (facts.channels > 0) {
+        // Counted by the decoder: the LFE is one of them and is said as the ".1".
+        const int full_bandwidth = facts.channels - (facts.lfe ? 1 : 0);
+        out += " " + std::to_string(full_bandwidth) + (facts.lfe ? ".1" : ".0");
+    } else if (facts.acmod == 0) {
         out += " dual mono";
     } else if (const int channels = acmod_channels(facts.acmod); channels > 0) {
         out += " " + std::to_string(channels) + (facts.lfe ? ".1" : ".0");
@@ -585,11 +696,11 @@ class BitrateMeter {
 }
 
 // The line the footer says about a stream, from the most to the least it can say; the screen takes the
-// first that fits its width. A coded stream is decoded on this board (the server sent it undecoded), and a
-// PCM one was decoded by the server.
-//   "Decoded on this board - 768 kb/s - from Music Assistant", "Decoded on this board - 768 kb/s",
-//   "Decoded here - 768 kb/s - from Music Assistant", "Decoded here - 768 kb/s", "768 kb/s"; "PCM from Music
-//   Assistant", "PCM".
+// first that fits its width. A coded stream is named as the heading names it (stream_name(): the codec, its
+// coded layout and its objects), with the rate that arrived and the server it came from; a PCM one was
+// decoded by the server. The list is never empty, and its last entry is the shortest.
+//   "Dolby TrueHD 7.1 - 5200 kb/s - from Music Assistant", "Dolby TrueHD 7.1 - 5200 kb/s", "Dolby TrueHD 7.1",
+//   "Dolby TrueHD"; "PCM from Music Assistant", "PCM". Each is shorter than the one before.
 [[nodiscard]] inline std::vector<std::string> stream_info_options(const StreamFacts& facts, int kbps,
                                                                   std::string_view server) {
     const std::string who = server_label(server);
@@ -600,22 +711,24 @@ class BitrateMeter {
         return out;
     }
     const std::string rate = kbps > 0 ? std::to_string(kbps) + " kb/s" : std::string();
-    const auto join = [&](const char* head) {
-        std::string line = head;
-        if (!rate.empty()) {
-            line += " - " + rate;
+    // A line the one before already was (a stream not yet decoded is "Coded audio" in full and short) is left out.
+    const auto add = [&out](std::string line) {
+        if (out.empty() || out.back() != line) {
+            out.push_back(std::move(line));
         }
-        return line;
     };
-    if (!who.empty()) {
-        out.push_back(join("Decoded on this board") + " - from " + who);
-        out.push_back(join("Decoded here") + " - from " + who);
-    }
-    out.push_back(join("Decoded on this board"));
-    out.push_back(join("Decoded here"));
+    const std::string full = stream_name(facts);
+    const std::string codec = codec_name(facts.codec);
     if (!rate.empty()) {
-        out.push_back(rate);
+        if (!who.empty()) {
+            add(full + " - " + rate + " - from " + who);
+        }
+        add(full + " - " + rate);
+    } else if (!who.empty()) {
+        add(full + " - from " + who);
     }
+    add(full);
+    add(codec);
     return out;
 }
 

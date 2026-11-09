@@ -53,7 +53,7 @@ trademarks of Dolby Laboratories. This project implements the openly published s
 A/52:2018 (of which E-AC-3 is normative Annex E), ETSI TS 102 366, ETSI TS 103 420 and ETSI TS
 103 190 (AC-4) — and is not affiliated with, endorsed by, or certified by Dolby Laboratories.
 TrueHD and MLP have no openly published standard: that codec is written from a specification
-supplied by the project's owner ([the plan](planning/truehd.md#sources-and-what-they-are) says what it is
+supplied by the project's owner ([the plan] says what it is
 and how the code is checked).
 Code and documentation use the technical names AC-3, E-AC-3, AC-4 and TrueHD. Whether the patents reading on
 these formats matter for your use is your problem to assess, not something this project
@@ -217,7 +217,7 @@ forge decode out.ac4 out.wav
 ```
 
 `forge`'s commands cover encoding, decoding, muxing, inspection, QC and live capture, for AC-3,
-E-AC-3 and AC-4, and decoding, inspection, muxing and encoding for TrueHD (`forge truehd-encode`);
+E-AC-3 and AC-4, and decoding, inspection, muxing and encoding for TrueHD (`forge truehd-encode`, and `truehd-atmos` for a provisional Atmos stream);
 run it with no arguments for the full listing.
 `forge-gui` is a Qt Quick front end over the same library: file and live-capture encoding, a plan
 view for placing objects, channel-level metering, QC, a stream player, an object inspector, a
@@ -391,7 +391,6 @@ packaging/      vcpkg port, winget manifest, Conan recipe (staged, pending upstr
                 Homebrew formula/cask (each release copies them to the live tap)
 docs/           the site source — see Documentation below; docs-snippets/ holds the generated
                 tables it includes, and overrides/ its home page template
-planning/       design proposals and phase plans, not published on the site
 ```
 
 The standards documents are not redistributed; `spec/` is gitignored. See

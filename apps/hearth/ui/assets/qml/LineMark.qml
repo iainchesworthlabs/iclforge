@@ -2,7 +2,7 @@ import QtQuick
 
 import Hearth
 
-// A lyric line's result, shown after the line has been sung (planning/karaoke-microphone.md, M5): three
+// A lyric line's result, shown after the line has been sung: three
 // pips, the percentage, or "not sung".
 //
 // Three levels as pips and a number, so that colour is never the only cue (L4). A line the reference

@@ -11,7 +11,7 @@
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/json.hpp"
 
-// _iclforge_player@v1 (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1): the
+// _iclforge_player@v1: the
 // objects the role adds to client/hello, client/state, stream/start and server/command, each a
 // struct with a writer that appends it as the value of a key the caller has written, and a reader.
 // Its burst chunk, ID 192 (message_id::kIclforgeBurst), is chunks.hpp's; the messages that carry
@@ -37,7 +37,14 @@ enum class DataType : std::uint8_t {
     kEac3,
     // IEC 61937-14's four burst types, whichever the server's packer chose.
     kAc4,
+    // TrueHD and MLP as access units, up to 24 to a chunk (a MAT frame's worth, 20 ms), not as the
+    // padded MAT burst: Pc 22 and a Pd in bytes.
+    // Added to the data_types a sink lists, not a new version of the role.
+    kTruehd,
 };
+
+// How many data types there are; the per-type limits below are indexed by DataType.
+inline constexpr std::size_t kDataTypeCount = 4;
 
 [[nodiscard]] std::string_view data_type_name(DataType type);
 // The burst type a stream of `type` is sent as: for AC-4, its first, the one on
@@ -94,7 +101,7 @@ inline constexpr double kKaraokeLevelMinDb = -24.0;
 inline constexpr double kKaraokeLevelMaxDb = 12.0;
 
 // The longest lyric document, in bytes of text, the role carries in one message: a Noise transport
-// message holds 65,518 bytes of plaintext (planning/hearth-sendspin-extension.md, Encryption), and
+// message holds 65,518 bytes of plaintext, and
 // a document's quotes, backslashes and line ends take a second byte each in JSON. A sink states
 // its own, smaller limit in the support object.
 inline constexpr std::uint32_t kMaxLyricsBytes = 60'000;
@@ -116,7 +123,7 @@ struct Support {
     // that type, indexed by DataType; 0 when it states none, which a server reads as "no limit
     // stated" and not as "none". A sink that refuses a wider syncframe states the figure it refuses
     // at, so a server can send that stream another way rather than find out one burst at a time.
-    std::array<std::uint8_t, 3> max_coded_channels{};
+    std::array<std::uint8_t, kDataTypeCount> max_coded_channels{};
 
     [[nodiscard]] std::uint8_t max_coded_channels_of(DataType type) const {
         return max_coded_channels[static_cast<std::size_t>(type)];
@@ -126,7 +133,7 @@ struct Support {
     // statement, not an absence: the sink decodes the bed and does not reconstruct objects. A
     // stream with more objects than a sink states is decoded as its bed by the sink itself, so a
     // server that wants them placed sends it PCM rendered on its own side.
-    std::array<std::optional<std::uint8_t>, 3> max_objects{};
+    std::array<std::optional<std::uint8_t>, kDataTypeCount> max_objects{};
 
     [[nodiscard]] std::optional<std::uint8_t> max_objects_of(DataType type) const {
         return max_objects[static_cast<std::size_t>(type)];
@@ -137,10 +144,20 @@ struct Support {
     // for max_coded_channels: an ESP32-S3 keeps up with AC-4 at 25 frames a second and falls behind
     // at 29.97, where a frame's decode, the frame-rate converter's, takes the same time. A frame
     // rate is compared as it is, so a limit of 30 takes 29.97 and 30 and one of 25 takes 24 and 25.
-    std::array<std::uint16_t, 3> max_frame_rate{};
+    std::array<std::uint16_t, kDataTypeCount> max_frame_rate{};
 
     [[nodiscard]] std::uint16_t max_frame_rate_of(DataType type) const {
         return max_frame_rate[static_cast<std::size_t>(type)];
+    }
+    // Per data type, the most coded data a sink takes of a stream of that type, in kbit/s, taken
+    // over the longest burst chunk (so a peak of 24 TrueHD access units, 20 ms, is what counts, not
+    // an average); 0 when it states none, which a server reads as "no limit stated". A stream whose
+    // peak is higher is sent another way, as for max_coded_channels. Stated by a sink whose link or
+    // ring cannot hold what the stream's declared peak rate allows.
+    std::array<std::uint32_t, kDataTypeCount> max_data_rate{};
+
+    [[nodiscard]] std::uint32_t max_data_rate_of(DataType type) const {
+        return max_data_rate[static_cast<std::size_t>(type)];
     }
     // The most bytes of lyric document (an LRC text, UTF-8) the sink holds for the item playing,
     // 1 to kMaxLyricsBytes; 0 when it does not say, which is a sink that takes no lyrics. A sink
@@ -149,7 +166,7 @@ struct Support {
     // The data types the sink reproduces karaoke for when it is told to (the `karaoke` decoder
     // setting), which a server reads before it sends such a stream as it is. Empty when it says
     // none: a sink from before the key reproduces AC-3's karaoke and nothing else, the codec its
-    // path was written for, so empty reads as {kAc3} (planning/karaoke-eac3.md, D6). A sink that
+    // path was written for, so empty reads as {kAc3}. A sink that
     // reproduces an E-AC-3 stream's lists kEac3. A karaoke stream of a type that is not listed is
     // played as coded by the sink's own decoder, so a server that wants the reproduction sends it
     // PCM it has decoded itself, and a group hears one reproduction.
@@ -157,7 +174,7 @@ struct Support {
     // The decoder keys the sink may ask a server to change with a request (kRequestableKeys, a
     // subset of them), which are the singer's karaoke choices and are the server's to hold. Empty
     // when it asks for none, as a sink from before the key; a server then ignores any request from
-    // it. A server only acts on a key the sink listed here (planning/hearth-android.md, D8).
+    // it. A server only acts on a key the sink listed here.
     std::vector<std::string> requests;
 
     [[nodiscard]] bool reproduces_karaoke(DataType type) const {
@@ -186,7 +203,7 @@ enum class Command : std::uint8_t {
     kSetOutputDelay,
     kSettings,
     kIdentify,
-    // The item's lyric document, and where in the item the sound is (W7d, planning/karaoke-phase2.md).
+    // The item's lyric document, and where in the item the sound is.
     kLyrics,
     kLyricsPosition,
 };
@@ -194,8 +211,7 @@ enum class Command : std::uint8_t {
 struct DecoderReport {
     DataType data_type = DataType::kEac3;
     // The coded audio coding mode, 0 to 7 (A/52, Table 5.8). For AC-4, the mode with the decoded
-    // channels' front and surround speakers, and dialnorm 0 until the decoder reports one
-    // (planning/hearth-sendspin-extension.md, State object).
+    // channels' front and surround speakers, and dialnorm 0 until the decoder reports one.
     std::int32_t acmod = 0;
     bool lfe = false;
     std::int32_t substreams = 0;
@@ -203,6 +219,10 @@ struct DecoderReport {
     std::int32_t objects = 0;
     bool objects_placed = false;
     double dialnorm = 0.0;
+    // The channels the decoder produced, the LFE among them; 0 where the sink does not say. For a stream whose layout A/52's
+    // acmod cannot name (TrueHD 7.1: eight channels, which acmod would call 5.1) the board's own screen names the layout from this.
+    // A local fact: it is not part of the state message, and a report read from one has 0.
+    std::int32_t channels = 0;
 
     friend bool operator==(const DecoderReport&, const DecoderReport&) = default;
 };
@@ -238,7 +258,7 @@ struct LyricsReport {
     friend bool operator==(const LyricsReport&, const LyricsReport&) = default;
 };
 
-// How a stream leaves the sink (D6, planning/hearth-android.md): the coded bits go on to a receiver
+// How a stream leaves the sink: the coded bits go on to a receiver
 // as they came ("passthrough", IEC 61937 over HDMI or S/PDIF), or the sink decoded them and plays
 // the samples ("pcm"). A sink that can do both says which it is doing for the stream it has.
 enum class Output : std::uint8_t {

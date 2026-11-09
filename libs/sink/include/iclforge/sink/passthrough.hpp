@@ -21,18 +21,22 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sink/sink.hpp"
 
-// A sink output that hands the coded stream to a receiver as it is (planning/hearth-android.md,
-// "How the audio is carried"): each Sendspin burst chunk is rebuilt into the IEC 61937 burst it
+// A sink output that hands the coded stream to a receiver as it is: each Sendspin burst chunk is
+// rebuilt into the IEC 61937 burst it
 // came from (iclforge::containers::iec61937::burst_from_parts), written to a link at the time it
 // is due, and the link is kept alive between them with null bursts, never silence, so that a
 // receiver keeps its lock.
+//
+// TrueHD is the one stream that arrives as access units and not as bursts (up to 24 to a chunk):
+// the output packs a chunk's units into a MAT frame (iclforge::containers::iec61937::MatPacker),
+// and the link is eight channels wide at 192 kHz (176.4 kHz for the 44.1 kHz family) for it.
 //
 // The link is a seam, as the program's outputs are: on Android it is an AudioTrack
 // (apps/hearth/android), in a test a model of one, so that what is decided here (which burst goes
 // into which slot, what is late, what is dropped) is tested on the host.
 //
-// What the clock can promise is a burst's length: a rigid stream cannot be nudged by less
-// (planning/hearth-android.md, D10). A burst that is due more than half a burst after the slot it
+// What the clock can promise is a burst's length: a rigid stream cannot be nudged by less.
+// A burst that is due more than half a burst after the slot it
 // would fill is dropped and counted, and one that is not due for more than half a burst is waited
 // for with null bursts, also counted; so a pass-through member of a group is within a burst of the
 // others, and says how often it was not.
@@ -43,7 +47,8 @@ namespace iclforge::sink {
 struct LinkFormat {
     sendspin::player::DataType data_type = sendspin::player::DataType::kAc3;
     // The content's sample rate. The carrier the link itself runs at is `carrier_ratio` times it:
-    // 1 for AC-3, 4 for E-AC-3 and for AC-4 HBR4.
+    // 1 for AC-3, 4 for E-AC-3 and for AC-4 HBR4, and 4, 2 or 1 for TrueHD's MAT (192 kHz or
+    // 176.4 kHz whatever the content rate within its family), on eight channels.
     std::uint32_t sample_rate = 48000;
     std::uint32_t carrier_ratio = 1;
     // One burst on the link, in bytes, and the content frames it lasts.
@@ -90,7 +95,7 @@ class BurstLink {
 
 struct PassthroughOptions {
     // How many bursts the link is kept filled to: the Shield took 4 ahead without an underrun and
-    // not 3 (planning/hearth-android-findings.md, F12), so 6 leaves two bursts of margin for a
+    // not 3, so 6 leaves two bursts of margin for a
     // step that is late.
     std::uint32_t bursts_ahead = 6;
     // How many bursts are queued before the device is expected to start moving: it did not with
@@ -172,6 +177,8 @@ class PassthroughOutput : public BurstStreamOutput {
         std::int64_t due_us = 0;
     };
 
+    // TrueHD: the chunk's access units packed into one MAT burst, queued for its time.
+    void write_truehd_locked(const sendspin::BurstChunk& chunk, std::int64_t local_time);
     void fill_slots_locked(std::int64_t now_us);
     void note_position_locked(std::int64_t now_us, const LinkPosition& position);
     [[nodiscard]] std::int64_t frames_to_us(std::uint64_t frames) const;

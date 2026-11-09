@@ -5,7 +5,7 @@ A hearth_sink board on the two-slot flash layout takes a new application image
 over its network: PUT /firmware writes the slot that is not running, the board
 restarts into it, and the new image stays on trial until it has run well for a
 while. A reset during the trial, or a trial that fails, boots the image before
-it again (planning/esp32-ota.md). This is the host side of that. Standard
+it again. This is the host side of that. Standard
 library only; the zeroconf package is used for --all when it is installed.
 
     python tools/hearth/ota.py push (--build-dir DIR | IMAGE | --release TAG | --run RUN_ID)
@@ -57,8 +57,8 @@ push reads the image file once, and sends the bytes it checked:
 Boards are updated one at a time. push stops at the first board that rolls
 back or does not come back, and the boards after it are not touched.
 
-push --release TAG and --run RUN_ID take published images instead of a build
-(planning/esp32-ota.md, O8). A release's hearth-sink-manifest.json lists each
+push --release TAG and --run RUN_ID take published images instead of a build.
+A release's hearth-sink-manifest.json lists each
 board's image with its chip, flash size, PSRAM, revision range and partition
 table; each board gets the one that matches its /hardware and /firmware, and a
 board no image fits is named and skipped. The image is downloaded then, from
@@ -1424,7 +1424,7 @@ def boards_from(args: argparse.Namespace) -> list[Board]:
     return boards
 
 
-# --- published images (planning/esp32-ota.md, O8) ---------------------------------------------
+# --- published images ---------------------------------------------
 
 # The name the repository had when this was written; repository() answers with the current one.
 FALLBACK_REPOSITORY = "iainchesworthlabs/iclforge"
@@ -1716,8 +1716,7 @@ EPILOG = (
     "H is a board's IP address or its mDNS name (hearth-eb2c64.local), with :PORT when the "
     "port is not 80. --all finds boards by their _sendspin._tcp service and needs the zeroconf "
     "package. Exit status: 0 every board updated or already running the image; 1 refused, "
-    "failed, or a usage error; 2 a board rolled back; 3 a board did not come back. "
-    "planning/esp32-ota.md has the design."
+    "failed, or a usage error; 2 a board rolled back; 3 a board did not come back."
 )
 
 

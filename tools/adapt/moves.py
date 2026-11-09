@@ -3,7 +3,7 @@
 
     moves.py <commit> [--root <worktree>] [--json <file>]
 
-A stage of the re-layout (planning/layout.md, planning/consolidation.md, planning/monorepo.md) moved
+A stage of the re-layout moved
 its files in a commit of their own, every rename `R100`, before any text was changed. The commit
 holds the map, so none is kept as data: this prints it as `old<TAB>new`, one move a line, or writes
 `{"moves": {...}}`. It fails when the commit holds anything but R100 renames, which is how a commit

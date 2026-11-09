@@ -3,7 +3,7 @@
 // run time with dlopen, so that nothing links against it and a system without it, or one that has
 // withdrawn it, is a reader that says so and not a program that does not start.
 //
-// Two things about it are the owner's to weigh (planning/karaoke-phase2-findings.md):
+// Two things about it are the owner's to weigh:
 //   - it is not a documented interface, and developers report that macOS 15.4 and later returns
 //     nothing for a program Apple has not entitled, which is what an unsigned or ordinary
 //     developer-signed Crucible is. Then read() is empty and support() says so: the strip keeps

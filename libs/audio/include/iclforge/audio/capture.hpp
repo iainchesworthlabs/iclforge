@@ -106,7 +106,7 @@ struct CaptureStats {
     std::uint64_t frames_dropped = 0;  // ring buffer overruns (consumer too slow)
 };
 
-// When a packet of captured audio was captured (planning/karaoke-microphone.md, MI6). A score and
+// When a packet of captured audio was captured. A score and
 // a take both need to know where in the playback a voice was sung, and that is the capture time of
 // its samples on the clock the playback position is read on, not the time a consumer got round to
 // them.
@@ -128,7 +128,7 @@ using StampRing = BasicRingBuffer<CaptureStamp>;
 
 // What the platform told the capture about its own timing, in frames at sample_rate(), or 0 where
 // it did not say. Not a promise about the path from a sound to the microphone: the device and its
-// driver add delay this cannot see (planning/karaoke-microphone-findings.md, F2).
+// driver add delay this cannot see.
 struct CaptureTiming {
     // How often a packet arrives.
     std::uint32_t period_frames = 0;

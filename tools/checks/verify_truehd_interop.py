@@ -241,7 +241,8 @@ def in_stream_order(pcm, channels, columns):
 def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
     """The problems with FFmpeg's strict decode of a hand-built stream against the outcome the
     manifest names for it (equal: the whole signal; short: fewer samples, the first of them the
-    signal's; refused: it fails; decodes: it succeeds, the library refusing the stream; differs: it
+    signal's; bed: the best presentation of a stream with a fourth substream, which it leaves alone;
+    refused: it fails; decodes: it succeeds, the library refusing the stream; differs: it
     succeeds and returns other samples, whose hash the manifest holds). The
     outcomes other than equal were seen with one FFmpeg version and are held only if `held`."""
     if path not in cache:
@@ -271,6 +272,13 @@ def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
                 f"ffmpeg did not return {outcome['returned']} samples, the first "
                 f"{outcome['equal_samples']} of them the signal's"
             ]
+        return []
+    if kind == "bed":
+        # The substreams it reads are the best presentation, whatever the fixture's own presentation
+        # is; its channels are in FFmpeg's order.
+        bed = in_stream_order(pcm, len(outcome["columns"]), outcome["columns"])
+        if sha256(bed) != outcome["pcm_sha256"]:
+            return ["ffmpeg's decode is not the bed (the best presentation) of the stream"]
         return []
     if kind == "equal":
         if "columns" in outcome:

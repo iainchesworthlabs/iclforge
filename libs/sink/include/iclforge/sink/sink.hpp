@@ -32,12 +32,12 @@
 #include "iclforge/sink/lyric_frame.hpp"
 #include "iclforge/sink/store.hpp"
 
-// iclforge::sink: libs/sendspin's player half as a sink that a program runs (planning/hearth-
-// android.md, D3). A Sendspin client that waits for servers: it listens on a WebSocket, advertises
+// iclforge::sink: libs/sendspin's player half as a sink that a program runs. A Sendspin client
+// that waits for servers: it listens on a WebSocket, advertises
 // _sendspin._tcp, pairs by its pairing PSK and a dynamic or static code, admits servers as the
 // specification ranks them, and hands each stream it is sent to an output the program supplies:
 // PCM, FLAC or Opus over player@v1, and AC-3 or E-AC-3, objects included, or AC-4, over
-// _iclforge_player@v1 (planning/hearth-sendspin-extension.md). It can list the other roles too,
+// _iclforge_player@v1. It can list the other roles too,
 // keeping what a server sends them and sending controller commands.
 //
 // It was apps/hearth/testsink's, whose outputs write a WAV file and decode a burst; it knows
@@ -74,9 +74,10 @@ struct Options {
     // two): a player that renders to a layout wider than stereo lists that width.
     std::vector<std::int32_t> pcm_channels{2};
     // The coded formats the extension role lists: what a server may send as bursts. A program lists
-    // the ones its output takes; the test sink's decoders take all three.
+    // the ones its output takes; the test sink's decoders take all four.
     std::vector<sendspin::player::DataType> data_types{
-        sendspin::player::DataType::kAc3, sendspin::player::DataType::kEac3, sendspin::player::DataType::kAc4};
+        sendspin::player::DataType::kAc3, sendspin::player::DataType::kEac3, sendspin::player::DataType::kAc4,
+        sendspin::player::DataType::kTruehd};
     // When set, asked for each connection instead of `data_types`: what the output takes now. A
     // route comes and goes with a TV (an Android box loses its HDMI output when the display sleeps),
     // so what a program could take when the sink started is not what it can when a server dials.
@@ -92,12 +93,12 @@ struct Options {
     // Lists karaoke and karaoke_vocals in the extension role's decoder settings, takes the
     // settings command (as accept_settings does), and hands a settings command's karaoke keys to
     // the burst output, which reproduces a karaoke AC-3 stream as they say: a sink with a decoder
-    // that does what a board's does (planning/karaoke-phase2.md, W7). Without it a karaoke stream
+    // that does what a board's does. Without it a karaoke stream
     // is played as coded, as a sink from before the keys plays it.
     bool karaoke = false;
     // With `karaoke`: also lists E-AC-3 among the codecs it reproduces karaoke for (the support
-    // object's `karaoke_codecs`), as a board whose firmware has the E-AC-3 path does
-    // (planning/karaoke-eac3.md, D6). Off, it lists none, which a server reads as AC-3 alone: a
+    // object's `karaoke_codecs`), as a board whose firmware has the E-AC-3 path does.
+    // Off, it lists none, which a server reads as AC-3 alone: a
     // board from before it. The decoder is the library's either way, so an E-AC-3 stream sent to
     // an off sink is reproduced all the same; it is the server's choice, which is what the
     // sink is for, that is under test.
@@ -107,12 +108,12 @@ struct Options {
     // them: it reproduces karaoke and has no way to be told a level.
     bool karaoke_levels = true;
     // The most bytes of lyric document the sink says it holds, and lists the `lyrics` and
-    // `lyrics_position` commands (W7d, planning/karaoke-phase2.md); 0 lists neither, as a board
+    // `lyrics_position` commands; 0 lists neither, as a board
     // from before them, or one with no heap to spare. What it receives is kept (Sink::roles()).
     std::uint32_t lyrics_max_bytes = 0;
     // The decoder keys the sink may ask a server to change (the extension role's support `requests`:
     // any of sendspin::player::kRequestableKeys), for a sink whose screen or remote chooses the
-    // singer's karaoke choice (D8, planning/hearth-android.md). Empty lists none, and request()
+    // singer's karaoke choice. Empty lists none, and request()
     // then sends nothing.
     std::vector<std::string> requests;
     // What the extension role's streams are rendered to, as its support and state objects say it:
@@ -158,6 +159,11 @@ struct Options {
     // The most frames a second the extension role's support object states it decodes, for every
     // data type it lists; 0 states none.
     std::uint16_t max_frame_rate = 0;
+    // The most coded kbit/s the extension role's support object states it takes, for every data
+    // type it lists; 0 states none.
+    std::uint32_t max_data_rate = 0;
+    // The sample rates the extension role lists for the coded streams it takes.
+    std::vector<std::int32_t> sample_rates{48000};
 };
 
 // What a sink reports, one line at a time, from any of its threads.
@@ -240,8 +246,8 @@ class BurstStreamOutput {
     [[nodiscard]] virtual const std::filesystem::path& file() const = 0;
     // What the output found in the current stream, once it has: the role's `decoder` state.
     [[nodiscard]] virtual const std::optional<sendspin::player::DecoderReport>& decoder() const = 0;
-    // How a stream this output took leaves the sink, which the role's `output` state says (D6,
-    // planning/hearth-android.md): handed to a receiver as it was coded (kPassthrough), or decoded
+    // How a stream this output took leaves the sink, which the role's `output` state says:
+    // handed to a receiver as it was coded (kPassthrough), or decoded
     // here and played as samples (kPcm). Unset for an output that does not say, which a server reads
     // as not known; the sink reports it only while a stream the output took is open.
     [[nodiscard]] virtual std::optional<sendspin::player::Output> output() const { return std::nullopt; }
@@ -263,8 +269,8 @@ class Outputs {
     [[nodiscard]] virtual std::unique_ptr<BurstStreamOutput> bursts(std::uint64_t connection) = 0;
 };
 
-// The request a sink's remote makes when the singer picks a vocals choice (D8,
-// planning/hearth-android.md). "Both" asks for the aware reproduction, which plays both voices as
+// The request a sink's remote makes when the singer picks a vocals choice.
+// "Both" asks for the aware reproduction, which plays both voices as
 // the song's mix does; the others ask for the capable one with that choice, the only reproduction
 // that has them. The owner's call, 2026-10-13. Advice only: see Sink::send_request.
 [[nodiscard]] sendspin::player::Request vocals_request(sendspin::player::KaraokeVocals vocals);
@@ -311,7 +317,7 @@ class Sink {
     };
     [[nodiscard]] Totals totals() const;
 
-    // What a screen says of the sink (planning/hearth-sink-screen.md, the model): who is connected and
+    // What a screen says of the sink: who is connected and
     // what each is doing here, the code a server asked to pair by that has not yet been typed there,
     // and how many servers this sink holds a pairing record for.
     struct Status {

@@ -1,5 +1,4 @@
-// hearth-testsink: a Sendspin player for Hearth's tests and contributors
-// (planning/hearth-reference-player.md, The test sink).
+// hearth-testsink: a Sendspin player for Hearth's tests and contributors.
 
 #include <chrono>
 #include <cstdint>

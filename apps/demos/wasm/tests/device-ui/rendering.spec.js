@@ -5,7 +5,7 @@
 // /status bodies recorded from the emulated board (payloads/README.md says
 // how), served as the device sent them; the rest are a recorded payload with
 // fields changed or taken out, as a firmware with fewer handlers, or an older
-// one, would send it - planning/esp32-device-ui.md's "What the page shows".
+// one, would send it.
 
 const fs = require('fs');
 const path = require('path');

@@ -1,6 +1,6 @@
 # The ESP32 sinks' profiles, configured and held to their definition, at the pull request.
 #
-# sink_profile.py verify (planning/esp32-platform-profiles.md) is what makes a profile a canon: a
+# sink_profile.py verify is what makes a profile a canon: a
 # configured build must carry the fragments the profile names, the locked values, and no watched
 # key nobody placed. That ran only after the merge, in ci.yml's ESP jobs, behind the footprint
 # probes, so two pull requests that were each valid alone first met on main, and a change to a

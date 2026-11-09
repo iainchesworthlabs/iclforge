@@ -45,6 +45,10 @@ Groups (G2_GROUPS names what each is for):
                                      units, 20-bit and other bit depths, other channel counts,
                                      --optimize-data-rate, --add-silence and the trim options,
                                      and the Atmos masters named with --atmos-master
+  truehd-last    dee_dthd_encoder    the last TrueHD legs before DEE's licence ends (2026-11-06):
+                                     impulses and band-limited tones at 96 kHz, a stepped tone
+                                     with and without --optimize-data-rate, dialnorm and DRC
+                                     profiles on streams of three presentations
   truehd-fixtures dee_dthd_encoder   0.25 s TrueHD streams, committed under testdata/truehd-dee/
                                      (--fixtures-out)
   truehd-long    dee_dthd_encoder    300 s TrueHD programmes (2.0, 5.1, 7.1), made in a second set
@@ -170,6 +174,10 @@ SPEAKERS = {
 }
 ALL_SPEAKERS = SPEAKERS["916"]
 NOISE_RMS = 0.05
+IMPULSE_SECONDS = 4.0
+IMPULSE_TEXT = ("silence with one sample set once a second: L +0.5 at 0.5 s into the second, R "
+                "-0.25 at 0.75 s")
+BAND_TONES = {"lo": (5000, 15000), "hi": (25000, 40000)}
 STEP_HZ = 997
 STEP_LEVELS_DB = tuple(range(-70, 0, 3))
 STEP_SECONDS = 1.5
@@ -222,7 +230,7 @@ G2_GROUPS = {
     "eac3-rates": "E-AC-3 at every layout and rate: the trend and races against DEE "
                   "(quality_race.py, gen_external_baseline.py), the decoder's third-party "
                   "coverage (verify_gold_reference.sh), the fixed-point tiers "
-                  "(planning/arithmetic-tiers.md)",
+                  "",
     "ac3-rates": "AC-3 at every layout and rate, for the same",
     "bluray": "7.1 E-AC-3 as Blu-ray carries it (an AC-3 core and a dependent substream): the "
               "decoder's dependent substreams and 7.1 from a third party",
@@ -232,22 +240,25 @@ G2_GROUPS = {
                      "information",
     "ac3-metadata": "AC-3 metadata, the same, and AC-3's timecode",
     "joc": "E-AC-3 JOC from channel beds: the object layer's third-party coverage "
-           "(test_dee_joc_fixture.cpp), transcoding to AC-4 (planning/ac4.md I1, I5)",
+           "(test_dee_joc_fixture.cpp), transcoding to AC-4",
     "truehd": "TrueHD with a lossless source: the TrueHD module's decode material, scored "
-              "against the sources by tools/checks/score_truehd_decode.py (planning/truehd.md), "
+              "against the sources by tools/checks/score_truehd_decode.py, "
               "and MAT passthrough",
     "truehd-open": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md "
-                   "(planning/truehd.md, \"Oracles\"): the rates, downmix presentations and "
+                   ": the rates, downmix presentations and "
                    "three substreams, DRC and dialnorm, lengths that are not a whole number of "
                    "access units, other bit depths and layouts, the encoder's data-rate and "
                    "stream-end options, and the Atmos input",
+    "truehd-last": "the last TrueHD legs made before DEE's licence ended: what a 96 kHz input and "
+                   "a stepped tone come back as, and dialnorm and DRC on streams of three "
+                   "presentations; test inputs scored against their sources like the rest",
     "truehd-fixtures": "short TrueHD streams with their sources, committed under "
                        "testdata/truehd-dee/ as the only streams in the tree from an outside "
                        "encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits",
     "truehd-long": "300 s TrueHD programmes for soak tests of the decoder and the network path "
                    "to Hearth sinks",
     "programme": "60 s and 300 s programmes for soak tests and listening: the ESP32 player "
-                 "(planning/esp32-stream-set.md), Hearth",
+                 ", Hearth",
     "objects": "Atmos-master inputs, refused on provenance as in the AC-4 gold set",
 }
 
@@ -465,6 +476,22 @@ def transients(speakers, seconds):
     return cols
 
 
+def impulses(rate, seconds):
+    """Two channels of silence with one sample set once a second: L +0.5 at 0.5 s into each
+    second, R -0.25 at 0.75 s. What the stream gives back around an impulse is its response."""
+    count = round(seconds * rate)
+    columns = [np.zeros(count), np.zeros(count)]
+    for second in range(int(seconds)):
+        columns[0][round((second + 0.5) * rate)] = 0.5
+        columns[1][round((second + 0.75) * rate)] = -0.25
+    return columns
+
+
+def band_tones(frequencies, seconds, rate):
+    t = np.arange(round(seconds * rate)) / rate
+    return [TONE_AMPLITUDE * np.sin(2.0 * np.pi * hz * t) for hz in frequencies]
+
+
 def stepped_tones(speakers):
     n = round(STEP_SECONDS * RATE)
     gain = np.repeat(10.0 ** (np.array(STEP_LEVELS_DB, dtype=np.float64) / 20.0), n)
@@ -582,6 +609,7 @@ def source_plan():
         add(f"{name}_16", layout, ("round16", name), f"{name} rounded to 16 bits",
             seconds=seconds, rate=rate, bits=16)
     thd_open_sources(plan, add, tones_text)
+    thd_last_sources(plan, add)
     return plan
 
 
@@ -648,8 +676,27 @@ def thd_open_sources(plan, add, tones_text):
             tones_text("20", HIGH_RATES[tag]), seconds=f, rate=HIGH_RATES[tag])
 
 
+def thd_last_sources(plan, add):
+    """The sources of the last TrueHD legs: single samples and tones at known frequencies, so that
+    whatever DEE does to a 96 kHz input shows in the difference between the decode and the
+    source, which is all the scorer reads."""
+    add("impulse_20", "20", ("impulse", "20", RATE), IMPULSE_TEXT, seconds=IMPULSE_SECONDS)
+    add("impulse_20_96k", "20", ("impulse", "20", 96000), IMPULSE_TEXT, seconds=IMPULSE_SECONDS,
+        rate=96000)
+    add("impulse_20_96k_16", "20", ("round16", "impulse_20_96k"),
+        "impulse_20_96k rounded to 16 bits", seconds=IMPULSE_SECONDS, rate=96000, bits=16)
+    for tag, hz in BAND_TONES.items():
+        add(f"band{tag}_20_96k", "20", ("band", hz, 96000),
+            f"a tone of {hz[0]} Hz in L and {hz[1]} Hz in R at -20 dBFS, 96 kHz", seconds=4.0,
+            rate=96000)
+
+
 def build_columns(spec, music, speech, plan, cache, seconds=SECONDS):
     kind = spec[0]
+    if kind == "impulse":
+        return impulses(spec[2], seconds)
+    if kind == "band":
+        return band_tones(spec[1], seconds, spec[2])
     if kind == "tones":
         _, layout, rate = spec
         return speaker_tones(SPEAKERS[layout], seconds, rate)
@@ -1023,6 +1070,7 @@ def g2_legs():
             audio_altered="--optimize-data-rate requantises the samples before coding")
 
     thd_open_legs(thd)
+    thd_last_legs(thd)
 
     # Programmes.
     for kbps in (96, 128, 192, 256):
@@ -1133,7 +1181,7 @@ def thd_open_legs(thd):
                                 ("31", "6ch", (0, 1, 2, 3, None, None)),
                                 ("40", "6ch", (0, 1, None, None, 2, 3)),
                                 ("50", "6ch", (0, 1, 2, None, 3, 4)),
-                                ("70", "8ch", (0, 1, 2, None, 3, 4, 5, None))):
+                                ("70", "8ch", (0, 1, 2, None, 3, 4, 5, 6))):
         op(f"thd-chn-{layout}-{pres}-48k24-wavlist", [(pres, (f"tones_{layout}", slots))])
 
     # J: the fixtures, 0.25 s each.
@@ -1159,6 +1207,41 @@ def thd_open_legs(thd):
     for pres, layout in (("2ch", "20"), ("6ch", "51"), ("8ch", "71")):
         op(f"thd-long-{pres}-programme_300-48k24", [(pres, f"programme_{layout}_300")],
            group="truehd-long")
+
+
+def thd_last_legs(thd):
+    """The legs asked for in the last days of DEE's licence. They
+    are test inputs like the rest: decoded and compared with the PCM that went in, and a refusal
+    is kept. DEE writes a dialnorm of -31 to -1 only, so a leg of "dialnorm 0" cannot be made."""
+    def last(name, presentations, **extra):
+        thd(name, presentations, group="truehd-last", refusal_ok=True, **extra)
+
+    # What a 96 kHz input comes back as: an impulse (the response), tones below and above 24 kHz,
+    # 16 bits, the same impulse at 48 kHz, and with --optimize-data-rate off.
+    last("thd-last-2ch-impulse-48k24", [("2ch", "impulse_20")])
+    last("thd-last-2ch-impulse-96k24", [("2ch", "impulse_20_96k")])
+    last("thd-last-2ch-impulse-96k16", [("2ch", "impulse_20_96k_16")])
+    last("thd-last-2ch-impulse-96k24-optimize-off", [("2ch", "impulse_20_96k")],
+         extra_args=["--optimize-data-rate", "0"])
+    for tag in BAND_TONES:
+        last(f"thd-last-2ch-band{tag}-96k24", [("2ch", f"band{tag}_20_96k")])
+    # The stepped tone's one least significant bit: no option, no DRC profile, optimising off,
+    # and the loudness measurement skipped.
+    last("thd-last-2ch-steps-48k24", [("2ch", "steps_20")])
+    last("thd-last-2ch-steps-48k24-optimize-off", [("2ch", "steps_20")],
+         extra_args=["--optimize-data-rate", "0"])
+    last("thd-last-2ch-steps-48k24-skip", [("2ch", "steps_20")],
+         loudness=["--loudness-management", "skip:dialnorm=-27"])
+    # One dialnorm and per-presentation DRC on a stream of three presentations.
+    for value in (27, 5):
+        last(f"thd-last-8ch-music-48k24-dmx6-dmx2-dialnorm-{value}",
+             [("8ch", "music_71"), ("6ch", None), ("2ch", None)],
+             loudness=["--loudness-management", f"skip:dialnorm={-value}"])
+    last("thd-last-8ch-music-48k24-dmx6-dmx2-drc-film_light-speech-music_standard",
+         [("8ch:drc_profile=film_light", "music_71"), ("6ch:drc_profile=speech", None),
+          ("2ch:drc_profile=music_standard", None)])
+    last("thd-last-2ch-music-48k24-drc-speech", [("2ch:drc_profile=speech", "music_20")])
+    last("thd-last-2ch-music-48k24-drc-film_light", [("2ch:drc_profile=film_light", "music_20")])
 
 
 def object_legs(masters, atmos_masters=None):
@@ -1187,6 +1270,11 @@ def object_legs(masters, atmos_masters=None):
              "options": ["--presentation", "atmos", "-i", "{master}", "--presentation", "8ch",
                          "--presentation", "6ch", "--presentation", "2ch"]},
         ]
+        # The number of elements DEE codes the bed and objects in (its help lists 12, 14, 16).
+        for elements in (12, 14, 16):
+            legs.append({**common, "name": f"obj-thd-atmos-{name}-e{elements}",
+                         "options": ["--presentation", f"atmos:number_of_elements={elements}",
+                                     "-i", "{master}"]})
     return legs
 
 

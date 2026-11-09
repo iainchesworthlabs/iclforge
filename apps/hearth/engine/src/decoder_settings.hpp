@@ -11,8 +11,7 @@
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 
-// The decoder configuration model (planning/hearth-reference-player.md,
-// "Decoder configuration"): what the app's decoder controls hold, and the
+// The decoder configuration model: what the app's decoder controls hold, and the
 // library configuration they become. One place, so the settings page, the
 // engine and the tests agree on what each control means.
 //
@@ -24,7 +23,7 @@
 // stage leaves the choice of programme to its caller - so StreamDecoder
 // applies it after decoding.
 //
-// AC-4 (planning/ac4.md, I2, and its "One control for both formats") shares
+// AC-4 shares
 // the stereo fold, the LFE in a fold, the concealment and the layout with
 // AC-3 and E-AC-3, and has controls of its own in Ac4Settings: the
 // presentation, its DRC decoder mode and output level, which decision 12
@@ -74,7 +73,7 @@ struct Ac4Settings {
     // output layout does not itself fold to stereo or mono (decoder_setup()'s
     // own comment): unset plays the source's coded layout; k7X4, k7X2, k7X0,
     // k5X4 or k5X2 fold Part 2's renderer down to a narrower one, the same
-    // six forge decode's own speakers= takes (planning/ac4.md, I5).
+    // six forge decode's own speakers= takes.
     std::optional<iclforge::ac4::DownmixTarget> immersive_layout = std::nullopt;
     // Part 2 clause 4.7: full decoding (the default) reconstructs A-CPL,
     // A-JCC and A-JOC in full; core decoding replaces or skips them for
@@ -84,7 +83,7 @@ struct Ac4Settings {
     friend bool operator==(const Ac4Settings&, const Ac4Settings&) = default;
 };
 
-// TrueHD and MLP's controls (planning/truehd-parity-hearth-player.md, row 25). The decoder reads
+// TrueHD and MLP's controls. The decoder reads
 // dialogue normalisation and the dynamic range words and applies neither (libs/truehd/ERRATA.md,
 // entry 10), so there is no control for either, and the Decoder tab says so.
 struct TruehdSettings {
@@ -114,7 +113,24 @@ enum class DualMonoChoice : std::uint8_t {
     kSecond,
 };
 
+// Which of a file's audio tracks plays when it holds more than one, which a Blu-ray remux does: TrueHD
+// first, and AC-3 or E-AC-3 after it. Hearth decodes TrueHD here but cannot yet send it on as it is,
+// so an output that takes a bitstream is better
+// served by the compressed track until it can.
+enum class TrackPreference : std::uint8_t {
+    // The compressed (AC-3, E-AC-3 or AC-4) track where the output decision for it is a bitstream
+    // to the output Hearth has open; otherwise the best track, which is the first Hearth can play.
+    kAutomatic,
+    // The first track Hearth can play, whatever the output.
+    kBest,
+    // The first AC-3, E-AC-3 or AC-4 track, whatever the output.
+    kCompressed,
+};
+
 struct DecoderSettings {
+    // See TrackPreference. Applied when an item opens, as `programme` is, so it is not part of the
+    // decoder configuration.
+    TrackPreference track = TrackPreference::kAutomatic;
     // §7.7's operating mode. kLine and kRf each fix the dynamic range
     // handling and normalise dialogue; kCustom uses the four switches below.
     ac3::OperatingMode mode = ac3::OperatingMode::kLine;

@@ -24,7 +24,7 @@
 #include "microphone_session.hpp"
 
 // apps/hearth/engine/src/microphone_session.*: a singer's microphone from the person turning it on
-// to what it heard (planning/karaoke-microphone.md, M4). A scripted input stands in for the device
+// to what it heard. A scripted input stands in for the device
 // and the test says what time it is.
 
 namespace {

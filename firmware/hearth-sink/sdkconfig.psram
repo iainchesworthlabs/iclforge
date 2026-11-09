@@ -21,8 +21,7 @@
 # 256 frames - none did, and the queue never fell below 3 ms. That is 43 ms more
 # latency, on a source that has network latency anyway.
 #
-# For a 7.1.4 stream, two things more (planning/esp32-714-realtime.md,
-# decisions 13 and 14). A 32 KB instruction cache, where the default is 16 KB:
+# For a 7.1.4 stream, two things more. A 32 KB instruction cache, where the default is 16 KB:
 # the decoder's code runs from flash through it, and at 32 KB a 7.1.4 frame
 # decodes 3.1 ms faster folded to 2.0 and 3.8 ms faster onto twelve slots, for
 # 16 KB of internal SRAM. And a play's first unit held until its second has
@@ -47,7 +46,7 @@ CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 # lost, the segments behind it are queued and each keeps its buffer, and the retransmission that
 # would fill the gap has no buffer left to arrive in. The board then answers nothing (no ARP, no
 # ping, no HTTP) while its CPUs, lwIP's thread and the Wi-Fi association are all alive, for as long
-# as the connection is there; planning/ac4-in-release-images.md has the measurements (the Wi-Fi
+# as the connection is there (the Wi-Fi
 # driver's buffer table at the stall: 32 of 32 dynamic receive buffers out, 3,982 allocation
 # failures, the one TCP connection with ooseq set). The C6 and the P4 take ESP-IDF's 4.
 CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS=4
@@ -70,10 +69,10 @@ CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM=1
 #
 # With sdkconfig.ac4 as well, an AC-4 play keeps only allocations under 512 bytes in
 # internal RAM and its decoder's state goes to PSRAM: the component's
-# CONFIG_ICLFORGE_AC4_INTERNAL_BELOW, 512 on this part (planning/ac4.md, D14c). The AC-3
+# CONFIG_ICLFORGE_AC4_INTERNAL_BELOW, 512 on this part. The AC-3
 # and E-AC-3 plays keep the 16 KB above, the policy their board figures were measured under.
 #
-# No core dump on this board (planning/esp32-ota.md, O4). With task stacks
+# No core dump on this board. With task stacks
 # allowed in PSRAM, ESP-IDF gives the dump a stack of its own in internal SRAM
 # (ESP_COREDUMP_USE_STACK_SIZE, 1,792 bytes at the least), and the core dump
 # cost this board 4,016 bytes of internal SRAM in all, measured with idf.py
