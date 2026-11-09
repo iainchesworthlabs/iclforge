@@ -254,6 +254,51 @@ class Harness(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertEqual(sorted(p.name for p in self.cache.iterdir()), ["b.eac3", "c.eac3"])
 
+    def cache_status(self, *extra, env=None):
+        """Run --cache-status; return (stdout lines as a dict, stderr)."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.ExitStack() as stack:
+            for p in (mock.patch.object(sys, "argv", ["x", "--cache-status", *extra]),
+                      mock.patch.object(vfi, "SAMPLES", SAMPLES),
+                      mock.patch.dict(os.environ, env or {}),
+                      contextlib.redirect_stdout(out), contextlib.redirect_stderr(err)):
+                stack.enter_context(p)
+            rc = vfi.main()
+        self.assertEqual(rc, 0)
+        return dict(line.split("=", 1) for line in out.getvalue().split()), err.getvalue()
+
+    def test_cache_status_complete_needs_every_sample_to_verify(self):
+        status, _ = self.cache_status("--cache-dir", str(self.cache))
+        self.assertEqual(status, {"have": "3", "total": "3", "complete": "true"})
+
+        (self.cache / "b.eac3").unlink()
+        status, _ = self.cache_status("--cache-dir", str(self.cache))
+        self.assertEqual(status, {"have": "2", "total": "3", "complete": "false"})
+
+    def test_cache_status_deletes_what_fails_its_pin_or_is_not_a_sample(self):
+        """A full set of files is not a complete cache if one is truncated, and
+        nothing that is not a verified sample may be left to be saved."""
+        (self.cache / "a.ac3").write_bytes(b"truncated")
+        (self.cache / "c.eac3.part").write_bytes(b"half")
+        (self.cache / "gone.eac3").write_bytes(b"pinned by an older revision")
+        status, err = self.cache_status("--cache-dir", str(self.cache))
+        self.assertEqual(status, {"have": "2", "total": "3", "complete": "false"})
+        self.assertEqual(sorted(p.name for p in self.cache.iterdir()), ["b.eac3", "c.eac3"])
+        self.assertIn("a.ac3 (fails its pin)", err)
+        self.assertIn("c.eac3.part (stray or half-written)", err)
+
+    def test_cache_status_of_a_missing_directory_is_empty_and_creates_nothing(self):
+        missing = self.tmp / "never-restored"
+        status, _ = self.cache_status(env={"FATE_CACHE_DIR": str(missing)})
+        self.assertEqual(status, {"have": "0", "total": "3", "complete": "false"})
+        self.assertFalse(missing.exists())
+
+    def test_cache_status_needs_a_directory(self):
+        env = {k: v for k, v in os.environ.items() if k != "FATE_CACHE_DIR"}
+        with (mock.patch.dict(os.environ, env, clear=True),
+              self.assertRaisesRegex(SystemExit, "--cache-status needs")):
+            self.cache_status()
+
 
 if __name__ == "__main__":
     unittest.main()

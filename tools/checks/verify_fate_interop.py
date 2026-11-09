@@ -37,6 +37,13 @@ Usage:
                       temporary directory removed on exit)
     --cli PATH        forge, overriding $ICLFORGE_CLI
     --list            print the pinned corpus and exit, downloading nothing
+    --cache-status    audit the cache directory against the pins and exit,
+                      downloading nothing and needing neither forge nor ffmpeg:
+                      files that fail their pin (and stray or half-written
+                      ones) are deleted, and `have=`, `total=` and `complete=`
+                      are printed on stdout as KEY=VALUE lines, ready for
+                      $GITHUB_OUTPUT. interop.yml runs it before and after the
+                      decode to decide whether the CI cache is worth saving
     --tolerate-unreachable
                       (or FATE_TOLERATE_UNREACHABLE=1) when the archive cannot be
                       reached after the retries below, check the samples already in
@@ -285,6 +292,32 @@ def fetch(sample: dict, cache_dir: Path) -> Path:
     raise AssertionError("unreachable")
 
 
+def cache_status(cache_dir: Path) -> tuple[int, int]:
+    """Audit cache_dir against the pins; return (samples held, samples pinned).
+
+    A sample counts as held only if its file is there AND hashes to the pin -
+    the same test fetch() applies - so "complete" can never mean "a full set of
+    files, some of them truncated". Anything that is not a verified sample is
+    deleted: a file that fails its pin, a half-written .part, and a sample an
+    earlier revision of this script pinned and this one no longer does. That
+    keeps a CI cache entry to exactly the corpus and means a bad file is never
+    saved into one. Only regular files directly in cache_dir are touched."""
+    wanted = {sample["path"].split("/")[-1]: sample["sha256"] for sample in SAMPLES}
+    held = 0
+    if not cache_dir.is_dir():
+        return 0, len(wanted)
+    for entry in sorted(cache_dir.iterdir()):
+        if not entry.is_file():
+            continue
+        if entry.name in wanted and sha256_of(entry) == wanted[entry.name]:
+            held += 1
+            continue
+        reason = "stray or half-written" if entry.name not in wanted else "fails its pin"
+        print(f"cache: removing {entry.name} ({reason})", file=sys.stderr)
+        entry.unlink()
+    return held, len(wanted)
+
+
 def ffmpeg_strict_decode(source: Path, out_wav: Path) -> None:
     """FFmpeg's own strict read, the same flags every other gate in this repo
     uses (tools/ci/run_codec_matrix.sh's run_ffmpeg_check, and
@@ -307,6 +340,9 @@ def main() -> int:
     parser.add_argument("--cli", default=os.environ.get("ICLFORGE_CLI", ""))
     parser.add_argument("--list", action="store_true",
                          help="Print the pinned corpus and exit, downloading nothing.")
+    parser.add_argument("--cache-status", action="store_true",
+                         help="Audit the cache directory against the pins, delete what fails "
+                              "them, print have=/total=/complete= and exit.")
     parser.add_argument("--tolerate-unreachable", action="store_true",
                          default=os.environ.get("FATE_TOLERATE_UNREACHABLE") == "1",
                          help="If the archive cannot be reached, check what the cache holds "
@@ -316,6 +352,18 @@ def main() -> int:
     if args.list:
         for sample in SAMPLES:
             print(f"{sample['path']}\n    {sample['note']}")
+        return 0
+
+    if args.cache_status:
+        status_dir = args.cache_dir or (Path(os.environ["FATE_CACHE_DIR"])
+                                        if os.environ.get("FATE_CACHE_DIR") else None)
+        if status_dir is None:
+            raise SystemExit("::error::--cache-status needs --cache-dir or FATE_CACHE_DIR")
+        held, total = cache_status(status_dir)
+        print(f"FATE cache: {held} of {total} pinned samples held", file=sys.stderr)
+        for line in (f"have={held}", f"total={total}",
+                     f"complete={'true' if held == total else 'false'}"):
+            print(line)
         return 0
 
     if not args.cli or not Path(args.cli).exists():
