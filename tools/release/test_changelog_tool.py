@@ -38,7 +38,7 @@ def tree(fragments: dict[str, str], changelog: str = CHANGELOG) -> Path:
 
 
 class Assemble(unittest.TestCase):
-    def test_groups_by_type_in_order_then_keeps_the_handwritten_unreleased(self):
+    def test_keeps_the_handwritten_unreleased_first_then_groups_by_type_in_order(self):
         root = tree({"b.fixed.md": "**B.** fixed\n", "a.added.md": "**A.** added\nwraps\n"})
         self.assertEqual(t.assemble(root, "0.2.0", "2026-02-02"), 0)
         text = (root / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -46,7 +46,7 @@ class Assemble(unittest.TestCase):
         self.assertLess(section.index("### Added"), section.index("### Fixed"))
         self.assertIn("- **A.** added\n  wraps\n", section)
         self.assertIn("- **B.** fixed\n", section)
-        self.assertLess(section.index("### Fixed"), section.index("an older entry"))
+        self.assertLess(section.index("an older entry"), section.index("### Added"))
         self.assertIn(t.POINTER, text.split("## [0.2.0]")[0])
         self.assertIn("## [0.1.0] - 2026-01-01", text)
 

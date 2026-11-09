@@ -1,1 +1,0 @@
-**A bare TrueHD stream from a Blu-ray transport stream reads all its units.** The AC-3 core frames between the units are passed over by `ElementaryReader`, `probe_stream` and the Python reference; before, every unit up to the next major sync after the first frame was lost (ERRATA 66).
