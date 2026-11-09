@@ -16,8 +16,8 @@
 // the value of a key the caller has written, and a reader. The messages that carry them are
 // messages.hpp's.
 //
-// Where aiosendspin 9.1.1 reads these objects differently, the writer takes the dialect
-// (planning/hearth-sendspin-extension.md, C36 and C37). Beside the objects, the arithmetic the
+// Where aiosendspin 9.1.1 reads these objects differently, the writer takes the dialect.
+// Beside the objects, the arithmetic the
 // roles require of a server: the controller's group volume and mute, and the colours' contrast.
 
 namespace iclforge::sendspin {

@@ -13,5 +13,5 @@
 # The AC-4 image has it too: its board suite hung at the first play after eight restarts with
 # this limit, twice in two attempts (2026-10-25, S3b), and that was the unbounded TCP out-of-order
 # queue (sdkconfig.psram, LWIP_TCP_OOSEQ_MAX_PBUFS), not the allocation limit; an AC-4 play takes
-# 512 for itself (ICLFORGE_AC4_INTERNAL_BELOW). planning/ac4-in-release-images.md has both.
+# 512 for itself (ICLFORGE_AC4_INTERNAL_BELOW).
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096

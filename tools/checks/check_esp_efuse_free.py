@@ -3,8 +3,7 @@
 
 A board flashed from this tree has to stay recoverable over USB: whatever goes
 wrong with an image, `esptool write-flash` through the chip's ROM download mode
-puts a working one back (planning/esp32-ota.md, "What stays USB-only, and how a
-board is recovered"). Some ESP-IDF options take that away by burning eFuses,
+puts a working one back. Some ESP-IDF options take that away by burning eFuses,
 which cannot be undone, and two more stop the bootloader checking an image
 before it boots it, which the plan's integrity checks rely on. Any of them can
 arrive as one line in an sdkconfig fragment, and nothing else in CI would
@@ -143,8 +142,7 @@ def main() -> int:
             refused += 1
             print(
                 f"::error file={relative},line={number}::{option}=y would stop a board being "
-                f"recovered over USB or checking its image at boot: {REFUSED[option]}. "
-                f"See planning/esp32-ota.md"
+                f"recovered over USB or checking its image at boot: {REFUSED[option]}."
             )
 
     print(f"esp recovery check: {len(found)} fragment(s) read, {refused} refused setting(s)")

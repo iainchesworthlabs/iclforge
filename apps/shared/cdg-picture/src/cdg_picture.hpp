@@ -7,7 +7,7 @@
 
 #include "cdg_frame_source.hpp"
 
-// The picture of a CD+G disc (planning/karaoke-phase2.md, W13f and decision D11): the frame a
+// The picture of a CD+G disc: the frame a
 // CdgFrameSource holds for the position, drawn as large as fits and with the proportions of the
 // disc's 300 by 216, in whole-pixel steps so that its small type stays crisp. The source reads the
 // file and follows the packets; this is only the glass in front of it, and is why it is a separate

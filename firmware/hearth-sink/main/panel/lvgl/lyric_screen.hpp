@@ -4,7 +4,7 @@
 
 #include "lvgl.h"
 
-// The lyric screen (planning/karaoke-p4x-panel.md, "The screen"): LVGL objects for the header, the
+// The lyric screen: LVGL objects for the header, the
 // stage where the lines are, and the footer, brought up to date once a frame from what the Sendspin
 // player holds. One screen, whichever display it is drawn on (display.hpp).
 //
@@ -31,7 +31,7 @@ struct ScreenStats {
     std::uint32_t dev_refreshes = 0;
     std::uint32_t dev_refresh_us_last = 0;
     std::uint32_t dev_refresh_us_max = 0;
-    // The no-lyrics screen has dimmed or is dark (planning/p4x-now-playing.md): a black cover is up.
+    // The no-lyrics screen has dimmed or is dark: a black cover is up.
     bool dimmed = false;
     // The backlight, percent: lit, the dimmed floor, or off in the dark view.
     int backlight = 80;

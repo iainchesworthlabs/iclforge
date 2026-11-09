@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The lyrics of the item playing (planning/karaoke-design.md, K5; the design
-// sheet's "Hearth: Karaoke page, reference view" and "Hearth: singer view").
+// The lyrics of the item playing.
 //
 // Three states for a word, in three colours and one cue that is not colour
 // (L4): *sung* is the accent, *not yet sung* is the muted neutral, and the word
@@ -17,8 +16,8 @@ import Hearth
 // (muted); a file that times lines and not words emphasises the whole line, and
 // no word times are invented for it.
 //
-// A `.cdg` beside the item with no lyrics file is the picture of a karaoke disc
-// (planning/karaoke-phase2.md, W13f): it has no text to follow, so it is shown as
+// A `.cdg` beside the item with no lyrics file is the picture of a karaoke disc:
+// it has no text to follow, so it is shown as
 // the picture it is, against the same position and the same delay. With a lyrics
 // file beside it too, the words are shown unless the singer chose the picture
 // (KaraokeController.preferPicture, for this run of the app): `showingPicture`.
@@ -50,7 +49,7 @@ Item {
     readonly property bool showingPicture: KaraokeController.showingPicture
     readonly property var lines: KaraokeController.lines
 
-    // --- a duet (planning/karaoke-phase2.md, W11b) --------------------------
+    // --- a duet --------------------------
     // A line that has a singer says it in words, and sits on a side: the first vocal's lines
     // at the left, the second's indented, both together across. Colour is the third cue, never
     // the only one (L4). The guide is the vocal that is playing: where the stream is karaoke,
@@ -119,8 +118,8 @@ Item {
         return root.singerOf(index) === "v2" ? root.currentColor : root.sungColor;
     }
 
-    // A line's place on the item's timeline, which is what the tune and the singer are placed on
-    // (planning/karaoke-microphone.md, M5): its own times are the lyrics', and the singer's nudge
+    // A line's place on the item's timeline, which is what the tune and the singer are placed on:
+    // its own times are the lyrics', and the singer's nudge
     // shows the words later, so the same nudge puts the line later in the item.
     function itemWindowOf(index) {
         const line = root.lines[index];
@@ -266,8 +265,8 @@ Item {
                         font.pixelSize: root.unit
                         wrapMode: Text.WordWrap
                     }
-                    // How the line was sung, once it has been (planning/karaoke-microphone.md,
-                    // M5): three pips and a percentage, or "not sung", and nothing for a line the
+                    // How the line was sung, once it has been: three pips and a percentage, or
+                    // "not sung", and nothing for a line the
                     // tune has no notes in or with the microphone off. The line's own times are
                     // the lyrics', so the nudge is added to put it on the item's timeline. The
                     // revision is read in a real condition: a bare read in a binding is dropped.

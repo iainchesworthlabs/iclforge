@@ -6,8 +6,7 @@
 
 #include "iclforge/audio/passthrough.hpp"
 
-// What has been run, per platform audio API, of sending TrueHD to a local output as MAT
-// (planning/truehd-parity-hearth-player.md, H6; libs/containers/ERRATA.md, question 7).
+// What has been run, per platform audio API, of sending TrueHD to a local output as MAT.
 //
 // The output decision reads this and says so in its reason: Hearth does not claim what it has not
 // tried (the document's definition of first class, point 7). A platform is NOT RUN until a run
@@ -19,9 +18,9 @@
 // Shield Pro through Hearth for Android into the same receiver (status by eISCP): Android.
 //
 // To mark a platform as run: the owner (or a session working with the owner's receiver) plays a
-// MAT stream through it to a receiver that shows TrueHD, the result goes into docs/platforms and
-// planning/truehd-parity-hearth-player.md with the date, the receiver and the stream, and the
-// row below changes in the same commit as the page that records the run. A test pins the table, so
+// MAT stream through it to a receiver that shows TrueHD, the result goes into docs/platforms with
+// the date, the receiver and the stream, and the row below changes in the same commit as the page
+// that records the run. A test pins the table, so
 // that a platform cannot become "run" without someone reading this.
 
 namespace iclforge::hearth {

@@ -12,8 +12,6 @@ release. This guide is for someone with a board and a release. It covers:
 - what to do when a board does not come back.
 
 To build the firmware yourself instead, see [An ESP32-S3 sink](sink-esp32-s3.md#build-and-flash).
-[planning/esp32-ota.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md)
-has the design and the reasons for it.
 
 !!! note "Status as of 2026-09-30: unsigned development images"
     The images are checked for damage at every step, but not signed: while the boards are in

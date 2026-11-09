@@ -3,7 +3,7 @@ menu "TrueHD probe"
         int "Stack of the decoding task, in bytes"
         default 131072
         help
-            The decoder's frame is some 33 KB on a host (planning/truehd-parity-esp32-sinks.md), and on
+            The decoder's frame is some 33 KB on a host, and on
             an ESP32-C6 it overran a 48 KB stack by 10 KB (a stack-protection fault, and on the
             ESP32-S3, with no such check, a silent hang). The probe reports the stack the task
             reached, and this is what it was given.

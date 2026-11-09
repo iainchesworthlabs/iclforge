@@ -1,5 +1,5 @@
 // The REST control surface, and the web UI it serves. See
-// ../include/iclforge/control.hpp and planning/esp32-device-ui.md.
+// ../include/iclforge/control.hpp.
 
 #include "iclforge/control.hpp"
 
@@ -432,7 +432,7 @@ struct Control::Impl {
 
     static Impl* self(httpd_req_t* req) { return static_cast<Impl*>(req->user_ctx); }
 
-    // Flash mode (planning/esp32-ota.md): nothing plays and no setting
+    // Flash mode: nothing plays and no setting
     // changes until the board restarts. True, having answered, when the
     // request is refused for it.
     static bool refused_in_flash_mode(httpd_req_t* req) {
@@ -603,8 +603,7 @@ struct Control::Impl {
                 append_bool(out, "objects", info->objects);
                 append_bool(out, "objects_rendered", info->objects_rendered);
                 append_number(out, "slots", static_cast<unsigned long long>(info->slots));
-                // How this play serves the layout (planning/esp32-device-ui.md,
-                // "The output layout").
+                // How this play serves the layout.
                 append_key(out, "layout");
                 append_json_string(out, info->layout.data());
                 append_key(out, "render");

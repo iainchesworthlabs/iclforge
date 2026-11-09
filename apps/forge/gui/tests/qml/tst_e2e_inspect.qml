@@ -55,7 +55,7 @@ TestCase {
     // A dedicated fixture (like atmos-objects.ec3 above, rather than a fuzz/robustness corpus
     // file or one of testdata/ac4's own short, sparse-I-frame decoder-unit-test streams):
     // two A-JOC dynamic objects over reference_stereo.wav, `ac4-encode objects=` (E9's own scene
-    // grammar) - planning/ac4.md, I5.
+    // grammar).
     readonly property url ac4ObjectStreamUrl: Qt.resolvedUrl("../fixtures/ac4-objects.ac4")
     readonly property url notAStreamUrl:
         Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.wav")
@@ -330,7 +330,7 @@ TestCase {
         dialog.close();
     }
 
-    // planning/ac4.md, I5: the same export path above, over a direct-coded AC-4 object stream -
+    // The same export path above, over a direct-coded AC-4 object stream -
     // exportObjects() itself is codec-agnostic (stream_player_controller.cpp), so this proves
     // decode_ac4_to_memory() now fills has_objects/object_audio the way its E-AC-3 sibling always
     // has, not that the export mechanism itself differs.

@@ -8,8 +8,7 @@
 #include <string_view>
 #include <vector>
 
-// The operating system's media sessions (planning/karaoke-phase2.md, D9, and
-// planning/karaoke-phase2-findings.md, "The media-session back ends"): where a song a player is
+// The operating system's media sessions: where a song a player is
 // playing is, as the player has told the system, so that Crucible's lyric strip can follow an
 // application without a person pressing Start. Windows publishes it through the System Media
 // Transport Controls, Linux through MPRIS on the D-Bus session bus, macOS through the now-playing

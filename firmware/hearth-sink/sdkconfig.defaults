@@ -21,7 +21,7 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 
 # Two application slots, and a bootloader that goes back to the one that ran
-# before (partitions.csv, planning/esp32-ota.md). An image an update writes
+# before (partitions.csv). An image an update writes
 # boots on trial, and a reset before that image accepts itself boots the other
 # slot instead. An image flashed over USB is never on trial: `idf.py flash`
 # writes an empty otadata, and the bootloader boots ota_0 from it as it booted
@@ -29,7 +29,7 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # A panic's core dump, kept in the coredump partition through the restart and
-# a rollback, for GET /firmware/coredump (planning/esp32-ota.md, O4). Its
+# a rollback, for GET /firmware/coredump. Its
 # static internal RAM, measured with idf.py size on 2026-09-25: 2,128 bytes on
 # the S3 with task stacks in internal RAM, 1,140 on the C6, and more where task
 # stacks may be in PSRAM, since the dump then has a stack of its own (3,652 on
@@ -44,7 +44,7 @@ CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
 # a server that comes round again before it has run queues a second close of
 # the same slot, which then lands on the new connection that took the slot:
 # an update's upload, reset before the board read any of it, while three other
-# clients held the server's sockets (planning/esp32-ota.md, Robustness). The
+# clients held the server's sockets. The
 # cost: httpd_queue_work() waits for room when a server's queue is full,
 # rather than failing. The Sendspin host queues at most one tick, one request
 # and one close for each of its three connections, five in all, and its queue
@@ -84,7 +84,7 @@ CONFIG_LIBC_STDOUT_LINE_ENDING_LF=y
 # single largest setting on the part.
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
-# The time (planning/p4x-now-playing.md, stage 3; main/clock/sntp/wall_clock.cpp): every board that has a
+# The time: every board that has a
 # network keeps its clock with a time server, and a screen draws it. The servers are the one a person names
 # (PUT /ntp-server), the one the router gives over DHCP (option 42, kept by lwIP when a lease is bound;
 # net/stack.cpp turns that on) and pool.ntp.org when nobody has named one, so two slots at most. The

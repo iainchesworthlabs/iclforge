@@ -18,7 +18,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "platform/process.hpp"
 
-// `forge decode strict` (planning/ac4.md, option D): a decode that lost frames or units after the
+// `forge decode strict`: a decode that lost frames or units after the
 // first one decoded exits 2 once it has written what it could decode, where without `strict` it
 // exits 0 and warns as it always has. One case for each loss the decoders count: an AC-4 frame
 // waiting for an I-frame, a concealed AC-3, E-AC-3 or AC-4 frame, and a TrueHD unit a lenient

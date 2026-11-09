@@ -795,7 +795,7 @@ double tone_amplitude(std::span<const float> x, std::size_t first, std::size_t c
 }
 
 // Each channel's own tone at unity gain and 40 dB of SNR, and every other
-// channel's tone 60 dB under it there: planning/ac4.md, E3's exit.
+// channel's tone 60 dB under it there.
 void check_routing(const std::vector<double>& hz, const std::vector<std::vector<float>>& input,
                    const std::vector<std::vector<float>>& decoded) {
     REQUIRE(decoded.size() == hz.size());

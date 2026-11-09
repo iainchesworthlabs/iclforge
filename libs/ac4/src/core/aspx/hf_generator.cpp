@@ -17,7 +17,7 @@ namespace {
 // ratio's decibels are 10 log10(x), and its inverse is 10^(y / 20). At
 // Real = double this calls std::log10/std::pow exactly as the code always
 // did (bit-identical: the default build's tests and hashes hold unchanged).
-// At Real = float (planning/ac4.md, D14a) it instead takes the equal forms
+// At Real = float it instead takes the equal forms
 // (10 / log2 10) log2(x) and 2^(y log2(10) / 20) through iclforge::internal's
 // scalar_log2/scalar_exp2, never std::log10f/std::powf directly: two
 // platforms' libm can disagree in the last bit on the same float input,
@@ -56,7 +56,7 @@ template <typename Value>
 // Real = float it compares the squared magnitude with 16, which is float
 // multiplies and an add: hypotf differs in the last bit between C libraries, and
 // a coefficient that one platform finds just under the limit and another at it
-// zeroes a subband's prediction on the second only (planning/ac4.md, D14a4).
+// zeroes a subband's prediction on the second only.
 //
 // At Real = Fixed32 the coefficient is solved as a dsp::tiered::Energy (MantExp) and compared as at
 // float.

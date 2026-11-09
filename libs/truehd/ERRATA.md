@@ -1,7 +1,6 @@
 # iclforge::truehd: where the specification and the streams disagree
 
-"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5, except §15, which is v3.6's (planning/truehd.md says what it is and
-how it is used; section numbers are v3.3's, except §16.3.3 (v3.4), §17 (v3.5) and §15 (v3.6)). Every entry below is a place where the specification is silent, contradicts itself or disagrees
+"TH spec" is the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.5, except §15, which is v3.6's (section numbers are v3.3's, except §16.3.3 (v3.4), §17 (v3.5) and §15 (v3.6)). Every entry below is a place where the specification is silent, contradicts itself or disagrees
 with the streams FFmpeg 6.1.1's `truehd` and `mlp` encoders write (and its decoder reads). The streams decide:
 FFmpeg's decoder decodes them, and the codec is lossless, so a reading that decodes all of them sample for sample
 is the reading in use. Where a reading is forced by the streams and the specification is silent, it is marked
@@ -168,7 +167,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     and reported as `ExtraData::padding_only`. **Confirmed by TH spec v3.9 §16.2 and by the owner's discs.** DEE has no option for the extra data and the owner has no Atmos master that scores a leg of it, so the owner decided (2026-10-31) that the discs are the evidence: `forge probe detail=format` of 60 s of each of six Atmos streams from four discs (*Blade Runner 2049*, *Dune: Part Two* three times, *The Lord of the Rings: The Two Towers*, a Hans Zimmer concert disc) reads 11,376 extra-data regions, and in every one the check nibble, the framing, the parity byte and `evo_reserved` are right and the §16.8 capacity rule holds with the length as the words after the header word.
 
 20. **The lossless check across a join (§7.3; entry 12).** Two streams of one format joined end to end
-    (`testdata/truehd/truehd_cat_st48_s24.thd`, `planning/truehd-fixtures.md`): the second stream's first restart header
+    (`testdata/truehd/truehd_cat_st48_s24.thd`): the second stream's first restart header
     carries a lossless check that checks nothing (entry 12). The library reads it as the check of the first stream's last
     interval, finds it wrong and, strict, stops at the join; lenient, it counts the failure and decodes on, to the samples
     FFmpeg's strict decode returns (FFmpeg logs "Lossless check failed - expected 00, calculated e7" as a warning and goes
@@ -176,7 +175,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     is that told? Recommendation: keep the strict stop, since one file holding two streams is not a disc's stream, and
     document `truehd-check=lenient` for it. Evidence: `python3 tools/checks/verify_truehd_interop.py --forge forge`.
 
-21. **An option that a TrueHD run does not apply (`forge`; planning/truehd-parity-forge.md, question 7).** `forge` has one
+21. **An option that a TrueHD run does not apply (`forge`).** `forge` has one
     option vocabulary for every command, and a run on TrueHD or MLP applies few of the options in it. The rest were accepted
     and dropped with exit 0: on `decode` `channels=2`, `drc=0.5`, `programme=3`, `verify-content` and the objects directory,
     on `truehd-encode` `src=`, `dialnorm=` and `map=`, on `ts`, `mkv`, `mp4` and `spdif` `mainid=`, `asvc=` and
@@ -263,7 +262,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     decode a permutation that is not its own inverse differently, and the new wording, taken for the bits of the stream, is the other one.
     The owner's Blu-ray decides the stream: its second and third substreams carry `ch_assign` (0, 5, 1, 4, 2, 3) and (0, 6, 1, 4, 2, 3,
     7, 5), neither its own inverse, and with the library's reading every lossless-check interval of the 2, 6 and 8 channel presentations
-    passes and the 8 channel output equals FFmpeg's (planning/truehd-disc-findings.md, question 6; entry 43). So the library's reading is
+    passes and the 8 channel output equals FFmpeg's. So the library's reading is
     what Dolby's encoder writes, and what is left is the wording. **Recommendation:** word §7.4 as "the field, read in order, gives the
     output position of each matrix channel; the inverse maps output positions to matrix channels", and keep the pseudo-code's
     `ch_assign[out_ch]` as that inverse.
@@ -359,8 +358,8 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     provisional:** the bits are written as the line names them (off by default, as in FFmpeg's streams) and are never set on their
     own; `normalize` writes only the dialogue norm and says, for each presentation whose bit is off, that a decoder may ignore the field;
     `metadata` sets a bit with `truehd-control-6ch=on` and the like. The owner's two discs show that the bit is not constant in streams
-    that exist: `twoch_control_enabled` is set in the Atmos streams of *Dune: Part Two* and clear in *Blade Runner 2049*
-    (planning/truehd-disc-findings.md), so a decoder meets both and the library's default of clear is one of the two. **Recommendation:** leave `normalize` as it is until the DEE set
+    that exist: `twoch_control_enabled` is set in the Atmos streams of *Dune: Part Two* and clear in *Blade Runner 2049*,
+    so a decoder meets both and the library's default of clear is one of the two. **Recommendation:** leave `normalize` as it is until the DEE set
     shows whether a stream with the bit clear carries a dialogue norm at all; if DEE sets the bit whenever it writes one, `normalize`
     should set it too.
     **Measured (2026-10-31):** DEE sets `twoch_control_enabled` in every stream and `sixch_` and `eightch_control_enabled` only in a stream of the 2 channel presentation alone; it writes the
@@ -375,8 +374,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     should apply them, which is a separate decision.
     **Measured (2026-10-31):** `heavy_drc_start_up_gain` is 0 in every DEE stream and on all six disc streams; `drc_start_up_gain` is 0 in nearly every DEE stream (-1 in three legs, of dialnorm 31 and
     27) and -6 to -64 on the discs, where it counts up from one major sync to the next. Raw stays.
-56. **What `forge qc` of a TrueHD stream fails (TH spec §7.3, §12.5, §18).** Built, as the parity audit recommended (question 2 of
-    `planning/truehd-parity-forge.md`): an integrity gate and the existing loudness presets, exit 6 when either fails. The integrity gate fails on
+56. **What `forge qc` of a TrueHD stream fails (TH spec §7.3, §12.5, §18).** Built: an integrity gate and the existing loudness presets, exit 6 when either fails. The integrity gate fails on
     a byte the reader does not take for an access unit, a failed check (nibble, major sync CRC, restart header CRC, parity, segment CRC),
     a restart interval whose lossless check fails, and a unit that starts before the unit ahead of it has arrived at the declared peak rate (entry 99; the old
     queue model, the encoder's, failed Dolby's own streams; the declared rate is `MajorSync::peak_data_rate_bps()`, the unit TH spec v3.9 §4.4 gives and question 12 records; the law is
@@ -412,7 +410,7 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     rendered feed (`truehd-render=`, when built) against the 8 channel decode.
 62. **The cadence of the object audio metadata (TH spec §15.5.3; entry 61).** §15.5.3 says one OAMD evolution frame per access unit, with
     timing re-based to the 40 sample unit. The owner's two discs carry one extra-data frame of 64 bytes for every 1536 samples (gaps of 38 and
-    39 units, planning/truehd-disc-findings.md, question 19), which is E-AC-3's frame length, and the standard's block offset factor runs in
+    39 units), which is E-AC-3's frame length, and the standard's block offset factor runs in
     32 sample steps to 2016. The reader takes whatever cadence it finds: a payload applies from the first sample of its access unit plus the
     payload's `smploffst`, its update blocks from there plus their offsets, and an object keeps its last position until the next block.
     **Recommendation:** read the 1536 sample cadence as it is on the discs, and the writer (WP1 step 4) write frames at that cadence; the owner
@@ -519,15 +517,15 @@ with `--handbuilt`, on the hand-built streams, whose manifest says what FFmpeg d
     declares and keeps the peak rate and the 75 ms already (entry 12; `encoder.cpp` refuses a stream it cannot send within both);
     "real-time headroom" is that and the speed. **Not checked:** it has no test of its own for `block_data_bits` at most 16,000 or the
     blocks per segment (a 192 kHz 6 channel stream of white noise has more than 16,000 bits in a block of 160 samples if sent raw), which
-    is a gap to measure with the stream probe and close in a later change. No tighter ceiling is known; the work-package README names none.
+    is a gap to measure with the stream probe and close in a later change. No tighter ceiling is known.
 100. **May the metadata fields of a DEE stream be read to settle questions 51 to 55?** Question 51's recommendation is to encode a programme with two
-    dialogue norms and read the field back; the rule for DEE's streams (the decision of 2026-09-26, `planning/work-packages/README.md` rule 4) is that they
+    dialogue norms and read the field back; the rule for DEE's streams (the decision of 2026-09-26) is that they
     are decoded and compared with their sources and not read for format facts. `gen_dee_gold.py` also stores `forge probe`'s output for every leg in the
     manifest, so the fields are recorded whether or not anyone reads them. DEE writes a dialnorm of -31 to -1 only (`--loudness-management
     skip:dialnorm=N`; the default measures it), so "dialnorm 0 against another value" cannot be made. Nothing reads the fields until this is answered.
     **Recommendation:** allow it for the dialogue norm, mix level, source format and control bits, on the legs whose input value is known
     (`thd-last-8ch-music-48k24-dmx6-dmx2-dialnorm-27` and `-5`, `thd-dialnorm-*`): a value set and read back is a check of a unit, not a look at how DEE
-    writes a stream; use the `measure_only` leg of the same programme as the "unset" case. Evidence for the legs: `planning/truehd-validation.md`.
+    writes a stream; use the `measure_only` leg of the same programme as the "unset" case.
     **Answered by the owner on 2026-10-31: yes.** Read for those four fields on known-input legs only; the results are under questions 51 to 55.
 101. **A way to score a reading without reading a stream.** The scorer says a decode is the source, not that the leg depends on the reading under test
     (the 16-bit `seed_shr7`, question 5; the filter histories across a restart, question 18; the shift by matrix channel, question 6). Decoding the leg with the other
@@ -828,7 +826,7 @@ repeated value is refused. Not added to `testdata/truehd/handbuilt`: that set is
 `ch_assign` should join it).
 
 **43. `output_shift` is indexed by the matrix channel (§8.2, §7.3; with entries 12 and 42).** The library shifted the
-output channel in position `p` by `output_shift[p]`. On the owner's Blu-ray (a TrueHD Atmos stream, planning/truehd-disc-findings.md)
+output channel in position `p` by `output_shift[p]`. On the owner's Blu-ray (a TrueHD Atmos stream)
 the second and third substreams carry a permuted `ch_assign` and a different shift for each channel, and the lossless check of every
 restart interval failed in both of them, with the 6 and 8 channel presentations stopping at the second restart. The shift is the one of
 the matrix channel the output takes (`output_shift[m]` with `m` the channel `output_source[p]` names), the same index the lossless
@@ -882,8 +880,7 @@ segment. FFmpeg reads the end-of-stream marker as `0xD234E` only: `hb_marker_shi
 
 **47. `extended_substream_info` is the low pair of the four bits (§4.1, §4.5; TH spec v3.9; the owner's Blu-ray).** §4.1 lists "2+2 bits (low 2 bits
 used, upper 2 reserved)" after the substream count. The library read the upper pair as `extended_substream_info` and the lower as
-reserved, which the FFmpeg-made streams cannot show (both are zero). The Atmos stream on the owner's Blu-ray (planning/truehd-disc-findings.md,
-question 2) has 0x43 there: four substreams, the upper pair 0, the low pair 3, and its major sync carries the 16-channel extension of
+reserved, which the FFmpeg-made streams cannot show (both are zero). The Atmos stream on the owner's Blu-ray has 0x43 there: four substreams, the upper pair 0, the low pair 3, and its major sync carries the 16-channel extension of
 §14.2, which the old reading never looked for. The pair is now read and written the other way round and any non-zero value of the low
 pair means an extended substream; §4.5 lists 0, 1 and 2 and the disc has 3, which the table does not say. `test_access_unit.cpp` holds
 the byte. **Confirmed by the Blu-ray; the meaning of 3 is open (question 46).**
@@ -982,7 +979,7 @@ in 229 of 229 access units that carry extra data (payload id 11, 50 or 51 bytes)
 11 dynamic objects and one update block: the 12 channels are the LFE and 11 objects, as entry 61 reads them. The check nibble, framing and
 parity of all 229 pass. **Provisional**: (a), (b) and (d) are what the disc shows; (c) is the open part of question 60.
 
-**66. AC-3 core frames between the access units of a Blu-ray track (§3.3, §21.2; planning/truehd-disc-findings.md).** A TrueHD track of a
+**66. AC-3 core frames between the access units of a Blu-ray track (§3.3, §21.2).** A TrueHD track of a
 Blu-ray transport stream carries the programme's AC-3 core (here 448 kbit/s, 1792 bytes, one every 38 or 39 access units) between its
 access units. `forge decode` and `probe` set the frames aside when they read the transport stream itself, or a bare stream that begins with
 one, but not for the bare stream `forge demux` writes from it, which begins with a TrueHD unit. `ElementaryReader` then took the first frame
@@ -1319,7 +1316,7 @@ no TrueHD stream here has an evolution frame, so nothing decides it.
 25. **The payload configuration a TrueHD writer sends (A6, A8, A9).** Table 56 fixes it for E-AC-3: one OAMD payload per frame, frame
     aligned, no sample offset or duration, `groupid` shared with JOC (there is none in TrueHD), priority 0. Table 56 also says
     `codecdatae` 1 where Annex H says 0. **Recommendation:** write what `libs/objects` writes for E-AC-3 (Table 56 with `codecdatae` 0,
-    `groupid` 0) and read anything; nothing is written yet (planning/truehd-atmos.md).
+    `groupid` 0) and read anything; nothing is written yet.
 26. **The program assignment (B4 to B7, B11 to B13).** The standard's syntax (§5.5.3): `b_lfe_present` in the dynamic-only branch;
     `content_description` as four flags that gate the bed, ISF, dynamic-object and reserved-data groups; `b_bed_chan_distribute` first,
     then the instance count (bits + 2), then `b_lfe_only` before the assignment; the ISF index and the dynamic object count only when
@@ -1528,7 +1525,7 @@ boundary, since a stream may end inside a restart interval. A join is whole unit
 sync for the same reason. The seam keeps the second stream's own words: the access unit's `input_timing` (the encoder's arrival model
 counts it up from its stream's first unit, entry 37) restarts at the second stream's value, and the restart headers' `output_timing` do
 too. FFmpeg's strict decode of a join is the two decodes in order, and of a cut the same slice of the whole decode
-(`planning/truehd-parity-forge.md`, question 14, which asks whether the words should be renumbered). `forge`'s own strict decode stops
+(whether the words should be renumbered is open). `forge`'s own strict decode stops
 at the join, for the reason of question 20, and `truehd-check=lenient` decodes it. **Provisional, owner to confirm**; no player has been
 asked about the timing words.
 

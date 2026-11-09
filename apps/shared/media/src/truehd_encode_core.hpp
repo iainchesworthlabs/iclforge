@@ -45,7 +45,7 @@ struct Layout {
 // ---- several sources, named places ---------------------------------------------------------------
 //
 // `map=` for truehd-encode, the grammar of the other encoders with TrueHD's channel names for the
-// places (planning/truehd-parity-forge.md, question 16, option A): `<source>.<channel>:<place>`,
+// places: `<source>.<channel>:<place>`,
 // comma separated, source and channel counted from 0, the place one of L R C LFE Ls Rs Lvh Rvh Lc Rc
 // Lrs Rrs Cs Ts Lsd Rsd Lw Rw Cvh LFE2 (any case). The places named have to make one channel
 // assignment (TH spec §13.1: the pairs and singles of `libs/truehd`'s table); the stream's channels

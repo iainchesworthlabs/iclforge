@@ -3,7 +3,7 @@ package com.iclforge.hearth
 /**
  * The name a screen gives a coded stream, from what the output found in its first syncframe (the extension
  * role's `decoder` state, over `NativeSink.statusJson()`): "Dolby Digital 5.1", "Dolby Digital Plus 5.1 +
- * objects". It is the footer's format chip of planning/hearth-sink-screen.md, which says the route beside it.
+ * objects". It is the footer's format chip, which says the route beside it.
  */
 object StreamFormat {
     /** libs/sendspin's `DecoderReport`, as the status JSON carries it. */

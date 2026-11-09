@@ -22,13 +22,13 @@
 #include "iclforge/sink/sink.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 
-// A burst output that decodes what it is sent (planning/hearth-android-phases-4-5.md, phase 4):
+// A burst output that decodes what it is sent:
 // each stream's bursts of AC-3 or E-AC-3 with any object layer, or of AC-4, decoded and rendered to
 // the sink's speaker layout by iclforge::render, and the samples handed to a PcmSink. It was the
 // test sink's output, which writes a float WAV file and a play-time log; the Android app's is the
 // same decode with a sink that plays.
 //
-// AC-4 (planning/ac4.md, D11): a burst is one AC-4 sync frame (IEC 61937-14 Annex A), zero-padded
+// AC-4: a burst is one AC-4 sync frame (IEC 61937-14 Annex A), zero-padded
 // to a whole 8-byte unit in an HBR16 burst, which iclforge::ac4::Decoder decodes to its own
 // channels; those are rendered by the bed ac4_bed() makes of the decoder's speakers, in blocks of
 // 256 samples, a two-speaker layout included, since the AC-4 decoder has no fold of its own yet. A
@@ -45,7 +45,7 @@
 // written. A burst that does not decode resets the decoders, and the stream carries on from the
 // next.
 //
-// TrueHD (planning/truehd-parity-hearth-player.md, H5): a chunk is one to 24 whole access units,
+// TrueHD: a chunk is one to 24 whole access units,
 // which iclforge::truehd::Decoder decodes (all the substreams its presentation `best` takes, strict
 // checking) to 24-bit integers, and which are rendered by the bed the stream's channel names make
 // (truehd_bed()), a unit at a time (40, 80 or 160 samples). A chunk's duration is its units' at the

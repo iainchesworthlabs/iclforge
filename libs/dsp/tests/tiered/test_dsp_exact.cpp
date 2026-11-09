@@ -1,5 +1,5 @@
 // The transforms of libs/dsp/src/tiered against verbatim copies of the code
-// they replaced (planning/ac4.md, D14e): the FFT passes, the inverse MDCT and the windowed
+// they replaced: the FFT passes, the inverse MDCT and the windowed
 // overlap-add are held to the BITS of the plan's generic radix loop, the old inverse transform and
 // the old block synthesis, at the decoder's scalar and at double, in both directions, on dense data
 // and on spectra with runs of zeros of either sign. A sign of zero is a bit, and a stream whose

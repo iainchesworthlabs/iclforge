@@ -1030,8 +1030,8 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  delta=off         skip §7.2.2.6 delta bit allocation - the corrections "
                      "chosen per run from the real coefficients and the second fit that weighs "
                      "them - wherever this command encodes; eac3-encode's [tools] argument has "
-                     "the bare nodelta token. The encoders' first effort level "
-                     "(planning/arithmetic-tiers.md): what a part with little time for the "
+                     "the bare nodelta token. The encoders' first effort level: "
+                     "what a part with little time for the "
                      "search gives up, measured on the ESP32-S3 page");
         fmt::println("  sign-objects      atmos/atmos-path/atmos-encode/atmos-cbi: write a keyed EMDF "
                      "object signature (needs signing-key=); truehd-atmos and metadata on a "

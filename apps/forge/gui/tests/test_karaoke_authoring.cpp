@@ -1,5 +1,5 @@
 // What the Karaoke flow decides from the parts an author supplies
-// (src/karaoke_authoring.hpp; planning/karaoke.md A2, A3 and A8): the coding
+// (src/karaoke_authoring.hpp): the coding
 // mode Table C.2.1 gives for what was supplied, which file and channel each
 // coded channel comes from, and the named problems and warnings. The table is
 // transcribed here independently of the code under test.

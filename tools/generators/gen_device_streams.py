@@ -163,8 +163,7 @@ def make_sources(work):
 # Each entry: the file, one line on what it is, and either the forge command
 # that makes it ({name} is a source above, {out} the output) or the file in
 # the tree it is a copy of. "psram" marks a stream measured to need more
-# internal RAM than the http shape has without PSRAM (planning/esp32-stream-set.md,
-# "What the network shape holds at 7.1.4"): CI's shape plays everything else.
+# internal RAM than the http shape has without PSRAM: CI's shape plays everything else.
 
 SET = [
     # 7.1.4, for listening and for a level on every slot.

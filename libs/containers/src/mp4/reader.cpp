@@ -309,7 +309,7 @@ void for_each_child(std::span<const std::byte> body, std::size_t at, std::size_t
 
 // 'tenc', the track encryption box of ISO/IEC 23001-7 (DASH-IF IOP v5 part 6 section 6.2 cites its
 // clause 8.2). The standard has not been read; this layout is what GPAC, FFmpeg and Shaka Packager
-// write (planning/cenc-conformance.md, M3 and M7) and what tools/generators/cenc_make_protected.py
+// write and what tools/generators/cenc_make_protected.py
 // writes and GPAC and FFmpeg decrypt: version and flags (4), a reserved byte, a byte that is
 // reserved in version 0 and in version 1 holds crypt_byte_block (high four bits) and
 // skip_byte_block (low four), default_isProtected, default_Per_Sample_IV_Size, default_KID (16),
@@ -630,13 +630,12 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
             // sample_description_index) or per fragment ('tfhd', 'trex'); a packager that writes a
             // clear lead-in puts a clear entry and a protected one in one track, and a reader that
             // took the clear entry would hand back the lead-in, or the lead-in and then ciphertext
-            // as audio (planning/cenc-conformance.md, G1 and M7). Refusing the whole track is the
+            // as audio. Refusing the whole track is the
             // strictest rule that keeps every clear track working, and it is decided here, at
             // 'moov', before any sample is delivered, so the streaming Reader and a pipe get the
             // same answer as demux(). The price is that a track declaring a protected entry no
             // sample uses is refused too; none of the files examined writes one. Reading the clear
-            // samples of such a track, and decrypting the rest, waits for a key
-            // (planning/cenc-read-side.md, 5.4).
+            // samples of such a track, and decrypting the rest, waits for a key.
             const bool refuse =
                 s.in_trak && s.pending.protection.has_value() &&
                 (s.pending.has_entry || is_dolby_or_unstated(*s.pending.protection));

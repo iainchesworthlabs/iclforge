@@ -53,8 +53,7 @@
 // not read as far as its clear entry, because the entry a sample belongs to is named per chunk
 // ('stsc') or per fragment ('tfhd', 'trex') and a reader that returned the lead-in alone would
 // hand back a truncated programme as if it were the whole of it. A protected track beside a
-// readable one is listed in Demuxed::skipped with its Protection. See
-// planning/cenc-conformance.md and, for reading with a key, planning/cenc-read-side.md.
+// readable one is listed in Demuxed::skipped with its Protection.
 //
 // UNTRUSTED INPUT. Every box length, chunk offset and sample size in an MP4
 // is self-declared, and the sample table is an INDEX - a hostile stsc can
@@ -194,7 +193,7 @@ enum class TrackKind : std::uint8_t { kAudio, kVideo, kText, kOther };
 // information box ('sinf') of an 'enca' or 'encv' entry, and the track encryption box ('tenc')
 // that ISO/IEC 23001-7 puts in its 'schi'. Reported as stored, for a caller that tells a person
 // what protects a track; nothing here reads a key or decrypts a byte. The layouts are those of
-// files written by GPAC, FFmpeg and Shaka Packager (planning/cenc-conformance.md, M3 and M7); the
+// files written by GPAC, FFmpeg and Shaka Packager; the
 // standard itself has not been read.
 struct Protection {
     // The sample entry's four characters: "enca" (audio) or "encv" (video).

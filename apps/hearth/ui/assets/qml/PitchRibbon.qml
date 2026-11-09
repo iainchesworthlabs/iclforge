@@ -2,8 +2,7 @@ import QtQuick
 
 import Hearth
 
-// The tune as a ribbon of notes and the singer's own pitch as a line over it, in time with the words
-// (planning/karaoke-microphone.md, M5; "What the singer sees").
+// The tune as a ribbon of notes and the singer's own pitch as a line over it, in time with the words.
 //
 // Time runs left to right with "now" a little in from the left edge, so the notes about to be sung
 // are ahead of the line being drawn. The singer's voice is drawn on the tune's octave, as it is

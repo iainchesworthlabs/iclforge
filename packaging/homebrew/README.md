@@ -14,7 +14,7 @@ brew install --cask iainchesworthlabs/iclforge/iclforge   # forge-gui.app, prebu
 ```
 
 The formula and the cask are named `iclforge` from the first release made after the rename of
-the family (`planning/ac4.md`, decision 41). `tap_migrations.json` here maps the old names
+the family. `tap_migrations.json` here maps the old names
 (`ac3forge`, `ac3gui`) to them, and goes to the root of the tap, which `manifest-bump.yml`
 copies it to with the formula and the cask, removing `Formula/ac3forge.rb` and `Casks/ac3gui.rb`
 in the same pull request (Homebrew reads the map for a name that has no file).

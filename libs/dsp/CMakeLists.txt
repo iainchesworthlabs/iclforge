@@ -5,7 +5,7 @@
 #
 # src/tiered/ holds the kernels written against a decode tier's scalar (iclforge::dsp::tiered:
 # AC-4's mixed-radix FFT, MDCT and KBD windows, its QMF banks and synthesis, its sample rate
-# converter, and the tables they read; planning/consolidation.md, C5). The codec that calls them
+# converter, and the tables they read). The codec that calls them
 # builds them at its tier (libs/ac4/CMakeLists.txt), with the tier's scalar from
 # variants/decode-scalar-<tier>/. This library builds those its own functions are made of, at
 # double: the sample rate converter, which dsp::resample is (decision 22).

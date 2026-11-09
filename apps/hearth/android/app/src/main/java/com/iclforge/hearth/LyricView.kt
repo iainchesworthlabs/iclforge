@@ -17,7 +17,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The lyric screen of planning/hearth-sink-screen.md, S2 to S8: the past line, the line being sung with
+ * The lyric screen (S2 to S8 of the sink screen): the past line, the line being sung with
  * the fill running through its words, the next lines, a duet's two vocals, the count-in of an
  * instrumental gap, a line timed as a whole, plain text, "no lyrics" after a grace, and each line in its
  * own direction. It draws one [LyricFrame] (what libs/sink's core answered at that moment) and keeps no

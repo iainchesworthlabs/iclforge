@@ -13,7 +13,7 @@
 #include "iclforge/sendspin/messages.hpp"
 
 // The pairing messages (pairing.md, Messages), each a struct with a writer and a reader, in
-// both dialects where they differ (planning/hearth-sendspin-extension.md, C22 to C26). The
+// both dialects where they differ. The
 // binary values - nonces, shares, tags, wrapped PSKs - are fixed-size and base64url, and a
 // reader refuses any of the wrong length: a pairing message that no conformant peer produces
 // is a protocol error (pairing.md, Protocol Errors).

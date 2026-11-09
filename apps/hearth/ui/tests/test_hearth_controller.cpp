@@ -552,7 +552,7 @@ TEST_CASE("decoder settings: mode/downmix/dual-mono/objects/joc-domain/concealme
               .toStdString() == "line");
 }
 
-// --- AC-4's own decoder settings (planning/ac4.md, I2; DecoderAc4.qml) -------
+// --- AC-4's own decoder settings -------
 
 TEST_CASE("decoder settings: AC-4's own controls round-trip through the map",
           "[hearth][hearth-controller]") {
@@ -1290,7 +1290,7 @@ TEST_CASE("media_info_to_map: an E-AC-3 karaoke programme is karaoke to the deco
           "independent substream with no objects",
           "[hearth][hearth-controller][karaoke]") {
     // The decoder reproduces a flagged programme when it is one independent substream and carries no
-    // object layer (ac3::is_karaoke_programme, planning/karaoke-eac3.md, D3); the page needs to know the
+    // object layer (ac3::is_karaoke_programme); the page needs to know the
     // difference between that and a programme that is only flagged.
     iclforge::hearth::MediaInfo info;
     MediaProgramme alone;
@@ -1451,7 +1451,7 @@ TEST_CASE("decoder_changes_from_sink_request: only a member of the group being p
     CHECK(ui::decoder_changes_from_sink_request(pending, QStringLiteral("g1")).isEmpty());
 }
 
-// --- TrueHD and MLP (planning/truehd-parity-hearth-player.md, H3) ------------
+// --- TrueHD and MLP ------------
 
 TEST_CASE("queue_row: a TrueHD or MLP item reads its codec off the facts, since it has no bitstream format",
           "[hearth][hearth-controller][truehd]") {

@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// A Hearth sink's own speaker and decoder settings pages (planning/hearth-
-// reference-player.md#a6-network-outputs-in-the-application, A6's second
+// A Hearth sink's own speaker and decoder settings pages (A6's second
 // slice; docs/hearth/design/screenshots/network-sink-{speakers,decoder}.png).
 // Network.qml shows this instead of the plain "paired" card once
 // NetworkController.selectedSinkSettable is true - a sink offering

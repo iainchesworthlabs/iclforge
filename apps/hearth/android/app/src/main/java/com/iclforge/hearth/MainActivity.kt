@@ -11,7 +11,7 @@ import android.widget.FrameLayout
 import kotlin.math.max
 
 /**
- * The app's one screen (planning/hearth-sink-screen.md). It is the lyric view (S2 to S8, which takes
+ * The app's one screen. It is the lyric view (S2 to S8, which takes
  * the whole surface) while lyrics are held or a stream is playing, and otherwise the status screen:
  * starting (S0: waiting for the network or the receiver), idle (S1: the name, the address, who it is
  * paired with or waiting for, the code a server asked to pair by) or attention (S10: the sink did not
@@ -34,8 +34,8 @@ class MainActivity : Activity() {
 
     /**
      * Asks the core for a lyric frame and shows it, at the rate the frame says: 30 a second while a
-     * word is being sung, 5 while a line is shown, 1 otherwise (planning/hearth-sink-screen.md,
-     * Motion). The screen is a guest of the audio, which it shares no thread with: the core answers
+     * word is being sung, 5 while a line is shown, 1 otherwise. The screen is a guest of the
+     * audio, which it shares no thread with: the core answers
      * from its own state under a lock it holds for microseconds.
      */
     private val frames = object : Runnable {
@@ -122,7 +122,7 @@ class MainActivity : Activity() {
             finish()
         }
         // A TV box that lets its display sleep loses its HDMI audio route with it, and a bitstream with
-        // it (planning/hearth-android-findings.md, F12). While this screen is the one shown, the
+        // it. While this screen is the one shown, the
         // display stays on; what keeps it on once the person leaves is the next phase's (spike S3).
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         SinkService.start(this)

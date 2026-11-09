@@ -1,7 +1,7 @@
 // iclforge-truehd-encode-tool: a small command line over iclforge::truehd::Encoder for the
 // interoperability checks (tools/checks/verify_truehd_encode_interop.py, tools/ci/
 // fuzz_truehd_encoder_space.py). WAV in, TrueHD out. The forge `encode` command is the real
-// front end and replaces this when it lands (planning/truehd.md, phase T2c).
+// front end and replaces this when it lands.
 //
 //   iclforge-truehd-encode-tool in.wav out.thd [bits=N] [restart=N] [order=N] [matrix=0|1]
 //       [verify=0|1] [chunk=N] [peak=BPS] [assignment=0xNNNN] [stereo-mode=N] [rate-violations=0|1]

@@ -42,8 +42,8 @@ endif()
 
 # iclforge::ac4::Encoder (libs/ac4/src/encoder): configurations and samples from the input, each
 # frame read back by the decoder, whose trace must be the encoder's, decoded
-# to finite PCM, and written again byte for byte by a second encoder
-# (planning/ac4.md, the encoder's ladder, items 1 and 8). The encoder is
+# to finite PCM, and written again byte for byte by a second encoder.
+# The encoder is
 # iclforge_ac4_objects too.
 if(ICLFORGE_BUILD_AC4)
     iclforge_add_fuzzer(fuzz_ac4_encode iclforge::ac4)

@@ -14,7 +14,7 @@
     <!-- The server asked for the QR form of its code (the SP:1 token), drawn at the right. -->
     <string name="scan_code">Scan this code to pair, or type the token under it.</string>
     <string name="activity">%1$d connection(s) · %2$d stream(s) · %3$d chunk(s) · %4$d burst(s)</string>
-    <!-- The lyric screen (planning/hearth-sink-screen.md, S2 to S8). -->
+    <!-- The lyric screen. -->
     <string name="no_lyrics">No lyrics for this item</string>
     <string name="no_lyrics_hint">The server sent none with it.</string>
     <string name="waiting_for_song">Waiting for the song</string>

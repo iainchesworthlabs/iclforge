@@ -2,8 +2,8 @@
 """Fail when a public header declares into a namespace that is not its library's.
 
 Every library under libs/ is one namespace under the family root `iclforge`: the AC-3 and E-AC-3
-codec is `iclforge::ac3`, AC-4 is `iclforge::ac4`, the MP4 writer is `iclforge::containers::mp4`
-(planning/layout.md). A codec that declares into the root itself, as the AC-3 library did until the
+codec is `iclforge::ac3`, AC-4 is `iclforge::ac4`, the MP4 writer is `iclforge::containers::mp4`.
+A codec that declares into the root itself, as the AC-3 library did until the
 namespaces were nested, is a name every other library and every consumer shares with it, and a
 consumer cannot tell from the spelling which library a name belongs to. This check makes the
 mapping data: tools/checks/namespaces.json lists each library and the namespaces under `iclforge`

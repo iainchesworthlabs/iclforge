@@ -97,9 +97,7 @@ it, and the other stacks this page spells are held to it too. The list, generate
 <!-- sink-profiles:end -->
 
 A change to a profile, to a fragment it names or to the default of a key it locks is one pull
-request that edits `profiles.json` too and carries a board run
-([`planning/esp32-platform-profiles.md`](../../planning/esp32-platform-profiles.md), "Changing a
-profile").
+request that edits `profiles.json` too and carries a board run.
 
 ## Running it
 
@@ -168,8 +166,7 @@ partition that says which of them boots: `partitions.csv` for a board with
 bootloader is built with `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`
 (`sdkconfig.defaults`). An image an update writes into the other slot boots on
 trial, and a reset before that image accepts itself boots the previous one
-again. Updates over the network, in the next section, build on this
-([planning/esp32-ota.md](../../planning/esp32-ota.md)).
+again. Updates over the network, in the next section, build on this.
 
 A USB flash - `idf.py flash`, or `esptool write-flash @flash_args` from the
 build directory - writes these:
@@ -242,14 +239,12 @@ The firmware PUTs answer only requests addressed to the board's IP address or
 its own `.local` name, which keeps a web page elsewhere from sending them
 through a browser on this network. Images are not signed while the boards are
 in development: anyone on the network can update a board, as anyone with a USB
-cable can. [planning/esp32-ota.md](../../planning/esp32-ota.md) has the
-reasons, and what later phases add.
+cable can.
 
 ### Updates from GitHub releases
 
 A board built with `sdkconfig.pull` (`CONFIG_ICLFORGE_FIRMWARE_PULL`) can look at GitHub for a newer
-release and install it, in addition to being pushed to
-([planning/esp32-ota.md](../../planning/esp32-ota.md), "Updates from GitHub releases (O10)"):
+release and install it, in addition to being pushed to:
 
 - `GET /firmware/available` is the state of that flow: whether this board can pull and, if not, why;
   what stops a check right now; the channel (`stable` or `beta`); the version a check found; the
@@ -342,8 +337,7 @@ decode more slowly than the rest, and without the hold a 7.1.4 stream played
 over WiFi ran the DAC dry in them. It costs 32 ms before a play is heard, and a
 copy of that one unit while it waits. `sdkconfig.psram` turns it on for the
 network shapes, together with a 32 KB instruction cache, and `sdkconfig.ci`
-runs CI through it; `planning/esp32-714-realtime.md` in the repository has the
-measurements.
+runs CI through it.
 
 **A local 7.1.4 stream folded to 2.0** fits without PSRAM once the output stage
 folds a block at a time, and it needs a DMA queue that holds a whole frame:
@@ -553,15 +547,15 @@ configurations set 80; the default is 0, none), the component's
 | `PUT /network` | body: an SSID, a newline, then the passphrase. Stored for the next boot; the station stays on the network it is already associated with. Improv over the serial port is the other way in, and the one a board with no network at all needs. |
 | `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a wired network and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
 | `PUT /network-preference` | body: `auto`, `ethernet` or `wifi`. Stored, and acted on at once with no restart. `400` for any other word, `409` where there is nothing to choose between, or where `wifi` has no network stored to join. A change to one interface is undone if that interface does not come up |
-| `GET /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark`, as text, on a board with a panel: what the screen shows while a song has no lyrics ([planning](../../planning/p4x-now-playing.md)); `meters` is a spectrum of the main mix with the room's channels under it ([planning](../../planning/p4x-meters-view.md)), on a screen of at least 240 by 240 with the Sendspin player; `dark` is the backlight off until a touch lights the speakers for 30 s; `404` on a board with none |
+| `GET /now-playing` | `speakers`, `title`, `clock`, `meters`, `off` or `dark`, as text, on a board with a panel: what the screen shows while a song has no lyrics; `meters` is a spectrum of the main mix with the room's channels under it, on a screen of at least 240 by 240 with the Sendspin player; `dark` is the backlight off until a touch lights the speakers for 30 s; `404` on a board with none |
 | `PUT /now-playing` | body: one of those words. Stored, and followed at once with no restart. `400` for any other word, `409` where there is no panel or the build cannot draw that view (`title` is refused until it is built) |
 | `GET /dim-after` | `never`, or the minutes with nothing touched after which that screen dims, as text, on a board with a panel; `404` on a board with none |
 | `PUT /dim-after` | body: `never`, or whole minutes from 1 to 240. Stored, and followed at once. `400` for any other body, `409` where there is no panel |
-| `GET /idle-view` | `lit`, `dim`, `clock` or `dark`, as text, on a board with a panel: what the waiting screen (nothing playing, the board paired) does once the dim time has passed with nothing touched ([planning](../../planning/p4x-now-playing.md), "The waiting screen"); `404` on a board with none |
+| `GET /idle-view` | `lit`, `dim`, `clock` or `dark`, as text, on a board with a panel: what the waiting screen (nothing playing, the board paired) does once the dim time has passed with nothing touched; `404` on a board with none |
 | `PUT /idle-view` | body: one of those words. Stored (`idle_view`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
-| `GET /speakers-style` | `glow` or `pulse`, as text, on a board with a panel: how the speakers view shows a level (`pulse` makes each speaker's filled circle grow and shrink a little with it; [planning](../../planning/p4x-speakers-options.md)); `404` on a board with none |
+| `GET /speakers-style` | `glow` or `pulse`, as text, on a board with a panel: how the speakers view shows a level (`pulse` makes each speaker's filled circle grow and shrink a little with it); `404` on a board with none |
 | `PUT /speakers-style` | body: `glow` or `pulse`. Stored (`np_style`), and followed at once with no restart. `400` for any other body, `409` where there is no panel |
-| `GET /dynamic-range` | `standard` or `late-night`, as text, on a board with a Sendspin player: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range the listener wants ([planning](../../planning/hearth-late-night.md)); `404` on a board with none |
+| `GET /dynamic-range` | `standard` or `late-night`, as text, on a board with a Sendspin player: how much of an AC-3, E-AC-3 or AC-4 stream's dynamic range the listener wants; `404` on a board with none |
 | `PUT /dynamic-range` | body: `standard` or `late-night`. Stored (NVS key `dyn_range`, kept over a restart; `CONFIG_ICLFORGE_EXAMPLE_DYNAMIC_RANGE` is a board's first answer), and followed from the next stream's start. `late-night` is line mode's level with the stream's `compr` words (AC-3, E-AC-3) or speaker DRC mode (AC-4) on top, and wins over a server's decoder mode; it changes nothing in a stream that carries neither. `400` for any other word, `409` where there is no player. `POST /play` plays as the build says |
 | `GET /preferences` | every preference this board has, as JSON, on every board: its id, group, label, kind, how a change applies, the route that sets it, its value, whether the board can use it and why not, and each choice the same way. Read-only: a change goes through the entry's own route. The board's capability description decides what is available ([the Preferences sheet](../../docs/hearth/sink-esp32-p4.md#adjust-and-preferences)) |
 | `GET /timezone` | the time zone the board's time is shown in, as text: a POSIX string, or `none` (the time is UTC); `404` on a board that keeps no time (no network, or QEMU's) |
@@ -651,15 +645,13 @@ QEMU's Ethernet stand-in, and with WiFi up the decoder does not fit beside it.
 ## Playing from a Sendspin server
 
 `sdkconfig.sendspin` makes the board a Sendspin player
-([planning/hearth-reference-player.md](../../planning/hearth-reference-player.md),
-B3), on WiFi with the page on port 80:
+on WiFi with the page on port 80:
 
 ```bash
 SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.psram-4k;sdkconfig.sendspin;sdkconfig.ac4;sdkconfig.s3-fast;sdkconfig.s3-dcache" idf.py build
 ```
 
-`sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; planning/ac4.md,
-D14g). QIO is the second stage bootloader's, so a board takes it with one USB flash that includes its bootloader (`idf.py flash`); a
+`sdkconfig.s3-fast` is the S3's flash and cache setting (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; D14g). QIO is the second stage bootloader's, so a board takes it with one USB flash that includes its bootloader (`idf.py flash`); a
 network update leaves the mode a board has. `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap) and `sdkconfig.ac4` are
 in the S3 release image since 2026-10-29: an E-AC-3 7.1.4 play left 1.5 KB of internal RAM free with the cache at the 16 KB allocation
 limit and leaves 60 KB free at the end of its lap at the 4 KB limit the image keeps (`sdkconfig.psram-4k`), and the cache is what holds the AC-4 plays in real time.
@@ -672,8 +664,7 @@ Nothing plays at boot. The player listens on port 8928 at `/sendspin`, the
 board advertises `_sendspin._tcp` under its name, and a server that finds it
 dials it. Two roles are offered:
 
-- `_iclforge_player@v1`
-  ([planning/hearth-sendspin-extension.md](../../planning/hearth-sendspin-extension.md)):
+- `_iclforge_player@v1`:
   AC-3 or E-AC-3 in IEC 61937 bursts, decoded on the board, rendered onto its
   layout, then routed, trimmed and delayed as the server's settings say. The
   server can also set the layout, the crossover and the decoder's settings
@@ -1086,7 +1077,7 @@ fit, since the decoder's own scratch scales with its channel count and
 
 ### On the ESP32-P4
 
-The "best" tier of `planning/esp32-sink-tiers.md`: one I2S controller whose TDM frame
+The "best" tier: one I2S controller whose TDM frame
 holds 512 bits, four times the S3/C6's 128, is meant to reach this product's full
 sixteen-channel target alone (`sink/i2s_wide/audio_sink.cpp`) rather than needing a
 second line. WiFi reaches a P4 board over `esp_hosted`/SDIO to an onboard ESP32-C6
@@ -1168,7 +1159,7 @@ revisions v3.1 to v3.99 and, in `sink/i2s_wide`, to the 160 MHz PLL as the I2S c
 opens at the full sixteen 32-bit slots. The two images refuse each other's chips at boot. First run
 on a v3.2 chip on 2026-10-20: it boots at 400 MHz, joins Wi-Fi, reports revision 3.2, and plays a 5.1
 stream through sixteen 32-bit TDM slots in real time; the clocks on the pins are **not measured
-yet** ([planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md)).
+yet**.
 
 `main/panel/` is a screen for the lyrics of the item playing, picked by CMake like the sink and the
 source: `none` (every image but a P4's with a panel), and `lvgl`, LVGL 9 drawing
@@ -1189,8 +1180,7 @@ does not start it. A kit that is run on a bench gets it from the `panel-capture`
 `package_firmware.py` refuses to publish.
 
 `preview/` draws the same `lyric_screen.cpp` on a computer, in seconds. The screens, the pins, the
-fonts and what drawing costs are in [An ESP32-P4 sink](../../docs/hearth/sink-esp32-p4.md) and
-[planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md).
+fonts and what drawing costs are in [An ESP32-P4 sink](../../docs/hearth/sink-esp32-p4.md).
 
 ### Under QEMU
 
@@ -1239,7 +1229,7 @@ each kind takes. The ESP32-P4 and the ESP32-S3 have played it on a board. On the
 `sdkconfig.psram` and `sdkconfig.ac4`, with `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` after them, and an AC-4 play keeps its
 decoder's state in PSRAM (`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
 it keeps up at 2.0 and, with the second core, through the converter and at E-AC-3 7.1.4 ([Playback speed](../../docs/platforms/bare-metal/esp32-s3.md#playback-speed);
-phases D14c and D14g of `planning/ac4.md`). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
+phases D14c and D14g). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
 ([the C6 page](../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). With the decoder built in, the Sendspin
 player lists `ac4` beside `ac3` and `eac3` where `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` is 1 (the
 default on a P4, and on an S3 with the 64 KB data cache), and decodes an AC-4 stream a group sends
@@ -1311,9 +1301,6 @@ what each one is and the level each slot of a 7.1.4 output should get from it,
 and CI plays the set under QEMU onto 7.1.4 (`sdkconfig.ci-http714`) and holds
 every slot to it, and again on two cores with PSRAM (`sdkconfig.ci-lane`) for the
 streams that reach the decode lane's second thread, the psram-marked ones among them.
-[`planning/esp32-stream-set.md`](../../planning/esp32-stream-set.md) has
-what was measured - which streams a network shape without PSRAM can play, and
-which need a board with it.
 
 Two things differ between the sources and are worth knowing before writing a
 third:
@@ -1370,9 +1357,7 @@ stream at `2.0` took 36 ms to decode each 32 ms frame and fell behind. The
 output stage now folds 256 samples at a time: its scratch fits a shape without
 PSRAM, and on the board the same 7.1.4 play decodes in 30 ms a frame, level
 with real time. The same stream decodes and renders onto twelve slots in about
-30 ms. See
-[`planning/esp32-stream-set.md`](../../planning/esp32-stream-set.md#on-a-board)
-and [Folded to stereo](../../docs/platforms/bare-metal/esp32-s3.md#folded-to-stereo).
+30 ms. See [Folded to stereo](../../docs/platforms/bare-metal/esp32-s3.md#folded-to-stereo).
 
 All of it is [`iclforge/render/render.hpp`](../../libs/render/include/iclforge/render/render.hpp),
 one 256-sample block at a time, which is why a 7.1.4 layout costs the player 12 KB

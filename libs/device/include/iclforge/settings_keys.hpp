@@ -8,7 +8,7 @@
 #include <vector>
 
 // The keys of a Hearth board's own settings in NVS (firmware/hearth-sink/main/settings.hpp) and which
-// of them "Reset preferences" puts back to the image's defaults (planning/p4x-preferences.md, E4).
+// of them "Reset preferences" puts back to the image's defaults.
 //
 // A board's settings are of two kinds. The ones a person chooses once and leaves - what the screen shows,
 // when it dims, the clock - are PREFERENCES, and Reset preferences returns them to how a new board
@@ -68,7 +68,7 @@ enum class Kind : std::uint8_t {
     // How the board's outputs are wired, what room they serve and where that room is (its time zone): kept by Reset
     // preferences. A person set these up for the room, not for taste.
     setup,
-    // A technical setting that stays out of Preferences (planning/p4x-preferences.md): kept by Reset
+    // A technical setting that stays out of Preferences: kept by Reset
     // preferences.
     technical,
 };

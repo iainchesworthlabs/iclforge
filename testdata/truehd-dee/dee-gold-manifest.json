@@ -8,7 +8,7 @@
   "ffmpeg_version": "ffmpeg version 8.0.1-full_build-www.gyan.dev",
   "forge": "iclforge 0.10.0-beta.1+5678 release: v0.10.0-beta.1-5678-g79b9118fe0 commit:  79b9118fe02f94f839522e36fe91a8e6cc80f471",
   "groups": {
-    "truehd-open": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+    "truehd-open": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md: the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
     "truehd-fixtures": "short TrueHD streams with their sources, committed under testdata/truehd-dee/ as the only streams in the tree from an outside encoder at 7.1, with three substreams, at 96 kHz and at 16 and 20 bits"
   },
   "sources": {
@@ -909,7 +909,7 @@
     },
     "thd-len-2ch-48k-12000": {
       "group": "truehd-open",
-      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md: the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
       "encoder": "dee_dthd_encoder",
       "codec": "truehd",
       "source": "tones_20_n12000",
@@ -987,7 +987,7 @@
     },
     "thd-len-2ch-48k-12001": {
       "group": "truehd-open",
-      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md: the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
       "encoder": "dee_dthd_encoder",
       "codec": "truehd",
       "source": "tones_20_n12001",
@@ -1065,7 +1065,7 @@
     },
     "thd-len-2ch-48k-12039": {
       "group": "truehd-open",
-      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md: the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
       "encoder": "dee_dthd_encoder",
       "codec": "truehd",
       "source": "tones_20_n12039",
@@ -1143,7 +1143,7 @@
     },
     "thd-len-2ch-48k-4001": {
       "group": "truehd-open",
-      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md (planning/truehd.md, \"Oracles\"): the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
+      "for": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md: the rates, downmix presentations and three substreams, DRC and dialnorm, lengths that are not a whole number of access units, other bit depths and layouts, the encoder's data-rate and stream-end options, and the Atmos input",
       "encoder": "dee_dthd_encoder",
       "codec": "truehd",
       "source": "tones_20_n4001",

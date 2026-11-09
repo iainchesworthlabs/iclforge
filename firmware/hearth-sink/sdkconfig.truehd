@@ -1,4 +1,4 @@
-# TrueHD in the Hearth sink (planning/truehd-parity-esp32-sinks.md): the component's TrueHD decoder on,
+# TrueHD in the Hearth sink: the component's TrueHD decoder on,
 # so that a Sendspin stream of the `truehd` data type (one to 24 whole access units a chunk) is
 # decoded and played as an AC-3, E-AC-3 or AC-4 stream is.
 #

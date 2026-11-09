@@ -65,7 +65,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `lyrics`, `objects`, `pitch`, `truehd` | nothing | wasm |
 | `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4, and, in the command-line tool only, for decoding, analysis, wrapping and encoding of TrueHD. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `truehd`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-project`, `app-text-encoding`, `app-theme` | nothing | windows, linux, macos |
 | `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `dsp`, `lyrics`, `objects`, `pitch`, `render`, `sendspin`, `sink`, `truehd`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
-| `hearth-android` | `apps/hearth/android/` | Hearth for Android: a Sendspin sink for Android TV, advertised on the network, paired with from Hearth and playing what it sends. A foreground service owns one iclforge::sink; the screens are platform Views over JNI (planning/hearth-android.md). | `audio`, `lyrics`, `sendspin`, `sink` | nothing | android |
+| `hearth-android` | `apps/hearth/android/` | Hearth for Android: a Sendspin sink for Android TV, advertised on the network, paired with from Hearth and playing what it sends. A foreground service owns one iclforge::sink; the screens are platform Views over JNI. | `audio`, `lyrics`, `sendspin`, `sink` | nothing | android |
 
 ## Bindings
 
@@ -171,5 +171,5 @@ excuses nothing fails the check.
 
 | From | To | Where | Why |
 |---|---|---|---|
-| `ac4` | `app-media` | `libs/ac4/tests/decoder/test_object_render.cpp` | The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library (planning/monorepo.md, C7-2, finding 4). |
+| `ac4` | `app-media` | `libs/ac4/tests/decoder/test_object_render.cpp` | The one test of the object renderer builds its streams with the AC-4 tests' own helper (decoder/objects.hpp, which includes the encoder's private headers), so it stays in libs/ac4/tests and compiles apps/shared/media/src/ac4_object_render.cpp into ac4's test binary: a library's test using an app-library. |
 

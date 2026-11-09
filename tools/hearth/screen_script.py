@@ -7,7 +7,7 @@
     python tools/hearth/screen_script.py run   SCRIPT... --preview PANEL_PREVIEW --board HOST \
         --lease D:/ac3bld/board-kit.lock --session ID [--restore]
 
-A script (firmware/hearth-sink/preview/scripts/*.screen, planning/screen-test-harness.md) is a few
+A script (firmware/hearth-sink/preview/scripts/*.screen) is a few
 lines of what a person does at the glass and what they should then see:
 
     board p4-rev3-kit           # header: the BoardCaps variant (board_variants.hpp), glass, scene
@@ -330,7 +330,7 @@ class BoardBackend:
             else:
                 raise StepError(
                     f"the board's :{self.panel_port} has no {event[0]} route yet "
-                    "(planning/screen-test-harness.md, slice 2)"
+                    ""
                 )
         time.sleep(self.settle)
         board, preview = values_of(self.prefs()), values_of(self.shadow.prefs())

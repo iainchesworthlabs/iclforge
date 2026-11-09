@@ -6,7 +6,7 @@
 
 #include "iclforge/preferences.hpp"
 
-// The Speakers sheet (planning/hearth-speaker-trim-identify.md, planning/p4x-preferences.md): the page the Preferences'
+// The Speakers sheet: the page the Preferences'
 // "Speaker levels and distances" row opens. The room as the layout in force draws it (iclforge/render/room_plan.hpp,
 // read-only here) with the speaker the test tone is on lit, a tap on a speaker playing the tone through that speaker
 // and choosing it; and for the chosen speaker its level (-12 to +12 dB, a half decibel a step) and its distance from the

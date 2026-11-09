@@ -20,8 +20,7 @@
 #include "session.hpp"
 #include "truehd_index.hpp"
 
-// The media information (planning/hearth-reference-player.md, Media
-// information): what a queue item's file says about itself, read once for the
+// The media information: what a queue item's file says about itself, read once for the
 // whole file.
 //
 // - The container's facts, from the item's loader: the track, its codec

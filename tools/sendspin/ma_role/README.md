@@ -1,8 +1,8 @@
 # ma_role: `_iclforge_player@v1` for an aiosendspin 10.2.1 server
 
 A self-contained package (no imports from the rest of the repository) that lets a Sendspin server
-send an E-AC-3 stream, undecoded, to a sink that decodes it itself. Written for the Music Assistant
-fork of `planning/ma-atmos-e2e.md`, which vendors it by copying the three modules; `tools/sendspin`
+send an E-AC-3 stream, undecoded, to a sink that decodes it itself. Written for a Music Assistant
+fork, which vendors it by copying the three modules; `tools/sendspin`
 holds the proof that it works.
 
 | File | What |

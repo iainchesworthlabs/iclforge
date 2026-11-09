@@ -1,8 +1,7 @@
 # ---------------------------------------------------------------------------
 # iclforge::ac4 - the AC-4 codec, ETSI TS 103 190-1 V1.4.1 and TS 103 190-2
 # V1.3.1, written from the published texts: the bitstream inspector, the
-# decoder and the encoder, one library laid out by AC-3's areas
-# (planning/consolidation.md, C1):
+# decoder and the encoder, one library laid out by AC-3's areas:
 #
 #   core/     the table of contents and the presentation types (toc.cpp), the
 #             tables generated from the ETSI attachments and the transforms both
@@ -22,7 +21,7 @@
 # encoder/.
 #
 # Made by iclforge_add_library() (cmake/IclforgeLibrary.cmake). The
-# minimum-footprint profile (ICLFORGE_MINIMAL_AC4, planning/ac4.md, D14b)
+# minimum-footprint profile (ICLFORGE_MINIMAL_AC4)
 # builds the decode-only archive from a narrower list of the same sources
 # (minimal.cmake), as libs/ac3 does; the encoder has no such archive, being
 # built for no ESP32 part (decision 34).
@@ -117,8 +116,7 @@ set(_ac4_signature_sources
 # What the decoder and the encoder compute alike: the tables generated from the
 # ETSI attachments, in namespace iclforge::ac4::detail, and the transforms, the
 # QMF banks and the sample rate converter, which are dsp's tiered kernels
-# (libs/dsp/src/tiered, iclforge::dsp::tiered; planning/consolidation.md, decision
-# 14). Those are written against the decode tier's scalar, which iclforge::dsp's
+# (libs/dsp/src/tiered, iclforge::dsp::tiered). Those are written against the decode tier's scalar, which iclforge::dsp's
 # own library is built at none of, so the codec that calls them builds them, as
 # libs/ac3/minimal.cmake builds dsp's files into AC-3's archive.
 set(_dsp_tiered ../dsp/src/tiered)
@@ -143,15 +141,13 @@ set(_ac4_kernel_sources
     src/core/tables/sfb_tables.cpp
     src/core/tables/ssf_tables.cpp)
 
-# The scalar the kernels are explicitly instantiated at (planning/ac4.md, D14a:
-# "AC-4 joins ICLFORGE_DECODE_SCALAR"): the root's one option for every codec,
-# by its tier. "fixed" is iclforge::internal::Fixed32, the ESP32-C6's and -C3's
-# (planning/ac4.md, D14d).
+# The scalar the kernels are explicitly instantiated at: the root's one option for every codec,
+# by its tier. "fixed" is iclforge::internal::Fixed32, the ESP32-C6's and -C3's.
 #
 # ICLFORGE_AC4_ALSO_AT_DOUBLE: the encoder calls straight into a handful of these
 # same kernels (Mdct, QmfAnalysis, QmfSynthesis, Resampler,
 # ajoc::Reconstruction, aspx::generate_high_band) always at double - decision
-# 34 (planning/ac4.md), the encoder never runs on an ESP32 and has no float or
+# 34, the encoder never runs on an ESP32 and has no float or
 # fixed-point tier of its own, so it does not follow ICLFORGE_DECODE_SCALAR.
 # iclforge::ac3 avoids this by compiling its encoder's and decoder's DSP
 # separately (ICLFORGE_ENCODE_SCALAR beside ICLFORGE_DECODE_SCALAR,
@@ -207,7 +203,7 @@ else()
         LINK_PRIVATE ${_ac4_link_private})
 endif()
 
-# -Wdouble-promotion as an error on the float tier (planning/ac4.md, D14a): an
+# -Wdouble-promotion as an error on the float tier: an
 # implicit float-to-double promotion anywhere in the kernels is exactly the
 # unmeasured cost a single-precision-FPU target (the ESP32-P4/S3) cannot afford,
 # so it is a build failure rather than a silent one. GCC/Clang only - MSVC has no
@@ -228,9 +224,9 @@ endif()
 # The float tables of the sample rate converter are built by the compiler, in
 # libs/dsp/src/tiered/resampler.cpp and in no other translation unit and only in a
 # build whose scalar is float, and the Q1.30 tables alike only in one whose
-# scalar is fixed (planning/ac4.md, D14d) (tiered/resampler_design.hpp: the
+# scalar is fixed (tiered/resampler_design.hpp: the
 # three ratios the decoder uses, 1001/960 the long one, 47,094 coefficients each
-# designed with a Kaiser window and a sinc, planning/ac4.md, D14a5). A
+# designed with a Kaiser window and a sinc). A
 # compiler's limit on what its constant evaluator may do in one constant
 # expression is set for small computations and this is not one: the three tables
 # take 6 to 10 million steps in MSVC, 10.6 million in Clang and 76 to 78 million
@@ -240,8 +236,8 @@ endif()
 # below are three to eleven times what the tables need. The evaluation makes the
 # file take 5 to 14 seconds longer to compile, by compiler: clang-cl 5.9 s where
 # it took 0.8, GCC 16 6.0 where 0.8, GCC 14 6.1 where 1.1, ESP-IDF's RISC-V GCC
-# 15 8.4 where 1.5, Clang 22 8.8 where 1.0 and MSVC 14.7 where 0.7
-# (planning/ac4.md, D14a5); a double build pays nothing. The ESP-IDF component
+# 15 8.4 where 1.5, Clang 22 8.8 where 1.0 and MSVC 14.7 where 0.7;
+# a double build pays nothing. The ESP-IDF component
 # reaches this file through the root CMakeLists.txt, so the same limits apply
 # there. libs/dsp/src/tiered/transform_tables.cpp narrows the inverse transform's
 # tables (core/dsp/transform_tables.hpp) to the tier's scalar the same way:

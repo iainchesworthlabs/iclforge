@@ -248,7 +248,7 @@ belongs to one platform skips on the others.
    the mode is never chosen. The
    pin entry, the tray entry and the pin's round trip are covered; the page in
    the mode, the notes shown in it and the column's ticks are not, and wait for a
-   receiver (planning/truehd-parity-crucible.md, Phase 4).
+   receiver.
 
 ## UI defects found (both fixed)
 

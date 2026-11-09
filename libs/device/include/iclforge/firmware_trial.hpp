@@ -4,7 +4,7 @@
 #include <optional>
 
 // When an image an update wrote has proved itself, and when it has had long
-// enough to (planning/esp32-ota.md, "The trial").
+// enough to.
 //
 // The rollback bootloader boots a newly written slot once, marked
 // PENDING_VERIFY. The image then has to say it is good -

@@ -251,7 +251,7 @@ TEST_CASE("media info json: an MPEG-TS item's service descriptor, and the AC-4 c
     CHECK(iclforge::hearth::codec_token(MediaCodec::kEac3) == "eac3");
 }
 
-// TrueHD and MLP (planning/truehd-parity-hearth-player.md, H3): read off real streams, since the
+// TrueHD and MLP: read off real streams, since the
 // figures are the index's and a hand-filled MediaInfo would only repeat the writer.
 TEST_CASE("media info json: a TrueHD item states its stream in an additive member",
           "[hearth][media-info][truehd]") {

@@ -1,5 +1,5 @@
 // The panel's task: LVGL, the lyric screen, the drawing statistics and the read-back route. See
-// ../panel.hpp and planning/karaoke-p4x-panel.md.
+// ../panel.hpp.
 //
 // One task owns LVGL. Each cycle it brings the screen up to date from what the Sendspin player holds
 // and lets LVGL draw what that dirtied; a cycle takes a few hundred microseconds when a word fills
@@ -399,7 +399,7 @@ void rest(std::int64_t rest_us) {
 
 // The audio comes first. A decoder that spends a long share of its 32 ms on a burst (a 7.1.4 object stream, AC-4) is slowed by the screen's memory
 // traffic beside it: the kit measured the Meters view at +1.6 to 2.2 ms a burst under JOC, +0.5 to 0.7 with the screen's task kept on the decode
-// core (planning/p4x-meters-view.md, "What the screen costs the audio path"). So while the mean burst is at CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
+// core. So while the mean burst is at CONFIG_ICLFORGE_EXAMPLE_PANEL_YIELD_BURST_US
 // or more (in at that, out at 70 % of it, so it does not flap) the Meters view is held at ten updates a second. At YIELD 2 this task is also made
 // on the decode core (start()), where it cannot run beside the decode task: FreeRTOS here has no call to move a task between cores, so that one is
 // for always. Looked at once a second; a stream that is not bursts is never busy.

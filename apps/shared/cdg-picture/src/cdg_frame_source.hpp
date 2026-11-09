@@ -3,7 +3,7 @@
 #include <QImage>
 #include <QObject>
 
-// Whatever a window gets the picture of a CD+G disc from (planning/karaoke-phase2.md, W13f): the
+// Whatever a window gets the picture of a CD+G disc from: the
 // controller of the program that holds the disc and the position it is shown at. CdgPicture, the
 // item that draws it, knows only this, so Hearth's KaraokeController, Crucible's CrucibleLyrics
 // and the Forge GUI's player each give it frames from their own state, and the item is none of

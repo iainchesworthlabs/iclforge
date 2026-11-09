@@ -6,7 +6,7 @@
 
 #include "iclforge/pitch/reference.hpp"
 
-// A pitch score (planning/karaoke-microphone.md, D10): for the stretches where a reference melody
+// A pitch score: for the stretches where a reference melody
 // has a note, how much of that time the singer's pitch was within a tolerance of it, with octaves
 // ignored. It is not a judgement of singing: it hears nothing but pitch, and it is exactly as good
 // as the reference it is given.

@@ -8,7 +8,7 @@
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 
-// The TrueHD decoder as the Sendspin player's burst path uses it (planning/truehd-parity-esp32-sinks.md):
+// The TrueHD decoder as the Sendspin player's burst path uses it:
 // a chunk of one to 24 whole access units (the Sendspin extension's TrueHD data type), each decoded
 // to a block of 40, 80 or 160 samples a channel in the order and layout the renderer takes, as
 // AC-3's, E-AC-3's and AC-4's decoders hand them over. It is libs/truehd's decoder, built by
@@ -17,8 +17,7 @@
 // (the way ac4_stream.hpp does for AC-4).
 //
 // A unit that gives no samples (a stream joined before its first major sync, or after a unit that
-// did not read) is handed over as silence of its length, so the output is as long as the chunks say
-// (planning/hearth-sendspin-extension.md, "Where a sink joins").
+// did not read) is handed over as silence of its length, so the output is as long as the chunks say.
 //
 // What it does not do: objects. libs/truehd decodes the bed and the board states that it places no
 // objects, and a stream's presentation is the highest one the chunks hold (a server cuts the

@@ -1,10 +1,10 @@
 """A6's exit with aiosendspin 9.1.1: a group of two test sinks and the scripted player plays one
 programme, from the app's own Engine.
 
-planning/hearth-reference-player.md, A6's exit: "from the app, a group of two test sinks and the
-reference Python player plays one programme" - read against A4's own exit and Verified-by (same
-doc), which always means a real aiosendspin process by that phrase, never a second in-process test
-double (aiosendspin_exit.py's own docstring is the A4 case this mirrors).
+The exit reads "from the app, a group of two test sinks and the reference Python player plays one
+programme", which, as for A4's own exit, always means a real aiosendspin process by that phrase,
+never a second in-process test double (aiosendspin_exit.py's own docstring is the A4 case this
+mirrors).
 
 Starts the scripted player in aiosendspin_player.py on a loopback port, runs iclforge-hearth-tests's
 hidden [aiosendspin-group] case (apps/hearth/engine/tests/test_aiosendspin_group.cpp) with the

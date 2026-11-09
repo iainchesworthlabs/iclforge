@@ -1,4 +1,4 @@
-# The measurement overlay of a profile (planning/esp32-platform-profiles.md, "measure"): keys
+# The measurement overlay of a profile: keys
 # that only observe, given after the profile's own fragments, for an image that is run to be
 # measured. Declared in profiles.json, where the keys it may touch are listed; the guard holds
 # the build to them, so an image built with it is the profile's and not a scratch build.

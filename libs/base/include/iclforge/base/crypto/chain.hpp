@@ -20,7 +20,7 @@
 // usage, the authority and subject key identifiers, and, for a trust anchor the operator names, its
 // own basicConstraints, key usage, validity and path length (an anchor is trusted as given, like a
 // pin). The specification is silent on all of these (CS spec §6.1 steps 3 and 4); libs/ac4/ERRATA.md
-// open questions 7 and 8 and planning/static-analysis-truehd-signing-cenc.md say what has been asked.
+// open questions 7 and 8 say what has been asked.
 
 #include <array>
 #include <cstddef>

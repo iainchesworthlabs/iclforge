@@ -1,8 +1,8 @@
 package com.iclforge.hearth
 
 /**
- * Which of the sink screens is up when there are no lyrics to show, and what it says
- * (planning/hearth-sink-screen.md): S0 starting, S1 idle, S10 attention. A function of what the app
+ * Which of the sink screens is up when there are no lyrics to show, and what it says:
+ * S0 starting, S1 idle, S10 attention. A function of what the app
  * knows, so that the rules are held by tests without a screen.
  */
 object StatusScreens {

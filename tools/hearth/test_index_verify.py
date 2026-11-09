@@ -1,5 +1,4 @@
-"""Unit tests for index_verify.py, the check a board makes of a signed firmware update index
-(planning/esp32-ota.md, O10).
+"""Unit tests for index_verify.py, the check a board makes of a signed firmware update index.
 
 stdlib unittest, as the "Oracle unit tests" step of _static.yml runs it, with nothing
 installed. The signed pairs under testdata/update_index/ were made once by

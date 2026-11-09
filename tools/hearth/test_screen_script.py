@@ -1,4 +1,4 @@
-"""Unit tests for screen_script.py, the screen scripts (planning/screen-test-harness.md).
+"""Unit tests for screen_script.py, the screen scripts.
 
 stdlib unittest, as _static.yml's "Oracle unit tests" step runs it. The preview is a stand-in (a
 Python program that speaks the `--drive` lines) and the board is a stand-in (two HTTP servers, the

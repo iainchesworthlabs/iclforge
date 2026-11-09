@@ -2,8 +2,7 @@
 'use strict';
 
 // Every action the page offers, driven through the page against the stand-in
-// device, and what the device was sent - planning/esp32-device-ui.md's "What
-// the page does". The error paths are the device's own refusals (400, 409), a
+// device, and what the device was sent. The error paths are the device's own refusals (400, 409), a
 // connection closed unanswered and a device that does not answer at all.
 
 const { test, expect, holdClockAt } = require('./fixtures');
@@ -11,8 +10,8 @@ const { REPLIES } = require('./stub');
 
 const DEMO = 'http://10.0.2.2:8000/demo.ec3';
 
-// THE PAGE NO LONGER PLAYS ANYTHING. A server owns playback from B2 on
-// (planning/hearth-reference-player.md): this page is what the BOARD is, and
+// THE PAGE NO LONGER PLAYS ANYTHING. A server owns playback from B2 on:
+// this page is what the BOARD is, and
 // POST /play stays in the REST surface for a person with curl. So the plays
 // these tests need are started through the device's own API rather than
 // through the page, as hearth or Music Assistant would.

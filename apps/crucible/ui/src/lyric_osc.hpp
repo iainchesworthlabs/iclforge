@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-// Events out (planning/karaoke-phase2.md, D9's rejected alternative, built on the owner's ask): what
+// Events out: what
 // the lyric strip follows, said over OSC 1.0 on UDP, so that a visual rig, a show-control desk or a
 // lighting console can follow the same line and word the strip does. Off until a person turns it
 // on and says where to send.

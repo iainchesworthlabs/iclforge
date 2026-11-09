@@ -1,6 +1,6 @@
 """A scripted Sendspin player on aiosendspin 9.1.1, standing in for Sendspin's reference player.
 
-planning/hearth-sendspin-extension.md, Decisions: A4's exit plays PCM, FLAC and Opus from Hearth's
+A4's exit plays PCM, FLAC and Opus from Hearth's
 server to this player, which tools/sendspin/aiosendspin_exit.py runs. The player listens for a
 server on a port, prints its URL, client_id and the SP:0 token that pairs it by its pairing PSK,
 takes player@v1 in the one codec it offers, and decodes every chunk with the SDK's decoders. When

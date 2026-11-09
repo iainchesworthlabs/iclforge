@@ -269,8 +269,7 @@ std::optional<DrcCodes> resolve_drc(const DrcConfig& d, bool experimental_gains)
             c.repeat_id = *mode.repeat_of;
             c.default_profile = false;
         } else if (mode.gains_config) {
-            // Transmitted gains, experimental (planning/ac4.md, "What
-            // the encoder writes by default").
+            // Transmitted gains, experimental.
             if (!experimental_gains || *mode.gains_config < 0 || *mode.gains_config > 3) {
                 return std::nullopt;
             }

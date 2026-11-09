@@ -1,5 +1,4 @@
-// Updates over the network. See ../include/iclforge/firmware.hpp and
-// planning/esp32-ota.md.
+// Updates over the network. See ../include/iclforge/firmware.hpp.
 
 #include "iclforge/firmware.hpp"
 
@@ -63,7 +62,7 @@ constexpr const char* kKeyLastReason = "last_why";
 constexpr const char* kKeyUploading = "uploading";
 
 // httpd_req_recv's timeout is 5 s a call; this many in a row is a stalled
-// upload (planning/esp32-ota.md: "A stalled connection gives up after 30 s").
+// upload.
 constexpr int kStalledReceives = 6;
 
 std::string hex(std::span<const std::uint8_t> bytes) {
@@ -1063,7 +1062,7 @@ Firmware::Impl::Outcome Firmware::Impl::run_upload(UploadJob& job) {
     }
     if (job.pulled != nullptr) {
         // The index named this image: the version in it is the one named, and it is not below the
-        // running image's security level (planning/esp32-ota.md, O10, "What an update may do").
+        // running image's security level.
         if (head.version != job.pulled->version ||
             head.secure_version < esp_app_get_description()->secure_version) {
             out.status = "400 Bad Request";
@@ -1533,7 +1532,7 @@ int Firmware::on_upload(httpd_req* req) {
     Impl& im = *impl_;
     if (!im.host_allowed(req)) {
         return reply_text(req, "403 Forbidden",
-                          "firmware changes are taken only on the board's own address or name (planning/esp32-ota.md)");
+                          "firmware changes are taken only on the board's own address or name");
     }
     if (im.other == nullptr) {
         return reply_text(req, "409 Conflict",
@@ -1622,7 +1621,7 @@ int Firmware::on_mode(httpd_req* req) {
     Impl& im = *impl_;
     if (!im.host_allowed(req)) {
         return reply_text(req, "403 Forbidden",
-                          "firmware changes are taken only on the board's own address or name (planning/esp32-ota.md)");
+                          "firmware changes are taken only on the board's own address or name");
     }
     const std::string body = short_body(req);
     if (body != "flash" && body != "normal") {
@@ -1658,7 +1657,7 @@ int Firmware::on_rollback(httpd_req* req) {
     Impl& im = *impl_;
     if (!im.host_allowed(req)) {
         return reply_text(req, "403 Forbidden",
-                          "firmware changes are taken only on the board's own address or name (planning/esp32-ota.md)");
+                          "firmware changes are taken only on the board's own address or name");
     }
     bool on_trial = false;
     {
@@ -1776,7 +1775,7 @@ int Firmware::on_coredump_erase(httpd_req* req) {
     Impl& im = *impl_;
     if (!im.host_allowed(req)) {
         return reply_text(req, "403 Forbidden",
-                          "firmware changes are taken only on the board's own address or name (planning/esp32-ota.md)");
+                          "firmware changes are taken only on the board's own address or name");
     }
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
     {

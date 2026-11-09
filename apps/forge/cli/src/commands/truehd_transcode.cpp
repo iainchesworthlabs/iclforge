@@ -26,8 +26,8 @@
 // `transcode` of a TrueHD or MLP stream to AC-3 or E-AC-3: the decode of the presentation
 // truehd-presentation= names (the best by default, as `decode` chooses it) re-encoded by the
 // command that encodes a WAV for the target codec, so that the layout, the bitrate and the metadata
-// options mean what they mean there. planning/truehd-parity-forge.md, question 5: no E-AC-3 to
-// TrueHD (a lossless copy of a lossy decode), and none to AC-4 from TrueHD here.
+// options mean what they mean there. There is no E-AC-3 to TrueHD (a lossless copy of a lossy
+// decode), and none to AC-4 from TrueHD here.
 //
 // The stream's own dialogue norm is carried (stored_dialnorm): the 6 and 8 channel fields as the
 // dialnorm, the 2 channel field less 6, as two DEE encodes of one programme settle them

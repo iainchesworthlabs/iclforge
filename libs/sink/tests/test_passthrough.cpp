@@ -18,8 +18,7 @@
 #include "iclforge/sink/passthrough.hpp"
 
 // The pass-through output decided on the host: which slot of a link each burst goes in, what is a
-// null burst, what is late. The link is a model of the Shield's AudioTrack as planning/
-// hearth-android-findings.md (F12) measured it: it does not move until 8 bursts are queued, starts
+// null burst, what is late. The link is a model of the Shield's AudioTrack as measured: it does not move until 8 bursts are queued, starts
 // about 200 ms after the 8th, takes one burst per 32 ms from then and reports its position in
 // steps of 20 ms. The clock is the test's, so the cases are exact and take no time.
 

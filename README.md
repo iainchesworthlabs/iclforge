@@ -53,7 +53,7 @@ trademarks of Dolby Laboratories. This project implements the openly published s
 A/52:2018 (of which E-AC-3 is normative Annex E), ETSI TS 102 366, ETSI TS 103 420 and ETSI TS
 103 190 (AC-4) — and is not affiliated with, endorsed by, or certified by Dolby Laboratories.
 TrueHD and MLP have no openly published standard: that codec is written from a specification
-supplied by the project's owner ([the plan](planning/truehd.md#sources-and-what-they-are) says what it is
+supplied by the project's owner ([the plan] says what it is
 and how the code is checked).
 Code and documentation use the technical names AC-3, E-AC-3, AC-4 and TrueHD. Whether the patents reading on
 these formats matter for your use is your problem to assess, not something this project
@@ -391,7 +391,6 @@ packaging/      vcpkg port, winget manifest, Conan recipe (staged, pending upstr
                 Homebrew formula/cask (each release copies them to the live tap)
 docs/           the site source — see Documentation below; docs-snippets/ holds the generated
                 tables it includes, and overrides/ its home page template
-planning/       design proposals and phase plans, not published on the site
 ```
 
 The standards documents are not redistributed; `spec/` is gitignored. See

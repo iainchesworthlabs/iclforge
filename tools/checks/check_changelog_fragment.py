@@ -29,7 +29,7 @@ import sys
 
 TYPES = ("added", "changed", "deprecated", "removed", "fixed", "security")
 NAME = re.compile(r"^changelog\.d/[A-Za-z0-9][A-Za-z0-9._-]*\.(" + "|".join(TYPES) + r")\.md$")
-NOT_CODE = ("docs/", "planning/", ".github/", "tools/", "changelog.d/")
+NOT_CODE = ("docs/", ".github/", "tools/", "changelog.d/")
 NOT_CODE_FILES = ("CHANGELOG.md", "ROADMAP.md", "README.md", "CONTRIBUTING.md", "SECURITY.md")
 
 

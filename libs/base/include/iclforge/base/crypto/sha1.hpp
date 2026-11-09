@@ -10,7 +10,7 @@
 // The chain is still checked link by link with ECDSA over SHA-256, but the pinned certificate is
 // the one the fingerprint names. A SHA-256 fingerprint has no such weakness, and the operator who
 // can choose should choose it; whether the SHA-1 form should be accepted at all is an owner's
-// question (planning/static-analysis-truehd-signing-cenc.md, question 1).
+// question.
 
 #include <array>
 #include <cstddef>

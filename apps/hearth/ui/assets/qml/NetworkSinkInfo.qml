@@ -3,8 +3,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The right-hand "THIS SINK" panel (planning/hearth-design.md's
-// network-pairing artboard): what NetworkController knows about the selected
+// The right-hand "THIS SINK" panel: what NetworkController knows about the selected
 // sink, as label/value rows - kind, address, roles, takes, outputs, latency
 // and clock. NetworkController.selectedSink already carries these as display
 // strings (network_view.cpp does the formatting), so this component only

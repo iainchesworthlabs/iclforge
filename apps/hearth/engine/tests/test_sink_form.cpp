@@ -745,7 +745,7 @@ TEST_CASE("sink form: a sink that lists no PCM and cannot take the stream is sen
     CHECK(mentions(choice.reason, "no PCM"));
 }
 
-// ---- karaoke (planning/karaoke-phase2.md, W7) ---------------------------------------------------
+// ---- karaoke ---------------------------------------------------
 //
 // A karaoke AC-3 stream whose reproduction is wanted goes as it is only to a sink that is told how
 // to reproduce it: a sink whose decoder is not played the coded channels, and a group would hear
@@ -833,7 +833,7 @@ TEST_CASE("sink form: where no PCM can be sent, the stream plays as coded and th
     CHECK(mentions(off.reason, "played as coded"));
 }
 
-// ---- the codec (planning/karaoke-eac3.md, D6) ----------------------------------------------------
+// ---- the codec ----------------------------------------------------
 //
 // A sink that takes the karaoke keys has a path for the codecs it lists: AC-3's alone when it
 // lists none, as a board from before E-AC-3's reproduction does. An E-AC-3 karaoke stream sent
@@ -895,7 +895,7 @@ TEST_CASE("sink form: where an E-AC-3 karaoke stream cannot be sent PCM, it play
     CHECK(mentions(choice.reason, "not for E-AC-3"));
 }
 
-// ---- the part levels (planning/karaoke-phase2.md, W10c) -----------------------------------------
+// ---- the part levels -----------------------------------------
 //
 // A level that moves the melody or a vocal is for the sink to apply, or for this app to apply in
 // the PCM it sends: a sink that took the reproduction and not the level would play the table, and

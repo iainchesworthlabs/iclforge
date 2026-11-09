@@ -1,4 +1,4 @@
-# Updates pulled from GitHub releases (planning/esp32-ota.md, O10): the HTTPS client, a certificate bundle of
+# Updates pulled from GitHub releases: the HTTPS client, a certificate bundle of
 # the three roots GitHub's hosts chain to (tls_roots.pem) and not ESP-IDF's whole default one, and the
 # routes. A board that takes it also needs a trust anchor for the signed index it pulls
 # (ICLFORGE_EXAMPLE_TRUST_ANCHORS in its sdkconfig, or the ICLFORGE_TRUST_ANCHORS_FILE CMake variable);

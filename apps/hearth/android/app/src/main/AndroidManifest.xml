@@ -14,7 +14,7 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <!-- The sink is a foreground service of the media-playback type from the first launch until
-         the person leaves it (planning/hearth-android.md, D9). The second permission is the one
+         the person leaves it. The second permission is the one
          API 34 asks for the type; the notification is the service's, and where the system hides it
          the service still runs. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

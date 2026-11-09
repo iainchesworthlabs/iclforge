@@ -50,8 +50,8 @@ class ClientKeyring {
     ClientKeyring& operator=(ClientKeyring&&) = delete;
 
     // The PSK whose psk_id is `id`, held under `category`; with no category, as aiosendspin
-    // 9.1.1's message 1 names none, held under any (planning/hearth-sendspin-extension.md,
-    // C3). The Sentinel PSK need not be held: the machine knows it.
+    // 9.1.1's message 1 names none, held under any. The Sentinel PSK need not be held: the machine
+    // knows it.
     [[nodiscard]] virtual std::optional<PskCandidate> find(const crypto::Digest32& id,
                                                            std::optional<PskCategory> category) const = 0;
 };

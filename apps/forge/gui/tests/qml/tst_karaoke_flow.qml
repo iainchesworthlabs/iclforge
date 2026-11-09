@@ -3,8 +3,7 @@ import QtTest
 
 import ForgeGui
 
-// The Karaoke flow (KaraokeFlow.qml; planning/karaoke-design.md, K6; planning/
-// karaoke.md A1 to A8) driven the way a person drives it: the part rows' own
+// The Karaoke flow (KaraokeFlow.qml) driven the way a person drives it: the part rows' own
 // buttons open the WAV picker, Next walks Parts, Levels, Hear and Save, and the
 // Save step's button goes through the same encode flow Guided's does. Every
 // step goes through the real EncoderController / StreamPlayerController
@@ -578,7 +577,7 @@ TestCase {
         }
     }
 
-    // ---- The format (planning/karaoke-eac3.md, E6, D7) -----------------------------------
+    // ---- The format -----------------------------------
     // AC-3 is what Annex C defines and the default; E-AC-3 carries the same service type, and a
     // note says what is this project's to reproduce and what a player may not.
     function test_theFormatIsAc3ByDefaultAndEac3IsAChoiceThatSaysWhatIsOurs() {

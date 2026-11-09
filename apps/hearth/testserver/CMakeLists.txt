@@ -1,4 +1,4 @@
-# hearth-testserver (planning/hearth-reference-player.md, B3 and B4): libs/sendspin's server host
+# hearth-testserver: libs/sendspin's server host
 # as a program that dials players, pairs them, sends them settings, plays one programme to them as a
 # group and reports what they said about it. Until the engine plays to boards, this is what drives
 # them, from a computer and in CI. It can run a test sink of its own, the reference a board's levels

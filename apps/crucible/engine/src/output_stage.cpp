@@ -40,7 +40,7 @@ constexpr std::size_t kCodedForWave[6] = {0, 2, 1, 5, 3, 4};
 // ties to even, clamped to the range, and silence for a value that is not a
 // number. This is where "lossless" starts: the stream decodes to exactly
 // these integers, and the float mix they came from is not recoverable from
-// them (planning/truehd-parity-crucible.md, question 4).
+// them.
 std::int32_t to_24_bit(float sample) {
     constexpr float kFullScale = 8388608.0F;  // 2^23
     if (std::isnan(sample)) {

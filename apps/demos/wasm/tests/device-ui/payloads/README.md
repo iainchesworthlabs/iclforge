@@ -31,7 +31,7 @@ layout (`sink_slots`, and `stream.layout`, `render`, `coded` and `silent`), in
 | `finished-51-on-714.json` | `layout-51.ec3` on 7.1.4: the rear surrounds and the heights silent. |
 | `next-51.json` | `PUT /layout` of `5.1` after that play: `layout` is the next play's, `stream.layout` still this one's. |
 | `finished-714-on-51.json` | `layout-714.ec3` at 5.1: the rears and the heights spread over the room. |
-| `finished-51-on-20.json` | `layout-51.ec3` at 2.0: the decoder's Lo/Ro fold. (7.1.4 at 2.0 does not fit this shape's internal RAM; see `planning/esp32-stream-set.md`.) |
+| `finished-51-on-20.json` | `layout-51.ec3` at 2.0: the decoder's Lo/Ro fold. (7.1.4 at 2.0 does not fit this shape's internal RAM.) |
 | `finished-dualmono-on-714.json` | `eac3-dualmono.ec3` on 7.1.4: two mono programmes on L and R. |
 | `finished-objects-as-bed.json` | `demo.ec3` on 7.1.4, in a shape that plays objects as their bed. |
 | `failed-sample-rate.json` | `ac3-51-44k.ac3`, which the player refuses: its sink runs at 48 kHz. |

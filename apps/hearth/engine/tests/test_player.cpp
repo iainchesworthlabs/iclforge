@@ -2161,8 +2161,7 @@ TEST_CASE("player: an output whose device goes away stops playback, and says so"
     CHECK(player->history().back().frames == item_frames);
 }
 
-// The speaker setup (planning/hearth-reference-player.md, A5's Speakers
-// page): trim and delay on the render layout's own slots, the crossover's
+// The speaker setup: trim and delay on the render layout's own slots, the crossover's
 // corner, and routing/device facts forwarded to whatever PcmSink is open.
 // Each setting is keyed by slot, exercised here against "5.1" (L C R Ls Rs
 // LFE - slot 0 is L) or "2.0" (L R) so the tests read the same names
@@ -2512,8 +2511,7 @@ TEST_CASE("player: identify_stop before anything plays leaves the render exactly
     CHECK(log->kept == plain_log->kept);
 }
 
-// The transport bar's master volume (planning/hearth-reference-player.md,
-// A5's Player): one gain for every slot, applied after render and after the
+// The transport bar's master volume: one gain for every slot, applied after render and after the
 // per-speaker trim above - not part of the speaker setup, and not keyed by
 // slot.
 

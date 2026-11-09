@@ -42,7 +42,7 @@ if(ICLFORGE_IS_MSVC_LIKE)
                                 PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
 
-# TrueHD in the containers (planning/truehd.md, phase T2c): the tests read the committed FFmpeg fixtures
+# TrueHD in the containers: the tests read the committed FFmpeg fixtures
 # (ICLFORGE_GOLDEN_TRUEHD_DIR) and meet the truehd library only through truehd/truehd_stream.hpp, because the
 # library itself knows no codec. iclforge-truehd-container-tool is the same code as a command line, which
 # tools/checks/verify_truehd_containers.py runs against FFmpeg.

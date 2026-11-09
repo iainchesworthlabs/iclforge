@@ -9,11 +9,11 @@
 #include <string_view>
 #include <vector>
 
-// Lyrics for karaoke playback (planning/karaoke.md, requirements L1 to L6): a
+// Lyrics for karaoke playback: a
 // `.lrc` file read into lines of timed words, and a stateless cursor that says
 // where in them a playing position is. No Qt in it, and nothing but the
 // standard library, so that Hearth's window, Crucible, the sink firmware and
-// the browser can all link it (planning/karaoke-phase2.md, W13a); a controller
+// the browser can all link it; a controller
 // reads a file with read_lyrics() and a view asks lyric_position() on every
 // frame.
 //
@@ -32,8 +32,8 @@
 //   [ti:] [ar:] [al:] [by:] [length:mm:ss]   kept for display; other id tags
 //                         are read and ignored
 //   V1:text  V2:text  V1+V2:text
-//                         a duet's singer for the line (planning/karaoke-phase2.md,
-//                         W11): the marker is the first thing after the line's time
+//                         a duet's singer for the line: the marker is the first thing after the
+//                         line's time
 //                         tags (or after its first word tag), in either case, with
 //                         spaces round the `+` and after the colon, and is not
 //                         part of the line's text. V1 and V2 are the two vocals of
@@ -125,7 +125,7 @@ struct TextEncoding {
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
     const TextEncoding& encoding = {});
 
-// A SubRip (`.srt`) file read as lyrics (planning/karaoke-phase2.md, W13c): the cues of
+// A SubRip (`.srt`) file read as lyrics: the cues of
 //
 //   1
 //   00:00:12,000 --> 00:00:15,500
@@ -148,7 +148,7 @@ struct TextEncoding {
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
     const TextEncoding& encoding = {});
 
-// An Advanced SubStation Alpha (`.ass`) file read as lyrics (planning/karaoke-phase2.md, W13d). Its
+// An Advanced SubStation Alpha (`.ass`) file read as lyrics. Its
 // `Dialogue:` events are lines, with the start and the end the event has (so, as in SubRip, a gap
 // between events is nothing being sung), and the karaoke override tags are word times:
 //
@@ -179,8 +179,8 @@ struct TextEncoding {
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
     const TextEncoding& encoding = {});
 
-// The words of a MIDI karaoke file (`.kar`, a Standard MIDI File; planning/karaoke-phase2.md,
-// W13e), whose BYTES are given: syllables as Text (or Lyric) meta events, each at its tick, turned
+// The words of a MIDI karaoke file (`.kar`, a Standard MIDI File),
+// whose BYTES are given: syllables as Text (or Lyric) meta events, each at its tick, turned
 // into milliseconds through the file's tempo map, or, where the file's time division is SMPTE (a
 // frame rate of 24, 25, 29.97 or 30 and the ticks in a frame, which fix the length of a tick and
 // leave the tempo events meaning nothing), through that. The words are taken from the track named
@@ -301,7 +301,7 @@ struct LyricPosition {
     std::int64_t position_ms = 0;
 };
 
-// `delay_ms` is the singer's nudge (planning/karaoke.md, K5): positive shows
+// `delay_ms` is the singer's nudge: positive shows
 // the lyrics later.
 [[nodiscard]] LyricPosition lyric_position(const Lyrics& lyrics, std::int64_t position_ms,
                                            std::int64_t delay_ms = 0);

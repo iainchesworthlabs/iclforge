@@ -220,7 +220,7 @@ DecodeOutcome open_truehd(const QString& path, bool* no_truehd_track = nullptr) 
     return outcome;
 }
 
-// How an AC-3 karaoke stream is to be reproduced (planning/karaoke.md, P2):
+// How an AC-3 karaoke stream is to be reproduced:
 // the decoder's OutputConfig fields, kOff being the coded channels.
 struct KaraokeChoice {
     iclforge::ac3::KaraokeReproduction reproduction = iclforge::ac3::KaraokeReproduction::kOff;
@@ -280,7 +280,7 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
     std::vector<iclforge::ac4::Speaker> layout;
     // Whether the frame-1 setup below has run - NOT order.empty(): a presentation of objects
     // alone has no speakers or channels at all (iclforge::ac4::DecodedFrame's own comment), so
-    // `order` legitimately stays empty for the life of the decode (planning/ac4.md, I5). Before
+    // `order` legitimately stays empty for the life of the decode. Before
     // this fix, such a stream re-ran the block below on every frame and still read as "no frame
     // decoded" at the end, since nothing ever made `order` non-empty to signal that decoding had
     // succeeded.
@@ -333,7 +333,7 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
             return false;
         }
         append_planar(result.channels, pcm.channels, order);
-        // Objects (planning/ac4.md, I5): D10's DecodedFrame::objects into the same
+        // Objects: D10's DecodedFrame::objects into the same
         // has_objects/object_count/object_audio fields the E-AC-3 path above fills, so
         // exportObjects() - already codec-agnostic - writes AC-4's objects the same way it
         // already writes E-AC-3 JOC's. A mid-stream count change is skipped, the same
@@ -451,8 +451,7 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
         }
         result->codec_label = QStringLiteral("E-AC-3");
         // A karaoke programme (one independent substream flagged bsmod 7 above 1/0) is reproduced
-        // under the same choice as an AC-3 stream is, below; any other decodes as it did
-        // (planning/karaoke-eac3.md, D1 to D3).
+        // under the same choice as an AC-3 stream is, below; any other decodes as it did.
         iclforge::ac3::DecoderConfig config;
         config.output.karaoke = karaoke_choice.reproduction;
         config.output.karaoke_vocals = karaoke_choice.vocals;

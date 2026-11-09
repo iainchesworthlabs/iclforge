@@ -16,8 +16,7 @@
 // cost only when the layout asks for what the bed cannot give. This is the
 // ESP32 player's policy, moved out of the player so that every player that
 // renders - the boards, the desktop player's engine and its test sink - makes
-// the same decision from the same inputs (planning/hearth-reference-player.md,
-// "Decoder configuration").
+// the same decision from the same inputs.
 
 namespace iclforge::ac3::render {
 

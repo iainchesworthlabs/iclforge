@@ -14,7 +14,7 @@ import java.io.FileOutputStream
  * What the lyric view's tests share: a document goes through the library's own frame (the pure half
  * of `Sink::lyric_frame()`, over JNI), the parse and the view, and is drawn to a 1080p bitmap with
  * no display; the picture is written to the app's external files (`lyric-renders/`) and the pixels
- * are probed where planning/hearth-sink-screen.md puts things.
+ * are probed where the sink screen's design puts things.
  */
 abstract class RenderTestBase {
     protected val instrumentation = InstrumentationRegistry.getInstrumentation()

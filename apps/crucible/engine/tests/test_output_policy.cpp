@@ -208,7 +208,7 @@ TEST_CASE("a chosen endpoint that is absent or silent falls back and says so", "
     CHECK(silent.reason.find("silent device") != std::string::npos);
 }
 
-// TrueHD 5.1 (planning/truehd-parity-crucible.md, questions 1 and 3): pin-only until a receiver
+// TrueHD 5.1: pin-only until a receiver
 // has read it, so the automatic choice must not move for a receiver that merely accepts it.
 
 TEST_CASE("a receiver that takes TrueHD is not given it unless the mode is pinned", "[crucible]") {

@@ -21,7 +21,7 @@
 // ratios the decoder uses in read-only memory, built here by the compiler's constant evaluator with
 // `PortableMath` (dsp/portable_math.hpp: no library, the same bits on every compiler and every
 // target), so that no target designs anything at run time, which on a part with a single-precision
-// FPU takes seconds at 1001/960 (planning/ac4.md, D14a5), and so that the table is the same float
+// FPU takes seconds at 1001/960, and so that the table is the same float
 // everywhere. A ratio that is not one of the three, which only a test asks for, is designed at run
 // time with the same functions and gives the same coefficients.
 
@@ -114,7 +114,7 @@ constexpr void design_phase(const ResamplerDesign& d, int p, double* row) noexce
 }
 
 // How a coefficient of the double design is stored: rounded to float once, for the converter at
-// float, or as Q1.30, for the fixed-point tier (planning/ac4.md, D14d), each coefficient times 2^30
+// float, or as Q1.30, for the fixed-point tier, each coefficient times 2^30
 // rounded half away from zero.
 struct FloatCoefficient {
     using Type = float;

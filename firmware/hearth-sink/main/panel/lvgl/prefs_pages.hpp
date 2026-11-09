@@ -7,7 +7,7 @@
 
 #include "iclforge/preferences.hpp"
 
-// The pages the System group of Preferences puts over the sheet (planning/p4x-preferences.md, E4): the confirming step
+// The pages the System group of Preferences puts over the sheet: the confirming step
 // before an action or a change that asks first (Restart, Reset preferences, Factory reset with its held button, the
 // switch between the cable and Wi-Fi, Forget on a paired server), the keyboard that types the player's name, About,
 // and the list of paired servers.

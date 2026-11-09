@@ -15,8 +15,7 @@
 
 // Sendspin's JSON messages after the Noise handshake (messaging.md, Core messages;
 // roles/player/v1.md), each a struct with a writer and a reader, in both dialects where
-// they differ (planning/hearth-sendspin-extension.md, Music Assistant and aiosendspin
-// 9.1.1). The pairing messages have a header of their own, and so do the objects of the other
+// they differ. The pairing messages have a header of their own, and so do the objects of the other
 // roles (state_roles.hpp, stream_roles.hpp) and of `_iclforge_player@v1` (iclforge_player.hpp),
 // which the messages here carry.
 //

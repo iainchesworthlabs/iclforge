@@ -230,7 +230,7 @@ G2_GROUPS = {
     "eac3-rates": "E-AC-3 at every layout and rate: the trend and races against DEE "
                   "(quality_race.py, gen_external_baseline.py), the decoder's third-party "
                   "coverage (verify_gold_reference.sh), the fixed-point tiers "
-                  "(planning/arithmetic-tiers.md)",
+                  "",
     "ac3-rates": "AC-3 at every layout and rate, for the same",
     "bluray": "7.1 E-AC-3 as Blu-ray carries it (an AC-3 core and a dependent substream): the "
               "decoder's dependent substreams and 7.1 from a third party",
@@ -240,12 +240,12 @@ G2_GROUPS = {
                      "information",
     "ac3-metadata": "AC-3 metadata, the same, and AC-3's timecode",
     "joc": "E-AC-3 JOC from channel beds: the object layer's third-party coverage "
-           "(test_dee_joc_fixture.cpp), transcoding to AC-4 (planning/ac4.md I1, I5)",
+           "(test_dee_joc_fixture.cpp), transcoding to AC-4",
     "truehd": "TrueHD with a lossless source: the TrueHD module's decode material, scored "
-              "against the sources by tools/checks/score_truehd_decode.py (planning/truehd.md), "
+              "against the sources by tools/checks/score_truehd_decode.py, "
               "and MAT passthrough",
     "truehd-open": "TrueHD streams chosen to answer the open questions of libs/truehd/ERRATA.md "
-                   "(planning/truehd.md, \"Oracles\"): the rates, downmix presentations and "
+                   ": the rates, downmix presentations and "
                    "three substreams, DRC and dialnorm, lengths that are not a whole number of "
                    "access units, other bit depths and layouts, the encoder's data-rate and "
                    "stream-end options, and the Atmos input",
@@ -258,7 +258,7 @@ G2_GROUPS = {
     "truehd-long": "300 s TrueHD programmes for soak tests of the decoder and the network path "
                    "to Hearth sinks",
     "programme": "60 s and 300 s programmes for soak tests and listening: the ESP32 player "
-                 "(planning/esp32-stream-set.md), Hearth",
+                 ", Hearth",
     "objects": "Atmos-master inputs, refused on provenance as in the AC-4 gold set",
 }
 
@@ -1210,7 +1210,7 @@ def thd_open_legs(thd):
 
 
 def thd_last_legs(thd):
-    """The legs asked for in the last days of DEE's licence (planning/truehd-validation.md). They
+    """The legs asked for in the last days of DEE's licence. They
     are test inputs like the rest: decoded and compared with the PCM that went in, and a refusal
     is kept. DEE writes a dialnorm of -31 to -1 only, so a leg of "dialnorm 0" cannot be made."""
     def last(name, presentations, **extra):

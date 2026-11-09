@@ -9,7 +9,7 @@
 
 #include "dev_screen.hpp"
 
-// The Preferences sheet (planning/p4x-preferences.md): a scrollable list of everything a person chooses once and
+// The Preferences sheet: a scrollable list of everything a person chooses once and
 // leaves, grouped (Display, Sound, Network, Time, Updates, System) and drawn from the registry
 // (iclforge/preferences.hpp) for the board it is on. What a control is, which choices it has and whether this board
 // can do them all come from the registry and the board's capability description; this file only draws them and

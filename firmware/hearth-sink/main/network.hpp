@@ -27,8 +27,8 @@
 //
 // IT COMES UP AT BOOT, not at the first play. A sink is found before it is
 // played to: mDNS has to be answering and the control surface reachable while
-// the board sits idle, which is the whole of B2
-// (planning/hearth-reference-player.md). The HTTP source still calls
+// the board sits idle, which is the whole of B2.
+// The HTTP source still calls
 // network_up() when it opens, and gets the network that is already up. A
 // board with no network at boot gets one when Improv gives it one
 // (provision.hpp), and app_main then starts what boot would have.
@@ -134,8 +134,8 @@ struct NetworkLink {
 [[nodiscard]] bool network_wifi_ready();
 [[nodiscard]] bool network_wifi_up();
 
-// Where the network this board joins comes from, for GET /firmware
-// (planning/esp32-ota.md): "stored" in NVS, "built-in" to this image alone
+// Where the network this board joins comes from, for GET /firmware:
+// "stored" in NVS, "built-in" to this image alone
 // (CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID), "wired" for a network that needs
 // nothing stored (QEMU's Ethernet), or "none". An image with no network
 // built in - every image CI publishes - cannot rejoin a "built-in" one.

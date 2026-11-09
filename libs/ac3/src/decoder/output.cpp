@@ -723,8 +723,8 @@ struct KaraokePlan {
     std::size_t right_terms = 0;
     // The coded slot of the LFE, which is output after Rk when there is one, and the scale-down
     // the three sums took: the LFE is in none of Annex C's equations, so what it is given is the
-    // same factor, which keeps its level against L, C and R as the mix put it (D8,
-    // planning/karaoke-eac3.md; Dolby's decoder, which scales nothing, keeps it the same way).
+    // same factor, which keeps its level against L, C and R as the mix put it (Dolby's decoder,
+    // which scales nothing, keeps it the same way).
     bool lfe = false;
     std::size_t lfe_channel = 0;
     Scalar lfe_gain{1};
@@ -869,10 +869,10 @@ MixLevels mix_levels(const std::optional<meta::MixMetadata>& mix) {
     MixLevels out;
     if (!mix.has_value()) {
         // An E-AC-3 stream with no mixmdate: Dolby's decoder folds it at -3 dB for the centre and
-        // -3 dB for the surrounds, measured (planning/karaoke-eac3-findings.md), where AC-3's
+        // -3 dB for the surrounds, measured, where AC-3's
         // -4.5 and -6 dB stand in for a bsi that has no level to read. Annex E has no bsi
         // cmixlev or surmixlev to fall back on, so the AC-3 numbers were never a reading of the
-        // stream (planning/karaoke-eac3.md, D10).
+        // stream.
         out.loro_clev = meta::level::kMinus3dB;
         out.loro_slev = meta::level::kMinus3dB;
         return out;

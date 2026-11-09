@@ -10,8 +10,8 @@
 
 #include "iclforge/lyrics/midi_melody.hpp"
 
-// libs/lyrics/src/midi_melody.cpp: the notes of a MIDI karaoke file, and which track is the melody
-// (planning/karaoke-microphone.md, D9; findings F4). The files are built here, byte by byte, so
+// libs/lyrics/src/midi_melody.cpp: the notes of a MIDI karaoke file, and which track is the melody.
+// The files are built here, byte by byte, so
 // that what is in them is what the test says.
 
 namespace {

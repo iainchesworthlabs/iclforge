@@ -22,7 +22,7 @@
 #include "iclforge/truehd/io/access_unit.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 
-// The encoder (planning/truehd.md, phase T2a), held to this library's decoder: the codec is
+// The encoder, held to this library's decoder: the codec is
 // lossless, so whatever goes in comes back sample for sample. The check against FFmpeg's strict
 // decode is tools/checks/verify_truehd_encode_interop.py; these are the cases that do not need it.
 

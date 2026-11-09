@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// "Before you play anything" (planning/hearth-design.md; docs/hearth/design/
-// screenshots/first-run.png): shown once, over the Play page, before the
+// "Before you play anything": shown once, over the Play page, before the
 // queue has played anything - what output Hearth uses, where per-output
 // setup lives, and that a network sink needs pairing first. Closing it,
 // either way, marks HearthController.firstRunSeen so it does not return

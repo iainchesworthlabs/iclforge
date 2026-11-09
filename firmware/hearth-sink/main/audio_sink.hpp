@@ -205,7 +205,7 @@ void sink_write(std::span<const std::span<const float>> channels);
 // report.
 [[nodiscard]] std::uint64_t sink_frames_written();
 
-// Flash mode (planning/esp32-ota.md): every line closed and its DMA buffers
+// Flash mode: every line closed and its DMA buffers
 // given back, so nothing reaches the DACs until the board restarts. Not safe to
 // call while a play is in progress, for the reason sink_open is not. A later
 // sink_open would open the lines again, though nothing calls one after this:

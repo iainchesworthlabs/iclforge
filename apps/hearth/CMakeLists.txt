@@ -1,4 +1,4 @@
-# Hearth's applications (planning/hearth-reference-player.md).
+# Hearth's applications.
 #
 # The engine is unconditional: it is the player itself - the queue, the
 # transport, a session per item, the output decision - and it needs nothing

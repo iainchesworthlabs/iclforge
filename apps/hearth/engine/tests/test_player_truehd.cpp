@@ -22,7 +22,7 @@
 #include "stream_decoder.hpp"
 #include "truehd_test_support.hpp"
 
-// TrueHD through the player and the session (planning/truehd-parity-hearth-player.md, H1 and H2):
+// TrueHD through the player and the session:
 // a queue of TrueHD items plays to a fake device and ends, two of them join without a gap at the
 // expected sample, a seek lands in the unit that holds the place asked for, and a unit that does
 // not read plays as silence until the stream's next restart. The streams are the library's

@@ -226,8 +226,8 @@ int refuse_truehd(std::string_view command, std::string_view in_path,
                   std::string_view reason = {});
 
 // --- options a TrueHD run does not apply -----------------------------------------------------------
-// PROVISIONAL, until the owner answers question 7 of planning/truehd-parity-forge.md (and the entry
-// in libs/truehd/ERRATA.md): an option that a run on TrueHD or MLP does not apply is refused by name
+// PROVISIONAL, until the owner answers the open question on it (and the entry in
+// libs/truehd/ERRATA.md): an option that a run on TrueHD or MLP does not apply is refused by name
 // with a usage error, as E-AC-3 refuses verify-content, and is never accepted and dropped. A
 // verification flag (verify-content, check-content, verify-objects, syntax-trace= and the like) must
 // never succeed without verifying. The only options warned about instead are the choices between

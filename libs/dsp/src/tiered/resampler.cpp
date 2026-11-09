@@ -80,7 +80,7 @@ BasicResamplerFilter<Coefficient>::BasicResamplerFilter(int up, int down) {
             // are flash behind a cache, where a miss costs ten times a PSRAM's, and the table of
             // 1001/960 (188 KB against a cache of 128 KB) misses on most of what it reads. Read in
             // place it took the converter 60 ms a frame at 23.976 fps on the P4; from the copy, in
-            // the PSRAM that the heap puts a block of that size in, 17 ms (planning/ac4.md, D14a5).
+            // the PSRAM that the heap puts a block of that size in, 17 ms.
             table_.assign(compiled.coefficients.begin(), compiled.coefficients.end());
             return true;
         };

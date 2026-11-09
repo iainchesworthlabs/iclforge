@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Network tab (planning/hearth-reference-player.md, A6): discovery,
+// The Network tab: discovery,
 // connection and pairing. The list on the left (NetworkSinkList.qml) is
 // shared with every state; which view fills the rest of the page follows the
 // selected sink's own pair state, the same switch DecoderPage.qml makes on

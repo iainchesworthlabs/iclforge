@@ -93,8 +93,8 @@ constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // are not listed, so a server sends none).
 constexpr std::uint32_t kLyricsMaxBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES;
 // What a lyric document needs of the heap it is made in, beyond a reserve, to be read and held:
-// measured at about ten times its text at the peak, on S3 and P4 (planning/hearth-sendspin-
-// extension.md, Lyrics). The internal heap always keeps `kLyricsHeapReserve`, and PSRAM, where the
+// measured at about ten times its text at the peak, on S3 and P4. The internal heap always keeps
+// `kLyricsHeapReserve`, and PSRAM, where the
 // document goes when there is room, `kLyricsPsramReserve`.
 constexpr std::size_t kLyricsHeapFactor = 12;
 constexpr std::size_t kLyricsTransientFactor = 3;
@@ -107,7 +107,7 @@ constexpr std::int32_t kBufferMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_BUFFER_MS;
 constexpr bool kUnpairedAccess = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_UNPAIRED_ACCESS != 0;
 constexpr bool kOfferPcm = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_PCM != 0;
 // Whether the hello lists metadata@v1, which only a board with a screen to draw it on does: the title
-// card (planning/p4x-now-playing.md). A board with none would be sent a message at every track and pause
+// card. A board with none would be sent a message at every track and pause
 // for nothing, and would keep a title it never shows.
 #if defined(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI) || defined(CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
 constexpr bool kListMetadata = true;
@@ -307,8 +307,8 @@ std::atomic<bool> g_name_pending{false};
     s.lyrics_max_bytes = kLyricsMaxBytes;
     // The codecs it reproduces karaoke for when told to (the `karaoke` setting): every one it
     // decodes. burst_player.cpp lays a karaoke AC-3 syncframe and an E-AC-3 programme of one
-    // independent substream out from the reproduction alike, so a server sends either as it is
-    // (planning/karaoke-eac3.md, D6); a board that said nothing here would be taken for AC-3's
+    // independent substream out from the reproduction alike, so a server sends either as it is;
+    // a board that said nothing here would be taken for AC-3's
     // alone.
     s.karaoke_codecs = karaoke_codecs;
     return s;
@@ -354,12 +354,12 @@ std::atomic<bool> g_name_pending{false};
     }
     const std::uint64_t capacity = player.buffer_capacity();
     // PCM, and Opus where the build decodes it (CONFIG_ICLFORGE_SENDSPIN_OPUS): FLAC would need its
-    // decoder on the board, which the player has not measured room for
-    // (planning/hearth-reference-player.md, B3). Stereo at 48 kHz, which is the only rate the
+    // decoder on the board, which the player has not measured room for.
+    // Stereo at 48 kHz, which is the only rate the
     // board plays. Opus is listed last, so that a server that is not asked for it sends PCM.
     // The depth of the sink's own slots first: a server sends the first format it can, and 24-bit
     // PCM to a 16-bit slot is half as much again in the air, in the ring and through the player
-    // for the same audio (planning/esp32-sink-compatibility-matrix.md, the C6 PCM runs).
+    // for the same audio.
     const m::AudioFormat pcm24{
         .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 24};
     const m::AudioFormat pcm16{
@@ -617,7 +617,7 @@ class Events final : public iclforge::SendspinEvents {
         report_now();
     }
 
-    // metadata@v1: what the server says is playing, for the title card (planning/p4x-now-playing.md).
+    // metadata@v1: what the server says is playing, for the title card.
     // The store takes the object as the server's dialect means it (title_card.hpp): the specification's
     // (and aiosendspin 10's, which Music Assistant runs now) is the whole state, and aiosendspin 9.1.1's only
     // what changed, a cleared field as null. A field is `kSet` when it came with a value, `kClear` when it

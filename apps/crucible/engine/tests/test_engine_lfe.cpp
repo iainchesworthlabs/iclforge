@@ -15,8 +15,8 @@
 #include "iclforge/containers/iec61937/mat.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 
-// The bed's LFE, from a tap to the receiver (planning/truehd-parity-crucible.md,
-// question 14). A surround application's LFE channel used to be dropped by the
+// The bed's LFE, from a tap to the receiver. A surround application's LFE channel used to be
+// dropped by the
 // bed mixer, so the engine's 5.1 bed went out with an empty LFE in every mode
 // that reads it. The engine now hands the encoder the sum of the bed taps' LFE
 // as its `lfe` span (AtmosEncoder::encode_frame's third argument), and the

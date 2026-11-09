@@ -1,6 +1,6 @@
 #pragma once
 
-// The preferences of a board: everything a person chooses once and leaves (planning/p4x-preferences.md), as a
+// The preferences of a board: everything a person chooses once and leaves, as a
 // registry that the screen, the REST listing (GET /preferences) and the web page all draw from. Adjust is for
 // the in-the-moment tweaks of the lyrics screen (delay, text size) and is not in here; the technical settings
 // (slot width, the second I2S line, the time server) stay with the developer view and the routes.
@@ -197,8 +197,8 @@ class Backend {
 
     // Sound: the test tone through the speakers one after another (identify_each), and the level and distance kept for
     // each speaker. The tone is the board's own, played through the output stage the music plays through; it is refused
-    // while something else has the sink, and it stops of its own accord after a minute at most (planning/
-    // hearth-speaker-trim-identify.md). A trim is read and written as the words of PUT /trim ("L level=-1.5
+    // while something else has the sink, and it stops of its own accord after a minute at most. A
+    // trim is read and written as the words of PUT /trim ("L level=-1.5
     // distance=2.4"): the tone and the numbers are applied by the Sendspin player, which this library knows nothing of.
     [[nodiscard]] virtual bool identify_running() const = 0;
     // Why the tone cannot start now ("A song is playing."), or empty when it can.
@@ -666,7 +666,7 @@ inline ResetReport reset_preferences(Backend& backend);
 
 namespace detail {
 
-// --- Network and System (E4, planning/p4x-preferences.md) ------------------------------------------------------------
+// --- Network and System (E4) ------------------------------------------------------------
 
 [[nodiscard]] inline Availability needs_network_choice(const BoardCaps& caps) {
     if (caps.network.choice()) {
@@ -812,7 +812,7 @@ inline constexpr std::array<ChoiceDef, 2> kIdentifyChoices{{
     return backend.set_speaker_trim_text(statements);
 }
 
-// Late night is the player's decoders' (planning/hearth-late-night.md): a board with no Sendspin player decodes no
+// Late night is the player's decoders': a board with no Sendspin player decodes no
 // Dolby stream, and PCM, which is all a player may be sent, carries no metadata to compress.
 [[nodiscard]] inline Availability needs_dolby_decoder(const BoardCaps& caps) {
     return caps.sendspin ? Availability::yes()

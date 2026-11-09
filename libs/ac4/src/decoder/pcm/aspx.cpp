@@ -50,8 +50,7 @@ constexpr Energy kMaxExponent{96};
 
 // 2^exponent through dsp::tiered::exp2_of: at double that is std::exp2, as it always
 // was, and at float the project's own function, which gives the same float on
-// every platform where the C libraries' exp2f differ in the last bit
-// (planning/ac4.md, D14a4).
+// every platform where the C libraries' exp2f differ in the last bit.
 [[nodiscard]] Energy exp2_clamped(Energy exponent) noexcept {
     return dsp::tiered::exp2_of(std::clamp(exponent, kMinExponent, kMaxExponent));
 }

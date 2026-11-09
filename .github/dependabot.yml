@@ -61,7 +61,7 @@ updates:
     commit-message:
       prefix: "build"
     # aiosendspin itself stays where it is: 9.1.1 is the release Music Assistant pins, and the
-    # scripts here stand in for it (planning/hearth-sendspin-extension.md). 10.0.0 dropped
+    # scripts here stand in for it. 10.0.0 dropped
     # `encode_token` from aiosendspin.noise.pairing_token, which aiosendspin_player.py imports, and
     # the job that runs these scripts (Core checks / Hearth Sendspin) is not on the pull-request
     # gate, so #1477 merged green and main went red behind it on 2026-10-12. A move to a new
@@ -138,7 +138,7 @@ updates:
       - dependency-name: "com.android.application"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
-  # Hearth for Android (planning/hearth-android.md): its own Gradle project and lockfile, which
+  # Hearth for Android: its own Gradle project and lockfile, which
   # carries the plugin and the build tooling and no library of its own.
   - package-ecosystem: "gradle"
     directory: "/apps/hearth/android"

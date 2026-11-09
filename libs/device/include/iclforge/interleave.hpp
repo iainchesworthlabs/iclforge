@@ -17,8 +17,8 @@
 // other end; this is arithmetic and indexing, and indexing is where the bugs
 // are. libs/device/tests/test_interleave.cpp builds it on the host.
 //
-// It is library code with a temporary home: planning/esp32-player.md hands it
-// over to libs/ac3 as iclforge::ac3::io::interleave, and this copy goes when that lands.
+// It is library code with a temporary home: it is to move
+// to libs/ac3 as iclforge::ac3::io::interleave, and this copy goes when that lands.
 //
 // SLOTS ARE FIXED WIDTH AND MUST ALL BE WRITTEN. A TDM frame carries `slots`
 // samples whatever the programme has, so a 5.1 stream on an 8-slot bus has two

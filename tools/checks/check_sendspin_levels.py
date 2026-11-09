@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hold a board's Sendspin levels to a test sink's, for one stream both played.
 
-planning/hearth-reference-player.md, B4. A board playing a stream over
+A board playing a stream over
 _iclforge_player@v1 prints, when the stream ends, a line of counters and one
 line per output with that output's RMS over the whole stream, scaled by a
 million (firmware/esp-idf/iclforge/src/burst_player.cpp):

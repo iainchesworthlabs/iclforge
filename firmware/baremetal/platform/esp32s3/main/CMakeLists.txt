@@ -16,7 +16,7 @@
 # CMakeLists.txt uses for the two hosted shapes.
 #
 # The AC-4 decoder's probe (ac4_probe.cpp) where the configuration turns the component's
-# AC-4 decoder on (sdkconfig.ac4; planning/ac4.md, D14c). CONFIG_ICLFORGE_AC4 is unset in
+# AC-4 decoder on (sdkconfig.ac4). CONFIG_ICLFORGE_AC4 is unset in
 # IDF's requirements pass, where the source list does not matter, and set when the
 # sources are compiled, as the component's own Sendspin sources are chosen.
 if(ICLFORGE_ESP_PROFILE STREQUAL "encoder")

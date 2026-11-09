@@ -901,8 +901,7 @@ std::expected<SessionOutput, Refusal> ServerSession::send_burst(std::int64_t tim
     if (!write_burst_chunk_header(message, timestamp_us, send_ahead, pc, pd)) {
         return refuse(Refusal::kBadBurst);
     }
-    // What the player would reject is not sent (planning/hearth-sendspin-extension.md, Burst
-    // chunks).
+    // What the player would reject is not sent.
     const auto parsed = parse_burst_chunk(message);
     if (!parsed || !player::carries(burst_stream_->data_type, parsed->data_type())) {
         return refuse(Refusal::kBadBurst);

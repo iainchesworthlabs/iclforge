@@ -1,5 +1,5 @@
 // The decoder's A-CPL stage (libs/ac4/src/decoder/pcm/acpl.cpp) against a verbatim copy of the stage it
-// replaced (planning/ac4.md, D14e): one interpolated matrix of doubles for every parameter, product
+// replaced: one interpolated matrix of doubles for every parameter, product
 // and sum, and every coefficient narrowed to Real at every element. The stage now interpolates once
 // for each run of subbands that shares a band and its acpl_param_prev and narrows once for the run;
 // this holds the QMF matrices it writes to the BITS of the old stage's, at the decoder's scalar,
@@ -52,8 +52,8 @@ constexpr double kSqrt2 = 1.4142135623730951;
     return static_cast<std::size_t>(index);
 }
 
-// Pseudocode 109 is evaluated at InterpReal (planning/ac4.md, D14h: float at the float tier, double
-// elsewhere), by the core's acpl::interpolate() at that scalar, whole, as the stage's runs and
+// Pseudocode 109 is evaluated at InterpReal, by the core's acpl::interpolate() at that scalar,
+// whole, as the stage's runs and
 // columns must equal it; the sums of interpolated values a coefficient takes are formed there too.
 // The stage as libs/ac4/src/decoder/pcm/acpl.cpp had it, for the elements the test builds: a pair,
 // and the 5.X element in ASPX_ACPL_1, 2 and 3.

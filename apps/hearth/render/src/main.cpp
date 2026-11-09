@@ -1,5 +1,4 @@
-// hearth-render: plays one item through Hearth's engine into a WAV file
-// (planning/ac4.md, phase I2: "the gain scripts through the engine").
+// hearth-render: plays one item through Hearth's engine into a WAV file.
 //
 // The item goes through what the window plays it with - a Player with a
 // queue of one, the Session that reads the item and the StreamDecoder that

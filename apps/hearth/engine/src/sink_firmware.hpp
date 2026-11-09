@@ -14,7 +14,7 @@
 #include "iclforge/firmware_image.hpp"
 #include "iclforge/firmware_status.hpp"
 
-// A Hearth sink's firmware, from this computer (planning/esp32-ota.md, O5).
+// A Hearth sink's firmware, from this computer.
 //
 // The board's own HTTP routes on port 80 - GET /hardware and GET /firmware,
 // PUT /firmware, PUT /firmware/rollback and POST /restart - which

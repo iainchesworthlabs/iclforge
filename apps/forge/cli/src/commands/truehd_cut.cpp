@@ -32,7 +32,7 @@
 // What a join leaves at its seam is the second stream's first unit: it opens with a major sync and
 // restart headers, so a decoder starts afresh there, and its `input_timing` word (TH spec §3.4) is
 // the second stream's own counter, not a continuation of the first's. The words are carried as they
-// are (libs/truehd/ERRATA.md, entry 80; planning/truehd-parity-forge.md, question 14).
+// are (libs/truehd/ERRATA.md, entry 80).
 
 namespace forge_cli::commands {
 

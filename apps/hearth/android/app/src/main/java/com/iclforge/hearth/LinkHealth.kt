@@ -1,8 +1,8 @@
 package com.iclforge.hearth
 
 /**
- * What the pass-through link has just said of itself, for the attention screen (planning/hearth-sink-
- * screen.md, S10): the receiver would not take the stream, or the link dropped under it. Written by
+ * What the pass-through link has just said of itself, for the attention screen: the receiver would
+ * not take the stream, or the link dropped under it. Written by
  * [PassthroughBridge] from whichever thread the audio backend calls on; read by the screen.
  *
  * Times are `SystemClock.uptimeMillis()`; 0 is "never".

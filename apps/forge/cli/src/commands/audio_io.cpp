@@ -239,7 +239,7 @@ int record_passthrough(std::string_view out_path, std::uint32_t seconds,
 // the take and coded when it ends (a TrueHD encode is not frame by frame as AC-3's is, and a take
 // is seconds), written as a bare .thd. The channels are the device's, in its order, and the stream
 // carries as many as the device has (one to eight); the rate is the device's, which TrueHD takes at
-// 44.1, 48, 88.2, 96, 176.4 and 192 kHz (planning/truehd-parity-forge.md, row P7).
+// 44.1, 48, 88.2, 96, 176.4 and 192 kHz.
 // What a TrueHD take refuses is refused before a device is asked for: the options it does not
 // apply, an output that is not a .thd, a take of no seconds.
 int check_truehd_take(std::string_view out_path, std::uint32_t seconds, const Options& meta) {
@@ -1111,8 +1111,8 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
     if (is_truehd_stream(stream)) {
         return refuse_truehd("play", in_path);
     }
-    // AC-4: no receiver found takes it over IEC 61937 (planning/ac4.md, phase
-    // D11), so 'play' decodes it on an ordinary output, as its fallback for a
+    // AC-4: no receiver found takes it over IEC 61937, so 'play' decodes it on an ordinary output,
+    // as its fallback for a
     // sink that bitstreams nothing does - 'monitor's own path, with decode's
     // AC-4 options.
     if (is_ac4_stream(stream)) {

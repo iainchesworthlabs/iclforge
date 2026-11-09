@@ -3,7 +3,7 @@
 #include <cstddef>
 
 // A board with no USB cannot be read back over the console and cannot be put right with a cable. The
-// P4X kit is one: it sits on Ethernet and PoE, and takes an update over OTA (planning/esp32-board-bench.md).
+// P4X kit is one: it sits on Ethernet and PoE, and takes an update over OTA.
 // Two files implement this header, and main/CMakeLists.txt picks one by -DCRYPTO_BENCH_REPORT:
 //
 //   net_report_none.cpp      the default: nothing happens, the bench prints to the console and repeats.

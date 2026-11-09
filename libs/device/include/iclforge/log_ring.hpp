@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-// The console's last bytes, kept for GET /log (planning/esp32-ota.md, O4): a
+// The console's last bytes, kept for GET /log: a
 // ring over storage the owner gives it. `written` counts every byte ever put,
 // so a reader asks for what came after the count it last saw, and learns when
 // the ring has moved past what it asked for.

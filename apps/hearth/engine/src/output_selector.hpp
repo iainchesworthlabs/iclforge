@@ -13,7 +13,7 @@
 #include "output_decision.hpp"
 #include "queue.hpp"
 
-// Each item's output, decided (planning/hearth-reference-player.md, A3).
+// Each item's output, decided.
 //
 // choose_output() is pure; this gathers what it decides from. An endpoint's
 // row comes from two readings, kept apart as sink_capabilities.hpp keeps

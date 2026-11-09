@@ -6,7 +6,7 @@
 #include "iclforge/lyrics/playhead.hpp"
 
 // libs/lyrics/include/iclforge/lyrics/playhead.hpp: where in an item the sound is, from the anchors a
-// server sends (planning/karaoke-phase2.md, W7d). The sums are exact (a speed of 1 or 0), so each
+// server sends. The sums are exact (a speed of 1 or 0), so each
 // expectation is the arithmetic of the format and not what the code happens to give.
 
 namespace {

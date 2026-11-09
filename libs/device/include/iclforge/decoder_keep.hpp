@@ -8,9 +8,9 @@
 // then a 7 KB request on a track change. A decoder is let go when a stream that cannot use it
 // begins, and an AC-3 or E-AC-3 decoder was let go for an Opus stream and an AC-4 one, but not for
 // PCM. On an ESP32-S3 that left the E-AC-3 decoder an earlier play made in internal RAM for every
-// PCM stream after it, and the S3's internal heap is thin with it (planning/esp32-platform-profiles.md,
-// "The S3's internal heap is thin during an E-AC-3 stream": 58 to 60 KB least free on the first
-// stream of a boot, 7.2 KB on a later one). Wi-Fi's receive buffers are made from what is left.
+// PCM stream after it, and the S3's internal heap is thin with it (58 to 60 KB least free on
+// the first stream of a boot, 7.2 KB on a later one). Wi-Fi's receive buffers are made from what
+// is left.
 //
 // A part with PSRAM can make them again: its first stream after a boot does, with the heap in the
 // state a PCM stream leaves it. A part without (the C6) keeps what it has, as it did.

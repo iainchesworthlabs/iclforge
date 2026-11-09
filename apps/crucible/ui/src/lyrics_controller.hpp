@@ -14,7 +14,7 @@
 #include "lyric_osc.hpp"
 #include "media_session.hpp"
 
-// Lyrics for the application a person has selected (planning/karaoke-phase2.md, W13b, D9): an
+// Lyrics for the application a person has selected: an
 // `.lrc` file imported against one application of the room, and a strip that shows the line being
 // sung. A second QML singleton beside CrucibleController, so that crucible_controller.cpp does not
 // grow. What it wraps is libs/lyrics, the Qt-free reader and cursor that Hearth's window shares.
@@ -32,7 +32,7 @@
 // or length) is not followed against the lyrics of the last one: they wait for the person. And a
 // platform that cannot read sessions says why, instead of reading as "nothing is playing".
 //
-// A CD+G disc (planning/karaoke-phase2.md, W13f and D11) is imported the same way and is followed by
+// A CD+G disc is imported the same way and is followed by
 // the same clock and nudge, but it carries a picture and no text: status() says "picture", lines()
 // is empty and the strip draws it with the shared CdgPicture, asking pictureFrame(app, position).
 //
@@ -43,7 +43,7 @@ class CrucibleLyrics : public iclforge::apps::CdgFrameSource {
     QML_ELEMENT
     QML_SINGLETON
 
-    // Events out (planning/karaoke-phase2.md, D9's alternative): what the strip follows, said over OSC
+    // Events out: what the strip follows, said over OSC
     // 1.0 on UDP to a rig that reads it (lyric_osc.hpp has the addresses). Off until a person turns
     // it on; the destination is an IPv4 address and a port. Kept with the window's other choices.
     Q_PROPERTY(bool oscEnabled READ oscEnabled WRITE setOscEnabled NOTIFY oscChanged)

@@ -1,12 +1,13 @@
 #pragma once
 
-// The Meters view's rules, as pure functions of what the board knows (planning/p4x-meters-view.md): which representation of the channels
+// The Meters view's rules, as pure functions of what the board knows: which representation of the
+// channels
 // appears under the spectrum, from the display's width and the number of outputs of the room; how the room's outputs fold into the six
 // of a surround sum and into the stereo downmix; how many bands make a bar of the spectrum; the ranges, zones and ballistics the meters
 // share. The drawing (src/panel/lvgl/meters_screen.cpp) and the analysis (iclforge/dsp/spectrum.hpp) are elsewhere; none of this
 // draws or allocates, and every input is in the capabilities, never the name of a board.
 //
-// The rule (the owner's, 2026-10-26, from the pictures of planning/p4x-meters-view.md):
+// The rule (the owner's, 2026-10-26, from pictures of the rooms):
 //
 //                   2.0     5.1     7.1.4   9.1.6
 //   width >= 800    pair    grid    grid    grid        every output a bar, grouped in space; the spectrum on top
@@ -61,8 +62,8 @@ inline constexpr int kBands = 31;
 // The level of a bar of `per_bar` bands: their powers added (levels are in dB below a full-scale sine, so the sum of the 10^(dB/10)).
 inline constexpr float kSilentDb = -120.0F;
 
-// 10^(dB / 10) and 10 log10(p) in single precision: the P4 has no double-precision unit, and a double pow or log10 there is several microseconds
-// (planning/p4x-meters-view.md, "Kit results"). A float keeps 1e-6 dB of what a bar is read to.
+// 10^(dB / 10) and 10 log10(p) in single precision: the P4 has no double-precision unit, and a double pow or log10 there is several microseconds.
+// A float keeps 1e-6 dB of what a bar is read to.
 [[nodiscard]] inline float db_to_power(float db) { return std::exp2(db * 0.33219281F); }
 [[nodiscard]] inline float power_to_db(float power) { return power <= 1e-12F ? kSilentDb : 3.01029996F * std::log2(power); }
 

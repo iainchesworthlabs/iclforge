@@ -1,5 +1,4 @@
-// hearth-testserver: a Sendspin server for Hearth's board and CI tests
-// (planning/hearth-reference-player.md, B3 and B4).
+// hearth-testserver: a Sendspin server for Hearth's board and CI tests.
 //
 // It dials each player it is given, pairs it, sends it settings, plays one AC-3 or E-AC-3
 // programme to all of them as a group over _iclforge_player@v1, and reports what each said: its
@@ -361,7 +360,7 @@ class BurstSource {
     std::vector<std::uint8_t> payload_;
 };
 
-// An AC-4 programme (planning/ac4.md, I6): its sync frames, each one burst, on the timeline of the
+// An AC-4 programme: its sync frames, each one burst, on the timeline of the
 // data-burst periods IEC 61937-14 writes them with. Packed once, so that every pass has the same
 // bursts and the next starts where the last ended.
 struct Ac4Programme {
@@ -389,7 +388,7 @@ struct Ac4Programme {
            bytes[6] == std::byte{0x6F} && (bytes[7] == std::byte{0xBA} || bytes[7] == std::byte{0xBB});
 }
 
-// A TrueHD programme (planning/truehd-parity-hearth-player.md, H5): the stream's access units, 24 to a
+// A TrueHD programme: the stream's access units, 24 to a
 // chunk (sendspin::kTruehdUnitsPerChunk), each chunk a burst of Pc 22 and a Pd in bytes, on the
 // timeline of the units' samples. The chunk's payload is a view of the file: its units are
 // contiguous there. Shaped as an Ac4Programme so that the same source sends it.
@@ -1690,8 +1689,8 @@ int main(int argc, char** argv) {
         failure = error;
     }
     const std::optional<std::int64_t> start_server_us = group->start_time();
-    // The group sends ahead of play, and stream/end has a player drop what it has not played yet
-    // (planning/hearth-sendspin-extension.md, stream/end): the end waits for the last burst to have
+    // The group sends ahead of play, and stream/end has a player drop what it has not played yet:
+    // the end waits for the last burst to have
     // played, and for the players' output queues after it.
     if (failure.empty() && start_server_us) {
         const std::int64_t played_out_us = *start_server_us + (end_frame * 1'000'000 / kSampleRate) + kEndMarginUs;

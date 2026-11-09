@@ -31,8 +31,7 @@ struct FirmwareFile;
 struct NetworkStatus;
 }
 
-// The one object the Network page talks to (planning/hearth-reference-player.md,
-// A6: discovery, connection, pairing and groups). Kept apart from
+// The one object the Network page talks to. Kept apart from
 // HearthController rather than adding to it: what it wraps, NetworkSinks, is a
 // standing Sendspin server with its own thread and its own lifetime, not a
 // command queue in front of one Player the way Engine is - the two controllers
@@ -77,7 +76,6 @@ class NetworkController : public QObject {
     Q_PROPERTY(QString pairingError READ pairingError NOTIFY sinksChanged)
 
     // --- a Hearth sink's own settings pages (A6's second slice) ----------
-    // planning/hearth-reference-player.md#a6-network-outputs-in-the-application;
     // docs/hearth/design/screenshots/network-sink-{speakers,decoder}.png.
     // True for a paired, connected sink offering _iclforge_player@v1 - what
     // Network.qml checks to show these pages instead of the plain "paired"
@@ -114,7 +112,7 @@ class NetworkController : public QObject {
     // only shows and links out to, never edits.
     Q_PROPERTY(QVariantMap sinkOnlyOnSink READ sinkOnlyOnSink NOTIFY sinksChanged)
 
-    // --- a Hearth sink's firmware (planning/esp32-ota.md, O5) ------------
+    // --- a Hearth sink's firmware ------------
     // The selected sink's Firmware tab (NetworkSinkFirmware.qml), each value
     // the display string the tab shows (sink_firmware_view.hpp's
     // FirmwarePanel): answering, statusText, reported, runningText,

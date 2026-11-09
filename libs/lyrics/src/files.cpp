@@ -15,7 +15,7 @@
 // item. A translation unit of its own so that a program that only parses text (the sink firmware,
 // which is handed the document by a server) does not link <fstream>, <filesystem> and the locale
 // machinery they pull in: an S3 with Wi-Fi up has a few hundred bytes of internal RAM to spare for
-// its decode task's stack (planning/karaoke-phase2.md, W7d).
+// its decode task's stack.
 
 namespace iclforge::lyrics {
 

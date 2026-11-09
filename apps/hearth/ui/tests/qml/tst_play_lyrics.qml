@@ -7,8 +7,8 @@ import HearthTest
 
 import "HearthTestHelpers.js" as H
 
-// The lyrics on the Play page (PlayLyricsCard.qml, PlayPage.qml; planning/karaoke.md, "Found
-// while building": a lyric view beside the queue). An item with a lyrics file gets a card: its
+// The lyrics on the Play page (PlayLyricsCard.qml, PlayPage.qml): a lyric view beside the queue.
+// An item with a lyrics file gets a card: its
 // own column beside the queue in a wide window, the first card of the monitor column in a
 // narrower one. An item without one gets nothing, and the page is as it was.
 //

@@ -1,5 +1,5 @@
-// The race of the encoder's presentations against DEE's substreams
-// (planning/ac4.md, phase E6). DEE writes one presentation of one substream,
+// The race of the encoder's presentations against DEE's substreams.
+// DEE writes one presentation of one substream,
 // so its side of the race is phase D7's test multiplexer (mux.hpp) over
 // the gold set's legs of the same sources: music and effects, dialogue and
 // associated audio, each a DEE encode at its own rate, made into presentations

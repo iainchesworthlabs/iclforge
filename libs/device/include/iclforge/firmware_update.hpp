@@ -11,7 +11,7 @@
 
 #include "iclforge/firmware_status.hpp"
 
-// Updates from GitHub releases (planning/esp32-ota.md, O10): the part of a board's "Check for
+// Updates from GitHub releases: the part of a board's "Check for
 // updates" that is data and rules, free of ESP-IDF like firmware_image.hpp beside it, so every rule
 // is exercised on a laptop (libs/device/tests/test_firmware_update.cpp) and the screen, the page,
 // ota.py and ac3hearth draw the same words.

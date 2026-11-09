@@ -10,8 +10,8 @@
 #include <string>
 #include <string_view>
 
-// The pictures of one CD+G disc, as images by position (planning/karaoke-phase2.md, W13f and
-// decision D11): a `.cdg` file read once, and the screen that follows its packets, so that a
+// The pictures of one CD+G disc, as images by position: a `.cdg` file read once, and the screen
+// that follows its packets, so that a
 // program with a disc to show asks "what is on screen at this position" and is handed a QImage.
 // Hearth's lyric view, Crucible's lyric strip and the Forge GUI's player all show a disc this way,
 // and none of them owns the format: that is libs/lyrics' `cdg.hpp`, which this wraps.

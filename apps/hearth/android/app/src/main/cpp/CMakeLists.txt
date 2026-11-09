@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # Hearth for Android's native build: a THIN wrapper, as apps/demos/android's is, over the repository
-# root (planning/hearth-android.md). It does three things:
+# root. It does three things:
 #
 #  1. Puts vcpkg in front of the NDK's toolchain, because libs/sendspin needs the "hearth" feature's
 #     five packages (mbedTLS, cpp-httplib, libFLAC, Opus, mdns) and Gradle's own toolchain has none.

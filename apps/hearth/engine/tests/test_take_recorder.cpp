@@ -18,8 +18,7 @@
 #include "iclforge/sendspin/messages.hpp"
 #include "take_recorder.hpp"
 
-// apps/hearth/engine/src/take_recorder.*: a take kept as lossless FLAC with a description beside it
-// (planning/karaoke-microphone.md, M6; D11, D13).
+// apps/hearth/engine/src/take_recorder.*: a take kept as lossless FLAC with a description beside it.
 
 namespace {
 

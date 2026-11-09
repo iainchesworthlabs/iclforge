@@ -15,12 +15,11 @@
 //
 //     [4][int64 timestamp µs][uint32 send_ahead µs][one encoded frame]
 //
-// aiosendspin 9.1.1 has no send_ahead, so its header is nine bytes
-// (planning/hearth-sendspin-extension.md, C31):
+// aiosendspin 9.1.1 has no send_ahead, so its header is nine bytes:
 //
 //     [4][int64 timestamp µs][one encoded frame]
 //
-// _iclforge_player@v1 (planning/hearth-sendspin-extension.md, Burst chunks),
+// _iclforge_player@v1,
 // ID 192: the same header, then one IEC 61937 burst without its sync words,
 // byte-swapping or zero stuffing:
 //

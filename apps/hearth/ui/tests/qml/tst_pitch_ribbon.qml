@@ -4,7 +4,7 @@ import QtTest
 import Hearth
 import HearthTest
 
-// The two pictures of how a person sings (planning/karaoke-microphone.md, M5): a line's mark
+// The two pictures of how a person sings: a line's mark
 // (LineMark.qml) and the pitch ribbon (PitchRibbon.qml). Both are pictures of an answer they are
 // handed, so they are held here with answers made up for them; the answers themselves are tested
 // where they are made (test_microphone_controller.cpp). This suite never turns a microphone on.

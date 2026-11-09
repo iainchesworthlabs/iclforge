@@ -148,7 +148,7 @@ JNIEXPORT jlongArray JNICALL Java_com_iclforge_hearth_NativeSink_totals(JNIEnv* 
 
 // The lyric view's frame as UTF-8 bytes of one JSON object. Bytes, not a jstring: NewStringUTF takes
 // the JVM's modified UTF-8, which has no four-byte sequences, and a lyric may be in a script that
-// needs them (planning/hearth-sink-screen.md, T4).
+// needs them.
 JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_NativeSink_lyricFrame(JNIEnv* env, jobject /*self*/,
                                                                            jint delay_ms) {
     const std::string json = sink().lyric_frame_json(static_cast<std::int32_t>(delay_ms));

@@ -23,7 +23,7 @@
 #include "ac4_objects_core.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 
-// forge atmos-encode with codec=ac4 (planning/ac4.md, I5b): the source's channels
+// forge atmos-encode with codec=ac4: the source's channels
 // as AC-4 objects, run against the real binary and held to the steps the page takes
 // (apps/shared/media/src/ac4_objects_core.hpp, ac4_encode_core.hpp): the file the command
 // writes is the file those steps write for the same sources, assignment and scene.

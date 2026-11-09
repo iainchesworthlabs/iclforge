@@ -14,7 +14,7 @@
 #include "iclforge/truehd/export.hpp"
 
 // A scan of a TrueHD or MLP stream held in memory: what the stream is, how long it is, and where a
-// decoder can join it. This is audit row Co11 (planning/truehd-parity-library.md): the same
+// decoder can join it. This is audit row Co11: the same
 // capability AC-3 and E-AC-3 have in ScannedStream and access_unit_at_sample, with the one
 // difference TrueHD forces, which is the granule.
 //

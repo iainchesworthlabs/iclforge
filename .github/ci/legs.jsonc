@@ -42,7 +42,7 @@
       "preset": "linux-gcc",
       "ccache": true,
       "parallel_tests": true,
-      // Hearth (planning/hearth-reference-player.md, A7): libs/sendspin and apps/hearth,
+      // Hearth: libs/sendspin and apps/hearth,
       // with the [sendspin] and [hearth] cases ctest runs below. ICLFORGE_BUILD_HEARTH
       // defaults ON (root CMakeLists.txt) and CMakePresets.json's "core" fragment selects
       // vcpkg's "hearth" feature by default too, so every leg here builds and tests it

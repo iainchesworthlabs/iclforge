@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "The bench: the six ESP32 boards on the owner's desk and where the tools find them (tools/hearth/bench.py, planning/esp32-board-bench.md). A board is addressed by name, so that the lock that guards it, its address and its serial port come from one row and cannot be mixed. ICLFORGE_BENCH names another file of this shape for another machine. mac_tail is the last three octets of the chip's MAC: bench_flash.py reads the MAC of the chip on the port and writes nothing when the tail differs. No Wi-Fi value is in this file; the network fragment is named by path.",
+  "note": "The bench: the six ESP32 boards on the owner's desk and where the tools find them (tools/hearth/bench.py). A board is addressed by name, so that the lock that guards it, its address and its serial port come from one row and cannot be mixed. ICLFORGE_BENCH names another file of this shape for another machine. mac_tail is the last three octets of the chip's MAC: bench_flash.py reads the MAC of the chip on the port and writes nothing when the tail differs. No Wi-Fi value is in this file; the network fragment is named by path.",
   "locks": "D:/ac3bld",
   "idf": "D:/esp/esp-idf",
   "idf_tools": "D:/esp/tools",
@@ -55,7 +55,7 @@
       "port": "COM7",
       "lock": "p4x-board.lock",
       "mac_tail": "e753f9",
-      "note": "The ESP32-P4X-Function-EV-Board kit (chip v3.2, 7-inch panel, planning/karaoke-p4x-panel.md): the only board that runs the p4-rev3 image. Its USB-Serial/JTAG connector is the one marked JTAG. A restart and an OTA update keep its link to the C6 (tried 2026-10-20: 8 restarts, 8 updates, 4 USB flashes each followed by an update, with the system reset of #1434), so it takes OTA and is not marked restart_kills_c6_link. It has an RJ45 port as well: the p4-rev3 image uses it beside the Wi-Fi (docs/hearth/sink-esp32-p4.md)."
+      "note": "The ESP32-P4X-Function-EV-Board kit (chip v3.2, 7-inch panel): the only board that runs the p4-rev3 image. Its USB-Serial/JTAG connector is the one marked JTAG. A restart and an OTA update keep its link to the C6 (tried 2026-10-20: 8 restarts, 8 updates, 4 USB flashes each followed by an update, with the system reset of #1434), so it takes OTA and is not marked restart_kills_c6_link. It has an RJ45 port as well: the p4-rev3 image uses it beside the Wi-Fi (docs/hearth/sink-esp32-p4.md)."
     }
   }
 }

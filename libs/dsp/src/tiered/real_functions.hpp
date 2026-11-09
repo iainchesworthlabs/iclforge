@@ -8,7 +8,7 @@
 
 // The transcendentals the QMF-domain tools of libs/ac4/src/decoder call at the decoder's scalar, where the
 // answer reaches the output and a C library's last bit would be heard on a platform that had
-// another one (planning/ac4.md, D14a4).
+// another one.
 //
 // At Real = double they are libm's own calls, exactly as the tools made them (`std::pow`, and
 // `iclforge::internal::scalar_exp2`, which is `std::exp2` there), so the double build's output is

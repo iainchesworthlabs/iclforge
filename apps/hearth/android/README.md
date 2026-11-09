@@ -1,9 +1,7 @@
 # Hearth for Android
 
 A Sendspin **sink** for Android TV: it is advertised on the network, paired with from Hearth, and
-plays what Hearth sends it. The plan is [`planning/hearth-android.md`](../../../planning/hearth-android.md)
-and the one screen design it, the desktop Hearth and the ESP32-P4X panel share is
-[`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md).
+plays what Hearth sends it. It shares one screen design with the desktop Hearth and the ESP32-P4X panel.
 
 **State: phases 0 to 3, and the protocol additions D6, D7 and D8.** The service, the advertisement,
 the listener, the pairing records and the pass-through output are here: an AC-3 or E-AC-3 stream a
@@ -19,12 +17,11 @@ the server for the singer's karaoke choice (D8).
 
 TrueHD (2026-11-04): a server that lists `truehd` is sent the stream's access units, 24 to a chunk; `libs/sink` packs a chunk into one MAT
 burst, and the pass-through backend writes it to an `ENCODING_IEC61937` track on the 7.1 mask through the bridge's `openLink()`. The app lists `truehd` only when the
-route's `isLinkSupported()` is true. It is built and its packing is tested on the host; on 2026-11-04 a Shield Pro was sent stereo 48 kHz TrueHD for 40 s and an Onkyo TX-RZ740 reported TrueHD (planning entry 139).
+route's `isLinkSupported()` is true. It is built and its packing is tested on the host; on 2026-11-04 a Shield Pro was sent stereo 48 kHz TrueHD for 40 s and an Onkyo TX-RZ740 reported TrueHD.
 
 What it does not do yet: decode locally for karaoke (phase 4), and play `player@v1`'s PCM, FLAC and
 Opus (5): a stream of those is accepted and dropped. AC-4 is not listed: nothing has shown a receiver decoding it over
-this route. Phases 4 and 5 are planned in
-[`planning/hearth-android-phases-4-5.md`](../../../planning/hearth-android-phases-4-5.md).
+this route. Phases 4 and 5 are still to come.
 
 | Part | Where |
 |---|---|
@@ -56,7 +53,7 @@ asks for is shown on the screen and written to logcat under the tag `HearthSink`
 
 ## Tests
 
-The pass-through path, end to end (planning/hearth-android.md, AR1): a Sendspin server session packs a
+The pass-through path, end to end: a Sendspin server session packs a
 Dolby-encoded fixture into IEC 61937 bursts the way Hearth's server does, sends each over a loopback
 WebSocket to the sink with the pass-through output over a model of the Shield's device, and the bursts
 the device was handed are compared, byte for byte and in order, with the ones the packer wrote.
@@ -73,8 +70,7 @@ for the emulator CI runs them on; a run on one device builds one ABI with
 
 ## The status screens (phase 3c)
 
-When there are no words to show the app's screen is one of three
-([`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md), S0, S1 and S10), chosen
+When there are no words to show the app's screen is one of three (S0, S1 and S10 of the screen design), chosen
 by `StatusScreens.choose()` from what the app knows:
 
 | Screen | When | Says |
@@ -130,7 +126,7 @@ phone's own scanner app and a real server's pairing flow with the QR form of the
 ## The lyric screen (phase 2)
 
 When a document is held or a stream is playing, the app's one screen is the lyric view
-([`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md), S2 to S8): the past line,
+(S2 to S8 of the screen design): the past line,
 the line being sung with the fill running through it, the next lines, a duet's two vocals, the count-in
 of an instrumental gap, a line timed as a whole, plain text, "no lyrics" after a one-second grace, and
 each line in its own direction. It draws one `LyricFrame` the sink's core answers
@@ -145,7 +141,7 @@ Greek, Cyrillic and CJK).
 ![An instrumental gap: four dots that go out one a second, the line before above and the next line under](../../../docs/hearth/screenshots/android-lyric-count-in.png)
 ![A Hebrew line: right-aligned, its words flowing right to left](../../../docs/hearth/screenshots/android-lyric-hebrew.png)
 
-**Controls** ([S9](../../../planning/hearth-sink-screen.md#the-screens)): the D-pad's centre (or a tap)
+**Controls** (S9 of the screen design): the D-pad's centre (or a tap)
 opens a sheet over the foot of the stage: the lyric delay's "-" and "+", and the text size, S, M and L. The
 four directions move a focus ring (the accent, 2 u wide and 2 u out) through them, the centre presses the
 one it is on, Back closes it, and it hides itself after eight seconds without a key; a file with no times
@@ -156,7 +152,7 @@ still nudge the delay by 50 ms and up and down scroll a file with no times.
 
 **The vocals row (D8).** While a stream is open the sheet has a row between the delay and the size: Both,
 V1, V2 and None. The centre on one asks the server for it (`NativeSink.requestVocals`, a `client/command`
-request, [the spec's Requests](../../../planning/hearth-sendspin-extension.md#requests)), as the capable
+request), as the capable
 reproduction with those vocals for V1, V2 and None, since the choice of vocals is read by that
 reproduction alone, and as the aware reproduction for Both, which plays both voices as the song's mix
 does (`sink::vocals_request`, the owner's call of 2026-10-13). It is advice with no answer: the row fills what was asked and not what is playing, and **this sink hands the

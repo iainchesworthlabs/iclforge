@@ -60,7 +60,7 @@
 // bursts, rendered to their speaker layout with its objects. Each sink's WAV holds exactly what a
 // local decode and render of the programme gives, and every chunk's logged play time puts the
 // programme's first frame at the same local time on both sinks, within 1 ms: the group plays in
-// step (planning/hearth-reference-player.md, A4's exit). A hidden case, [hearth-soak], plays the
+// step. A hidden case, [hearth-soak], plays the
 // E-AC-3 programme for ten minutes. Sinks that list the other roles get the group's metadata,
 // colours, transport, artwork and visualizer frames, and a controller's volume and mute reach every
 // player in the group.
@@ -2299,7 +2299,7 @@ TEST_CASE("group: ten minutes of E-AC-3 JOC in step on two test sinks", "[.][hea
     play_joc_programme(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_soak_" + scratch_pid_suffix()), "2.0.2", 298);
 }
 
-// D11 (planning/ac4.md): the Dolby Encoding Engine's 2.0 AC-4 stream at 48 kHz and frame_rate_index
+// D11: the Dolby Encoding Engine's 2.0 AC-4 stream at 48 kHz and frame_rate_index
 // 13, the rate the decoder on main decodes, sent to a paired test sink over _iclforge_player@v1:
 // each frame in its own AC-4 data-burst, with the Pc and Pd
 // iclforge::containers::iec61937::Ac4BurstPacker writes and the frame's 2 048 samples on the

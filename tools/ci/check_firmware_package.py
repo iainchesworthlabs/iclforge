@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open every published hearth_sink image before it is uploaded (planning/esp32-ota.md, O8).
+"""Open every published hearth_sink image before it is uploaded.
 
     python tools/ci/check_firmware_package.py DIR [--allow-missing] [--index FILE ...]
 
@@ -76,7 +76,7 @@ IMAGES = {
     "hearth-sink-esp32c6": Rule("esp32c6", 0x000D, "4MB", False, 0, 99),
     "hearth-sink-esp32c6-16mb": Rule("esp32c6", 0x000D, "16MB", False, 0, 99),
     # sdkconfig.p4 builds for v1.x silicon; a v3.x board needs another build, which is
-    # sdkconfig.p4-rev3 over it (planning/karaoke-p4x-panel.md, D7): ESP-IDF's minimum for v3.x is
+    # sdkconfig.p4-rev3 over it: ESP-IDF's minimum for v3.x is
     # v3.1, and its maximum is 3.99. Each refuses the other's chip at boot.
     "hearth-sink-esp32p4-rev1": Rule("esp32p4", 0x0012, "16MB", True, 100, 199, refuse_above=199),
     "hearth-sink-esp32p4-rev3": Rule("esp32p4", 0x0012, "16MB", True, 301, 399, refuse_above=399),

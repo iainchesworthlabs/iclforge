@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Speakers page (planning/hearth-design.md, "Speaker setup"): routing,
+// The Speakers page: routing,
 // trim, delay, the bass-management crossover, the identify tone, the plan
 // diagram, and the speaker layout itself - the picker, the "As text" field,
 // the Heights control and each speaker's own Size toggle (HearthController.
@@ -35,7 +35,7 @@ ScrollView {
     readonly property var outputNames: HearthController.outputNames
 
     // The routing grid's column header for output `index`: the device's own
-    // name beside its 1-based number ("1 FL", planning/hearth-design.md's
+    // name beside its 1-based number ("1 FL", the design's
     // mockup) where HearthController.outputNames has one, else the bare
     // number alone - a device that cannot say, or a width no standard
     // arrangement fits, leaves that entry empty.

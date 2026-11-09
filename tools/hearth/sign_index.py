@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sign a firmware update index, and make throwaway keys to try it (planning/esp32-ota.md, O10).
+"""Sign a firmware update index, and make throwaway keys to try it.
 
     sign_index.py sign   --index hearth-update-beta.json --out hearth-update-beta.sig.json \
                          --pfx-env FIRMWARE_SIGN_PFX_BASE64 \

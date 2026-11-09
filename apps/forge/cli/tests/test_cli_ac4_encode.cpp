@@ -1,4 +1,4 @@
-// forge ac4-encode's options (planning/ac4.md, phase E7), each run against the
+// forge ac4-encode's options, each run against the
 // real binary and checked in what it writes: the stream's sync frames and
 // table of contents, and the syntax trace (syntax-trace=) of the elements the
 // option sets. The stream options first (crc=, the codec mode, the frame and
@@ -1003,8 +1003,8 @@ TEST_CASE("ac4-encode gives the 7.X pair to a 7.X substream beside a mono one", 
 
 TEST_CASE("fmp4 fragments an AC-4 stream whose presentations keep CMAF's rules", "[cli][ac4]") {
     // One presentation with its presentation_id: what Part 2 Annex H.1.2.1
-    // asks. apps/forge/cli/tests/test_cli_ac4.cpp checks the fragments themselves
-    // (planning/ac4.md's phase I1); the refusal for a configuration 6
+    // asks. apps/forge/cli/tests/test_cli_ac4.cpp checks the fragments themselves;
+    // the refusal for a configuration 6
     // presentation is in the EMDF section above.
     const auto dir = scratch_dir();
     const auto log = dir / "ac4_fmp4.log";

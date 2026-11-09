@@ -7,10 +7,10 @@
 
 #include "iclforge/sink/sink.hpp"
 
-// hearth-testsink: iclforge::sink as a program (planning/hearth-reference-player.md, The test
-// sink). A Sendspin client that waits for servers, which decodes each stream it plays to a WAV file
+// hearth-testsink: iclforge::sink as a program. A Sendspin client that waits for servers, which
+// decodes each stream it plays to a WAV file
 // with a play-time log: PCM, FLAC or Opus over player@v1, and AC-3 or E-AC-3, objects included, or
-// AC-4, over _iclforge_player@v1 (planning/hearth-sendspin-extension.md), rendered to its speaker
+// AC-4, over _iclforge_player@v1, rendered to its speaker
 // layout. The sink itself, the pairing and the store are libs/sink's; what is here is the output
 // (wav_output.hpp, burst_output.hpp) and the speaker layout it renders to.
 //

@@ -16,7 +16,7 @@ struct Stage;
 struct StageOptions;
 }  // namespace iclforge::lyrics
 
-// The lyrics the board holds, for a screen (planning/karaoke-p4x-panel.md, D5). In a header of its own,
+// The lyrics the board holds, for a screen. In a header of its own,
 // with nothing of ESP-IDF in it, so that the lyric screen builds on a computer as well (preview/):
 // sendspin.hpp includes it, and the firmware's definition of sendspin_read_lyrics() is the Sendspin
 // player's (sendspin/player/sendspin.cpp).
@@ -41,7 +41,7 @@ class LyricsReader {
 bool sendspin_read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
                           const iclforge::lyrics::StageOptions& options);
 
-// What the server says is playing (metadata@v1), for the title card (planning/p4x-now-playing.md). Read the
+// What the server says is playing (metadata@v1), for the title card. Read the
 // same way, and under the same lock: the reader copies what it needs, and only what changed (the store's
 // revision says so), since it is asked five times a second and the heap it copies into is the one a
 // decoder leaves little of.

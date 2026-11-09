@@ -5,8 +5,7 @@
 TrueHD (`0xF8726FBA`, Blu-ray and HD DVD) and MLP (`0xF8726FBB`, DVD-Audio) elementary streams, written
 from the owner's *Dolby TrueHD (MLP) Reference Specification*, v3.9 ("TH spec" in the code). The library links
 `iclforge::base` and nothing else. The Atmos substream is decoded and written (below, provisionally: nothing outside this
-repository reads it), and the object audio metadata is handled by `forge`, which links `iclforge::objects`
-([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md)).
+repository reads it), and the object audio metadata is handled by `forge`, which links `iclforge::objects`.
 
 The specification contradicts itself and the streams in places and is silent in others. Every such place is
 an entry of
@@ -187,8 +186,7 @@ writes that structure (entry 70: `min_chan` 8, the channels from 8 up coded, pri
 rebuilding all 9 to 16 objects from the bed rows, the bed a fixed render of the objects so that `encode()` takes the objects alone;
 static within a restart interval). No decoder outside this repository reads substream 3.
 The Atmos stream is written at 48, 96 and 192 kHz (the bed is 7.1 at all three, so at 192 kHz it has 8 channels, past the 6 that §9.6 and §21.6 allow a plain stream). 96 and 192 kHz are PROVISIONAL: the ramp step
-(`object_ramp_step`: 6552, 3276, 1636), the rate model, the metadata frame (kept at 1536 samples at every rate, so 16 ms and 8 ms) and the width of the scaled fine sum are the rule's reading, written in
-[`libs/truehd/notes/feature-truehd-atmos-96-192.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/notes/feature-truehd-atmos-96-192.md) with what the Dolby Reference Player showed of them. The decoder reads any rate.
+(`object_ramp_step`: 6552, 3276, 1636), the rate model, the metadata frame (kept at 1536 samples at every rate, so 16 ms and 8 ms) and the width of the scaled fine sum are the rule's reading. The decoder reads any rate.
 [`libs/truehd/ERRATA.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/libs/truehd/ERRATA.md) (entries 30 to 38, questions 12 to 15)
 records each place the specification and the streams left it a choice. `forge truehd-encode` is the command;
 `iclforge-truehd-encode-tool` (WAV in, `.thd` out) is the test tool the interoperability checks use.
@@ -220,7 +218,7 @@ stream and checks every unit's header, directory, parity and CRC, and exits 1 if
 | `tools/references/truehd_syntax.py`, an independent transcription | the same 25, and the hand-built streams | none beyond the two readings agreeing |
 | Hand-built streams, `tools/references/truehd_writer.py` (`tools/checks/verify_truehd_interop.py --handbuilt`) | an IIR filter and its `new_states`, LSB bypass (under either restart sync), noise generators 0 and 1 (at 48, 96 and 192 kHz), a negative output shift and an output shift on a moved channel, a 16 bit MLP stream, terminators of both kinds, several matrices with a permuted `ch_assign` (also one that changes at each restart), an output shift, the block data check, the end-of-stream marker, extra data, the directory's DRC word, four substreams with a 16-channel one, and one at the limits TH spec v3.6 gives substream 3 (15 matrices, `huff_lsbs` 31) | FFmpeg: the whole signal each was built from, for 19 of the 33, and the bed of four more (it leaves their substream 3 alone); the manifest names what FFmpeg does with the other 10 (it refuses the 16-channel and limit streams and a stream with a terminator, applies no negative output shift, and clears the low bits of a 16 bit MLP stream). **None** for the extra data's layout, the DRC word's values, the block data CRC and the 16-channel substream |
 | DEE's streams of known sources | scored on the owner's machine by `tools/checks/score_truehd_decode.py`, which skips when the set is absent; 13 of them are in `testdata/truehd-dee` (11 pass, the two at 96 kHz differ from their sources in the encoder, none fail); the full set of 142 legs scores 87 PASS, 9 ALTER (the DEE option alters the audio), 46 UNEXPLAINED (25 at 96 kHz, 21 stepped tones at 48 kHz: the decode is what the encoder coded and its lossless check passes), 0 FAIL | the sources |
-| The owner's Blu-ray (an Atmos 7.1 stream of four substreams), analysed on the owner's machine | `planning/truehd-disc-findings.md`: every lossless-check interval of the 2, 6 and 8 channel presentations, the 8 channel output against FFmpeg's | the disc's own lossless checks, and FFmpeg |
+| The owner's Blu-ray (an Atmos 7.1 stream of four substreams), analysed on the owner's machine | every lossless-check interval of the 2, 6 and 8 channel presentations, the 8 channel output against FFmpeg's | the disc's own lossless checks, and FFmpeg |
 
 FFmpeg's encoders do not write an IIR filter, LSB bypass, 7.1, a non-zero noise coefficient or shift, the Atmos substream or
 extra data. The hand-built streams carry all of them but the Atmos substream, and FFmpeg's decoder reads them to the

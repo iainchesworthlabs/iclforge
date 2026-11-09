@@ -6,7 +6,7 @@ import HearthTest
 
 import "HearthTestHelpers.js" as H
 
-// The AC-4 decoder page (DecoderAc4.qml; planning/ac4.md, phase I2): every
+// The AC-4 decoder page (DecoderAc4.qml): every
 // control, driven by a real click, press or key, writes its setting, and what
 // the engine then plays changes as the setting's formula says - measured
 // tone by tone at the fake device (TestServices.toneLevelDb()) on streams
@@ -291,7 +291,7 @@ TestCase {
         verify(H.checkBox(page, "Mix in audio description") !== null);
         verify(H.checkBox(page, "Dialogue normalisation") !== null);
         verify(H.checkBox(page, "Follow the stream's preferred downmix") !== null);
-        // AC-4's dynamic range is its own (planning/ac4.md, decision 12): no
+        // AC-4's dynamic range is its own: no
         // operating mode here.
         compare(H.segment(page, "Mode", "line"), null);
         verify(H.textItem(page, "Nothing AC-4 is playing.") !== null);

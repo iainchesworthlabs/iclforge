@@ -9,8 +9,8 @@
 // the coefficient store (ac3/internal/encode_scalar.hpp), as one overload set.
 //
 // Header-only, in its own target (libs/base) so that iclforge::ac3 and
-// libs/ac4/src/core both use this one copy rather than each carrying their own
-// (planning/ac4.md, decision 31). It lived at src/forge/src/core/scalar_math.hpp
+// libs/ac4/src/core both use this one copy rather than each carrying their own.
+// It lived at src/forge/src/core/scalar_math.hpp
 // until AC-4's D14a moved it here; nothing about the functions changed in the
 // move.
 //
@@ -130,8 +130,8 @@ inline double scalar_exp2(double x) { return std::exp2(x); }
 // lemma). 2^r = e^(r ln 2) is then the same degree-6 Taylor series scalar_exp
 // evaluates, whose truncation at |r ln 2| = 0.3466 is under 5e-8, well inside
 // a float ulp at this scale; 2^n is built directly as an exponent field, as
-// scalar_exp's is. Added for D14a's hf_generator.cpp
-// (planning/ac4.md, "Arithmetic"): dB conversions in the QMF-domain high-band
+// scalar_exp's is. Added for D14a's hf_generator.cpp:
+// dB conversions in the QMF-domain high-band
 // generator, run at Real, need libm's log10/pow replaced with log2/exp2
 // through this pair, so two platforms' libm cannot disagree in a decoded
 // sample's last bit (libs/ac4/src/core/aspx/hf_generator.cpp).

@@ -102,8 +102,7 @@ TEST_CASE("the extension of the channel meaning has a body of length + 1 words (
 TEST_CASE("a major sync with the 16-channel extension is written as the owner's discs have it",
           "[truehd][io]") {
     // A dynamic-object-only programme with an LFE and 11 other channels: the 4 bit length (1) and
-    // 18 bits of fields, in 2 words, which is the 32 byte major sync of the owner's Blu-rays
-    // (planning/truehd-disc-findings.md, question 2: dialogue norm 31, mix level 35, 11 channels).
+    // 18 bits of fields, in 2 words, which is the 32 byte major sync of the owner's Blu-rays.
     MajorSync sync = stereo_major_sync();
     sync.num_substreams = 4;
     sync.extended_substream_info = 3;

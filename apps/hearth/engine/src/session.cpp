@@ -313,7 +313,7 @@ std::expected<Session, std::string> Session::open(
         // Annex C's karaoke type, of the programme that plays. An AC-3 stream is one when its
         // bsmod and acmod say so; an E-AC-3 one when the decoder's own rule does, which asks
         // for one independent substream and no object layer (ac3::is_karaoke_programme, the
-        // rule the decoder reproduces by: planning/karaoke-eac3.md, D1 to D3).
+        // rule the decoder reproduces by).
         const bool other = chosen != nullptr && chosen != &session.scanned_.programmes.front();
         const auto bsmod = static_cast<ac3::meta::BitstreamMode>(
             other ? chosen->bsmod : session.scanned_.bsmod);

@@ -21,8 +21,8 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sink/sink.hpp"
 
-// A sink output that hands the coded stream to a receiver as it is (planning/hearth-android.md,
-// "How the audio is carried"): each Sendspin burst chunk is rebuilt into the IEC 61937 burst it
+// A sink output that hands the coded stream to a receiver as it is: each Sendspin burst chunk is
+// rebuilt into the IEC 61937 burst it
 // came from (iclforge::containers::iec61937::burst_from_parts), written to a link at the time it
 // is due, and the link is kept alive between them with null bursts, never silence, so that a
 // receiver keeps its lock.
@@ -35,8 +35,8 @@
 // (apps/hearth/android), in a test a model of one, so that what is decided here (which burst goes
 // into which slot, what is late, what is dropped) is tested on the host.
 //
-// What the clock can promise is a burst's length: a rigid stream cannot be nudged by less
-// (planning/hearth-android.md, D10). A burst that is due more than half a burst after the slot it
+// What the clock can promise is a burst's length: a rigid stream cannot be nudged by less.
+// A burst that is due more than half a burst after the slot it
 // would fill is dropped and counted, and one that is not due for more than half a burst is waited
 // for with null bursts, also counted; so a pass-through member of a group is within a burst of the
 // others, and says how often it was not.
@@ -95,7 +95,7 @@ class BurstLink {
 
 struct PassthroughOptions {
     // How many bursts the link is kept filled to: the Shield took 4 ahead without an underrun and
-    // not 3 (planning/hearth-android-findings.md, F12), so 6 leaves two bursts of margin for a
+    // not 3, so 6 leaves two bursts of margin for a
     // step that is late.
     std::uint32_t bursts_ahead = 6;
     // How many bursts are queued before the device is expected to start moving: it did not with

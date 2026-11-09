@@ -417,7 +417,7 @@ TEST_CASE("the converter's table rounded to float is the same on every platform"
     // double, whose last bit the C libraries do not all agree on), the same design with the
     // portable functions made now at run time, and, in a float build, the table the compiler made.
     // A float table that differs by a bit anywhere would give the host, the Cortex-M3 leg and the
-    // ESP32s each a converter of its own (planning/ac4.md, D14a4 and D14a5): what the pins hold is
+    // ESP32s each a converter of its own: what the pins hold is
     // that the libraries in CI round it the same way and that the compiler's evaluation agrees with
     // the machine's.
     struct Pin {

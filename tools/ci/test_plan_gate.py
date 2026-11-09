@@ -18,7 +18,7 @@ def plan(*paths: str) -> dict[str, str]:
 
 class DocsOnly(unittest.TestCase):
     def test_markdown_and_docs_tree_skip_the_build(self):
-        got = plan("docs/library/index.md", "CHANGELOG.md", "planning/ac4.md")
+        got = plan("docs/library/index.md", "CHANGELOG.md", "ROADMAP.md")
         self.assertEqual((got["docs_only"], got["build"], got["gui"]), ("true", "false", "false"))
 
     def test_generated_snippets_and_assets_are_docs(self):
@@ -198,7 +198,7 @@ class Conservative(unittest.TestCase):
             "apps/forge/cli/main.cpp",
             "tools/hearth/board_suite.py",
             "firmware/hearth-sink/README.md",
-            "planning/esp32-platform-profiles.md",
+            "docs/platforms/bare-metal/build-profiles.md",
         ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["esp"], "false")
@@ -235,7 +235,7 @@ class Conservative(unittest.TestCase):
             "apps/forge/cli/main.cpp",
             "tools/hearth/board_suite.py",
             "firmware/hearth-sink/README.md",
-            "planning/esp32-platform-profiles.md",
+            "docs/platforms/bare-metal/build-profiles.md",
         ):
             with self.subTest(path=path):
                 self.assertEqual(plan(path)["esp_size"], "false")

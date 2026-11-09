@@ -255,7 +255,7 @@ iclforge::render::OutputLayout g_layout;
 // least one. Written only from begin_play, on the task that owns the player.
 int g_sink_channels_open = 0;
 
-// Updates over the network (iclforge/firmware.hpp, planning/esp32-ota.md).
+// Updates over the network (iclforge/firmware.hpp).
 // Its routes are the control surface's; flash mode's teardown runs here, on
 // app_main's task, which owns the player, and the firmware's task waits for
 // it on g_flash_mode_done. g_control_started is one of the trial's conditions.
@@ -518,7 +518,7 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
                           (CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL != 0 &&
                            location.find("parallel=off") == std::string_view::npos);
     // below=N is this play's allocation limit for internal RAM, so that one image
-    // compares limits (planning/ac4.md, D14c); without it the Kconfig's value holds.
+    // compares limits; without it the Kconfig's value holds.
     if (const auto at = location.find("below="); at != std::string_view::npos) {
         int below = 0;
         const char* const first = location.data() + at + 6;
@@ -530,8 +530,7 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
     }
     // The play's own demand on the heap, which report_end prints: what was free
     // as it began, and the least that was free from there to its end, read with
-    // the heap monitor rather than sampled (planning/esp32-stream-set.md has why
-    // a sample reads high). Everything running counts - the network stack, the
+    // the heap monitor rather than sampled. Everything running counts - the network stack, the
     // Sendspin player, the ring and the decode task's stack - so what the
     // decoder alone asked for is a little less.
     g_heap_at_start_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -687,7 +686,7 @@ iclforge::ControlHandlers control_handlers() {
     // The same call the screen's keyboard makes (preferences.cpp): what a rename changes is
     // iclforge/device_name.hpp's to say.
     h.set_name = [](std::string_view text) { return player::preferences().set_name(text); };
-    // The listener's sound (planning/p4x-preferences.md): a level and distance for each speaker, and a test tone out
+    // The listener's sound: a level and distance for each speaker, and a test tone out
     // of each, where a Sendspin player is there to apply them. The others answer that they have none.
     if (player::sendspin_sound_caps().player) {
         h.trim = player::sound_trim_json;
@@ -765,8 +764,8 @@ iclforge::ControlHandlers control_handlers() {
             return player::network_set_preference(preference);
         };
     }
-    // A board with a screen chooses what it shows while a song has no lyrics, and when that dims
-    // (planning/p4x-now-playing.md). Both are stored, and the panel follows at once.
+    // A board with a screen chooses what it shows while a song has no lyrics, and when that dims.
+    // Both are stored, and the panel follows at once.
     if (player::panel_built()) {
         h.now_playing = []() { return std::string(iclforge::nowview::view_name(player::settings().now_view)); };
         h.set_now_playing = [](std::string_view word) {
@@ -790,7 +789,7 @@ iclforge::ControlHandlers control_handlers() {
         };
         h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
         h.set_dim_after = [](int minutes) { return player::preferences().set_dim_after_minutes(minutes); };
-        // What a person chose for the screen (planning/p4x-preferences.md): the backlight's lit level, which a glass with no
+        // What a person chose for the screen: the backlight's lit level, which a glass with no
         // backlight to dim refuses, and how the clock view writes the time. Stored, and the panel follows at once.
         // All three go through the preferences' backend, as the Preferences screen does, so that a route and the screen
         // cannot disagree about what a setting is or when it is refused.
@@ -805,8 +804,8 @@ iclforge::ControlHandlers control_handlers() {
         // What the screen costs (iclforge/panel_stats.hpp), read on port 80 where the capture port is off.
         h.panel_stats = []() { return player::panel_stats_text(); };
     }
-    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp,
-    // planning/hearth-late-night.md), on a board with a Sendspin player, which is what decodes for a listener. Stored,
+    // How much of a Dolby stream's dynamic range the listener wants (iclforge/base/dynamic_range.hpp),
+    // on a board with a Sendspin player, which is what decodes for a listener. Stored,
     // and followed from the next stream's start. The control surface's own play (POST /play) plays as the build says.
     if (player::sendspin_built()) {
         h.dynamic_range = []() {
@@ -818,7 +817,7 @@ iclforge::ControlHandlers control_handlers() {
             return range.has_value() && player::preferences().set_late_night(*range == iclforge::ac3::DynamicRange::kLateNight);
         };
     }
-    // The time of day, on every board that keeps one (main/wall_clock.hpp, planning/p4x-now-playing.md, stage 3):
+    // The time of day, on every board that keeps one (main/wall_clock.hpp):
     // the zone it is shown in, the server asked for it and whether to ask at all. Each is stored and followed
     // at once. A zone is applied first, because the board's C library must read it as the route did, and is
     // not left applied if it cannot be stored.
@@ -987,8 +986,7 @@ iclforge::PullHooks pull_hooks() {
     };
     hooks.time_sync_on = [] { return player::settings().time_sync; };
     // A TLS session is tens of KB: with PSRAM the allocations that large go there, and without it
-    // (the ESP32-C6) they do not fit beside a playing stream (planning/esp32-ota.md, "TLS on the
-    // board").
+    // (the ESP32-C6) they do not fit beside a playing stream.
     hooks.room_beside_stream = [] {
         return has_psram() || !(g_player != nullptr || player::sendspin_playing());
     };
@@ -1203,7 +1201,7 @@ void on_alloc_failed(std::size_t size, std::uint32_t caps, const char* function)
 }
 
 // What a play asks of internal RAM, set against what is free now, in the line a bench check
-// and the board suite read (planning/esp32-platform-profiles.md, "Boot-time budget line"):
+// and the board suite read:
 //
 //   budget: when=boot net=1 internal_free=90931 largest=31744 ask_ring=0 ask_decode_stack=0
 //   ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 headroom=23552 floor=0 verdict=ok
@@ -1428,7 +1426,7 @@ extern "C" void app_main() {
                 // without one: the Improv task and the network stack. On the
                 // S3 board that left the burst player's task no 32 KiB block
                 // (largest 31,744), so a board just given its network could
-                // not play until it was restarted (planning/esp32-ota.md, O9).
+                // not play until it was restarted.
                 // A boot with the network stored starts the player before
                 // those, so restart into one, once the Improv client has had
                 // its answer. That boot has its network from the start, so it
@@ -1488,7 +1486,7 @@ extern "C" void app_main() {
                     g_firmware.restart(cmd.text);
                     break;
                 case CommandKind::kFlashMode:
-                    // Flash mode (planning/esp32-ota.md): every play stops,
+                    // Flash mode: every play stops,
                     // servers hear the board is going, the sink closes and the
                     // Sendspin service is withdrawn. Nothing starts any of it
                     // again: the board restarts to leave flash mode.

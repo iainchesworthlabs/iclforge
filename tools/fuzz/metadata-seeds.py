@@ -26,8 +26,8 @@ Two subcommands, both driven from tools/fuzz/generate-seeds.sh:
       Packs the first four frames of a 48 kHz, frame_rate_index 13 AC-4
       stream into IEC 61937-14 AC-4 data-bursts and writes them to
       fuzz_iec61937_unwrap/ as a PCM16 stereo WAV, the shape 'forge spdif'
-      gives AC-3 and E-AC-3 carriers. forge does not pack AC-4 yet
-      (planning/ac4.md, I1), so this does, the way
+      gives AC-3 and E-AC-3 carriers. forge does not pack AC-4 yet,
+      so this does, the way
       iclforge::containers::iec61937::Ac4BurstPacker does at that rate: 2 048 IEC 60958
       frames a burst, Pc 0x0D18, Pd the frame's length in bits.
 

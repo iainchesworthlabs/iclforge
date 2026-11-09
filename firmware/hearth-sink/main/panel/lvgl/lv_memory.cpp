@@ -1,4 +1,4 @@
-// LVGL's heap, in PSRAM (planning/karaoke-p4x-panel.md, Q3).
+// LVGL's heap, in PSRAM.
 //
 // ESP-IDF's malloc() sends an allocation of up to CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL (16 KB) to
 // internal RAM first, and LVGL's objects, styles, glyph caches and draw buffers are almost all

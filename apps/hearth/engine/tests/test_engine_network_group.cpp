@@ -55,7 +55,7 @@
 #include "stream_decoder.hpp"
 #include "truehd_test_support.hpp"
 
-// Issue #874's own exit (planning/hearth-reference-player.md, A6): "from the
+// Issue #874's own exit: "from the
 // app, a group of two test sinks... plays one programme." Unlike
 // test_network_group_sink.cpp, which drives NetworkGroupSink directly to
 // prove the wrapper's own translation, this drives it from
@@ -1294,7 +1294,7 @@ TEST_CASE("engine: a sink set to Opus is sent the decoded programme as Opus",
     CHECK(energy > 1.0);
 }
 
-// planning/ac4.md, I2: "AC-4 decodes to PCM for every output, and is sent as a
+// I2: "AC-4 decodes to PCM for every output, and is sent as a
 // bitstream only over the extension role ... to sinks that decode it." One
 // AC-4 item from the Engine to a group of a player@v1 sink and an
 // _iclforge_player@v1 sink that lists AC-4 (D11's test sink): the first takes
@@ -1417,7 +1417,7 @@ TEST_CASE("engine: an AC-4 presentation a sink would not choose reaches a group 
     CHECK(sinks.burst_sink->totals().bursts == 0U);
 }
 
-// ---- karaoke (planning/karaoke-phase2.md, W7: a sink that can decode, decodes) ------------------
+// ---- karaoke ------------------
 //
 // A karaoke AC-3 stream (bsmod 7, 3/2 and the LFE) played to a group of two boards: one takes the
 // karaoke keys, so it is sent the stream as it is and told how to reproduce it; the other does not,
@@ -2058,7 +2058,7 @@ TEST_CASE("engine: a change of vocals while a karaoke item plays reaches the boa
     rig.stop_playing();
 }
 
-// --- the lyrics beside an item (W7d, planning/karaoke-phase2.md) ----------------------------------
+// --- the lyrics beside an item (W7d) ----------------------------------
 
 namespace {
 
@@ -2515,7 +2515,7 @@ TEST_CASE("engine: members that leave and rejoin a group while it plays do not d
     // NetworkSinks::status() reads the group's facts from inside NetworkSinks' own: the trail was
     // guarded by that mutex, so a member rejoining a playing group while the page polled took the
     // two in opposite orders and stopped the engine for good (found by a real board restarting
-    // mid-item, planning/karaoke-phase2.md, W7d).
+    // mid-item, W7d).
     constexpr int kFrameCount = 200;
     iclforge::hearth::DecoderSettings wanted;
     wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
@@ -2566,7 +2566,7 @@ TEST_CASE("engine: members that leave and rejoin a group while it plays do not d
     CHECK(polls.load() > 0);
 }
 
-// planning/truehd-parity-hearth-player.md, H4: a 96 kHz item to a group whose sinks list 48 kHz and
+// H4: a 96 kHz item to a group whose sinks list 48 kHz and
 // 44.1 kHz. Two take PCM and one is set to Opus; the sink that lists 8 channels only has no form at
 // all and is sent nothing, with the reason. The audio is converted here, once, for the group: each
 // PCM sink plays the item at 48 kHz, half as many frames as the item has, and what it plays is the
@@ -2834,7 +2834,7 @@ EngineStatus play_truehd_item(TruehdGroup& rig, const iclforge::hearth::testing:
 
 }  // namespace
 
-// planning/truehd-parity-hearth-player.md, H5: a TrueHD item is sent to a sink that lists "truehd" as
+// H5: a TrueHD item is sent to a sink that lists "truehd" as
 // its access units, 24 to a chunk, which it decodes itself, and to a sink that does not as the PCM
 // the application decodes. The two play the same samples, because the codec is lossless and the
 // layout is the stream's own.

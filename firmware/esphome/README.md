@@ -43,7 +43,7 @@ picks the version of *the library* it fetches. Pin both to tags for anything you
 intend to keep working.
 
 The component fetches the ESP-IDF component from `firmware/esp-idf/iclforge`, where the
-repository has it since the layout of planning/monorepo.md. A tag made before then keeps it at
+repository has it since the monorepo layout. A tag made before then keeps it at
 `esp-idf/iclforge` (v0.10.0-beta.1 does), so `version:` has to name a ref after the change: `main`,
 or the first release made from it.
 

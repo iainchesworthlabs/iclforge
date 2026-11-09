@@ -10,8 +10,7 @@
 #include <span>
 
 // When a sample leaves the audio port, and how a Sendspin player makes that
-// the time its server asked for (planning/hearth-reference-player.md, B3;
-// planning/hearth-sendspin-extension.md, Timing and row R9).
+// the time its server asked for.
 //
 // Three parts, free of ESP-IDF like dac_queue_model.hpp beside them, so that
 // the arithmetic runs on the host (libs/device/tests/test_playout.cpp):

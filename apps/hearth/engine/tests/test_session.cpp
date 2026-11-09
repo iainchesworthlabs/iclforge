@@ -306,8 +306,7 @@ TEST_CASE("session: each unit the item plays is reported with its frames, and no
 
 // Whether an item is karaoke, for the sinks that decode it themselves (ItemFacts::karaoke): an AC-3
 // stream flagged bsmod 7 above 1/0, as it always was, and an E-AC-3 programme the decoder would
-// reproduce (ac3::is_karaoke_programme): the same flag, one independent substream, no object layer
-// (planning/karaoke-eac3.md, D1 to D3).
+// reproduce (ac3::is_karaoke_programme): the same flag, one independent substream, no object layer.
 namespace {
 
 std::vector<std::byte> eac3_stream(iclforge::ac3::meta::BitstreamMode bsmod,

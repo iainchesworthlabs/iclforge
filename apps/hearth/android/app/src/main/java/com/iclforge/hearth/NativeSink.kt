@@ -77,7 +77,7 @@ object NativeSink {
 
     /**
      * Asks the server to play the vocals the remote chose: 0 none, 1 vocal 1, 2 vocal 2, 3 both (the
-     * request path of planning/hearth-android.md, D8). Advice, and it has no answer: this sink hands the
+     * request path, D8). Advice, and it has no answer: this sink hands the
      * receiver the coded bits, so it plays every vocal whatever the server decides, and what the server
      * does shows in what its decoding members play.
      */

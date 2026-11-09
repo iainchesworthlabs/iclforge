@@ -39,7 +39,7 @@
 # application including the Windows seams; the -q row below covers its window's C++ on Linux,
 # and the engine core stays a row of the plain run.
 #
-# libs/sendspin and apps/hearth (Hearth, planning/hearth-reference-player.md) ARE gated here,
+# libs/sendspin and apps/hearth (Hearth) ARE gated here,
 # unlike apps/crucible above: config-linux-gcc-coverage is the one coverage preset that turns
 # ICLFORGE_BUILD_HEARTH on (CMakePresets.json), and both iclforge::sendspin and hearth_engine link
 # iclforge::coverage themselves for exactly the reason apps/forge/cli/src's own link does - see their
@@ -141,7 +141,7 @@ fi
 #   ac3iab 95.4/92.9  iamf 96.1/96.2    apps/shared/media/src 83.3/71.9
 #   apps/crucible/engine 95.9/87.8
 #
-# forge is six components since the layout change of planning/layout.md, one row each below. Measured
+# forge is six components since the layout change, one row each below. Measured
 # on the split code the same way (GCC 16 / gcovr 8.6, WSL2, the 3,250 tests of the coverage leg):
 #
 #   ac3 94.5/87.9    base 88.8/64.7    dsp 87.7/94.7
@@ -159,7 +159,7 @@ fi
 # passthrough instantiations only run against a card. libs/sendspin and
 # apps/hearth now have a real measurement behind their floors.
 #
-# AC-4 is one library since planning/consolidation.md's C1: the inspector's floor was 93/88 and the
+# AC-4 is one library since the consolidation: the inspector's floor was 93/88 and the
 # decoder's and the core's 88/80, and the encoder, now among its files, was not measured. Until a
 # coverage run measures the merged library, it takes the lowest of the three.
 #
@@ -173,8 +173,8 @@ fi
 #
 # libs/sink is the sink core that was apps/hearth/testsink/src/sink.cpp and store.cpp, counted in the
 # apps/hearth row above until it moved. Its floors are under that row's (87/77), which it was part of,
-# and have not been measured on their own: the first hosted run of this job sets them (planning/
-# hearth-android.md, phase 1a). A row here needs its directory in the gcovr --filter below as well:
+# and have not been measured on their own: the first hosted run of this job sets them. A row here
+# needs its directory in the gcovr --filter below as well:
 # this one was added without it, and the first run that got as far as the gate (2026-10-13, run
 # 38354367943) said "no data for libs/sink" of a library built and tested with coverage on.
 #

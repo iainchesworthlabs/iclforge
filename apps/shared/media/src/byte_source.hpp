@@ -8,8 +8,8 @@
 #include <vector>
 
 // Where a program's bytes are read from when it does not hold all of them in memory: a TrueHD file
-// is the one stream Hearth plays that can run to gigabytes (planning/truehd-parity-hearth-player.md,
-// row 5), and a container's audio track is the same stream with other tracks between its frames.
+// is the one stream Hearth plays that can run to gigabytes, and a container's audio track is the
+// same stream with other tracks between its frames.
 //
 // A source answers reads at offsets. It is read from one thread at a time, by whoever owns it, and
 // never needs to be seekable in any way but by offset: a file stream, a memory-mapped file or a

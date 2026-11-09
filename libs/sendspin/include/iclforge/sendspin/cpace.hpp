@@ -14,8 +14,7 @@
 //
 // The confirmation tags follow the draft's §9.4 suggestion with HMAC-SHA-512,
 // mac_key = SHA-512("CPaceMac" || sid || ISK) and Ta = HMAC(mac_key, lv_cat(Ya, ADa)),
-// which is also what cpace-py 0.1.0, aiosendspin 9.1.1's CPace, computes
-// (planning/hearth-sendspin-extension.md, Q6).
+// which is also what cpace-py 0.1.0, aiosendspin 9.1.1's CPace, computes.
 //
 // What the peer sends is checked here: a share that is not 32 bytes, or that X25519
 // maps to the identity (a low-order point on the curve or its twist), aborts the

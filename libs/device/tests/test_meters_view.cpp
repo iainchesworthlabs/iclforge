@@ -15,7 +15,7 @@ namespace {
 mv::Spot spot(float azimuth, float elevation = 0.0F) { return {.azimuth_deg = azimuth, .elevation_deg = elevation, .lfe = false, .connected = true}; }
 mv::Spot lfe() { return {.azimuth_deg = 0.0F, .elevation_deg = 0.0F, .lfe = true, .connected = true}; }
 
-// The rooms of planning/p4x-meters-view.md, from the renderer's own layouts (their azimuths and elevations, in their slot order).
+// The rooms of the Meters view, from the renderer's own layouts (their azimuths and elevations, in their slot order).
 std::vector<mv::Spot> room_2_0() { return {spot(30), spot(-30)}; }
 std::vector<mv::Spot> room_5_1() { return {spot(30), spot(0), spot(-30), spot(110), spot(-110), lfe()}; }
 std::vector<mv::Spot> room_7_1_4() {

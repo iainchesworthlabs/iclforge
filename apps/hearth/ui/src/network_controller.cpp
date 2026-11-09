@@ -525,7 +525,7 @@ struct LayoutFields {
     return map;
 }
 
-// --- a Hearth sink's firmware (planning/esp32-ota.md, O5) -----------------
+// --- a Hearth sink's firmware -----------------
 
 // The largest file chooseSinkFirmwareFile() reads: every board's slot is at
 // most 4 MiB, so anything past twice that is not an image for one.

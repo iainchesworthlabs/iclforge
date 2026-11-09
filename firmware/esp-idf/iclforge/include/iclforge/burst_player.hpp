@@ -25,12 +25,12 @@
 #include "iclforge/block_tap.hpp"
 #include "iclforge/playout.hpp"
 
-// The Sendspin player's audio (planning/hearth-reference-player.md, B3): what
+// The Sendspin player's audio: what
 // the server sends arrives here with the time it should play, and leaves for
 // the sink at that time.
 //
-//   _iclforge_player@v1's bursts (planning/hearth-sendspin-extension.md, Burst
-//   chunks) are decoded, AC-3 or E-AC-3 with any object layer, or AC-4's channels
+//   _iclforge_player@v1's bursts are decoded, AC-3 or E-AC-3 with any object layer, or AC-4's
+//   channels
 //   where the build has its decoder (ac4_stream.hpp), and rendered onto the
 //   board's layout by iclforge::render;
 //   player@v1's PCM, which is what Music Assistant sends, is rendered onto the
@@ -112,7 +112,7 @@ struct BurstPlayerConfig {
     std::uint32_t max_ac4_frame_rate = 0;
     // As max_ac4_channels, for a TrueHD stream: the most channels a unit may decode to, which is
     // what the board keeps up with and states as max_coded_channels for "truehd" (the P4's 6, the
-    // S3's 2: planning/truehd-parity-esp32-sinks.md). A server cuts a stream with downmix substreams
+    // S3's 2). A server cuts a stream with downmix substreams
     // to it, so a unit with more is refused once the decoder has said how many it has. 0 refuses none.
     std::size_t max_truehd_channels = 0;
     // The most objects an E-AC-3 stream may declare for the board to place them in real time, which
@@ -311,7 +311,7 @@ class BurstPlayer {
     void set_dynamic_range(iclforge::base::DynamicRange range);
     // The identify tone on one output at `level_db`, or none: a server's, which it starts and stops itself.
     void identify(std::optional<iclforge::sendspin::player::Identify> tone);
-    // The board's own identify (planning/p4x-preferences.md): the tone, through the same output stage as the
+    // The board's own identify: the tone, through the same output stage as the
     // music, out of one speaker of the layout in force by role, or each in turn. Refused while a stream plays,
     // while something else holds the sink, and while a server's tone is on; stopped at once by a stream's start,
     // a hold, and kOff; and ended by its own limits in any case (iclforge/render/identify_sequence.hpp). Safe

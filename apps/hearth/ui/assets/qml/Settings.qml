@@ -6,7 +6,7 @@ import QtQuick.Layouts
 import Hearth
 import HearthLanguage
 
-// The Settings page (planning/hearth-design.md; issue #853): playback,
+// The Settings page: playback,
 // network (with the pairing records A6's Sendspin server will start filling
 // in), appearance, language and a diagnostics export - the same five cards
 // the mockup shows, in the same order - and a sixth, About, whose one button
@@ -182,7 +182,7 @@ ScrollView {
                         }
                     }
 
-                    // Karaoke (planning/karaoke-design.md, K5): the nudge a
+                    // Karaoke: the nudge a
                     // singer most often needs, because a file's own times and
                     // a particular output path rarely agree to the frame.
                     RowLayout {

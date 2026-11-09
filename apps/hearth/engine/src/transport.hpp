@@ -10,7 +10,7 @@
 #include "output_decision.hpp"
 #include "queue.hpp"
 
-// The transport state machine (planning/hearth-reference-player.md, A3): play,
+// The transport state machine: play,
 // pause, stop, next, previous and seek over the queue, and what the rest of
 // the engine has to DO about each of them.
 //

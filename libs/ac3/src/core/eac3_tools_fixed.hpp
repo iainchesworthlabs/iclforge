@@ -7,8 +7,8 @@
 #include "iclforge/ac3/core/eac3_tools.hpp"
 #include "iclforge/base/arithmetic/fixed32.hpp"
 
-// The Annex E tools in the fixed-point tier's scalar
-// (planning/arithmetic-tiers.md, Phase C), beside `eac3_tools.cpp`'s double
+// The Annex E tools in the fixed-point tier's scalar,
+// beside `eac3_tools.cpp`'s double
 // and float forms.
 //
 // Why here rather than there. `Fixed32` is internal to `libs/ac3/src/core/`

@@ -30,7 +30,7 @@
 //     last     [3][data]
 //
 // Hearth accepts both from any peer, and sends each peer the form its dialect
-// reads (planning/hearth-sendspin-extension.md, C1). A message is reassembled in
+// reads. A message is reassembled in
 // whichever form its first fragment used; switching form part-way is malformed.
 
 namespace iclforge::sendspin {
@@ -48,7 +48,7 @@ inline constexpr std::uint8_t kSourceLast = 15;
 inline constexpr std::uint8_t kVisualizerFirst = 16;
 inline constexpr std::uint8_t kVisualizerLast = 23;
 inline constexpr std::uint8_t kApplicationFirst = 192;
-// _iclforge_player@v1's burst chunk (planning/hearth-sendspin-extension.md).
+// _iclforge_player@v1's burst chunk.
 inline constexpr std::uint8_t kIclforgeBurst = 192;
 }  // namespace message_id
 

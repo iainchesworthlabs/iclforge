@@ -67,7 +67,7 @@ A **Presentation** picker appears for an AC-4 file: the decoder's own choice wit
 first, then each presentation of the table of contents by position, with its channels, language
 and `presentation_id`. Picking one decodes that presentation, as `forge play presentation=<n>`
 does, and the meters follow its channels. A presentation with A-JOC or direct-coded objects
-(planning/ac4.md, I5) shows **Export objects…** the same as an Atmos stream does; one without
+ shows **Export objects…** the same as an Atmos stream does; one without
 objects hides it, as before. **Export decoded WAV…** writes the presentation playing either way.
 
 ## Exporting

@@ -1,7 +1,7 @@
 'use strict';
 
 // A stand-in for iclforge::Control (firmware/esp-idf/iclforge/src/control.cpp), for the
-// web page's tests - planning/esp32-device-ui.md. It serves the page's two
+// web page's tests. It serves the page's two
 // files with the headers the firmware sends and answers the REST routes with
 // the firmware's status codes and reply texts, over a model of the streaming
 // example's player (firmware/hearth-sink/main/
@@ -399,8 +399,7 @@ function layoutOptions(device) {
     };
 }
 
-// How the player serves a layout (planning/esp32-device-ui.md, "The output
-// layout"): the decoder's fold for two full-range speakers or one and nothing
+// How the player serves a layout: the decoder's fold for two full-range speakers or one and nothing
 // else; objects placed when the layout has heights and the stream objects;
 // the coded channels placed otherwise, with the speakers they do not reach
 // left silent. A channel with no slot of its own is spread, which the model
@@ -2205,7 +2204,7 @@ async function startStub() {
                 device.layout = body;
                 return send(res, 200, judged?.verdict === 'limits' && judged.reason ? `${REPLIES.layoutNote}${judged.reason}\n` : REPLIES.layoutOk);
             }
-            // Updates over the network (planning/esp32-ota.md). A firmware
+            // Updates over the network. A firmware
             // without them answers every one of these routes 404.
             case 'GET /firmware':
                 if (!fw) {
@@ -2237,7 +2236,7 @@ async function startStub() {
                 return restart(() => (fw.mode = 'normal'));
             case 'PUT /firmware/rollback':
                 return fw ? rollback(res) : send(res, 404, REPLIES.noFirmware);
-            // An update from GitHub releases (planning/esp32-ota.md, O10): a firmware built without it says
+            // An update from GitHub releases: a firmware built without it says
             // so on GET /firmware/available (firmware_pull_none.cpp) and answers the rest 404. The model keeps
             // the body firmware_update.hpp's render_status writes in `device.update` when a test gives it one.
             case 'GET /firmware/available':

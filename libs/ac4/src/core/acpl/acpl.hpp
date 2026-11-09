@@ -104,8 +104,8 @@ using ParamPrev = std::array<double, kSubbands>;
 //
 // It is a template on the scalar the expression runs at: double, which is the pseudocode's and
 // what every tier but the decoder's float one uses, and float, which the float tier uses where the
-// chip's FPU is single precision and a double operation is a call into software (planning/ac4.md,
-// D14h). At float the same expression is evaluated operation for operation in single precision,
+// chip's FPU is single precision and a double operation is a call into software. At float the same
+// expression is evaluated operation for operation in single precision,
 // from values narrowed once, in the column; the float output is the same on every platform
 // (IEEE single, no fused multiply-add) and is not the double's narrowed.
 template <typename R>

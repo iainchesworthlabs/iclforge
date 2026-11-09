@@ -1237,7 +1237,7 @@ TEST_CASE("decode karaoke-melody=, karaoke-v1= and karaoke-v2= re-level the capa
 }
 
 // ---------------------------------------------------------------------------
-// Karaoke in E-AC-3 (planning/karaoke-eac3.md, E3): the decoder reproduces it, as Dolby's does
+// Karaoke in E-AC-3: the decoder reproduces it, as Dolby's does
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -1264,7 +1264,7 @@ TEST_CASE("decode karaoke reproduces an E-AC-3 karaoke stream, at the mixing gro
           "[cli][decode][karaoke][eac3]") {
     const auto dir = scratch_dir();
     // surmixlev=-6 is the group's lorosurmixlev: the vocals at half. bsmod=7 writes the group
-    // without `mixmeta` being asked for (planning/karaoke-eac3.md, D4).
+    // without `mixmeta` being asked for.
     const auto stream =
         write_eac3_karaoke_candidate(dir, "e32", "bsmod=7 cmixlev=-3 surmixlev=-6");
 
@@ -1305,7 +1305,7 @@ TEST_CASE("eac3-encode bsmod=7 alone writes the mixing group at the encoder's de
           "[cli][decode][karaoke][eac3]") {
     // No `mixmeta`, no levels: the stream still carries lorosurmixlev (the encoder's -6 dB
     // surround default, the same level an AC-3 karaoke stream is made at), so the reproduction
-    // does not fall to the decoder's own default of -3 dB (planning/karaoke-eac3.md, D4).
+    // does not fall to the decoder's own default of -3 dB.
     const auto dir = scratch_dir();
     const auto stream = write_eac3_karaoke_candidate(dir, "e32d", "bsmod=7");
 
@@ -1396,7 +1396,7 @@ TEST_CASE("transcode carries the service type between AC-3 and E-AC-3, and bsmod
 TEST_CASE("bsmod=7 on mono or 1+1 is written as asked, with a word about what it is",
           "[cli][encode][karaoke][eac3]") {
     // Mono's code 7 is Table 5.7's voice-over, and Annex A (Table A5.2) and Annex G (Table G.2)
-    // prohibit a karaoke service on 1+1 (planning/karaoke-eac3.md, D4). Both encoders accept it
+    // prohibit a karaoke service on 1+1. Both encoders accept it
     // and said nothing.
     const auto dir = scratch_dir();
     const auto encode = [&](const std::string& command, const std::string& name,

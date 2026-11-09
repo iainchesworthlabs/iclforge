@@ -17,7 +17,7 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sink/passthrough.hpp"
 
-// The pass-through output on TrueHD (planning/truehd-parity-hearth-player.md, entry 134): a chunk of
+// The pass-through output on TrueHD: a chunk of
 // up to 24 access units becomes one MAT burst for the link, which is eight channels wide at 192 kHz
 // (176.4 kHz for the 44.1 kHz family), and goes in the slot it is due in between null bursts. The
 // oracle is the access units themselves: the real bursts the link was given unwrap to them, in

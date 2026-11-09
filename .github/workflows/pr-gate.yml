@@ -254,8 +254,8 @@ jobs:
     with:
       runner: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '["ubuntu-latest"]' || vars.GATE_RUNNER_JSON || '["ubuntu-latest"]' }}
 
-  # The ESP32 sinks' profile guard before the merge (planning/esp32-platform-profiles.md,
-  # "Where each check runs"): every profile is configured in the IDF container and held to
+  # The ESP32 sinks' profile guard before the merge: every profile is configured in the IDF
+  # container and held to
   # its definition, with no compile. Planned when firmware/hearth-sink, firmware/esp-idf or
   # the profile tools change, so a change to a locked key's default or a fragment, and two
   # pull requests that are each valid alone, are seen here and not first on main.

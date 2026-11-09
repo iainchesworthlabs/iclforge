@@ -7,8 +7,8 @@ import ForgeGui
 // encode through the keyboard, the Encode button writes it, and the command
 // line the run recorded - the one the command bar echoed - is run through
 // this build's forge in a folder holding a copy of the source. The two files
-// must be the same bytes, for a raw stream and for an MP4 file (planning/
-// ac4.md, I3's exit criterion). The page's file is then decoded by the
+// must be the same bytes, for a raw stream and for an MP4 file. The page's file is then decoded by
+// the
 // player, measured by QC and opened on the object page, each through its own
 // picker.
 //

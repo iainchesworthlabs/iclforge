@@ -8,8 +8,8 @@
 #include <vector>
 
 // The melody of a MIDI karaoke file (`.kar`, a Standard MIDI File): the notes of the one track and
-// channel that carries the tune, as a reference for a singer's pitch
-// (planning/karaoke-microphone.md, D9; findings F4). parse_midi_karaoke() in lyrics.hpp reads the
+// channel that carries the tune, as a reference for a singer's pitch.
+// parse_midi_karaoke() in lyrics.hpp reads the
 // words and ignores every note; this reads the notes and uses the words only to find which of them
 // is the melody.
 //

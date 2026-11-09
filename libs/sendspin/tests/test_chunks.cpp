@@ -19,7 +19,7 @@
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/frames.hpp"
 
-// The audio chunks, including planning/hearth-sendspin-extension.md's test
+// The audio chunks, including the test
 // vectors for _iclforge_player@v1: a burst chunk from wrap_frame for
 // testdata's AC-3 5.1 fixture and one from Eac3BurstPacker for the
 // encoder's E-AC-3 syncframes of two blocks, checked field by field against the

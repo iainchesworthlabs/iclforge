@@ -49,7 +49,7 @@ failure, so a wiring mistake cannot turn it green.
 A planner ([`tools/ci/plan_gate.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/ci/plan_gate.py))
 reads the changed files and decides:
 
-- **Documentation only** (`docs/`, `docs-snippets/`, `planning/`, `overrides/`, `assets/`, any
+- **Documentation only** (`docs/`, `docs-snippets/`, `overrides/`, `assets/`, any
   `.md` file, `LICENSE`, `mkdocs.yml`): the static checks run, nothing is built.
 - **Nothing a Linux C++ build reads** (`bindings/python/`, `bindings/rust/`, `bindings/js/`, `firmware/esp-idf/`, `firmware/esphome/`,
   `apps/demos/android/`, `apps/demos/wasm/`, `firmware/baremetal/`, `apps/crucible/linux/`, `packaging/`, `requirements/`,

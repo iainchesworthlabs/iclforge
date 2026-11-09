@@ -140,7 +140,7 @@ struct HostBurst {
 
 // --- the device ----------------------------------------------------------------------------------
 
-// What the Shield's AudioTrack did in the spikes (planning/hearth-android-findings.md, F12), on the
+// What the Shield's AudioTrack did in the spikes, on the
 // real clock, and every burst it is handed written down: it does not move until 8 bursts are queued,
 // starts about 200 ms after, takes a burst per period, and reports its position in 20 ms steps.
 class ModelDevice final : public BurstLink {

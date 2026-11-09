@@ -197,7 +197,7 @@ TestCase {
                   "the Objects card does not say how many are placed");
     }
 
-    // An AC-4 item (planning/ac4.md, I2) plays, and the page says what the
+    // An AC-4 item plays, and the page says what the
     // decoder reads of it: the Stream card's frame rate and I-frames, the
     // presentation table, and the Metadata card - with no banner saying it
     // cannot play.

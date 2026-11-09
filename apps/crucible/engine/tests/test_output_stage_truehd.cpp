@@ -25,8 +25,7 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "output_stage.hpp"
 
-// The TrueHD 5.1 leg over fake devices (planning/truehd-parity-crucible.md,
-// rows C1, C9, C15, C16 and C21). The leg takes the encoder's bed, not its
+// The TrueHD 5.1 leg over fake devices. The leg takes the encoder's bed, not its
 // unit, rounds it to 24-bit integers, encodes it as TrueHD and hands the
 // sink MAT bursts. The oracle is the codec's own lossless property: unwrap
 // what reached the sink, decode it with iclforge::truehd, and the PCM must
@@ -384,8 +383,8 @@ TEST_CASE("truehd leg: write the bursts and the input for the FFmpeg check",
     REQUIRE(file.good());
 }
 
-// What the leg costs a frame, for the machines Crucible runs on (planning/truehd-parity-crucible.md,
-// C24): the reference programme through the stage a 1536-sample frame at a time, timing each
+// What the leg costs a frame, for the machines Crucible runs on: the reference programme through
+// the stage a 1536-sample frame at a time, timing each
 // submit(), against the 32 ms a frame lasts. Prints and checks nothing else, so it reads the same
 // on a Raspberry Pi and on this tree's CI. Hidden; run it by tag, in a Release build.
 TEST_CASE("truehd leg: what a frame costs, in milliseconds against the 32 the frame lasts",
@@ -552,7 +551,7 @@ struct WallClockPace {
 // on the next batch. The pre-roll (OutputStageConfig::truehd_prefill_ms) holds the first bursts
 // back until about 150 ms of them are in hand, which has to leave the device no gap, at the start
 // or later. The same run with no pre-roll is the control: the model has to see the gaps there, or
-// it would pass for the wrong reason (planning/truehd-parity-crucible.md, question 16). The
+// it would pass for the wrong reason. The
 // frames arrive at their nominal times, so a loaded host cannot fail it; what a slow host adds is
 // what the hidden case below measures.
 TEST_CASE("truehd leg: the pre-roll leaves the device no gap at the pace the engine feeds it",

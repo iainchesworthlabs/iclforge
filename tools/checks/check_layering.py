@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when a project of the tree uses a project its row of the table does not allow.
 
-The tree is a monorepo of projects (planning/monorepo.md): libraries under libs/, the products'
+The tree is a monorepo of projects: libraries under libs/, the products'
 programs under apps/, the code several programs share under apps/shared/, the language bindings
 under bindings/, the firmware under firmware/, the examples, and the vendored code under external/.
 What keeps the graph between them acyclic and one-way is nothing but the habit of the people editing

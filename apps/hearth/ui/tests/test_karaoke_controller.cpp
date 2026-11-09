@@ -1,4 +1,4 @@
-// KaraokeController (planning/karaoke-design.md, K5): the lyrics of the item
+// KaraokeController: the lyrics of the item
 // playing as the lyric view binds to them, and the cursor the view asks every
 // frame. The reader and the cursor's own rules are tested where they live
 // (libs/lyrics/tests/test_lyrics.cpp); what is checked here is what this
@@ -363,7 +363,7 @@ TEST_CASE("KaraokeController: the same item and length again is not read again",
     CHECK(line_at(controller, 2).value("endMs").toLongLong() == 20000);
 }
 
-// ---- timing the lyrics (planning/karaoke-phase2.md, W6) -------------------------------------
+// ---- timing the lyrics -------------------------------------
 //
 // The editing functions are tested where they live (libs/lyrics/tests/test_timing.cpp); what is
 // held here is the session around them: what a press is taken for, what a line and a word look

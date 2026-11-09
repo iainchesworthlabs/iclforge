@@ -61,7 +61,7 @@ TEST_CASE("the sizes grow with the display and are the same for a portrait panel
 
 TEST_CASE("the kit's sizes are the ones it has always been drawn at", "[screen_metrics]") {
     const screen::Metrics kit = screen::metrics_for(1024, 600);
-    // planning/karaoke-p4x-panel.md: 32 px margins, a 64 px footer with 48 px buttons, 72 px targets on the sheet, 24 px type.
+    // 32 px margins, a 64 px footer with 48 px buttons, 72 px targets on the sheet, 24 px type.
     REQUIRE(kit.margin == 32);
     REQUIRE(kit.footer == 64);
     REQUIRE(kit.footer_button == 48);

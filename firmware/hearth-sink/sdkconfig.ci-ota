@@ -1,4 +1,4 @@
-# Updates over the network under QEMU (planning/esp32-ota.md, "Tests"), after
+# Updates over the network under QEMU, after
 # the Sendspin player's CI shape:
 #
 #   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-ota"

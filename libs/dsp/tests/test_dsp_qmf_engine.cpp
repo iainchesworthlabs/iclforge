@@ -11,7 +11,7 @@
 
 #include "iclforge/dsp/qmf.hpp"
 
-// planning/consolidation.md decision 21: JOC's bank runs on the AC-4 banks' engine with its own
+// JOC's bank runs on the AC-4 banks' engine with its own
 // prototype. This holds it to the bank as it was before, written out directly - the window
 // folded with its alternating sign over the history oldest first, the odd-stacked sum
 // exp(-i pi (2k + 1) m / 128), the synthesis's real part, unfold and overlap-add - so that the

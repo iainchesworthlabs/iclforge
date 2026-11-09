@@ -64,8 +64,8 @@ endif()
 # One probe of three, never more than one: the profiles are mutually exclusive
 # at the root (no two of decode / AC-3 encode / E-AC-3 encode fit in an
 # ESP32-S3's internal SRAM at once), and the AC-4 decoder is a third shape of the
-# decode profile, with its own probe, since AC-4 shares nothing with iclforge::ac3
-# (planning/ac4.md, D14a). All three define iclforge_probe::run() rather than main(),
+# decode profile, with its own probe, since AC-4 shares nothing with iclforge::ac3.
+# All three define iclforge_probe::run() rather than main(),
 # so main.cpp and the ESP-IDF application run whichever was built without
 # knowing which it is.
 if(ICLFORGE_MINIMAL_ENCODER)

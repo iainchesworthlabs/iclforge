@@ -121,9 +121,8 @@ Crucible sends a receiver E-AC-3 or AC-3 and decodes that stream for everything 
 surround, stereo and headphones play a decode of it. Atmos is E-AC-3 with a JOC object layer;
 with no signing key, or on a receiver that takes AC-3 only, the stream is a 5.1 E-AC-3 or AC-3
 bed. Crucible has no AC-4 path. It captures what applications play as PCM and places it as
-Atmos objects for a receiver, and no receiver found accepts AC-4
-([planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md),
-decision 20). Crucible can also encode its 5.1 bed as TrueHD, a mode you pin, lossless from the
+Atmos objects for a receiver, and no receiver found accepts AC-4.
+Crucible can also encode its 5.1 bed as TrueHD, a mode you pin, lossless from the
 24-bit values the mix is rounded to and with no objects. The audio library opens the TrueHD link on ALSA, PipeWire
 (a sink whose codec list names it) and WASAPI (an endpoint that accepts the format in exclusive
 mode), so on macOS no endpoint is offered it; the mode has been tested over scripted devices and no

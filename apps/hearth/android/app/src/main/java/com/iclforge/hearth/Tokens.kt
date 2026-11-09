@@ -3,10 +3,9 @@
 package com.iclforge.hearth
 
 /**
- * The family's tokens as planning/hearth-sink-screen.md (Tokens, Layout) states them: the Signal
- * palette in its dark mode, which a sink always draws, whatever the OS theme is, and the sizes in
- * `u`, a 600th of the view's height. The desktop's palette and the P4X panel's screen are held to
- * the same file by the same script.
+ * The family's tokens: the Signal palette in its dark mode, which a sink always draws, whatever the
+ * OS theme is, and the sizes in `u`, a 600th of the view's height. The desktop's palette and the
+ * P4X panel's screen are held to the same tokens by the same script.
  */
 object Tokens {
     val BG: Int = 0xFF151313.toInt()

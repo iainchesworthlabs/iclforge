@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Play page (planning/hearth-design.md, "The main window, playing"): the
+// The Play page: the
 // queue and now playing, built over the real engine, plus the monitor beside
 // it - levels, loudness, this frame's detail, object placement and signal
 // path - all read from HearthController.levels/loudness/thisFrame/objects/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package hearth_sink board builds for publishing (planning/esp32-ota.md, O8).
+"""Package hearth_sink board builds for publishing.
 
     python tools/hearth/package_firmware.py package --build-dir BUILD \
         --name hearth-sink-esp32s3 --out DIR
@@ -37,9 +37,8 @@ tools/ci/check_firmware_package.py checks before anything is uploaded.
 
 `index` writes the update index of one channel from a release's manifest:
 hearth-update-<channel>.json, the small file a board reads to learn what the
-newest release is and, for each image, its size and SHA-256 (planning/esp32-ota.md,
-O10). sign_index.py signs it afterwards. The facts are the manifest's, so they
-have one source; the board picks its image by them.
+newest release is and, for each image, its size and SHA-256. sign_index.py signs it afterwards.
+The facts are the manifest's, so they have one source; the board picks its image by them.
 
 Stdlib only, as the CI container's Python needs nothing installed for it.
 """

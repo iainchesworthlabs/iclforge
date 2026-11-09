@@ -2,9 +2,7 @@
 
 #include <string>
 
-// How a server finds this sink: mDNS, advertising the Sendspin player service
-// (planning/hearth-reference-player.md B2, planning/hearth-sendspin-extension.md
-// row T4).
+// How a server finds this sink: mDNS, advertising the Sendspin player service.
 //
 //   _sendspin._tcp on port 8928, TXT path=/sendspin and name=<the board's>
 //
@@ -23,7 +21,7 @@ namespace player {
 // again when a network joined after boot comes up.
 void discovery_start();
 
-// Flash mode (planning/esp32-ota.md): the Sendspin service is withdrawn, so
+// Flash mode: the Sendspin service is withdrawn, so
 // servers stop dialling a board that is not listening, and the host name
 // stays, so a tool still finds the board by name.
 void discovery_withdraw();

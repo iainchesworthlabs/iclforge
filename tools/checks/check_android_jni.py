@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # The Android apps of the tree, each checked on its own: a package, its Kotlin, its native
-# definitions, its library. A second app (planning/hearth-android.md) is one more entry here.
+# definitions, its library. A second app is one more entry here.
 APPS = ("apps/demos/android/app", "apps/hearth/android/app")
 APP = APPS[0]
 # What an application id of this repository starts with: its GitHub account, the one the macOS

@@ -6,8 +6,8 @@ import android.net.nsd.NsdServiceInfo
 import android.util.Log
 
 /**
- * Advertises the sink as `_sendspin._tcp` through the platform's [NsdManager]
- * (planning/hearth-android.md, "Discovery, pairing, connection"). The listening socket and the
+ * Advertises the sink as `_sendspin._tcp` through the platform's [NsdManager].
+ * The listening socket and the
  * WebSocket are the native library's; this is the half only Android has, as the board's firmware
  * has its own mDNS around the same library.
  *

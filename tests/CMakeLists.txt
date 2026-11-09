@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# The tests that are not one project's (planning/monorepo.md, (e)). Each library's own are in
+# The tests that are not one project's. Each library's own are in
 # libs/<lib>/tests and each program's beside it (apps/<product>/<program>/tests), a binary each,
 # added by the root CMakeLists.txt after this directory; this one holds what every binary is built
 # with (support/, iclforge::test_support) and iclforge-perf. The golden vectors are in testdata/,

@@ -157,7 +157,7 @@ namespace variants {
     return caps;
 }
 
-// A JetKVM Mini with an ESP32-P4X (planning/jetkvm-mini.md): a square 240 by 240 IPS panel with NO touch and one or two
+// A JetKVM Mini with an ESP32-P4X: a square 240 by 240 IPS panel with NO touch and one or two
 // side buttons, no audio output at all, and one network interface - the Ethernet port of the Mini, or the Wi-Fi of the
 // Mini W. The first board whose screen is square, whose rows cannot be tapped, and whose sink has no slots.
 [[nodiscard]] inline BoardCaps p4x_jetkvm_mini_240() {

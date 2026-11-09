@@ -1,4 +1,4 @@
-// The AC-4 encoder's presentations and substreams (planning/ac4.md, phase E6):
+// The AC-4 encoder's presentations and substreams:
 // streams of several substreams, each in a substream group of its own, and
 // presentations of every presentation_config of Part 2 Table 53 made of them,
 // with alternative presentations' names, languages, content classifiers, group

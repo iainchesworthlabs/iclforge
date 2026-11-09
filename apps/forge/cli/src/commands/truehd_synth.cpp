@@ -15,8 +15,7 @@
 #include "truehd.hpp"
 #include "truehd_encode_core.hpp"
 
-// `silence` and `sine` with a `.thd` output (planning/truehd-parity-forge.md, row P4 and owner
-// question 6: the suffix chooses the codec, as `transcode`'s does): a generated signal coded by the
+// `silence` and `sine` with a `.thd` output: a generated signal coded by the
 // lossless encoder, so that a TrueHD test stream needs no WAV first. The stream is what `truehd-encode`
 // makes of the same signal as a WAV with the channel mask below, which tests/test_cli_truehd.cpp
 // holds. AC-3's bit rate and metadata options have no meaning for it and are refused by name.

@@ -10,8 +10,8 @@
 #include "iclforge/lyrics/playhead.hpp"
 #include "iclforge/lyrics/stage.hpp"
 
-// What a sink with no lyric file of its own holds to follow a song's words (planning/karaoke-phase2.md,
-// W7d): the item's document, as the server sent it, and a playhead moved by the server's anchors. It
+// What a sink with no lyric file of its own holds to follow a song's words: the item's document,
+// as the server sent it, and a playhead moved by the server's anchors. It
 // answers the line and the word the sound is in at a time on the clock the anchors are in, which a
 // screen on the sink draws, and which a sink without one reports as the line.
 //

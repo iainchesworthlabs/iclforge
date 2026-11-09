@@ -47,7 +47,7 @@
 #include "network_group_sink.hpp"
 #include "sink.hpp"
 
-// Issue #874's own exit (planning/hearth-reference-player.md, A6), read the way A4's own exit and
+// Issue #874's own exit, read the way A4's own exit and
 // Verified-by (the same doc) set the precedent for what "the reference Python player" means: a
 // real aiosendspin 9.1.1 process, driven by tools/sendspin/aiosendspin_group_exit.py the way
 // aiosendspin_exit.py drives test_aiosendspin.cpp for A4. That test proves single-client interop

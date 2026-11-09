@@ -1,5 +1,5 @@
 # The S3 release shape (profile s3-n16r8) on QEMU: what QEMU cannot do, and nothing else.
-# (planning/esp32-platform-profiles.md, "A QEMU twin of the release shape")
+#
 #
 #   SDKCONFIG_DEFAULTS="$(sink_profile.py defaults s3-n16r8 --overlay qemu-net)"
 #

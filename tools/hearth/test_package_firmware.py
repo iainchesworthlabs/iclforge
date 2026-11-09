@@ -1,5 +1,5 @@
 """Unit tests for package_firmware.py, which packages hearth_sink board builds
-for publishing (planning/esp32-ota.md, O8).
+for publishing.
 
 stdlib unittest, as ci.yml's script-lint job runs it. The builds are made from
 nothing by sink_build_fixture.py, with an app image the bootloader's checks

@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 
-// The decode demo's microphone (planning/karaoke-microphone.md, M7; D16): the library's pitch
+// The decode demo's microphone: the library's pitch
 // tracker, reference melody and scorer compiled into the demo's module (apps/demos/wasm/
 // pitch_bindings.cpp), and the card that follows a microphone with them (mic.js).
 //

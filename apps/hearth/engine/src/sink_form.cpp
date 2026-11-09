@@ -193,7 +193,7 @@ struct KaraokeRefusal {
     }
     // A sink that takes the setting has a path for the codecs it lists, and plays any other
     // stream as coded: an E-AC-3 karaoke stream sent to a board whose path is AC-3's would be
-    // heard as coded beside a member that reproduces it (planning/karaoke-eac3.md, D6).
+    // heard as coded beside a member that reproduces it.
     if (stream.stream && !support.reproduces_karaoke(data_type_of(*stream.stream))) {
         return KaraokeRefusal{
             .why = fmt::format("This sink reproduces karaoke for {}, not for {}",
@@ -214,7 +214,7 @@ struct KaraokeRefusal {
         return KaraokeRefusal{
             .why = "This sink takes no settings from this app, so it cannot be told"};
     }
-    // A level that moves a part (planning/karaoke-phase2.md, W10) is for the sink to apply, or
+    // A level that moves a part is for the sink to apply, or
     // for this app to apply in the PCM it sends: a sink that would play the table instead of it
     // would put a group's members at different levels.
     constexpr std::array<std::string_view, 3> kLevelKeys{"karaoke_melody_db", "karaoke_vocal1_db",

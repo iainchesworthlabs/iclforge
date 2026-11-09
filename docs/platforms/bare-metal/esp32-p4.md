@@ -5,11 +5,10 @@ single-precision FPU, 768 KB of L2MEM, and no radio of its own. It decodes in th
 the [ESP32-S3](esp32-s3.md) does, from the same `firmware/esp-idf/iclforge/` component, whose manifest
 lists `esp32p4` beside `esp32s3`, `esp32c3` and `esp32c6`.
 
-It is the "best" tier of the shared C6/S3/P4 sink family
-([`planning/esp32-sink-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md)):
+It is the "best" tier of the shared C6/S3/P4 sink family:
 closed 2026-09-08 as a replacement for the S3 Wi-Fi Sendspin sink (no on-die radio, the S3 probe
 already real-time), reopened 2026-09-21 as a complementary module once a board existed to measure
-it on. This page is that plan's Phase P1 — the probe and a board timing table, with no network —
+it on. This page is the probe and a board timing table, with no network —
 and, in its [AC-4](#ac-4) section, what `hearth_sink` measured on the same board with Wi-Fi up.
 
 Every figure on this page outside its [AC-4](#ac-4) section was measured on a board on 2026-09-23, with no network.
@@ -296,7 +295,7 @@ is 357,368 bytes, inside a 1 MB partition with half free.
 The fourteen fixtures above are six-frame clips built for this probe alone. The sink-tiers plan's
 exit criterion also asks for the actual stream-set files a real player streams -
 `firmware/hearth-sink/www/714-*.ec3`, eleven files, each isolating one Annex E
-coding-tool combination at 7.1.4 (`planning/esp32-stream-set.md` has the full manifest). These
+coding-tool combination at 7.1.4. These
 were wrapped bit for bit into a scratch copy of the probe - not re-encoded, since the point is to
 decode what a player actually receives - the same shape the ESP32-C6 page's "2/0, 5.1 and 7.1
 from one generator" section used for its own three stream-set files. That copy was never
@@ -370,9 +369,8 @@ samples at 48 kHz, 42.7 ms, or 1,920, 2,002 or 1,602 samples at the other frame 
 one pass, since an HTTP source cannot rewind, and its first frame carries one-off set-up, so the
 time per frame is the play without its first frame and the first frame has a column of its own. The
 hash costs 0.6 ms a frame at 2.0: a play with it off agrees with the same play with it on to 0.1%.
-Heap is `heap_caps_monitor_local_minimum_free_size`, as
-[the stream set's plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-stream-set.md)
-has it: the peak of what the play took from internal RAM and PSRAM together, and the least
+Heap is `heap_caps_monitor_local_minimum_free_size`:
+the peak of what the play took from internal RAM and PSRAM together, and the least
 internal RAM that was free while it ran. Stack left is the decode task's
 `stream.decode_stack_free`, of 64 KB. The stage timers are those of `ICLFORGE_STAGE_TIMERS`: a
 marker in the library at each part of the decode, whose self time, a stage's own less the stages
@@ -814,8 +812,7 @@ times under the DIO bootloader and started and played as it does under the QIO o
 safe on a board flashed either way. An update replaces the application and keeps the bootloader that is on the board, so a board flashed
 before D14e decodes at the DIO figures until it is flashed again over USB with its bootloader (`idf.py flash`, or `esptool write-flash
 @flash_args` from a build directory). The QIO bootloader is 944 bytes larger, 24,368 bytes at the Info log level against a window of 24,576
-(`CONFIG_BOOTLOADER_LOG_LEVEL_WARN` gives 2.5 KB back; [the OTA plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md)
-has the table). A bootloader that cannot set a flash chip's quad-enable bit stays in DIO (`sdkconfig.c6`, which reads its flash this way,
+(`CONFIG_BOOTLOADER_LOG_LEVEL_WARN` gives 2.5 KB back). A bootloader that cannot set a flash chip's quad-enable bit stays in DIO (`sdkconfig.c6`, which reads its flash this way,
 says so), and a project whose flash has no quad mode sets `CONFIG_ESPTOOLPY_FLASHMODE_DIO=y` after `sdkconfig.p4`. Not measured: a flash
 clock of 120 MHz, which ESP-IDF offers this part only under `IDF_EXPERIMENTAL_FEATURES`, with the flash's high-performance mode.
 
@@ -1043,7 +1040,7 @@ time), and with D14e's decoder and the flash in QIO mode it takes 10.8 and 14.1 
 
 ### Float output on the host, the Cortex-M3 leg and the board
 
-[Decision 26](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#decisions-of-2026-09-25)
+Decision 26
 promises identical `float` output everywhere, and the probe's six AC-4 fixtures pin it
 (`testdata/ac4-probe-pcm-hashes.json`, held on the x86-64 host and on the Cortex-M3 under QEMU).
 The board's PCM hash (FNV-1a over the sample bit patterns in the order the player delivered them, the
@@ -1334,15 +1331,6 @@ the same reason (see that step's own comment).
 
 ## Where to go next
 
-- [`planning/esp32-sink-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md) —
-  the plan this page is Phase P1 of, with the Ethernet shape (P2, for a board that has a PHY,
-  which this one does not) and the Wi-Fi shape over the onboard C6 and `esp_hosted` (P3), both
-  onto TDM and a pair of ES9080 DACs, and where each stands.
-- [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) —
-  phase D14b, of which the [AC-4](#ac-4) section is the measurement, D14a's third part, which
-  reworks what it found to cost most, D14a4, which took the converter and the last libm
-  disagreements out of the `float` decode, and D14a5, which builds the converter's tables at
-  compile time.
 - [ESP32-S3](esp32-s3.md) — the "better" tier, hardware-verified, the primary Wi-Fi Sendspin sink.
 - [ESP32-C6](esp32-c6.md) — the "OK" tier (a C61 is proposed as "good" between it and the S3), and
   the sibling page with the same "no QEMU for this part" gap.

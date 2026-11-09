@@ -7,8 +7,8 @@
 #include <span>
 #include <vector>
 
-// A fundamental-frequency tracker for a singing voice (planning/karaoke-microphone.md, D7; findings
-// F5). It answers, every hop, the pitch of the last frame of audio pushed, or that the frame is not
+// A fundamental-frequency tracker for a singing voice. It answers, every hop, the pitch of the
+// last frame of audio pushed, or that the frame is not
 // voiced. The algorithm is the McLeod Pitch Method (McLeod and Wyvill, ICMC 2005): the normalised
 // square difference function of a frame, the first of its key maxima that comes within a fraction
 // of the highest, and parabolic interpolation of that peak. It is written from the paper and

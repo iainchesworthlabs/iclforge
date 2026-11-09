@@ -12,8 +12,7 @@
 
 #include "iclforge/base/arithmetic/fixed32.hpp"
 
-// The fixed-point tier's block exponent (planning/arithmetic-tiers.md,
-// Phase B), shared by both decoders.
+// The fixed-point tier's block exponent, shared by both decoders.
 //
 // Q7.24 is an absolute format: a raw unit is 2^-24 of full scale wherever the
 // value sits. Phase A stored coefficients in it directly and measured what

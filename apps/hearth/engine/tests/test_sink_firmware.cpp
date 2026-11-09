@@ -1,5 +1,5 @@
 // A Hearth sink's firmware from this computer (apps/hearth/engine/
-// sink_firmware.hpp, planning/esp32-ota.md O5): reading what the board says,
+// sink_firmware.hpp): reading what the board says,
 // checking an image file, deciding whether a board may take it and how an
 // update ended - everything but the HTTP, which test_sink_firmware_board.cpp
 // runs against a stand-in board.

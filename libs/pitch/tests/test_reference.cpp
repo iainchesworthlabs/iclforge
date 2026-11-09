@@ -10,8 +10,7 @@
 #include "iclforge/pitch/synth.hpp"
 #include "iclforge/pitch/tracker.hpp"
 
-// libs/pitch/src/reference.cpp: a reference melody as a contour on a grid, and as notes
-// (planning/karaoke-microphone.md, D9).
+// libs/pitch/src/reference.cpp: a reference melody as a contour on a grid, and as notes.
 
 namespace {
 

@@ -262,8 +262,8 @@ double worst_error(std::span<const float> output, double freq, double output_rat
 
 }  // namespace
 
-// planning/consolidation.md decision 22: the AC-4 converter's filter, 100 dB down, centred on the
-// input's timeline as the old converter was.
+// The AC-4 converter's filter, 100 dB down, centred on the input's timeline as the old converter
+// was.
 TEST_CASE("resample keeps a tone on the input's timeline, to within the filter's ripple",
           "[dsp][resampler]") {
     for (const auto& [in_rate, out_rate] :

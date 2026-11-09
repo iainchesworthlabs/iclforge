@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Update hearth_sink over the network under QEMU, and hold every step to the plan.
 
-planning/esp32-ota.md, "Tests": the ESP32-S3 is the only part with a QEMU
+The ESP32-S3 is the only part with a QEMU
 machine, so this is where an update, a refusal and each kind of rollback run
 end to end, over QEMU's emulated Ethernet and a port forward, against images
 built from one tree:

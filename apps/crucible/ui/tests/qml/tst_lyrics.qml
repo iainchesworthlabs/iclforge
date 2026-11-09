@@ -4,7 +4,7 @@ import QtTest
 import Crucible
 import CrucibleTest
 
-// The lyrics of an application (CrucibleLyrics, LyricStrip.qml; planning/karaoke-phase2.md, W13b).
+// The lyrics of an application (CrucibleLyrics, LyricStrip.qml).
 //
 // The reader and the cursor are tested where they live (libs/lyrics). What is held here is what this
 // window makes of them: that an imported file is kept per application and says what it is, that
@@ -579,7 +579,7 @@ TestCase {
         compare(CrucibleLyrics.status(901), "timed");
     }
 
-    // --- the position from a media session (planning/karaoke-phase2.md, D9) ------------------------
+    // --- the position from a media session ------------------------
     // The reader is switched off in this suite (qml_test_main.cpp), so a machine's own music does
     // not move a case; what the system would have read is given to the controller as a script, at
     // the time of the case's own choosing.
@@ -751,7 +751,7 @@ TestCase {
         tryCompare(strip, "positionSource", "session", 5000);
     }
 
-    // --- events out over OSC (planning/karaoke-phase2.md, D9's alternative) ----------------------
+    // --- events out over OSC ----------------------
 
     function test_theEventsOutAreOffUntilTurnedOnAndAnAddressThatIsNotIpv4IsSaid() {
         compare(CrucibleLyrics.oscEnabled, false);
@@ -834,7 +834,7 @@ TestCase {
         compare(TestServices.oscReceived().length, 0);
     }
 
-    // --- the picture of a CD+G disc (planning/karaoke-phase2.md, W13f and D11) -----------------
+    // --- the picture of a CD+G disc -----------------
 
     // One 24-byte CD+G packet appended to `bytes`: command 9, the instruction, two parity bytes,
     // sixteen data bytes, four parity bytes.

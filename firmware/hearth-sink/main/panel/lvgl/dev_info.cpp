@@ -1,5 +1,4 @@
-// The developer view's side of the board: what it reads and the one thing it asks. See dev_info.hpp
-// and planning/karaoke-p4x-panel.md, "The developer view".
+// The developer view's side of the board: what it reads and the one thing it asks. See dev_info.hpp.
 //
 // Nothing here is new knowledge. Each fact is read from what the board already keeps for GET /status,
 // GET /hardware and GET /firmware (the network seam, the Sendspin player, the settings, the heap, the
@@ -70,7 +69,7 @@ constexpr std::int64_t kNetworkEveryUs = 2'000'000;
 // bus: the view asks every ten seconds. The first run of plays on the kit with the view open (four,
 // refreshing twice a second and asking every half second) had one with three late chunks and an
 // underrun against none of four with it shut, which is within the one-in-four that start badly with
-// nothing open (planning/karaoke-p4x-panel.md) and not enough to say it is not the view.
+// nothing open and not enough to say it is not the view.
 constexpr std::int64_t kNetworkWhilePlayingEveryUs = 10'000'000;
 // The console is read only while the internal heap has a block this big: a refresh that would make
 // a decoder's allocation fail is skipped, and the lines stay as they were.

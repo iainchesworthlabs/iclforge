@@ -8,12 +8,12 @@
         --baseline baselines/s3-n16r8.json
     python tools/hearth/board_suite.py lock   take|release|show --file LOCK --session ID
 
-What it does (planning/esp32-platform-profiles.md, "The board suite"), and stops at the first
+What it does, and stops at the first
 refusal:
 
 1. **Booking.** `run` takes the lock file itself, atomically, and refuses with no lock and
    `--session`, or when the file exists: the rule is that a board nobody has booked is not one
-   to run on (planning/esp32-board-bench.md). `--board` names a board of bench.json, which gives
+   to run on. `--board` names a board of bench.json, which gives
    the address and the lock and refuses a pair that is not its own. It prints what a script
    cannot check (the other sessions, a running idf.py or esptool) as a checklist first, and
    releases the lock when it ends, whatever happened, if it took it.
@@ -165,7 +165,7 @@ def resolve_board(args: argparse.Namespace) -> None:
         raise SuiteError(
             f"{row.name}: a restart can leave a P4 with no Wi-Fi (its C6 link), and --restart "
             "restarts it by POST /restart; restart it with --reset-by esptool (a watchdog reset), "
-            "or pass --accept-restart-fault (planning/esp32-board-bench.md has the recovery)"
+            "or pass --accept-restart-fault"
         )
     args.host = args.host or row.host
     args.lock = args.lock or str(row.lock)
@@ -1084,8 +1084,7 @@ def baseline_note(run: dict[str, Any], baseline: dict[str, Any]) -> str | None:
     figures are still the ones recorded: `compare` holds the run to them as they are, and this says
     which definition they were taken under. A profile gains a locked key at the value it already
     had in effect (a new switch left off) without a figure moving; the baselines are then kept,
-    and this is the note that goes with them (planning/esp32-platform-profiles.md, "Changing a
-    profile")."""
+    and this is the note that goes with them."""
     recorded, carried = baseline.get("profile_hash"), run.get("profile_hash")
     if not recorded or not carried or recorded == carried:
         return None

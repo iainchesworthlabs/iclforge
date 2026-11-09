@@ -616,7 +616,7 @@ TEST_CASE("RecordingSink reports a take that only fails as it is closed", "[gui]
 }
 
 // ---------------------------------------------------------------------------
-// AC-4 takes (planning/ac4.md, phase I1): record and live codec=ac4 describe
+// AC-4 takes: record and live codec=ac4 describe
 // the stream to the sink themselves (take_sink_config), and push each frame
 // with its I-frame flag. What the sink writes is held here to the one-shot
 // writers over the same frames, as the AC-3 and E-AC-3 cases above are.

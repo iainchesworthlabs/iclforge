@@ -16,8 +16,8 @@
 #include "iclforge/pitch/synth.hpp"
 #include "iclforge/pitch/tracker.hpp"
 
-// libs/pitch/src/bleed.cpp: is the microphone mostly the speakers? (planning/karaoke-microphone.md,
-// SC5; findings F6.) Every signal is synthetic: a played "backing", a singer, and a room that is a
+// libs/pitch/src/bleed.cpp: is the microphone mostly the speakers? Every signal is synthetic: a
+// played "backing", a singer, and a room that is a
 // delay, a gain and a few reflections. The numbers hold for these signals and say nothing of a
 // particular room.
 

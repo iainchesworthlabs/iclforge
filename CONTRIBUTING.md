@@ -116,10 +116,8 @@ packaged as one thing. `apps/crucible`, with the driver in `apps/crucible/window
 `apps/hearth`, `libs/sendspin` and the `hearth_sink` example are **Hearth**. `apps/demos/android` and
 `apps/demos/wasm` are library demonstrations. `libs/audio`, `apps/shared`, `notices/`, `tests/`,
 `tools/`, `cmake/`, `packaging/` and the version line are shared and owned by no one product.
-[The naming and scope plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/recasting.md)
-records what each member owns, down to the targets, packages and CI legs, under the names it was
-written with; [Renamed](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/renamed.md) maps them
-to the present ones.
+[Renamed](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/renamed.md) maps the family's
+earlier names to the present ones.
 
 **These naming rules govern prose and code.** In prose, "ICL Forge" is the family, and **Forge**,
 capitalised and standing alone, is the `forge` + `forge-gui` pair; Hearth and Crucible are named
@@ -358,8 +356,8 @@ Ranked by how much they prove. Prefer the strongest one available for what you a
 5. **Dolby's Reference Player and Media Encoder**, for object-layer syntax.
 6. **Dolby's Online Delivery Kit tools** (`streamdemuxer`, `mp4drop`), for what the MP4, DASH, HLS and TS writers produce: free to download, run locally by the `tools/checks/check_dolby_*.py` scripts (which skip without them), never committed and never fetched by CI; see [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#dolbys-online-delivery-kit-tools).
 
-**AC-4 has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#ac-4)
-and in `planning/ac4.md`. FFmpeg reads AC-4's framing and its MP4 track and has no AC-4 decoder, so
+**AC-4 has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#ac-4).
+FFmpeg reads AC-4's framing and its MP4 track and has no AC-4 decoder, so
 it does not check audio. The decoder is scored against the streams Dolby Encoding Engine (DEE)
 makes from known sources, the committed ones in `testdata/external-baseline/ac4-*` and a larger
 gold set kept locally (DEE's licence ends on 2026-11-06 and is not renewed), by
@@ -374,8 +372,8 @@ comparison, to MediaInfo's frame-by-frame reading and DEE's MP4 muxer
 say so in the commit message and hold the change to the standard's own tables and formulas, as
 the tests there do.
 
-**TrueHD has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#truehd-and-mlp)
-and in `planning/truehd.md`. The codec is lossless, so FFmpeg's strict decode (flags as above) is held to the
+**TrueHD has a ladder of its own**, set out in [docs/verification.md](https://iainchesworthlabs.github.io/iclforge/verification/#truehd-and-mlp).
+The codec is lossless, so FFmpeg's strict decode (flags as above) is held to the
 source sample for sample in both directions: its `truehd` and `mlp` encoders' streams through this decoder, and this
 encoder's streams through its decoder (`tools/checks/verify_truehd_interop.py`, `verify_truehd_encode_interop.py` and
 `verify_truehd_containers.py`). The syntax is transcribed a second time in `tools/references/truehd_syntax.py`, and
@@ -429,7 +427,7 @@ guides — are for a technical lay reader. Be clear, professional, and direct. E
 term on the page that uses it, not in a summary that points there. Examples and screenshots
 belong where they show the thing being described, and they must match that context.
 
-Developer pages — the library, building, platforms, CI, `design/` records, `planning/` — assume
+Developer pages — the library, building, platforms, CI, `design/` records — assume
 a mid-level developer who does not already know this audio domain.
 
 **Put information in one place.**
@@ -451,9 +449,8 @@ a mid-level developer who does not already know this audio domain.
   Legacy IDs at the bottom of `ROADMAP.md` resolve old PR references only.
 - Product index pages (`docs/*/index.md`) and [`docs/library/capabilities.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md)
   state **what ships today**.
-- Detailed implementation decisions belong in [`planning/`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning)
-  or a product's `design/` record. When a plan lands, add its changelog fragment and update the product index; trim
-  the roadmap row; leave or mark the plan superseded ([`planning/SUPERSEDED.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/SUPERSEDED.md)).
+- Detailed implementation decisions belong in a product's `design/` record. When work lands, add its
+  changelog fragment, update the product index and trim the roadmap row.
 
 **Each product page set follows one shape.** An `index.md` opens with a status callout (what's
 built, what isn't, what's verified on real hardware versus under emulation or in CI only),
@@ -463,14 +460,11 @@ not a guide a user reads first. [docs/crucible/design/promotion.md](https://gith
 and [docs/hearth/design/player-appliance.md](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/hearth/design/player-appliance.md)
 are the pattern to follow for a new one.
 
-**Non-trivial design work starts in `planning/`, not `docs/`.** A phase plan, a naming decision,
-or a proposal that touches more than a page or two belongs in
-[`planning/`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning) first —
-see [`planning/README.md`](https://github.com/iainchesworthlabs/iclforge/tree/main/planning/README.md)
-for the index and how it relates to the roadmap. `docs/` describes what exists; `planning/` is
-where what might exist gets argued out first, and a page only moves (or a `design/` record
-gets written) once the work has actually landed. Plans link to the roadmap for status; they do
-not duplicate the roadmap's tables or allocate numeric roadmap IDs.
+**Non-trivial design work is argued out in an issue or pull request, not in `docs/`.** A phase
+plan, a naming decision, or a proposal that touches more than a page or two is discussed there
+first. `docs/` describes what exists; a page is written (or a `design/` record gets written) once
+the work has actually landed. Proposals link to the roadmap for status; they do not duplicate the
+roadmap's tables or allocate numeric roadmap IDs.
 
 ## Commits
 

@@ -1,4 +1,4 @@
-"""Unit tests for bench_flash.py, the bench's writes (planning/esp32-board-bench.md).
+"""Unit tests for bench_flash.py, the bench's writes.
 
 stdlib unittest, as ci.yml's script-lint job runs it. No esptool, idf.py or board runs: the
 runner is a recorder that answers with what esptool 5 and idf.py printed on the bench, so what

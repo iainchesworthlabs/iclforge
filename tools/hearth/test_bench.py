@@ -1,4 +1,4 @@
-"""Unit tests for bench.py, the bench's table, locks and redaction (planning/esp32-board-bench.md).
+"""Unit tests for bench.py, the bench's table, locks and redaction.
 
 stdlib unittest, as ci.yml's script-lint job runs it. No board, no serial port and no network:
 the table is held to the profiles file, the locks are files in a temporary directory, and the
@@ -119,17 +119,6 @@ class Table(unittest.TestCase):
         self.assertEqual(self.table.board("P4b").after_flash, "watchdog-reset")
         # P4a's restart lost the C6 link on 2026-10-12, and a watchdog reset brought it back
         self.assertEqual(self.table.board("P4a").after_flash, "watchdog-reset")
-
-    def test_the_process_page_has_a_row_for_every_board_as_the_file_has_it(self) -> None:
-        page = (bench.HERE.parents[1] / "planning" / "esp32-board-bench.md").read_text("utf-8")
-        rows = {
-            line.split("|")[1].strip(): line for line in page.splitlines() if line.startswith("| ")
-        }
-        for board in self.table.boards.values():
-            row = rows.get(board.name)
-            self.assertIsNotNone(row, f"{board.name} has no row in the page's table")
-            for needed in (board.host, board.port, board.lock.name):
-                self.assertIn(needed, row, f"{board.name}: {needed}")
 
     def test_no_network_value_is_in_the_file(self) -> None:
         text = bench.BENCH_FILE.read_text("utf-8").lower()

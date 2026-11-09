@@ -15,8 +15,8 @@ chosen with --set (the default is both):
   cenc-enca-only.mp4               one `enca` entry, every fragment `cenc` encrypted
   cbcs-enca-only.mp4               the same with `cbcs` (a constant IV, so no `senc`)
 
---set dolby-ott: four files with the protection layout of Dolby's public OTT reference audio
-(planning/cenc-conformance.md, M13), the `dolby-ott` profile of cenc_make_protected.py
+--set dolby-ott: four files with the protection layout of Dolby's public OTT reference audio,
+the `dolby-ott` profile of cenc_make_protected.py
 
   dolby-ddp-cenc-iv8-piff.mp4          E-AC-3, `cenc`, whole sample, 8-byte IVs, `saiz` default 8,
                                        `senc` flags 0 and its PIFF uuid copy

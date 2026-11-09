@@ -5,11 +5,11 @@
 #
 # v1.x and v3.x firmware images are not interchangeable (Espressif's v3.x user guide, section 1.1):
 # this image refuses a v1.x chip at boot and sdkconfig.p4's refuses this one, which is why they are
-# two images (hearth-sink-esp32p4-rev1 and -rev3, planning/karaoke-p4x-panel.md, D7). Everything
+# two images (hearth-sink-esp32p4-rev1 and -rev3). Everything
 # else in sdkconfig.p4 (PSRAM, the hosted Wi-Fi buffers, the code in PSRAM, the DMA queue, the
 # low-power SRAM kept out of the heap) is as true of this silicon and is not repeated.
 #
-# FIRST RUN 2026-10-20 on a v3.2 kit (planning/karaoke-p4x-panel.md, "First run on the kit"): the
+# FIRST RUN 2026-10-20 on a v3.2 kit: the
 # image boots at 400 MHz with the PSRAM at 200 MHz, the revision window takes v3.2, and /hardware
 # says revision 3.2. The sink opens sixteen 32-bit TDM slots and plays through them in real time;
 # the clocks on the pins are NOT measured yet. The I2S clock source below was read from ESP-IDF
@@ -38,7 +38,7 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400=y
 # nothing on a good boot and still says what is wrong on a bad one.
 CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
 
-# The kit's RJ45 port (planning/karaoke-p4x-panel.md, "Ethernet"): the EMAC and the IP101GR PHY on
+# The kit's RJ45 port: the EMAC and the IP101GR PHY on
 # RMII, next to the Wi-Fi the C6 gives it. The pins are Kconfig's defaults, which are this board's
 # (ICLFORGE_EXAMPLE_ETH_*), so a kit on a PoE splitter is reached by the cable and falls back to
 # Wi-Fi when the cable is out. Only this profile has it: the FireBeetle boards have no PHY.
@@ -50,5 +50,4 @@ CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y
 # about one AC-4 5.1 play in ten found a block big enough, took 41 KB for the stack and left the fetch task's 8 KB
 # stack no block. In PSRAM the stack costs the decoders nothing measurable here (AC-3 2.0 56 permille of a frame
 # against 55 with it internal, E-AC-3 42 and 42, the 5.1 TDM row 143 and 142, on the kit, 2026-10-29).
-# planning/ac4-in-release-images.md has the plays.
 CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM=1

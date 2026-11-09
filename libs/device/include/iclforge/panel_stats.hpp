@@ -2,7 +2,7 @@
 
 // What the panel costs, as numbers a person (or a script) can read from the board on port 80: GET /panel-stats. The firmware's panel task
 // fills a PanelStats about twice a second; this header is the shape and the JSON text of it, host-tested, so that the route, the developer view
-// and the plan's measurement protocol (planning/p4x-meters-view.md, "Kit protocol") all read the same words.
+// and the plan's measurement protocol all read the same words.
 //
 // Nothing here is the Meters view's alone except the `meters` object: the panel's own memory and refresh time are what any view costs, and
 // the first thing to compare a new view with is the view it replaces.

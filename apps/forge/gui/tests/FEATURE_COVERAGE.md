@@ -131,7 +131,7 @@ reach without a device.
 
 ## AC-4 (encode, QC, player, object page)
 
-These controls arrived with AC-4 (planning/ac4.md, I3), after the tst_e2e_*
+These controls arrived with AC-4, after the tst_e2e_*
 suites, so **Before** reads "new".
 
 | Feature | Before | Now | Test case(s) |
@@ -163,7 +163,7 @@ suites, so **Before** reads "new".
 
 ## AC-4 objects
 
-The Objects tab's switch under the AC-4 codec (planning/ac4.md, I5b), which writes the
+The Objects tab's switch under the AC-4 codec, which writes the
 objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 
 | Feature | Before | Now | Test case(s) |

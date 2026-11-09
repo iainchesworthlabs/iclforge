@@ -20,7 +20,7 @@ import android.util.Log
 import java.io.File
 
 /**
- * The sink's owner (planning/hearth-android.md, "Lifecycle", D9): a foreground service that starts
+ * The sink's owner: a foreground service that starts
  * the native sink, advertises it through [SinkAdvertiser] and keeps both until it is told to stop,
  * which the notification's Quit action and the screen's button do. The Activity is only a view of
  * what this holds, so leaving the screen (HOME) does not end the sink.

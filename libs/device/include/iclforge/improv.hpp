@@ -3,7 +3,7 @@
 // https://www.improv-wifi.com/serial/ - a client (a browser page over Web
 // Serial, or the ESPHome tooling) hands a device its Wi-Fi credentials over
 // the same serial port the console uses. It is how a Hearth sink joins a
-// network without being rebuilt: planning/hearth-reference-player.md, B2.
+// network without being rebuilt.
 //
 // Header only, free of ESP-IDF and of this project's own audio types, for the
 // same reason iclforge/interleave.hpp and iclforge/sink_plan.hpp are: the

@@ -79,7 +79,7 @@ struct RawResult {
     bool karaoke_reproduced = false;
     QString coded_layout_label;
     // TrueHD or MLP: the audio is not held here. `channels` stays empty and the player reads it a
-    // window at a time from this source (row U2 of planning/truehd-parity-forge.md); `locations`
+    // window at a time from this source; `locations`
     // and the counts above are filled as for any other stream.
     std::shared_ptr<forge_gui::TruehdPcmSource> truehd;
     [[nodiscard]] std::size_t channel_total() const noexcept {

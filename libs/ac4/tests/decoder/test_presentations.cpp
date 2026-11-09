@@ -1,4 +1,4 @@
-// The decoder's presentations (planning/ac4.md, phase D7).
+// The decoder's presentations.
 //
 // Selection: a table of tables of contents built for it, of version 1 and
 // version 0 presentations, each case a table of contents, a PresentationChoice

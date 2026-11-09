@@ -2,8 +2,7 @@ import QtQuick
 
 import Hearth
 
-// Stands in for a page this slice has not built yet (planning/hearth-design.md
-// has the approved artboard). Kept as its own file, rather than inlined six
+// Stands in for a page this slice has not built yet. Kept as its own file, rather than inlined six
 // times in Main.qml, so each page becomes a one-line swap for the real thing
 // when its own slice lands.
 Item {

@@ -4,8 +4,7 @@ The question tools/ci/fuzz_encoder_space.py asks of AC-3's `encode` and
 tools/ci/fuzz_eac3_encoder_space.py of `eac3-encode`, asked of `ac4-encode`:
 driven across its configuration space by adversarial but valid audio, does the
 encoder ever write a stream a reader disagrees with, or refuse, crash or
-misframe something it should have encoded? planning/ac4.md, the encoder's
-ladder, item 7.
+misframe something it should have encoded?
 
 The PCM comes from the AC-3 harness's generator, imported rather than copied:
 its per-block plan, the `cliff` profile and the correlation modes serve every

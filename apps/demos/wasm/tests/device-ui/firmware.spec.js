@@ -1,8 +1,7 @@
 // @ts-check
 'use strict';
 
-// The firmware section - planning/esp32-device-ui.md, decision 29, and
-// planning/esp32-ota.md's O3: what GET /firmware says of both slots, a trial,
+// The firmware section: what GET /firmware says of both slots, a trial,
 // an upload and the last update; an update from a file, checked here on its
 // head before anything is sent, sent with the bytes shown, and the new
 // image's page loaded once the board runs it; Restart and Roll back, each

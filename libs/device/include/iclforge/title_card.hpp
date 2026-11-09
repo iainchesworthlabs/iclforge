@@ -1,9 +1,8 @@
 #pragma once
 
-// What the panel knows of the song a server says is playing (planning/p4x-now-playing.md, stage 2): the
+// What the panel knows of the song a server says is playing: the
 // title, the artist, the album and its year, and where in the song it is. A server tells a client that
-// lists metadata@v1 in server/state, and the two servers a board meets say it differently
-// (planning/hearth-sendspin-extension.md, C36):
+// lists metadata@v1 in server/state, and the two servers a board meets say it differently:
 //
 //   the specification   every object is the whole state: a field left out is a cleared one, an omitted
 //                       progress clears the position;

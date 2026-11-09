@@ -13,8 +13,8 @@ idf.py, so a build and an update are one command, as `build flash` is over USB:
 several, which are updated one at a time. --yes stops a board that is playing
 without asking, and --force pushes to a board that already runs the image.
 `ota` runs after `build` or `app` when either is on the same command line, and
-builds nothing itself. ota.py makes every check and prints every outcome
-(planning/esp32-ota.md); a non-zero exit status from it fails the idf.py run.
+builds nothing itself. ota.py makes every check and prints every outcome;
+a non-zero exit status from it fails the idf.py run.
 """
 
 from __future__ import annotations

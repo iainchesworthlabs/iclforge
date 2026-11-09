@@ -1,6 +1,5 @@
 # ---------------------------------------------------------------------------
-# The minimum-footprint profile's TrueHD archive (ICLFORGE_MINIMAL_TRUEHD, beside the profile's options;
-# planning/truehd-parity-esp32-sinks.md): what a decode reads - the CRCs and parities, the format and
+# The minimum-footprint profile's TrueHD archive (ICLFORGE_MINIMAL_TRUEHD, beside the profile's options): what a decode reads - the CRCs and parities, the format and
 # syntax tables, the major sync, the access unit and the decoder - and no encoder, no stream scanner,
 # no evolution frame or signing. Included by CMakeLists.txt; iclforge_add_library() makes the static
 # archive alone in the profile, with its compile options and code that is not position-independent.

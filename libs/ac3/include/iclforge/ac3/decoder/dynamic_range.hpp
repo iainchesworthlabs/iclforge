@@ -18,7 +18,7 @@
 //     from standard to late night moves no stream's level by its dialnorm. This is the trap a
 //     switch to OperatingMode::kRf falls into: RF mode applies every compr word with 11 dB
 //     (meta::kRfModeGainDb) that put dialogue at -20 dBFS for a set-top box, 11 dB up from where
-//     line mode leaves it (planning/hearth-late-night.md has the measurements).
+//     line mode leaves it.
 //   - Every syncframe that carries a compr word is decoded with that word's bare §7.7.2 gain, which
 //     an encoder writes to bring the loud passages under a ceiling and the quiet ones up toward
 //     dialogue: the stronger of the two compressions a stream can carry.

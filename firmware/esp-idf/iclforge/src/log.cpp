@@ -1,5 +1,4 @@
-// The console's recent output, for GET /log. See ../include/iclforge/log.hpp
-// and planning/esp32-ota.md (O4).
+// The console's recent output, for GET /log. See ../include/iclforge/log.hpp.
 //
 // stdout and stderr are reopened on a device of this file's own, /dev/ac3log,
 // whose writes go on to /dev/console as before and into the ring as well:

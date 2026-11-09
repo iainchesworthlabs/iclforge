@@ -405,7 +405,7 @@ std::string ac4_decoding(iclforge::ac4::DecodingMode decoding) {
     return decoding == iclforge::ac4::DecodingMode::kCore ? " in core decoding" : "";
 }
 
-// AC-4 objects into an ADM BWF master (planning/ac4.md, I5), reusing decode_adm.hpp's writer
+// AC-4 objects into an ADM BWF master, reusing decode_adm.hpp's writer
 // (forge_cli::write_adm_atmos_master) rather than a second one: the first seventeen of
 // iclforge::ac4::Speaker and iclforge::objects::oba::BedLabel name the same loudspeaker positions
 // in the same order (both TS 103 190-2 Annex F.3 and this project's own bed labels descend from the
@@ -598,7 +598,7 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path,
     std::size_t waiting_frames = 0;
     std::size_t concealed_frames = 0;  // under conceal=, frames made in place of ones that failed
 
-    // objects_dir/adm_out (planning/ac4.md, I5): D10's DecodedFrame::objects and their Annex F
+    // objects_dir/adm_out: D10's DecodedFrame::objects and their Annex F
     // properties, beside the rendering above, which stays - the same two outputs run_decode_eac3
     // gives E-AC-3's JOC objects, built the same way: objects_dir streams each object's own PCM to
     // its own mono WAV as it decodes, and adm_out accumulates every object's PCM and metadata
@@ -840,7 +840,7 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path,
     }
     if (waiting_frames > 0) {
         // On stderr whatever the report goes to: a run that loses frames still exits 0 (what exit
-        // code a loss should give is open, planning/ac4.md), so this line is what says so.
+        // code a loss should give is open), so this line is what says so.
         fmt::println(stderr,
                      "warning: {} frames waiting for an I-frame produced no output, of {} in the "
                      "stream; the output holds the other {}",
@@ -1482,7 +1482,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         status_println(status, "  {} channels, {} Hz: {}", map.size(),
                        sample_rate_hz(first.sample_rate), speakers);
     }
-    // The reproduction (applied to E-AC-3 as Dolby's decoder does: planning/karaoke-eac3.md) or
+    // The reproduction (applied to E-AC-3 as Dolby's decoder does) or
     // why there was none, in the words an AC-3 stream gets.
     report_karaoke(status, meta.output, first, folding(meta, first.acmod), karaoke_applied,
                    "decoded");
@@ -1518,8 +1518,8 @@ int run_decode_truehd_stream(std::span<const std::byte> stream, std::string_view
     // a TrueHD decode reads. objects_dir= and adm_out= are applied (run_decode_truehd). verify-content passing here would pass
     // without verifying anything.
     // channels=2 is the stream's own 2 channel presentation, which the stream carries as a
-    // substream and not as a fold the decoder makes (planning/truehd-parity-forge.md,
-    // question 5); channels=as-coded is what a TrueHD decode does. No other count is taken.
+    // substream and not as a fold the decoder makes; channels=as-coded is what a TrueHD decode
+    // does. No other count is taken.
     forge_cli::Options truehd_options = requested;
     std::vector<std::string_view> applied{"truehd-presentation=", "truehd-check=", "truehd-render=",
                                           "truehd-reading=", "strict", "channels=as-coded",

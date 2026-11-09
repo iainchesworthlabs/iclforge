@@ -1,6 +1,6 @@
 """Score forge's AC-4 encoder: its streams, decoded, against their sources.
 
-planning/ac4.md, the encoder's ladder, items 4 and 5, as phases E1 to E5 and E8 need them: SIMPLE,
+The legs are SIMPLE,
 ASPX and A-CPL, mono, stereo, 5.0 and 5.1, at frame_rate_index 13 and, in the frame-rate legs, the
 others, and the immersive element's 5.1.4. Each leg encodes a source with `forge
 ac4-encode`, which picks the codec mode from the rate, decodes the stream with `forge decode`,
@@ -79,8 +79,7 @@ RACE_IMMERSIVE_EXTRA.
 --librempeg PATH also decodes every stream with librempeg's ffmpeg, run in WSL (the path is the
 WSL one), and reports its scores against the source and how far its output is from the
 decoder's; of a 5.1.4 stream, for each source channel the output channel that follows it most
-closely, with their correlation and level. Nothing it measures is checked: planning/ac4.md,
-decision 13.
+closely, with their correlation and level. Nothing it measures is checked.
 
 --measure prints what every leg measures and checks nothing, for pinning a new leg.
 

@@ -1101,8 +1101,7 @@ struct Eac3Decoder::Impl {
     // float build the first cost 6,144 bytes a stream - 36,864 for a 7.1.4
     // stream's six, 43,008 with the coupling channel - and the second 6,144:
     // the first is what kept 7.1.4 AHT streams off an ESP32-S3 without PSRAM,
-    // and the second part of what keeps enhanced coupling there
-    // (planning/esp32-stream-set.md).
+    // and the second part of what keeps enhanced coupling there.
 
     // §7.1.3's packed exponent groups, for one stream of one block.
     //
@@ -1443,8 +1442,8 @@ void widen_into(std::vector<double>& out, const Range& in) {
 // of the frame decoder for the reason ecpl_spectrum_into gives: only a
 // template's `if constexpr` discards the branch whose calls do not exist for
 // the other scalar. The fixed-point tier has no fixed form of the spectrum,
-// the amplitudes, the angles or the reconstruction yet
-// (planning/arithmetic-tiers.md, Phase C), so for it this runs the float forms
+// the amplitudes, the angles or the reconstruction yet,
+// so for it this runs the float forms
 // over float copies and narrows the coupled bins back into the store; the
 // two floating tiers call the forms in their own scalar directly. `prev` and
 // `next` are the neighbouring blocks' enhanced coupling channels, or zero

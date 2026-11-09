@@ -1,8 +1,7 @@
 // @ts-check
 'use strict';
 
-// How the page reads the device - planning/esp32-device-ui.md's "How the page
-// updates": GET /status once a second while the page is visible, one at a
+// How the page reads the device: GET /status once a second while the page is visible, one at a
 // time, none while it is hidden, every five seconds while the status cannot be
 // read, and at once after an action. The clock is Playwright's, held still
 // and moved by hand, so each interval is exact.

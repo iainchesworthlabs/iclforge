@@ -4,8 +4,7 @@
 
 // Which Sendspin a peer speaks: the specification at the commit Hearth implements, or
 // aiosendspin 9.1.1, which Music Assistant pins and which differs from it in framing, the
-// player@v1 chunk header, several messages and pairing
-// (planning/hearth-sendspin-extension.md, Music Assistant and aiosendspin 9.1.1).
+// player@v1 chunk header, several messages and pairing.
 //
 // A connection has one dialect, settled before anything that depends on it is sent: a player
 // learns it from Noise message 1, a server from client/hello. Every function whose bytes

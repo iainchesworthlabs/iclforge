@@ -31,7 +31,7 @@ namespace iclforge::ac4::detail {
 // The core's own complex type (in place of std::complex<double>): the
 // decoder's QMF-domain reconstruction (this file and its neighbours in
 // pcm/) calls straight into libs/ac4/src/core's A-SPX, A-CPL and A-JOC kernels,
-// which take this type since D14a (planning/ac4.md), and a std::complex
+// which take this type since D14a, and a std::complex
 // buffer cannot be passed where one of those is asked for even at the same
 // underlying double representation - the two are unrelated types.
 //

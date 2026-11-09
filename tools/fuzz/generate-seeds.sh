@@ -325,8 +325,8 @@ add_seed "fuzz_iec61937_unwrap,fuzz_wav_read" "$WORK/spdif-eac3-51.wav"
 head -c 131072 "$WORK/roundtrip-stereo.wav" > "$WORK/carrier-not.wav"
 add_seed "fuzz_iec61937_unwrap" "$WORK/carrier-not.wav"
 # AC-4 (IEC 61937-14): the Dolby Encoding Engine's stereo stream, whose bursts
-# are as long as its frames. 'forge spdif' does not pack AC-4 yet
-# (planning/ac4.md, I1), so the seed script packs its first four frames.
+# are as long as its frames. 'forge spdif' does not pack AC-4 yet,
+# so the seed script packs its first four frames.
 python3 "$SCRIPT_DIR/metadata-seeds.py" ac4-carrier "$OUT" \
     "$REPO_ROOT/testdata/external-baseline/ac4-stereo-64/dee.ac4"
 

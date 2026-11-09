@@ -308,7 +308,7 @@ namespace {
 // TH spec §14.2, as read_extra reads it: the 4 bit length, the fields, and zero bits up to the
 // (length + 1) 16-bit words the length names, the length counting the nibble itself. The owner's
 // discs have length 1 with the 18 bits of a dynamic-object-only programme and 10 zero bits after
-// them (planning/truehd-disc-findings.md, question 2).
+// them.
 void write_extra(BitWriter& writer, const ExtraChannelMeaning& extra) {
     BitWriter body;
     put_field(body, extra.sixteench_dialogue_norm, 5);

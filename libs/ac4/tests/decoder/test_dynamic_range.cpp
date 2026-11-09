@@ -336,8 +336,8 @@ TEST_CASE("AC-4 late night: a new stream does not start at the last stream's out
 
 TEST_CASE("AC-4 late night: what the DRC stage costs on the host", "[.][ac4][cost]") {
     // Hidden: a measurement, not a check. DEE's 5.1 stream through the decoder as a board makes it,
-    // standard against late night, best of five passes each; the ratio is what planning/hearth-late-night.md
-    // quotes, and the board's own figure (S3, C6) is owed to a bench window.
+    // standard against late night, best of five passes each; the ratio is the one quoted
+    // for late night, and the board's own figure (S3, C6) is owed to a bench window.
     const std::vector<std::byte> stream = read_stream("ac4-51-drc-ltrt-192");
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
     REQUIRE_FALSE(scan.frames.empty());

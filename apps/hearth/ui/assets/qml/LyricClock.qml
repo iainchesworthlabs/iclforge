@@ -2,8 +2,7 @@ import QtQuick
 
 import Hearth
 
-// The clock a lyric view runs on (planning/karaoke-design.md, "Lyrics and the
-// clock").
+// The clock a lyric view runs on.
 //
 // HearthController polls the engine every 60 ms and publishes where the item
 // has got to (`positionMs`, which is what is heard: the device's clock less its

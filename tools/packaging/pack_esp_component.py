@@ -27,7 +27,7 @@ archive, which is the only check that actually establishes the thing this script
 is for. Needs an exported IDF environment; without one it says so and stops.
 
 --with-ac4 also stages the AC-4 library without its encoder, for a project that
-turns on CONFIG_ICLFORGE_AC4 (planning/ac4.md, D14b). Without it the archive is
+turns on CONFIG_ICLFORGE_AC4. Without it the archive is
 what it was before that option existed: the option is off by default, and a
 project that turns it on against an archive packed without the AC-4 sources is
 told so at configure.
@@ -64,8 +64,7 @@ STAGED_TREES = (
     #
     # The AC-3 codec and the four libraries it is built from: the minimum-footprint profile is
     # one archive of files from all five (libs/ac3/minimal.cmake). libs/base also holds the
-    # header-only Fixed32 and scalar functions libs/ac3 and libs/ac4 both include (planning/ac4.md
-    # decision 31).
+    # header-only Fixed32 and scalar functions libs/ac3 and libs/ac4 both include.
     "libs/ac3",
     "libs/base",
     "libs/device",
@@ -77,7 +76,7 @@ STAGED_TREES = (
 
 # What --with-ac4 adds: the AC-4 library, whose minimum-footprint archive
 # (libs/ac4/minimal.cmake) is the inspector, the core and the decoder. Not the
-# encoder, which no ESP32 part builds (planning/ac4.md, decision 34) and which
+# encoder, which no ESP32 part builds and which
 # the profile compiles none of: AC4_PRUNE drops its files from the staged
 # copy. Off by default, so an archive packed without the flag holds exactly the
 # trees it always did.
@@ -91,7 +90,7 @@ AC4_PRUNE = (
     "libs/ac4/src/encoder",
 )
 
-# A library keeps its tests and its fuzz harnesses beside its code (planning/monorepo.md, C7-1), in
+# A library keeps its tests and its fuzz harnesses beside its code, in
 # libs/<lib>/tests and libs/<lib>/fuzz. They were outside the trees above, in tests/ and fuzz/, and
 # are not part of a component archive, so staging leaves them out of every staged tree.
 CONSUMER_DIRS = ("tests", "fuzz")
@@ -248,14 +247,14 @@ def verify(archive: pathlib.Path, with_ac4: bool = False, targets: list[str] | N
         # Every target the manifest claims, not the first one. The two differ
         # in the thing the archive is most likely to get wrong: the S3 has a
         # single-precision FPU and builds the float32 decode path, the C3 has
-        # no FPU at all and builds the fixed-point one
-        # (planning/arithmetic-tiers.md), so a package that links for one can
+        # no FPU at all and builds the fixed-point one,
+        # so a package that links for one can
         # still fail to configure for the other. The manifest's own list is
         # the source - adding a target there is what adds it here.
         for target in targets or manifest_targets():
             # AC-4 on every part: single precision where there is a
-            # floating-point unit, the fixed-point tier where there is not
-            # (planning/ac4.md, D14d), as the AC-3 decoder above it.
+            # floating-point unit, the fixed-point tier where there is not,
+            # as the AC-3 decoder above it.
             defaults = f'CONFIG_IDF_TARGET="{target}"\nCONFIG_COMPILER_OPTIMIZATION_SIZE=y\n'
             if with_ac4:
                 # IDF's 1.5 MB factory partition: with AC-4 the esp32c3 image is

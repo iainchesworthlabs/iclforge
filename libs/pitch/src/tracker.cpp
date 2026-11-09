@@ -5,7 +5,7 @@
 #include <numbers>
 #include <utility>
 
-// The McLeod Pitch Method over a window of samples (planning/karaoke-microphone.md, D7). See
+// The McLeod Pitch Method over a window of samples. See
 // tracker.hpp for what it answers; this file is the arithmetic.
 
 namespace iclforge::pitch {

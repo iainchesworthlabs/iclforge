@@ -683,7 +683,7 @@ function loadFile(file) {
 }
 
 // --- Microphone ----------------------------------------------------------------------------
-// A singer's pitch against the tune (planning/karaoke-microphone.md, M7). The tune is the guide
+// A singer's pitch against the tune. The tune is the guide
 // melody's channel as coded, read by the library's tracker compiled into this module; the
 // microphone is the browser's, opened only by the button, with its own echo cancellation; the
 // score is the library's. mic.js has the pieces and the promises.

@@ -29,7 +29,7 @@ namespace iclforge::ac4::detail {
 // gives the same value on every platform's C library as it always did, so the
 // output moves by no bit; the call costs a hundred operations of the compiler's
 // software `double` on a part whose FPU is single precision, and a stream of 5.1
-// makes 250 of them a frame (planning/ac4.md, D14e).
+// makes 250 of them a frame.
 using ScaleFactorGains = std::array<Real, 256>;
 [[nodiscard]] ScaleFactorGains scale_factor_gains();
 
@@ -39,8 +39,8 @@ using ScaleFactorGains = std::array<Real, 256>;
 // Fails for a scale factor outside 0 to 255, which the note under Table A.1's
 // formula says is not a valid one. `sf_gain` is scale_factor_gains()'s. The
 // lines are the values times 2^-exponent: at double and float the exponent is
-// 0, and at Fixed32 the track's own, which puts its largest line in [1/2, 1)
-// (planning/ac4.md, D14d); that tier forms its gains itself and its table is
+// 0, and at Fixed32 the track's own, which puts its largest line in [1/2, 1);
+// that tier forms its gains itself and its table is
 // empty.
 //
 // `hsf` is the track's HSF extension (ETSI TS 103 190-1 clause 4.2.8.7 to 4.2.8.9) where it

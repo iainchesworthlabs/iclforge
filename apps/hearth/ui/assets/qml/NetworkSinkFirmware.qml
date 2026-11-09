@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// A Hearth sink's firmware (planning/esp32-ota.md, O5): what it runs, what it
+// A Hearth sink's firmware: what it runs, what it
 // would go back to, how its last update and its last crash went, and what the
 // board's own page offers - an update from a file, a rollback and a restart,
 // each asked about first. NetworkController.sinkFirmware carries every value

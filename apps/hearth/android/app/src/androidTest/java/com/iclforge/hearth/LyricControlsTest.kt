@@ -16,9 +16,9 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * AR7 of planning/hearth-android.md: "D-pad and remote only: every screen is reachable and operable
- * without a pointer", checked by a focus walk. The lyric screen's one control surface is the controls
- * sheet (planning/hearth-sink-screen.md, S9): it opens on the D-pad's centre, the four directions move
+ * The requirement "D-pad and remote only: every screen is reachable and operable without a
+ * pointer", checked by a focus walk. The lyric screen's one control surface is the controls
+ * sheet: it opens on the D-pad's centre, the four directions move
  * a focus ring through the delay's "-" and "+" and the three text sizes, the centre presses, Back (or
  * eight seconds without a key) closes it, and what it sets reaches the activity's callbacks.
  */

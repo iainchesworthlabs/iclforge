@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-// Is the microphone mostly the speakers? (planning/karaoke-microphone.md, SC5; findings F6.)
+// Is the microphone mostly the speakers?
 //
 // A pitch score cannot tell a singer from a loud speaker playing the answer: a silent singer in
 // front of speakers that play the guide melody scores near perfect, because the tracker follows

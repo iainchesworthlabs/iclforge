@@ -4,8 +4,8 @@ Two sets, from the same legs and sources:
 
 - The committed set: testdata/external-baseline/ac4-*/dee.ac4, ac4-manifest.json beside
   them, and each stream's syntax digest under testdata/ac4/. Short streams that CI reads.
-- The gold set (--gold-set DIR): every stream the phases of planning/ac4.md need, kept on a
-  local disk and never committed. Phase G0 of that plan made it and phase G1 added to it, both
+- The gold set (--gold-set DIR): every stream the project's AC-4 checks need, kept on a
+  local disk and never committed. Phase G0 made it and phase G1 added to it, both
   while the local DEE licence ran (it ends on 2026-11-06 and is not renewed, so no DEE stream
   can be made after that date).
 
@@ -260,7 +260,7 @@ DDPJOC = "dee_ddpjoc_encoder"
 # 2: ten legs added and the manifest extended to describe each stream. ac4-stereo-64's bytes
 #    are the version 1 bytes: main() checks a fresh encode against the committed file instead
 #    of overwriting it.
-# 3: planning/ac4.md's phase G0. Every leg but ac4-stereo-64 is made again from 5 s sources
+# 3: phase G0. Every leg but ac4-stereo-64 is made again from 5 s sources
 #    with loudness measured and not corrected, so a decode can be scored against its source;
 #    two one-tone-per-channel legs; source_sha256; walked values computed by ac4_syntax.py;
 #    the digests under testdata/ac4/ written here; the gold set.
@@ -465,7 +465,7 @@ def gold_legs():
 # Phase G1's sources and legs
 # ------------------------------------------------------------------------------------------
 
-# The phases each group of G1 legs is made for (planning/ac4.md).
+# The phases each group of G1 legs is made for.
 G1_GROUPS = {
     "synthetic": ("D2", "D3", "D4", "D5", "E1", "E2", "E3", "E4"),
     "immersive": ("D9", "E8"),
@@ -1138,7 +1138,7 @@ def master_legs(masters):
 # ADM BWF masters for the objects group, made with forge: `atmos-encode <in> objects.ec3 kbps
 # objects [paths]` codes each input channel as an object, and `decode objects.ec3 bed.wav
 # objects adm-master.wav` writes the Dolby Atmos Master ADM Profile BW64 its adm_out argument
-# writes (planning/ac4.md, phase G0's objects). music51 is music_51's six channels (G0's master);
+# writes. music51 is music_51's six channels (G0's master);
 # refobjects the five committed reference objects at their authored positions.
 MASTERS = {
     "music51": {"input": "sources/music_51.wav", "kbps": 768, "objects": 6, "paths": None},
@@ -1170,7 +1170,7 @@ DEE_CANNOT = [
      "input. Unsupported channel count'), and 5.1 with a silent LFE is written as 5.1"),
     ("22.2, the speech frontend where it can be seen, A-JCC, ASPX_ACPL_1, 44.1 kHz (48 kHz input "
      "only), transmitted DRC gains, the CRC or the bitstream version, as the census of 2026-09-15 "
-     "found (planning/ac4.md, What DEE writes)"),
+     "found"),
 ]
 
 

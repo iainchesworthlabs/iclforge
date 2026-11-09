@@ -480,7 +480,7 @@ TestCase {
         NetworkController.selectSink(sink.id);
     }
 
-    // The Firmware tab (planning/esp32-ota.md, O5) asks the sink's own web
+    // The Firmware tab asks the sink's own web
     // server, at the address mDNS gave for it - 127.0.0.1 for this test sink,
     // which serves no GET /firmware - and only while the tab is open. It says
     // the sink does not answer, and offers nothing it could not do.

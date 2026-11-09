@@ -2,7 +2,6 @@
 # The table every board with 16 MB of flash uses - the ESP32-S3
 # (sdkconfig.defaults), the ESP32-P4 (sdkconfig.p4) and an ESP32-C6 with 16 MB
 # (sdkconfig.flash16mb) - and the one the QEMU shapes CI runs use.
-# planning/esp32-ota.md has the reasoning behind each line.
 #
 # Two application slots, ota_0 and ota_1, and otadata, which says which of the
 # two boots. An update over the network writes the slot that is not running

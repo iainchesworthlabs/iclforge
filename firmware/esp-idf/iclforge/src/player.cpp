@@ -829,11 +829,11 @@ struct Player::Impl {
         const InternalBelow placement{config.ac4.internal_below};
 #endif
         // The least heap any AC-4 decode has asked for: the 2.0 fixtures' peak
-        // since D14f, 286,365 bytes (planning/ac4.md, D14f). A floor, not a
+        // since D14f, 286,365 bytes. A floor, not a
         // fit: a wider or A-CPL stream asks for more, and a part under the
         // floor cannot decode any. It is refused here, with the figures,
         // where it would otherwise be met as an abort() inside a frame: an
-        // ESP32-C6 with Wi-Fi up has 117 KB (planning/ac4.md, D14d).
+        // ESP32-C6 with Wi-Fi up has 117 KB.
         constexpr std::size_t kAc4FloorHeapBytes = 286365;
         if (const std::size_t room = heap_caps_get_free_size(MALLOC_CAP_8BIT);
             room < kAc4FloorHeapBytes) {

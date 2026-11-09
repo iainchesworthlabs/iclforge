@@ -1,4 +1,4 @@
-// The speakers view before and after planning/p4x-speakers-options.md: the old glow, the responsive glow and the pulse
+// The speakers view before and after the speakers-view options: the old glow, the responsive glow and the pulse
 // style over a synthetic music scene (scene.hpp). The new views are the real now_screen.cpp. (The earlier options
 // prototype is in the side-session notes.)
 // Prototypes of ways the no-lyrics screen could show the room (see CMakeLists.txt). Each option is an object tree
@@ -282,7 +282,7 @@ player::panel::NowLevels g_levels;
 bool g_have_levels = false;
 player::panel::NowSettings g_settings;
 
-// --- the view as it was: the glow of 2026-10-21 to 25, before planning/p4x-speakers-options.md ------------------------------
+// --- the view as it was: the glow of 2026-10-21 to 25, before the options ------------------------------
 // The same code as now_screen.cpp had (absolute thresholds, five core steps, 14 dB a second), reading the 5 Hz copy
 // of the status: every other window.
 

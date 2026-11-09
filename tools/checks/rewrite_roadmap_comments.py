@@ -32,7 +32,7 @@ SKIP_FILES = {
     "rewrite_roadmap_comments.py",
 }
 
-SKIP_DIR_PARTS = {"planning", ".cxx", "build", "node_modules", ".venv"}
+SKIP_DIR_PARTS = {".cxx", "build", "node_modules", ".venv"}
 
 LEGACY_ID_NAMES = {
     "A1": "Atmos dec3 repair remux",

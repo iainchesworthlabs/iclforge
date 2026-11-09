@@ -1,4 +1,4 @@
-// The lyric screen. See lyric_screen.hpp and planning/karaoke-p4x-panel.md.
+// The lyric screen. See lyric_screen.hpp.
 //
 // The rows of a line (the lines before it and after it, the words of the one being sung) are LVGL
 // objects that are built when the line changes and left alone while it is sung: a frame changes the
@@ -47,7 +47,7 @@ using iclforge::lyrics::Stage;
 using iclforge::lyrics::StageMode;
 using iclforge::lyrics::StageOptions;
 
-// --- the design's tokens (planning/karaoke-p4x-panel.md, "The screen"): Hearth's Signature palette
+// --- the design's tokens: Hearth's Signature palette
 // in its dark mode.
 constexpr std::uint32_t kBg = 0x151313;
 constexpr std::uint32_t kSurface = 0x1D1A1A;
@@ -378,7 +378,7 @@ struct Screen {
     bool dim_waiting = false;
     int backlight = kBacklightNormalPercent;
     // The waiting screen (nothing playing, nothing held): since when it has been the screen, and whether the screen was
-    // already dimmed or dark as it began (planning/p4x-now-playing.md, "The waiting screen"). While its saver shows the
+    // already dimmed or dark as it began. While its saver shows the
     // clock the header, the footer and the hairline are put away and the stage is the whole glass.
     bool idle_was = false;
     bool idle_carried = false;
@@ -1173,7 +1173,7 @@ void build_plain(int content_w) {
     lv_obj_set_user_data(scroller, reinterpret_cast<void*>(2));  // placed already
 }
 
-// What a song with no lyrics shows (planning/p4x-now-playing.md): the view the board is set to, and where
+// What a song with no lyrics shows: the view the board is set to, and where
 // that cannot be drawn the one it falls back to. The title card needs a title the server has said and the
 // fonts can draw, and with none the speakers show in its place (never an empty card); the speakers need
 // the room the player plays to, and with none, or with the view off, the sentence the screen has always
@@ -1623,7 +1623,7 @@ bool screen_update() {
     // Idle: nothing held, and nothing playing.
     const bool idle = stage.mode == StageMode::kNoLyrics && !playing;
 
-    // The no-lyrics screen (planning/p4x-now-playing.md): the settings it follows, read every frame, and,
+    // The no-lyrics screen: the settings it follows, read every frame, and,
     // while the speakers are what it shows, what the player says about the stream five times a second.
     g.now_set = read_now_settings();
     const bool no_lyrics = stage.mode == StageMode::kNoLyrics && playing;
@@ -1710,7 +1710,7 @@ bool screen_update() {
         g.wall = {};
     }
 
-    // The waiting screen (planning/p4x-now-playing.md, "The waiting screen"): once the dim time has passed with nothing
+    // The waiting screen: once the dim time has passed with nothing
     // touched, and the board is set up, it dims, shows the clock or goes dark, as the person chose; a touch brings the
     // status back. Decided here, before the rows are made, because the clock saver is a different set of rows. A screen
     // that was dimmed or dark as the stream ended stays so (idle_carried), and the status page is not lit between two
@@ -1808,7 +1808,7 @@ bool screen_update() {
     // The dark view is dark from the moment a song with no lyrics begins, and a touch lights it for
     // iclforge::nowview::kDarkAwakeMs: dim_state() is the whole rule, tested on the host. The developer
     // view keeps the screen lit while it is open: it is read, not touched.
-    // The night schedule (planning/p4x-preferences.md) makes the no-lyrics view the dark view while it is in force. The
+    // The night schedule makes the no-lyrics view the dark view while it is in force. The
     // waiting screen has its own rule (idle_state, above), which the night schedule's idle switch also reaches.
     const bool showing = g.np_active || dark_view;
     if (showing && !g.np_was_showing) {

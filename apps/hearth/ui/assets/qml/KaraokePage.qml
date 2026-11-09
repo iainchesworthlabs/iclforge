@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Karaoke page (planning/karaoke-design.md, K4; the design sheet's "Hearth:
-// Karaoke page, reference view"): what a karaoke stream is, the singer's choice
+// The Karaoke page: what a karaoke stream is, the singer's choice
 // of how it is reproduced (Annex C of ETSI TS 102 366), and what comes out of
 // which speaker.
 //
@@ -103,7 +102,7 @@ ScrollView {
         HearthController.setDecoderSettings(next);
     }
 
-    // A duet (planning/karaoke-phase2.md, W11b): which lines the vocal that is playing sings,
+    // A duet: which lines the vocal that is playing sings,
     // and so which are left for you.
     function duetSummary() {
         const first = KaraokeController.firstSingerLabel;
@@ -657,7 +656,7 @@ ScrollView {
                         }
                     }
 
-                    // Stamps the words of the item as it plays (planning/karaoke-phase2.md, W6).
+                    // Stamps the words of the item as it plays.
                     LyricTimingDialog { id: timingDialog }
 
                     // A lyrics file and a CD+G disc both beside the item: which one is shown. The
@@ -785,8 +784,8 @@ ScrollView {
                 Layout.alignment: Qt.AlignTop
                 spacing: Theme.gap * 2
 
-                // A singer's microphone and a pitch score against the tune (planning/karaoke-
-                // microphone.md, M4). Off until it is turned on, and closed when this page is left.
+                // A singer's microphone and a pitch score against the tune. Off until it is turned
+                // on, and closed when this page is left.
                 MicrophoneCard {
                     objectName: "microphoneCard"
                     reproduction: root.reproduction

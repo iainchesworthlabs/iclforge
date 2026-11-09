@@ -152,8 +152,7 @@ constexpr double kEpsilon = 1.0e-9;
 }
 
 // The ducker's parameter bands are the 15 of acpl_max_num_param_bands, by
-// subband: a table in the program's read-only data, not a function-local static
-// (planning/ac4.md, D14a's memory rules: nothing guarded, nothing lazy).
+// subband: a table in the program's read-only data, not a function-local static.
 [[nodiscard]] constexpr std::array<int, kSubbands> ducker_bands() noexcept {
     std::array<int, kSubbands> out{};
     for (std::size_t sb = 0; sb < out.size(); ++sb) {
