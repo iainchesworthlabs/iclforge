@@ -517,7 +517,15 @@ jobs:
               continue
             fi
             if lipo -info "$a" >/dev/null 2>&1 && lipo -info "$x" >/dev/null 2>&1; then
-              lipo -create "$a" "$x" -output "$m"
+              if [ "$(lipo -archs "$a")" = "$(lipo -archs "$x")" ] && cmp -s "$a" "$x"; then
+                # The same Mach-O file in both installs, so there is nothing to merge and lipo
+                # refuses ("have the same architectures"). Qt ships libworkerscriptplugin.dylib
+                # for x86_64 only, in the arm64 install too; the app uses no WorkerScript. It is
+                # already in merged/ from the rsync baseline above, byte for byte.
+                echo "::warning::$rel is the same $(lipo -archs "$a") file in both installs - left unmerged"
+              else
+                lipo -create "$a" "$x" -output "$m"
+              fi
             elif diff -q "$a" "$x" >/dev/null 2>&1; then
               : # Already byte-identical, and already present via the rsync baseline above.
             else
