@@ -2735,8 +2735,12 @@ namespace {
 // them, for the TrueHD cases below. `configure` sets the options each sink starts with.
 struct TruehdGroup {
     fs::path scratch;
-    std::map<std::string, std::unique_ptr<testsink::Sink>> sinks_by_name;
+    // The logs come before the sinks that write to them: members are destroyed in reverse order,
+    // and a sink's threads run until its own destructor stops them, so a log declared after its
+    // sink is gone while the sink can still call line() on it. That crashed the closing brace of
+    // a test, after every assertion had passed, on a loaded runner.
     std::map<std::string, std::unique_ptr<CodeLog>> logs;
+    std::map<std::string, std::unique_ptr<testsink::Sink>> sinks_by_name;
     std::unique_ptr<iclforge::hearth::MemorySettingsStore> settings;
     std::unique_ptr<iclforge::hearth::PairingStore> store;
     std::unique_ptr<iclforge::hearth::NetworkSinks> sinks;
