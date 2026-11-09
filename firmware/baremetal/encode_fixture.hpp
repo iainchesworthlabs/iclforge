@@ -30,7 +30,7 @@
 // is what keeps "regenerate on the host" true; the ordinary double build's
 // streams are pinned elsewhere, by testdata/bitstream-hashes.json.
 //
-// Re-pinned 2026-10-08 for planning/consolidation.md decision 20: the forward transform
+// Re-pinned 2026-10-08: the forward transform
 // runs on the family's one FFT, whose float rounding differs from the radix-4/2 kernel's, and
 // these six streams quantise differently. The double build's streams did not move.
 //

@@ -1,5 +1,4 @@
-// The speakers view and the title card. See now_screen.hpp, planning/p4x-now-playing.md and
-// planning/p4x-speakers-options.md.
+// The speakers view and the title card. See now_screen.hpp.
 //
 // A speaker is three objects: a halo (the peak, a few steps of faint accent behind it), a core (the RMS,
 // a few steps of accent, with the speaker's border) and its name inside. All of them are made when the
@@ -92,7 +91,7 @@ View g;
 // is the same to the minute is not looked at again.
 constexpr int kClockSize = 200;
 // The time is the muted colour at about 80 % and the date at about 60 %: the prototype's two steps, quiet in a
-// dim room (planning/p4x-now-playing.md, option D).
+// dim room.
 constexpr lv_opa_t kClockTimeOpa = 200;
 constexpr lv_opa_t kClockDateOpa = 150;
 // How wide each of the three labels is: the widest time ("00:00" in the 200 px face is about 560 px) with room,

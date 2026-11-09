@@ -7,8 +7,8 @@
 
 #include "network_view.hpp"
 
-// What the Network page's "What the sink reports" panel says of a sink's lyrics (planning/karaoke-
-// phase2.md, W7d): whether the sink takes them, whether it holds the item playing's, and where in
+// What the Network page's "What the sink reports" panel says of a sink's lyrics: whether the sink
+// takes them, whether it holds the item playing's, and where in
 // them its own clock has the sound. The sink reports the item and the line's index; the text and
 // the count are this computer's reading of the document it sent (SinkFacts::lyrics_*).
 //

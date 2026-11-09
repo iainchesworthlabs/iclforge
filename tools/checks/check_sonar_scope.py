@@ -4,7 +4,7 @@
     python3 tools/checks/check_sonar_scope.py [--root <repo>] [--properties <file>] [--unscanned]
 
 The properties file divides the repository three ways with Ant-style patterns, and a move of files
-(planning/monorepo.md, C7) changes which side a file falls on without a word from anyone:
+ changes which side a file falls on without a word from anyone:
 
   - sonar.sources lists the directories that are scanned, and sonar.exclusions takes files out of
     them;

@@ -2,7 +2,7 @@
 
 // A third-octave spectrum of a mono signal, for a meter: 31 bands from 20 Hz to 20 kHz (the ISO 266 series of a 31-band
 // graphic equaliser), each the level of the signal in it in dB below a full-scale sine's power, from the newest 8,192 samples of a
-// 48 kHz stream (171 ms), as 16-bit integers: what a player can put in a ring for nothing (planning/p4x-meters-view.md).
+// 48 kHz stream (171 ms), as 16-bit integers: what a player can put in a ring for nothing.
 //
 // It is the family's own FFT (iclforge/dsp/detail/fft_stockham.hpp, the passes AC-4 and the MDCT run) in float, twice:
 //
@@ -56,7 +56,7 @@ inline constexpr float kSilentDb = -120.0F;
 
 // A full-scale sine has a mean square of 0.5: 0 dB.
 // 10^(dB / 10) and 10 log10(x) in single precision: the P4 has no double-precision unit, and a double pow or log10 there is several microseconds, thirty
-// times an update (planning/p4x-meters-view.md, "Kit results"). A float keeps 1e-6 dB of the 0.01 the bars are read to.
+// times an update. A float keeps 1e-6 dB of the 0.01 the bars are read to.
 [[nodiscard]] inline float db_to_power(float db) { return std::exp2(db * 0.33219281F); }
 [[nodiscard]] inline float power_to_db(float power) { return 3.01029996F * std::log2(power); }
 

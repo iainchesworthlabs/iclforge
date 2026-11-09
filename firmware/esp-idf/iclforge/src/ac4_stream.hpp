@@ -12,7 +12,7 @@
 #include "iclforge/base/dynamic_range.hpp"
 #include "iclforge/base/executor.hpp"
 
-// The AC-4 decoder as the Sendspin player's burst path uses it (planning/ac4.md, I6): one AC-4
+// The AC-4 decoder as the Sendspin player's burst path uses it: one AC-4
 // sync frame a chunk, to blocks of 256 samples a channel in the order and layout the renderer
 // takes, as AC-3's and E-AC-3's decoders hand them over. It is libs/ac4's decoder in the
 // component's decode arithmetic, built by CONFIG_ICLFORGE_AC4; a build without that option links
@@ -99,7 +99,7 @@ class Ac4Stream {
     [[nodiscard]] static bool available();
 
     // The least free heap a play of any AC-4 stream asks for before a decoder is made, in bytes
-    // (the 2.0 fixtures' peak, planning/ac4.md, D14f): a part under it refuses the stream with the
+    // (the 2.0 fixtures' peak): a part under it refuses the stream with the
     // figures, where it would otherwise meet an abort() inside a frame.
     [[nodiscard]] static std::size_t heap_floor_bytes();
 

@@ -1,6 +1,6 @@
 #pragma once
 
-// The screen a panel shows while a song with no lyrics plays (planning/p4x-now-playing.md): which
+// The screen a panel shows while a song with no lyrics plays: which
 // view the owner chose, when it dims, and the words it says about the stream. Standard library only, so
 // that the host tests it (libs/device/tests/test_now_view.cpp): the words are what PUT /now-playing and
 // PUT /dim-after take and GET /status's screen reports, and what NVS holds is a number that must never
@@ -25,7 +25,7 @@ enum class View : std::uint8_t {
     kClock = 2,     // the time (needs a clock the board has to be given)
     kOff = 3,       // the screen this replaced: one sentence
     kDark = 4,      // nothing lit: the backlight off while a song has no lyrics, a touch lights the speakers for a while
-    kMeters = 5,    // an instrument: a spectrum of the main mix, and meters of the room's channels (planning/p4x-meters-view.md)
+    kMeters = 5,    // an instrument: a spectrum of the main mix, and meters of the room's channels
 };
 
 inline constexpr View kDefaultView = View::kSpeakers;
@@ -83,7 +83,7 @@ namespace detail {
 
 // --- the speakers' style --------------------------------------------------------------------------------
 
-// How the speakers view shows a level (planning/p4x-speakers-options.md). The stored values are these
+// How the speakers view shows a level. The stored values are these
 // numbers: never renumbered, never reused.
 enum class SpeakersStyle : std::uint8_t {
     kGlow = 0,   // each speaker glows with its level: the fill and a halo in steps
@@ -249,7 +249,7 @@ inline constexpr int kDefaultNightTo = 7 * 60;
 // server told it). From and to are minutes after midnight; a window that ends before it starts crosses midnight
 // (22:00 to 07:00), and one that ends where it starts is empty, which is never dark: a person who wanted the whole
 // day would pick the dark view. `idle` says that the idle screen, between songs, is covered too: not decided by
-// the owner (planning/p4x-now-playing.md, "Open"), so it is a separate setting and off.
+// the owner, so it is a separate setting and off.
 struct NightSchedule {
     bool enabled = false;
     int from_min = kDefaultNightFrom;
@@ -295,7 +295,7 @@ inline constexpr int kNightStepMinutes = 15;
 }
 
 // Whether the idle screen (between songs, nothing held) is darkened as well: the schedule is in force and its
-// `idle` setting says the idle screen is covered. Off until the owner decides (planning/p4x-now-playing.md, "Open").
+// `idle` setting says the idle screen is covered. Off until the owner decides.
 [[nodiscard]] constexpr bool night_covers_idle(const NightSchedule& night, std::optional<int> minute_of_day) {
     return night.idle && night_active(night, minute_of_day);
 }

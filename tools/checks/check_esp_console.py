@@ -81,8 +81,8 @@ ALLOCATION_FAILED = "could not allocate"
 # holds to a floor: "... ring_low=6144 heap_free=41648".
 HEAP_FREE = re.compile(r"heap_free=(\d+)")
 
-# hearth_sink's boot budget line (main/hearth_sink.cpp, report_budget; planning/esp32-platform-
-# profiles.md): "budget: when=boot net=1 internal_free=90931 largest=31744 ... headroom=23552
+# hearth_sink's boot budget line (main/hearth_sink.cpp, report_budget):
+# "budget: when=boot net=1 internal_free=90931 largest=31744 ... headroom=23552
 # floor=0 verdict=ok". --min-budget-headroom holds the last one to a margin and to verdict=ok.
 BUDGET_LINE = re.compile(r"^\s*budget: (.*)$")
 BUDGET_FIELD = re.compile(r"([a-z_]+)=(-?[A-Za-z0-9_-]+)")

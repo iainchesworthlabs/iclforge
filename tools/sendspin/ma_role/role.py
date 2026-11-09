@@ -1,7 +1,7 @@
 """`_iclforge_player@v1` as a plug-in role of an aiosendspin 10.2.1 server.
 
-The role the sinks list ahead of `player@v1` (planning/hearth-sendspin-extension.md, The role
-`_ac3forge_player@v1`, the name the page was written with; the wire name is `_iclforge_player@v1`),
+The role the sinks list ahead of `player@v1` (once named
+`_ac3forge_player@v1`; the wire name is `_iclforge_player@v1`),
 written the way aiosendspin 10.2.1's own roles are, so that a server which imports this package
 and calls `register()` negotiates it, reads its support and state objects, starts and ends its
 stream, and sends it burst chunks (binary id 192). Nothing here edits aiosendspin; two places

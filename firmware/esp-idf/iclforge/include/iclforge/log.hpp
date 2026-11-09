@@ -6,7 +6,7 @@
 
 #include "iclforge/log_ring.hpp"
 
-// The console's recent output, for GET /log (planning/esp32-ota.md, O4): a
+// The console's recent output, for GET /log: a
 // board updated over its network usually has no cable on it, and its console
 // is where it says what went wrong.
 

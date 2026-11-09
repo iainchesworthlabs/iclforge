@@ -1,5 +1,5 @@
-// hearth: the desktop reference player's window
-// (planning/hearth-reference-player.md, A5). Everything that is not the
+// hearth: the desktop reference player's window.
+// Everything that is not the
 // window lives in ../../engine/src and hearth_controller.hpp; this file stands the
 // QML up and offers Crucible's own debugging aid: `--shot <path.png>` grabs
 // the window after it has settled and quits, so a headless check (or the

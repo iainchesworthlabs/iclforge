@@ -1,5 +1,5 @@
 // A-CPL's interpolation and decorrelators (libs/ac4/src/core/acpl/acpl.cpp) against verbatim copies
-// of the code they replaced (planning/ac4.md, D14e): Pseudocode 109 evaluated at every subband and
+// of the code they replaced: Pseudocode 109 evaluated at every subband and
 // the decorrelators' coefficients narrowed at every tap. Both are held to the BITS of what they
 // gave, at the decoder's scalar and at double, on parameters of every framing and band count and on
 // signals with zeros of either sign, because a stream's PCM hash moves by one bit of either.
@@ -72,7 +72,7 @@ void interpolate(const acpl::Framing& framing, int num_param_bands, const acpl::
 }
 
 // Pseudocode 109 at every slot and subband, evaluated in single precision from the values narrowed
-// once (planning/ac4.md, D14h), the expression as written.
+// once, the expression as written.
 void interpolate_float(const acpl::Framing& framing, int num_param_bands,
                        const acpl::ParamSets& values, const acpl::ParamPrev& prev, int num_ts,
                        std::span<float> out) {

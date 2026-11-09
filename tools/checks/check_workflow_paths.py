@@ -4,7 +4,7 @@
 A workflow that triggers on `push` with `paths:` runs for a change to those paths and for nothing
 else, so a filter that names a directory the tree no longer has never fires, and one that omits a
 library its project is built from lets a change to that library through unbuilt. Both happened
-when the tree was re-laid out (planning/monorepo.md); this makes them a failed check.
+when the tree was re-laid out; this makes them a failed check.
 
     python3 tools/checks/check_workflow_paths.py [--root <repo>]
 

@@ -788,7 +788,7 @@ TEST_CASE("the mixmdate group is written only when it is asked for") {
 
 TEST_CASE("a karaoke service type writes the mixing group, at the levels the plan holds") {
     // Annex E has no cmixlev or surmixlev in bsi: the Lo/Ro group is where a decoder reads the
-    // levels of Annex C's reproduction (planning/karaoke-eac3.md, D4), so a stream flagged
+    // levels of Annex C's reproduction, so a stream flagged
     // karaoke carries one without `mixmeta` being asked for.
     using iclforge::ac3::meta::BitstreamMode;
     using iclforge::ac3::meta::MixLevel;

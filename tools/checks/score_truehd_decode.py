@@ -2,7 +2,7 @@
 """Scores a TrueHD decoder against the Dolby Encoding Engine's TrueHD streams of known sources.
 
 Run on the owner's machine, while the gold set exists: the full set is not committed (DEE's
-licence ends on 2026-11-06 and its streams stay with the owner; planning/truehd.md, "Oracles"),
+licence ends on 2026-11-06 and its streams stay with the owner),
 but 13 of its streams, with their sources and a manifest cut to them, are in testdata/truehd-dee
 and score with --set testdata/truehd-dee. tools/generators/gen_dee_gold.py makes the set, and this
 reads its manifest:

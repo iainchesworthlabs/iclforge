@@ -1,6 +1,6 @@
 #pragma once
 
-// What the panel follows of the board's settings (planning/p4x-preferences.md): the screen without lyrics, when it dims,
+// What the panel follows of the board's settings: the screen without lyrics, when it dims,
 // how the speakers are drawn, what the waiting screen does, the backlight's lit level, how the clock is written and the night schedule. Each is set
 // by a setter of the preferences' backend, which a tap on the Preferences sheet reaches **on the panel's own task**
 // (while it holds the lock that guards LVGL) and a PUT reaches on the control surface's, and each is read by the

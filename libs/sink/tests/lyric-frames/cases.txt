@@ -1,4 +1,4 @@
-# The conformance fixtures of planning/hearth-sink-screen.md as the sink's core frames them, at fixed
+# The conformance fixtures as the sink's core frames them, at fixed
 # positions (golden.txt holds the frame of each: `iclforge-sink-tests` and the Android app's own
 # instrumented test both compare their frames with it, so a renderer's test and the library agree).
 #

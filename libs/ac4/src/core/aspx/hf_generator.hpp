@@ -43,7 +43,7 @@ inline constexpr int kTsOffsetHfadj = 4;  // Pseudocode 86
 // takes 4 n calls of std::pow and a hundred multiplies and adds of the compiler's
 // software `double` on a part with a single-precision FPU: about 1.5 milliseconds a
 // channel on the P4, every frame (A-SPX's stage of a 5.1 frame took 7.7 ms less in its
-// five channels with them kept; planning/ac4.md, D14e). A channel keeps them for the
+// five channels with them kept). A channel keeps them for the
 // number of points it last had, and the frame's own work is the projection.
 struct CubicBasis {
     std::size_t n = 0;  // the number of points the vectors are for; 0 when none is made

@@ -14,7 +14,7 @@ For every C/C++ file (and header template):
 
 The sub-namespaces keep their names (iclforge::render, iclforge::meta, iclforge::oba ...), so every
 unqualified lookup that worked from inside `namespace ac3` works from inside `namespace iclforge`.
-Nesting the AC-3 codec's own symbols under iclforge::ac3 is the next stage (planning/layout.md): it
+Nesting the AC-3 codec's own symbols under iclforge::ac3 is the next stage: it
 needs a scope-aware rewrite, and its size is counted there.
 """
 

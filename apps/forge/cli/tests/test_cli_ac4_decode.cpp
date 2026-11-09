@@ -1,4 +1,4 @@
-// forge decode's AC-4 options (planning/ac4.md, phase D8), each run against
+// forge decode's AC-4 options, each run against
 // the real binary on committed streams: every DRC decoder mode at an output
 // level, the presentation by position, associated service and level, the
 // associated mix, every downmix with and without the LFE, a 7.X stream folded
@@ -344,8 +344,7 @@ TEST_CASE("decode renders AC-4's objects to the speakers the layout options name
     const auto isf = decode(objects / "direct-isf-sr3100.ac4", "", log);
     CHECK(isf.channels.size() == 11);
     CHECK(read_log(log).find("objects, rendered") == std::string::npos);
-    // decode's third argument, the directory D10's own decoded objects are written to
-    // (planning/ac4.md, I5: objects_dir is no longer E-AC-3-Atmos-only).
+    // decode's third argument, the directory D10's own decoded objects are written to.
     const auto object_dir = dir / "objects";
     REQUIRE(run_cli("decode " + quoted(objects / "direct-bed-5_1.ac4") + " " +
                         quoted(dir / "bed.wav") + " " + quoted(object_dir),

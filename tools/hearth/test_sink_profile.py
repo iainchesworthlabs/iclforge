@@ -1,5 +1,4 @@
-"""Unit tests for sink_profile.py, the reader of firmware/hearth-sink/profiles.json
-(planning/esp32-platform-profiles.md).
+"""Unit tests for sink_profile.py, the reader of firmware/hearth-sink/profiles.json.
 
 stdlib unittest, as ci.yml's script-lint job runs it. The builds are made from
 nothing: an sdkconfig, a CMakeCache.txt and, where a budget is tested, two
@@ -921,7 +920,7 @@ class CommandLine(unittest.TestCase):
 
 class KconfigChange(unittest.TestCase):
     """`check-change`: what a pull request adds to, or takes from, the Kconfig, held to the
-    profiles with no ESP-IDF (planning/esp32-platform-profiles.md, 'Where each check runs')."""
+    profiles with no ESP-IDF."""
 
     KCONFIG = """
 config ICLFORGE_SENDSPIN

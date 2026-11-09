@@ -31,7 +31,7 @@
 #include "transport.hpp"
 #include "unit_reports.hpp"
 
-// The player (planning/hearth-reference-player.md, A3): the queue, the
+// The player: the queue, the
 // transport, one session at a time, and a PCM sink, put together.
 //
 // The transport decides; this carries the decision out. Each command is
@@ -85,7 +85,7 @@
 // for a member playing player@v1, and the item's own units, packed into
 // bursts the same way a bitstream output's are, for a member playing
 // _iclforge_player@v1 - network_group_sink.hpp's own comment has the shape.
-// An AC-4 item (planning/ac4.md, I2) is decoded for every output and reaches
+// An AC-4 item is decoded for every output and reaches
 // a member as a bitstream only this way: a sync frame to a burst, packed by
 // iclforge::containers::iec61937::Ac4BurstPacker in the burst type the item's largest frame
 // needs, each burst placed at its frame's own start on the item's timeline.
@@ -207,7 +207,7 @@ public:
     [[nodiscard]] PlayPosition position() const;
 
     // Tells the open network group which item's lyrics its members are to hold and where the sound is
-    // in it (W7d, planning/karaoke-phase2.md). Called by the engine each turn; nothing for any other
+    // in it (W7d). Called by the engine each turn; nothing for any other
     // output. An item's lyric file is read when the clock reaches it, or when the output is opened
     // again (a new stream: its members' lyrics went with the old one).
     void follow_lyrics();
@@ -257,8 +257,7 @@ public:
     // when they are: a bitstream is decoded by the receiver.
     [[nodiscard]] std::string_view settings_note() const;
 
-    // The speaker setup (planning/hearth-reference-player.md, A5's Speakers
-    // page): the per-slot trim and delay applied to the renderer's slots
+    // The speaker setup: the per-slot trim and delay applied to the renderer's slots
     // before they reach the open sink, local or not. Routing itself lives on
     // the sink (PcmSink::set_routing()/routing()): iclforge::audio::PcmOutput
     // already carries a patch and builds a sensible default from the
@@ -291,8 +290,7 @@ public:
     bool set_crossover_hz(double hz);
     [[nodiscard]] double crossover_hz() const { return crossover_hz_; }
 
-    // The identify tone (planning/hearth-reference-player.md, A5's Speakers
-    // page): pink noise on one render layout slot at a time, in place of
+    // The identify tone: pink noise on one render layout slot at a time, in place of
     // whatever the item playing would put there - take_block() overwrites
     // the block entirely (render::IdentifyTone::fill()'s own behaviour:
     // silence on every other slot too), ahead of trim_delay_, which does

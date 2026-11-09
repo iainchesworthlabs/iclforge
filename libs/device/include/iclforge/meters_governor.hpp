@@ -1,7 +1,8 @@
 #pragma once
 
-// How often the Meters view updates: twenty times a second if the panel task can keep up, ten if it cannot (planning/p4x-meters-view.md,
-// "Measuring it"). Pure: the screen tells it what each update cost and how late it started, and it answers with the step to the next.
+// How often the Meters view updates: twenty times a second if the panel task can keep up, ten if
+// it cannot. Pure: the screen tells it what each update cost and how late it started, and it
+// answers with the step to the next.
 //
 // "Cannot keep up" is two things, judged over the last second of updates and never on one:
 //
@@ -17,8 +18,7 @@
 // 160 s); a minute at twenty a second puts it back. The first two seconds of a view, and of a view woken from dimming, are not judged:
 // the first draw of the stage and the first run of the code from the flash (cold in the cache) are not what the view costs, and the kit's
 // first run fell to ten a second in them and could not rise from it. The thresholds are the plan's guesses until the kit has measured
-// the real costs (planning/p4x-meters-view.md, "Kit protocol"; the first update of the canvas drawing cost 26 to 31 ms in the 5.1 and
-// 9.1.6 rooms): they are one struct so that a measurement changes numbers and not code.
+// the real costs: they are one struct so that a measurement changes numbers and not code.
 
 #include <algorithm>
 #include <array>

@@ -11,7 +11,7 @@
 
 #include "iclforge/audio/passthrough.hpp"
 
-// The play queue (planning/hearth-reference-player.md, Media): the items the
+// The play queue: the items the
 // player was given, in the order they will play, and which one is current.
 //
 // Deliberately a plain container with no I/O in it. An item arrives as a path

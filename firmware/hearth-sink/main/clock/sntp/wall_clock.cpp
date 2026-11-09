@@ -1,5 +1,4 @@
-// The board's time of day, kept with a time server. See ../../wall_clock.hpp and planning/p4x-now-playing.md,
-// stage 3.
+// The board's time of day, kept with a time server. See ../../wall_clock.hpp.
 //
 // SNTP is lwIP's client, through esp_sntp.h. lwIP keeps a table of servers; this keeps it the way the owner
 // asked (a server a person named, then the router's, then the pool when nobody named one) against a lease that

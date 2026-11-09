@@ -1,5 +1,4 @@
 // The board's web page, a client of the REST routes and nothing else.
-// planning/esp32-device-ui.md is its design.
 (() => {
   'use strict';
   const POLL_MS = 1000; // while the page is visible
@@ -646,7 +645,7 @@
   function render(s, read) {
     status = s;
     const state = str(s.state) || '';
-    // "flash": an update's flash mode (planning/esp32-ota.md), where nothing plays.
+    // "flash": an update's flash mode, where nothing plays.
     const head = state === 'finished' && s.why ? 'Finished (' + s.why + ')' : state === 'flash' ? 'Flash mode' : state ? state[0].toUpperCase() + state.slice(1) : 'Unknown';
     $('state').textContent = head;
     $('state').dataset.state = state;

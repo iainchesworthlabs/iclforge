@@ -10,8 +10,7 @@
 #include "iclforge/truehd/export.hpp"
 
 // The constants, the sample rates and the channel vocabulary of a TrueHD / MLP stream. "TH spec" is
-// the owner's Dolby TrueHD (MLP) Reference Specification, v3.5 (planning/truehd.md names its status
-// and where it disagrees with the streams; each such place is an entry of libs/truehd/ERRATA.md).
+// the owner's Dolby TrueHD (MLP) Reference Specification, v3.5.
 
 namespace iclforge::truehd {
 

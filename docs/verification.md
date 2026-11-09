@@ -1027,8 +1027,7 @@ lower case, upper case, dashed and `0x` prefixed, with `--track-id`, and with tw
 difference, nor did a control file FFmpeg had encrypted. The tool stops after the `moov` box. Whatever the cause, a tool that cannot be told from "ignores the key"
 proves nothing, so the check reports one skip for the decryption legs and `--require-decrypt` turns
 it into an error. No cipher output of forge's generator has been decrypted by a Dolby tool, and
-GPAC and FFmpeg remain the only decryption oracles ([planning/cenc-conformance.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md),
-section 6). Two ways to settle it: a newer streamdemuxer (the tested one is the AC-4 kit's; the
+GPAC and FFmpeg remain the only decryption oracles. Two ways to settle it: a newer streamdemuxer (the tested one is the AC-4 kit's; the
 Dolby Digital Plus kit was not examined), or a protected stream from Dolby with a published key.
 
 **Layouts the tool does not read.** For the 32 files that put a clear sample entry beside an
@@ -1286,7 +1285,7 @@ stereo at every rate and frame rate and in gapless parts, metadata at 2.0, 5.1, 
 stereo, substreams for presentations, 60 s programmes, and E-AC-3 and E-AC-3 JOC from the same
 sources, each with DEE's MP4 of it and what `forge` made of it. DEE writes no AC-4 from objects: its
 object encoders take only an Atmos master, and refuse every master this project writes as "not
-authored with Dolby tools" (`planning/ac4.md`, phase G0).
+authored with Dolby tools".
 
 ### The decoder's output
 
@@ -1594,8 +1593,7 @@ fps, plain and fragmented), give the same samples, to the last bit, as the eleme
 Forge cannot read the 12 HLS packed-audio files (`HLS/Audio_ID3/*_sub.ac4`). Each has an ID3v2 tag
 before every segment, 200 frames at 25 fps and 240 at 29.97, and forge, finding no AC-4 sync word at
 byte 0, tries the file as AC-3 and stops. With the tags skipped, the frames are the elementary
-stream's, byte for byte. The gap is in format detection and not in the decoder, and is recorded in
-`planning/ac4.md`.
+stream's, byte for byte. The gap is in format detection and not in the decoder.
 
 **A second source: Dolby's Spott reference files.** Thirteen audio-only MP4 files from Dolby's public test
 application (not in the kit, not committed, local only), each a codecs string in its name: four E-AC-3
@@ -1692,7 +1690,7 @@ readings in `libs/ac4/ERRATA.md` ("The 9.X.4 element") say, not that they are wh
 ### The decoder's 22.2 element
 
 The 22.2 element (Part 2 6.2.4.3, Tables 8 and 21 and Annex A.3) has no oracle outside the project: DEE
-does not write it (planning/ac4.md, "What DEE writes"), no stream of it is public, and librempeg does not
+does not write it, no stream of it is public, and librempeg does not
 decode it. What checks it is the standard's own tables and the project's two transcriptions:
 
 - **The syntax, in both transcriptions** (`libs/ac4/tests/decoder/test_channel_elements.cpp`,
@@ -1771,7 +1769,7 @@ which takes it to the layout a system asks for. Where the text leaves a choice o
 
 ### The decoder's API and packaging
 
-Phase D8 gives the decoder's API the form planning/ac4.md sets for channel-based streams, reports
+Phase D8 gives the decoder's API its form for channel-based streams, reports
 what a stream carries through it, and installs the inspector, the decoder and the core
 ([AC-4 decoding](library/ac4.md)). The tests are in `libs/ac4/tests/decoder/test_api.cpp` unless
 named otherwise.
@@ -1985,7 +1983,7 @@ SIMPLE and ASPX. It shares
 `libs/ac4/src/core`'s transforms, windows, codebooks, QMF banks and A-SPX tables and high frequency
 generator with the decoder, and writes the syntax through a transcription of the tables of its own.
 `forge ac4-encode` writes it raw or in MP4, with an option for each setting. Ten checks stand
-behind it (`planning/ac4.md`, the encoder's ladder, and phases E5's to E8's exits), and a
+behind it, and a
 paragraph on the objects follows them:
 
 - **Three transcriptions agree.** The encoder records each element it writes in the shape the decoder
@@ -2370,7 +2368,7 @@ only, and part of the second has no outside reader.
    `tools/checks/check_truehd_coverage.py` reads every committed stream with the Python transcription and fails when a feature
    (72 are listed: rates, channel counts, restart gaps, each FIR and IIR order, the codebooks, matrices, shifts, noise, the data check,
    the marker, extra data, the DRC word, word sizes) is carried by none, so deleting or regenerating a fixture into something plainer is a
-   failing check. `planning/truehd-fixtures.md` lists what is carried and what cannot be.
+   failing check.
 3. **DEE's TrueHD streams of known sources**, scored on the owner's machine by `tools/checks/score_truehd_decode.py` (the full
    set is not committed, 13 of its streams are in `testdata/truehd-dee`, and DEE's licence ends on 2026-11-06). Not run in CI. A DEE stream with the sixteen-channel substream
    would be the only outside check of that substream. [Scoring DEE's TrueHD streams](#scoring-dees-truehd-streams) says how.
@@ -2430,7 +2428,7 @@ an embedded timecode, and four lengths that are not a whole number of access uni
 2026-10-31, with forge built from `1e4ee5c3e`, they give 11 PASS, 2 UNEXPLAINED (the two 96 kHz legs) and 0 FAIL.
 
 The full set was scored on 2026-10-29 before the decoder fixes (26 PASS, 5 ALTER, 97 FAIL of 128). **Rescored on 2026-10-31** with forge at `1e4ee5c3e` plus the alternative-reading
-switches (142 legs: the 128 of the set and the 14 of the group `truehd-last`, made the same day; [planning/truehd-validation.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-validation.md)): **87 PASS, 9 ALTER,
+switches (142 legs: the 128 of the set and the 14 of the group `truehd-last`, made the same day): **87 PASS, 9 ALTER,
 46 UNEXPLAINED, 0 FAIL**, 34,600 lossless-check intervals ok and none failed; the three 300 s programmes (2.0, 5.1 and 7.1) 3 PASS (16,872 intervals ok, none failed). The five Atmos legs made
 from the owner's DAMF master (`obj-thd-atmos-sollevante`, `-dmx`, `-e12`, `-e14`, `-e16`) have no PCM source for the scorer and are test inputs for the decoder only (SKIP). The 46 UNEXPLAINED
 are 25 legs at 96 kHz and 21 stepped-tone legs at 48 kHz (a difference of one 24-bit step in 52,022 to 182,077 values whatever the DRC profile, the data-rate option or the loudness path), every

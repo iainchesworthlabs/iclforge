@@ -8,7 +8,7 @@
 
 #include "iclforge/dev_view.hpp"
 
-// About, the read-only page of a board's Preferences (planning/p4x-preferences.md, E4): the friendly
+// About, the read-only page of a board's Preferences: the friendly
 // subset of what the developer view shows. The firmware reads the same facts for both
 // (panel/lvgl/dev_info.cpp: read_network_now, read_configuration, the pairing count), so the version, the
 // addresses and the chip are never read twice in two ways; this is only the choice and the words.

@@ -266,8 +266,8 @@ iclforge::audio::Location truehd_location(iclforge::truehd::Channel channel) {
 // TrueHD and MLP: the decode of the presentation truehd-presentation= names, played as the units
 // decode (the channels in the order `decode` writes them, which is the WAV order the output
 // takes). The output is asked for the stream's own channel count and rate: the shared-mode device
-// says no if it does not take eight channels or 192 kHz, and the sentence says which it was
-// (planning/truehd-parity-forge.md, row L2). The channels go to the device in the order of its
+// says no if it does not take eight channels or 192 kHz, and the sentence says which it was.
+// The channels go to the device in the order of its
 // speaker mask, which is not the stream's for 7.1 (the side surrounds come ahead of the rears in
 // the stream, behind them in the mask); a stream with a channel no speaker bit names (the second
 // LFE, the wide and surround-direct pairs) is sent in its own order, and the status line says so.
@@ -470,7 +470,7 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     std::vector<std::span<const std::byte>> associated_units;
     if (access_units) {
         // The E-AC-3 decoder reproduces a karaoke programme as AC-3's does where the programme is
-        // one independent substream (planning/karaoke-eac3.md); `decode` reports it in the same
+        // one independent substream; `decode` reports it in the same
         // words, from the first unit played below.
         auto chosen = select_programme_units(stream, meta.programme, in_path);
         if (!chosen.has_value()) {

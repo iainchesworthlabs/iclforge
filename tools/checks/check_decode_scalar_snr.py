@@ -1,7 +1,7 @@
 """Gate a second decode scalar's path against the double one (minimum-footprint decoder profile).
 
-Written for the float32 path and used for the fixed-point one too
-(planning/arithmetic-tiers.md): --float-cli names whichever build is under
+Written for the float32 path and used for the fixed-point one too:
+--float-cli names whichever build is under
 test, and --min-snr-db the floor that build is held to.
 
 `ICLFORGE_DECODE_SCALAR=float` builds the decoder's coefficient stores,

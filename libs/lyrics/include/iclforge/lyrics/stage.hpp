@@ -9,7 +9,7 @@
 
 #include "iclforge/lyrics/lyrics.hpp"
 
-// What a screen shows of a song's words at one position (planning/karaoke-p4x-panel.md, D2): which
+// What a screen shows of a song's words at one position: which
 // lines are the past, the current and the next, which word is being sung and how far through it is,
 // and, between lines, how long until the next one. The desktop's lyric view works this out in QML
 // beside its controller; a sink's panel needs the same answer in C++ with no Qt, and a test needs it
@@ -62,7 +62,7 @@ struct Stage {
     // kLine: the line being sung; kGap on a line that only marks a time: that line.
     std::size_t line = 0;
     // kLine: the line has word times. When it has none the whole line is the emphasis and no word is
-    // named (no times are invented, planning/karaoke.md, decision 3).
+    // named (no times are invented).
     bool word_timed = false;
     // kLine and word_timed: the words in front of the one being sung are sung ([0, words_sung)), the
     // one being sung is `word` (none between two words), and the rest are not yet.

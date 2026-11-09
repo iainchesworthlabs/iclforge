@@ -33,8 +33,8 @@
 #include "truehd_meaning.hpp"
 #include "truehd_wrap.hpp"
 
-// TrueHD and MLP in the container, transport and analysis commands (planning/truehd.md, phase
-// T2c). The containers library knows no codec, so the facts a track description needs (the
+// TrueHD and MLP in the container, transport and analysis commands. The containers library knows
+// no codec, so the facts a track description needs (the
 // access units, which of them open with a major sync, the channel count, the end-of-stream padding)
 // are read here, with iclforge::truehd, and handed to it as plain values.
 //

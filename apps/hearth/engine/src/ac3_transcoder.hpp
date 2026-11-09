@@ -19,8 +19,7 @@
 #include "decoder_settings.hpp"
 #include "stream_decoder.hpp"
 
-// The streaming transcode to AC-3 (planning/hearth-reference-player.md, A3;
-// the appliance plan's gap 4): an E-AC-3 item for a receiver that takes AC-3
+// The streaming transcode to AC-3: an E-AC-3 item for a receiver that takes AC-3
 // but not E-AC-3.
 //
 // The player decodes the item for it onto a fixed 5.1 layout with neutral

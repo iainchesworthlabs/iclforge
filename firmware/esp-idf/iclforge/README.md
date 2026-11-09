@@ -33,8 +33,7 @@ live in the library because it is made of FreeRTOS:
   through the same server. `GET /` is a web page for the routes, and the only client they need:
   the state, the stream, the layout, the volume and the decode's timing, and the four actions,
   from two files in [`ui/`](ui), gzipped at build time (22 KB of the 69 KB they are as written) and sent from
-  flash with `Content-Encoding: gzip`
-  ([`planning/esp32-device-ui.md`](../../../planning/esp32-device-ui.md)). `GET /api` lists the
+  flash with `Content-Encoding: gzip`. `GET /api` lists the
   routes.
 - **`iclforge/interleave.hpp`**: planar float to interleaved 16-bit or 24-in-32 with slot padding,
   free of ESP-IDF and tested on the host. It and the other headers of the component that need no
@@ -52,7 +51,7 @@ live in the library because it is made of FreeRTOS:
 
 The player renders through the library's `iclforge::render` headers, which began in this component
 and moved to `libs/render/include/iclforge/render/` so that the desktop player and its test sink render
-with the same code ([`planning/hearth-reference-player.md`](../../../planning/hearth-reference-player.md)).
+with the same code.
 **`iclforge::render::OutputLayout`**
 ([`layout.hpp`](../../../libs/render/include/iclforge/render/layout.hpp)) is the speakers a player has, one
 per slot, from a name (`2.0`, `5.1`, `7.1.4`, `9.2.4`) or a speaker list (`L,R,C,LFE,Ls,Rs`, or
@@ -131,10 +130,8 @@ reset lands in `boot:0x0 (DOWNLOAD)` and the application never starts, so flash,
 board's RESET button, then attach with `idf.py monitor --no-reset`. Building several shapes on
 one machine, give each its own build directory and its own `-DSDKCONFIG=<build dir>/sdkconfig`.
 
-## Where this is going
+## Further reading
 
-[`planning/esp32-player.md`](../../../planning/esp32-player.md) is the plan for what the component
-should carry beyond the library for a player — buffering and tasks, the source and sink seams,
-a control surface — and for the ESPHome component that sits on it. The platform page,
+The platform page,
 [`docs/platforms/bare-metal/esp32-s3.md`](../../../docs/platforms/bare-metal/esp32-s3.md), has the footprint and timing figures
 and what the port required from the library.

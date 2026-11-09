@@ -433,7 +433,7 @@ TEST_CASE("a player with fewer outputs than the stage's most holds the delay it 
 }
 
 // What the stage costs, per output and block of 256 frames, on the machine the test runs on. Hidden: run it by
-// name ("[output-trim-bench]") for the figures planning/hearth-speaker-trim-identify.md quotes. The boards' own
+// name ("[output-trim-bench]") for the figures it gives. The boards' own
 // are the kit's to measure (the burst player's sink_us and decode figures); this gives the proportions between
 // the cases, which the boards share.
 TEST_CASE("the cost of the stage per output", "[.][output-trim-bench]") {

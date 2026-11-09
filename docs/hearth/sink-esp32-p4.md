@@ -20,15 +20,12 @@ they are sung.
     are not its:** about one play in five reaches the kit with its first chunk 300 to 600 ms late, with
     the glass, without it and at 40 Hz, over Wi-Fi and (more often) over wired, and those plays
     lose the start of their first second: lwIP's six-entry TCP receive mailbox refused the first
-    segments; PR #1610 makes it 32, and none of 40 plays had a late first chunk
-    ([the trace](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#what-the-glitches-were-the-first-chunk-comes-late)).
+    segments; PR #1610 makes it 32, and none of 40 plays had a late first chunk.
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
     owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
     Wi-Fi ([wired](#wired-and-wi-fi)): the sink answers on it, plays Sendspin through it,
     takes an update over it, falls back to Wi-Fi when the Ethernet cable is pulled and returns to wired
     when it is put back, so the kit can run on a PoE splitter; **the splitter itself is not yet tried.**
-    [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
-    has the plan, the first run and the list of what it runs next.
 
 Pairing, groups and firmware updates work the same as on the S3; see
 [An ESP32-S3 sink](sink-esp32-s3.md) and [Sink firmware](sink-firmware.md). This page covers what
@@ -87,8 +84,7 @@ idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.h
 AC-4 is `sdkconfig.ac4`, in both release profiles: since the fold of `p4-rev1-ac4` into `p4-rev1` and, on 2026-10-29, into `p4-rev3`,
 an image of either revision decodes AC-3, E-AC-3 and AC-4. The v3.x image keeps the decode task's stack of an HTTP play in PSRAM
 (`sdkconfig.p4-rev3`): the screen leaves it 74 KB of internal RAM at the start of a play, and an AC-4 5.1 play leaves 8 to 10 KB of it at its
-tightest ([planning/ac4-in-release-images.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4-in-release-images.md);
-[ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
+tightest ([ESP32-P4 platform page](../platforms/bare-metal/esp32-p4.md#ac-4)).
 
 ## On the v1.x board
 
@@ -144,8 +140,7 @@ the first slot, and its cause is not known.
   their slots and the other ten at zero. **Whether the clocks leave the pins at 24.576 MHz (BCLK) and
   48 kHz (WS) is not measured:** it needs a scope or a logic analyser.
 - **The DACs** are not wired and no firmware programs an ES9080 over I2C: the board plays to a
-  frame whose unused slots are zero, which is what the ES9080 contract is
-  ([sink tiers](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md#shared-es9080-contract-all-tiers)).
+  frame whose unused slots are zero, which is what the ES9080 contract is.
 
 ### The screen
 
@@ -352,7 +347,7 @@ the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
 
-**How the speakers follow the sound** (the plan is [planning/p4x-speakers-options.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-speakers-options.md)).
+**How the speakers follow the sound.**
 The screen reads the level of every 100 ms window the player measures (a lock and two short arrays,
 `BurstPlayer::levels()`; the heading and the title are still read five times a second), where it once read
 every other one. A level is judged against **the loudest the room has lately been** (it rises at once and
@@ -385,8 +380,7 @@ Both styles stay: the owner, 2026-10-25, saw the glow, as it was and as it becam
 minus 12% (the bound is `kPulseReach`), and kept both as a choice, with the glow the default.
 
 Which screen shows is the owner's: `speakers` (the default), `title`, `clock` ([below](#the-clock)),
-`dark`, or `off`, which is the old sentence. The plan, with how each was chosen and built, is
-([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
+`dark`, or `off`, which is the old sentence.
 
 **The title card.** The board lists `metadata@v1` in its hello, which a board with a screen does and
 one without does not, so a server that has the role tells it what is playing: the title, the artist,
@@ -428,8 +422,6 @@ second whatever the frame rate. The spectrum, the channel bars and the pair of m
 neighbouring bars that move alike), so an update is a handful of invalid areas and not a hundred (a rectangle for each part of each bar, which the kit measured at 80 to 290 ms a refresh). When the screen is dimmed or another view is
 chosen the tap is removed, so a board that is not showing meters pays nothing for them. Everything the view draws, and the analysis's
 tables (about 63 KB with the transform's work buffers, in PSRAM), exist only in an image with a panel; the C6 and S3 images have the tap's interface and nothing else.
-How fast it runs on the kit, and the protocol that measures it, are in
-([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
 
 ![The Meters view, a 2.0 room: the spectrum, and the pair of meters under it](screenshots/p4-panel-meters-2-0.png)
 ![The Meters view, 5.1: every output a bar, grouped in space](screenshots/p4-panel-meters-5-1.png)
@@ -449,9 +441,7 @@ twenty only after 10 s at ten with the cost under 60 % and nothing late, so that
 cold code are not what it costs). The target is **20 Hz if possible, else a steady 10 Hz** (no more than
 1 % of the steps without an update, an update under half of its step), and the kit protocol says which room holds which. **The audio comes first:** while the decoder is
 busy (a mean burst of 14 ms or more of its 32: a 7.1.4 object stream, AC-4; not a 5.1 E-AC-3 room) the view is held at ten, since the drawing and the analysis beside the decoder
-cost it 1.5 to 2 ms a burst in those rooms (`ICLFORGE_EXAMPLE_PANEL_YIELD`, default 1; 2 also keeps the panel's task on the decode core, and 0 turns it off). How each room holds up on the kit, and the
-protocol that measures it, are in
-([planning/p4x-meters-view.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-meters-view.md)).
+cost it 1.5 to 2 ms a burst in those rooms (`ICLFORGE_EXAMPLE_PANEL_YIELD`, default 1; 2 also keeps the panel's task on the decode core, and 0 turns it off).
 
 **The stream, in the footer.** While the speakers, the card or the meters show (and under the "no lyrics for
 this item" sentence, where there is room), the footer names the stream, its bitrate and who sends it, in the
@@ -498,9 +488,8 @@ The card dims as the speakers do, and its dark screen names the song (*Playing -
 Davis*). What the store keeps is small and fixed (a title of 256 bytes, an artist or an album of 160,
 cut at a character and not in the middle of one), in strings that keep their capacity, so a server's
 update and the panel's five reads a second allocate nothing from the internal heap an AC-4 decoder
-leaves little of. Two servers say it differently, and the board reads each as it means it
-([planning/hearth-sendspin-extension.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-sendspin-extension.md),
-C36): the specification's object is the whole state, so what it leaves out is gone (and aiosendspin 10,
+leaves little of. Two servers say it differently, and the board reads each as it means it:
+the specification's object is the whole state, so what it leaves out is gone (and aiosendspin 10,
 which Music Assistant runs now, sends it so); aiosendspin 9.1.1's carried only what changed, a field it
 cleared given as `null`, so that a pause (a progress and nothing else) leaves the title alone and a track
 with no artist does not keep the last one's. A state stamped in the future (a scheduled change, which
@@ -853,8 +842,7 @@ else.
 #### What was tested on wired
 
 On the v3.2 kit, 2026-10-20, with the owner's Ethernet cable to their router (100 Mbit/s, full duplex), the
-Wi-Fi and the USB cable on as well. Details and the numbers:
-[the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-cable-on-the-kit-2026-10-20).
+Wi-Fi and the USB cable on as well.
 
 - **The update path, before wired:** ten `ota.py push` runs (eight accepted, an image that never
   becomes healthy rolled back at its 300 s deadline, and one that panics rolled back by the
@@ -1018,15 +1006,13 @@ programme decoded to 2.0 over Wi-Fi for 60 s, the screen filling a looping song 
 One of five runs with the screen filling broke some 15 to 20 seconds in (underruns and resyncs, then
 every chunk late until the stream ended); the three that followed it on the same image did not, and
 a run with the screen idle had a smaller disturbance of the same kind. The cause was not found, and
-the screen is neither shown to be it nor shown not to be
-([the plan's Measured section](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#measured)).
+the screen is neither shown to be it nor shown not to be.
 **Not in these numbers:** the DSI engine's own reads of PSRAM (74 MB/s at 60 Hz, on the bus the
 decoder fetches its code from), and the AC-4 5.1 streams that fill a frame. Both were measured on the
 kit on 2026-10-20:
 
 **Measured on the v3.2 kit** (400 MHz, the glass; images of one tree, the decoder's time a frame
-over `POST /play`, the median of six plays alternating the screen idle and the demo song filling;
-[the plan has the method and every figure](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-second-session-on-the-kit)):
+over `POST /play`, the median of six plays alternating the screen idle and the demo song filling):
 
 | | AC-3 2.0 | E-AC-3 2.0 | AC-4 5.1 (Sendspin burst, layout 9.1.6) |
 |---|---|---|---|
@@ -1122,5 +1108,3 @@ unchanged. The firmware images themselves carry no notices file: the notices tra
   memory, AC-4
 - [Karaoke](../karaoke/index.md) — the stream and the lyrics files the screen shows
 - [Sink firmware](sink-firmware.md) — which image, and updating over the network
-- [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
-  — the plan, the decisions and the bring-up list

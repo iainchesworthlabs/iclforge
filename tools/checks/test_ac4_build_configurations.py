@@ -1,7 +1,7 @@
-"""AC-4 opt-in by build configuration (planning/ac4.md, phases D8 and I4).
+"""AC-4 opt-in by build configuration.
 
 ICLFORGE_BUILD_AC4 is on by default, and the AC-4 library (libs/ac4, one library since
-planning/consolidation.md's C1) is part of the default target. D8 found three builds that
+the consolidation) is part of the default target. D8 found three builds that
 linked none of it and turned the option off there instead of compiling it
 for nothing: the Android app's CMake wrapper, the WebAssembly preset and the Python
 wheel. Phase I4 binds AC-4 into the C API, Python, Rust and WebAssembly:

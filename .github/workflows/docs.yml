@@ -212,9 +212,8 @@ jobs:
           cp -r build/config-wasm-emscripten/bin/wasm_decode_demo/. docs/assets/wasm-decode-demo/
           cp -r build/config-wasm-emscripten/bin/wasm_encode_demo/. docs/assets/wasm-encode-demo/
 
-      # The Hearth sink installer (docs/hearth/sink-installer.md,
-      # planning/esp32-ota.md O9) flashes a board from the browser with ESP Web
-      # Tools. The site serves its own copy rather than a CDN's, so a reader's
+      # The Hearth sink installer (docs/hearth/sink-installer.md) flashes a board from
+      # the browser with ESP Web Tools. The site serves its own copy rather than a CDN's, so a reader's
       # browser loads nothing from a third party on the page that writes their
       # board's flash: the npm tarball, pinned to a version and to the
       # integrity npm published for it, unpacked into the page's assets.

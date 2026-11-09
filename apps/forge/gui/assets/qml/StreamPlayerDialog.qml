@@ -8,7 +8,7 @@ import ForgeGui
 // "Open stream" — the GUI twin of `forge monitor` (play an already-encoded
 // file's decoded bed through an ordinary output) fused with `forge decode`'s
 // export (a WAV of the bed, and for an Atmos or an AC-4 object stream one WAV
-// per decoded object - planning/ac4.md, I5). Open → decode → real transport, the same
+// per decoded object). Open → decode → real transport, the same
 // "distinct surface, reachable from the header" shape QcDialog.qml/
 // ObjectInspectorDialog.qml already use, for the identical reason: this
 // reads a stream that already exists, with no plan, no source and no

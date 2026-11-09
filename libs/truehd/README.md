@@ -2,7 +2,7 @@
 
 The Dolby TrueHD and MLP bitstream, a lossless decoder and an encoder, written from the owner's *Dolby TrueHD (MLP) Reference
 Specification* v3.9 ("TH spec") and checked against streams FFmpeg's encoders write and against FFmpeg's decoder.
-[planning/truehd.md](../../planning/truehd.md) is the plan; [ERRATA.md](ERRATA.md) lists, first, the questions only
+[ERRATA.md](ERRATA.md) lists, first, the questions only
 the owner can answer, and then every place the specification and the streams disagree.
 
 It links `iclforge::base` and nothing else. The option is `ICLFORGE_BUILD_TRUEHD` (on by default).
@@ -39,7 +39,7 @@ first restart header. A failed check (the check nibble, a CRC, a parity byte, th
 `Strictness::kStrict` and a counter with `kLenient`. The decoder reads substreams 0 to 2 (up to 8 channels) and the
 generic 16-channel substream 3 the same way. FFmpeg's encoders write neither 7.1 nor the sixteen-channel substream: 7.1 is
 checked through this library's encoder, whose streams FFmpeg's decoder reads, and the sixteen-channel substream has no
-external oracle, because FFmpeg refuses its restart sync (see the plan).
+external oracle, because FFmpeg refuses its restart sync.
 
 ## Encoding
 

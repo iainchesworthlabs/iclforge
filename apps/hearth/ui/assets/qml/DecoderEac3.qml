@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The AC-3 and E-AC-3 decoder page (planning/hearth-design.md): every
+// The AC-3 and E-AC-3 decoder page: every
 // control DecoderSettings holds, read from and written straight back to
 // HearthController.decoderSettings - a real, working decoder, not a
 // settings-only form.

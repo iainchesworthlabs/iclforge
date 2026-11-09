@@ -46,7 +46,7 @@ namespace ac = sendspin::player;
 // TrueHD arrives as access units, up to 24 to a chunk (sendspin::kTruehdUnitsPerChunk), and the
 // link takes them as MAT bursts of 61,440 bytes on an eight-channel carrier at 192 kHz for the 48
 // kHz family and 176.4 kHz for the 44.1 kHz family, the carrier the owner chose on 2026-10-29 and
-// a receiver has been seen to name TrueHD on (planning/truehd-parity-hearth-player.md, entry 120).
+// a receiver has been seen to name TrueHD on.
 // A burst lasts 24 units, which is 24 * 40 samples at 48 and 44.1 kHz and twice and four times
 // that at their doubles, so the carrier runs at 4, 2 or 1 times the content rate. The same table
 // as audio::link_rate(), which this library does not depend on.

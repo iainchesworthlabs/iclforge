@@ -1,4 +1,4 @@
-# Adapt an open branch to a migration stage of planning/layout.md, or measure how it would fare.
+# Adapt an open branch to a migration stage of the re-layout, or measure how it would fare.
 #
 # A stage rewrites most of the tree (moves, include spellings, names). Merging it by hand puts a developer's
 # edits against a tree where every include, namespace and path has changed. Running the stage's own scripts on
@@ -18,7 +18,7 @@
 #
 #   -Apply    does steps 1 to 4 in the worktree -Root, which must be clean and on the branch.
 #   -Measure  counts, without touching the branch, the files `git merge-tree` reports as conflicted when the
-#             branch is merged by hand and when the scripts have run on it first (the table in planning/layout.md);
+#             branch is merged by hand and when the scripts have run on it first;
 #             it needs a worktree of the migrated tree (-Root) and writes one result_<branch>.json to -Data.
 #
 # Usage:

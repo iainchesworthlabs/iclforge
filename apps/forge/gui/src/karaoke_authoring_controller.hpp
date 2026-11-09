@@ -6,7 +6,7 @@
 #include <QVariantMap>
 #include <QtQmlIntegration>
 
-// The Karaoke flow's rules, for QML (planning/karaoke-design.md, K6): a
+// The Karaoke flow's rules, for QML: a
 // stateless singleton over karaoke_authoring.hpp, so what the page shows of a
 // set of parts - the coding mode, where each coded channel comes from, the
 // checks - is what the tested helper decided, not something QML works out

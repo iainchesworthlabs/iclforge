@@ -1,7 +1,7 @@
 // @ts-check
 'use strict';
 
-// planning/esp32-device-ui.md's accessibility section, checked in the browser:
+// The page's accessibility, checked in the browser:
 // landmarks and names (every locator in these tests is by role and name, so a
 // control without one fails whatever drives it), every action from the
 // keyboard, text contrast in both colour schemes, a visible focus, controls

@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The lyric view against planning/hearth-sink-screen.md, S2 to S8, on the device's own text engine:
+ * The lyric view (S2 to S8 of the sink screen) on the device's own text engine:
  * the karaoke examples' documents (staged from examples/karaoke) go through the library's own frame
  * (`Harness.lyricFrameJson`, the pure half of `Sink::lyric_frame()`), through the parse, and into the
  * view, which is drawn to a bitmap at 1920 by 1080 with no display and no server. Each picture is

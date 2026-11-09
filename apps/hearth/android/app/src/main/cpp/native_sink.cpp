@@ -200,8 +200,8 @@ std::string NativeSink::start(const std::string& state_directory, const std::str
     options.code_method = sink::CodeMethod::kDynamic;
     options.unpaired_access = false;
     // The coded stream goes to the receiver as it is, in the formats the route takes when a server
-    // dials. player@v1's PCM is listed and dropped: the phase that decodes (planning/
-    // hearth-android.md, phase 4) and the one that plays it (5) are not this one's.
+    // dials. player@v1's PCM is listed and dropped: the phase that decodes and the one that plays
+    // it (5) are not this one's.
     options.codecs = {sendspin::messages::Codec::kPcm};
     options.extension_role = true;
     SharedAudio* audio = &impl_->audio;

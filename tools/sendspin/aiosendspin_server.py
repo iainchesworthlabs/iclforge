@@ -1,6 +1,6 @@
 """Music Assistant's Sendspin server, scripted on aiosendspin 9.1.1 or 10.2.1, to hearth-testsink.
 
-A rehearsal of A4's exit with Music Assistant (planning/hearth-reference-player.md, A4's exit):
+A rehearsal of A4's exit with Music Assistant:
 Music Assistant's Sendspin provider runs aiosendspin 9.1.1's SendspinServer, and this script drives
 one the way the provider does. For each codec it starts hearth-testsink on a loopback port,
 offering only that codec and player@v1, dials it, pairs by the sink's SP:0 token or by the dynamic

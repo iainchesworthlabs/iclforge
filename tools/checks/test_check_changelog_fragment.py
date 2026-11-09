@@ -71,7 +71,6 @@ class RequiringAFragment(unittest.TestCase):
             "docs/a.md",
             "tools/x.py",
             ".github/workflows/a.yml",
-            "planning/p.md",
             "README.md",
         ]
         self.assertEqual(run(changed=changed, require=True), [])

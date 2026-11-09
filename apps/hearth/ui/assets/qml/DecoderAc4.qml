@@ -4,14 +4,14 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The AC-4 decoder page (planning/hearth-design.md; planning/ac4.md, I2):
+// The AC-4 decoder page:
 // every control DecoderSettings::ac4 holds, and the ones AC-4 shares with
 // AC-3 and E-AC-3, read from and written straight back to
 // HearthController.decoderSettings - the decoder the engine plays AC-4
 // through takes each from its next frame.
 //
 // Dynamic range and the output level are AC-4's own, apart from the AC-3 and
-// E-AC-3 page's operating mode (planning/ac4.md, decision 12). The stereo
+// E-AC-3 page's operating mode. The stereo
 // fold, the LFE in it and what a bad frame does are one control for both
 // formats ("One control for both formats"), so they are the same settings
 // here as on that page.
@@ -553,8 +553,8 @@ ScrollView {
             }
         }
 
-        // Under both columns, full width, for the same reason "Errors" above is
-        // (planning/ac4.md, I5): the immersive layout's six choices do not fit a
+        // Under both columns, full width, for the same reason "Errors" above is:
+        // the immersive layout's six choices do not fit a
         // column beside their label at the window's narrowest.
         Card {
             Layout.fillWidth: true

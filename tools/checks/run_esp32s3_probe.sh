@@ -12,7 +12,7 @@
 #
 # --ac4 builds the decode profile with the component's AC-4 decoder and the AC-4 probe
 # (firmware/baremetal/ac4_probe.cpp) over sdkconfig.ac4, which turns on the board's octal PSRAM
-# and sends the decoder's allocations of 512 bytes and more there (planning/ac4.md, D14c).
+# and sends the decoder's allocations of 512 bytes and more there.
 # QEMU emulates that PSRAM. It gates what the other two directions gate, with the AC-4
 # probe's own ceilings, and two things more: every fixture's PCM hash against the pins the
 # Cortex-M3 leg and the host are held to (testdata/ac4-probe-pcm-hashes.json, decision
@@ -194,8 +194,8 @@ if [[ "$DIRECTION" == "encoder" ]]; then
 fi
 
 # --- and the AC-4 direction's --------------------------------------------------
-# Plain assignments, for the reason the encode block gives. Measured 2026-10-03 under QEMU
-# (planning/ac4.md, D14c), sdkconfig.ac4 with allocations of 512 bytes and more in PSRAM:
+# Plain assignments, for the reason the encode block gives. Measured 2026-10-03 under QEMU,
+# sdkconfig.ac4 with allocations of 512 bytes and more in PSRAM:
 #
 #   - the image: 51,469 bytes of DIRAM, half the AC-3 and E-AC-3 decode image's, since
 #     iclforge::ac3's decoders are not linked;

@@ -4,7 +4,7 @@ import android.content.res.AssetManager
 import android.graphics.Typeface
 
 /**
- * The family's faces (planning/hearth-sink-screen.md, Tokens): Archivo for Latin, Noto Sans Hebrew and
+ * The family's faces: Archivo for Latin, Noto Sans Hebrew and
  * Noto Sans Arabic for the scripts the phone's own fonts may lack, and the system's fallback for
  * everything else (Greek, Cyrillic and CJK: no face is bundled for them, which is the spec's open item
  * 9). The files are the shared theme's (apps/shared/theme/assets/fonts), staged into the APK's assets

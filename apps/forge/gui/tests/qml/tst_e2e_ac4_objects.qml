@@ -3,7 +3,7 @@ import QtTest
 
 import ForgeGui
 
-// AC-4 objects from the page, end to end (planning/ac4.md, I5b's exit criteria). The
+// AC-4 objects from the page, end to end. The
 // Objects tab and the AC-4 tab author objects, the Encode button writes them, and the
 // command line the run recorded - the one the command bar echoed - is run through this
 // build's forge in a folder holding copies of what it names: the sources, and the scene

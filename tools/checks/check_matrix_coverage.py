@@ -45,7 +45,7 @@ directly, via the same error-message path real bad input hits:
              same way for the same reason.
   ac4        every command whose usage row names an AC-4 file (in.ac4 or
              out.ac4) - decode, probe, transcode, the containers and the rest
-             planning/ac4.md's phase I1 taught AC-4 - must be run on AC-4 at
+             that handle AC-4 - must be run on AC-4 at
              least once: a `run <command>` line whose arguments name a file
              with "ac4" in it. A command can reach AC-4 only through its own
              code path for it (its own decoder, burst packer or track), so a

@@ -33,8 +33,8 @@ license: "GPL-3.0-or-later"  # matches LICENSE at the repo root
 #     under QEMU on every push since. Its LX7 has a single-precision FPU, which
 #     is what makes the float32 decode path worth having.
 #   - The ESP32-C3 is the fixed-point tier's part: a single-core RV32IMC with
-#     no floating-point unit, decoding in Q7.24 integer arithmetic
-#     (planning/arithmetic-tiers.md). It was "a different port entirely" here
+#     no floating-point unit, decoding in Q7.24 integer arithmetic.
+# It was "a different port entirely" here
 #     until that tier existed; what it needed was arithmetic, not a port. Its
 #     probe runs under qemu-riscv32 in CI, and the PCM it produces is
 #     bit-identical to the x86 host's and the Cortex-M3 leg's - which is a
@@ -47,8 +47,8 @@ license: "GPL-3.0-or-later"  # matches LICENSE at the repo root
 #   - The original ESP32 and the S2 have no FPU worth the name for this (the S2
 #     has none at all). The fixed tier is what they would want too, and neither
 #     has been built.
-#   - The ESP32-P4 is the "best" tier of the same shared sink family
-#     (planning/esp32-sink-tiers.md): closed 2026-09-08 as an S3 Wi-Fi
+#   - The ESP32-P4 is the "best" tier of the same shared sink family:
+# closed 2026-09-08 as an S3 Wi-Fi
 #     replacement (integer-only PIE; no on-die radio; the S3 probe was already
 #     real-time), reopened 2026-09-21 as a complementary module once a board
 #     existed to measure it on. Dual-core RV32IMAFC at 400 MHz with a

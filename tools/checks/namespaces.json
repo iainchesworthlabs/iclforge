@@ -20,7 +20,7 @@
   "debts": [
     {
       "file": "libs/objects/include/iclforge/objects/aliases.hpp",
-      "reason": "iclforge::oba and iclforge::emdf, aliases of iclforge::objects::oba and iclforge::objects::emdf for a release (planning/consolidation.md, decision 19): the release after C6 deletes the file and this row"
+      "reason": "iclforge::oba and iclforge::emdf, aliases of iclforge::objects::oba and iclforge::objects::emdf for a release: the release after C6 deletes the file and this row"
     },
     {
       "file": "libs/base/include/iclforge/base/bitreader.hpp",

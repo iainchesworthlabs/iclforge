@@ -1,7 +1,7 @@
 #pragma once
 
 // The room a layout describes, seen from above, for a screen: where each speaker is drawn, and how a
-// level makes one glow (planning/p4x-now-playing.md). The ESP32-P4's panel draws it while a song with no
+// level makes one glow. The ESP32-P4's panel draws it while a song with no
 // lyrics plays; the numbers are here, standard library only and tested on the host
 // (libs/render/tests/test_room_plan.cpp), because a wrong subscript here puts the centre in the
 // subwoofer's place and the picture is the only thing that would say so.
@@ -289,8 +289,8 @@ namespace detail {
 //
 // A level is judged against the loudest the room has lately been (LevelCeiling), not against full scale. The
 // player's volume is applied before the meter, so against full scale the glow shrinks with the volume knob;
-// against the programme's own loudest the same music shows the same at any volume
-// (planning/p4x-speakers-options.md). Silence is still absolute: an output with nothing on it is hollow.
+// against the programme's own loudest the same music shows the same at any volume.
+// Silence is still absolute: an output with nothing on it is hollow.
 inline constexpr int kGlowCoreSteps = 6;  // 1 (faintly lit) to 6 (as loud as it shows); 0 is silent
 inline constexpr int kGlowHaloSteps = 2;  // 0 (none) to 2, from the peak
 inline constexpr float kGlowSilentDb = -80.0F;

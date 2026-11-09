@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """The Hearth sink screen's tokens: one file, one generated output, two checked sources.
 
-planning/hearth-sink-screen.md fixes the family's tokens once and planning/hearth-android.md (D13)
-says where: docs/hearth/design/sink-screen-tokens.json. This script
+The family's tokens are fixed once, in docs/hearth/design/sink-screen-tokens.json. This script
 
   * writes the Android app's Tokens.kt from it (--write) and holds the committed copy to it
     (--check);
@@ -82,10 +81,9 @@ def kotlin(tokens: dict) -> str:
 package com.iclforge.hearth
 
 /**
- * The family's tokens as planning/hearth-sink-screen.md (Tokens, Layout) states them: the Signal
- * palette in its dark mode, which a sink always draws, whatever the OS theme is, and the sizes in
- * `u`, a 600th of the view's height. The desktop's palette and the P4X panel's screen are held to
- * the same file by the same script.
+ * The family's tokens: the Signal palette in its dark mode, which a sink always draws, whatever the
+ * OS theme is, and the sizes in `u`, a 600th of the view's height. The desktop's palette and the
+ * P4X panel's screen are held to the same tokens by the same script.
  */
 object Tokens {{
     val BG: Int = {argb(c["bg"])}.toInt()

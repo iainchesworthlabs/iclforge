@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// A singer's microphone, on the Karaoke page (planning/karaoke-microphone.md, M4).
+// A singer's microphone, on the Karaoke page.
 //
 // What the card promises is as much its content as its controls: the microphone is off until the
 // button is pressed, and is closed again when the page is left or the item ends; nothing is

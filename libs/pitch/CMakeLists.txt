@@ -1,7 +1,6 @@
 # ---------------------------------------------------------------------------
 # iclforge::pitch - a fundamental-frequency tracker for a singing voice, a reference melody as a contour
-# of pitch on a grid, and a pitch score of one against the other (planning/karaoke-microphone.md, D7 to
-# D10; findings F5).
+# of pitch on a grid, and a pitch score of one against the other.
 #
 # Standard library only, so that Hearth, the browser build and the sink firmware can all link it: the
 # board's microphone path is a later step and wants the same arithmetic. The tracker is the McLeod Pitch

@@ -1,8 +1,7 @@
 // The real sink for a part with a WIDE I2S TDM frame - the ESP32-P4's one
 // controller carries 512 bits a frame (I2S_LL_SLOT_FRAME_BIT_MAX), four
 // times the ESP32-S3/C6's 128, which is enough on its own to reach this
-// product's full sixteen-channel target (planning/esp32-sink-tiers.md's
-// "best" tier: one wide controller into both ES9080 DACs, 16x32-bit) - on
+// product's full sixteen-channel target - on
 // >=v3.0 silicon. See "TDM MODE IS NOT REACHABLE..." below for what this
 // means on the pre-production chip revision this was brought up on.
 //
@@ -221,7 +220,7 @@ i2s_tdm_slot_mask_t slot_mask(std::size_t slots) {
 // just output 0"; i2s_tdm.c sizes the buffer by popcount(slot_mask), `active_slot`). The queue is
 // the same depth in time (kDmaDescriptors x kDmaFrames frames) and costs 4 bytes a frame for each
 // channel and not for each slot of the frame: 73,728 bytes of internal RAM for a 5.1 layout where
-// all sixteen slots took 196,608 (planning/karaoke-p4x-panel.md, "Where the internal RAM goes").
+// all sixteen slots took 196,608.
 [[nodiscard]] std::size_t dma_slots(const Line& line) {
     return iclforge::dma_slots(line.tdm, line.slots, line.channels);
 }
@@ -343,7 +342,7 @@ bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGp
         // 32-bit slots of the full frame are 512 bits, 24.576 MHz of bit clock at 48 kHz; the
         // controller's mclk is three times the frame (73.728 MHz) and needs a source at least twice
         // that, 147.456 MHz, so 160 MHz it is, divided by 2.17. Chosen at build time, not read from
-        // the chip, because the two revisions are two images (planning/karaoke-p4x-panel.md, D7).
+        // the chip, because the two revisions are two images.
         // NOT RUN ON A v3.x BOARD YET: this is the line the kit's first TDM open checks.
         tdm_cfg.clk_cfg.clk_src = I2S_CLK_SRC_PLL_160M;
 #else

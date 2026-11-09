@@ -1,4 +1,4 @@
-// The AC-4 encoder's metadata (planning/ac4.md, phase E5): further loudness
+// The AC-4 encoder's metadata: further loudness
 // values, DRC's decoder modes, the stereo downmix's values and dialogue
 // enhancement, read back by the decoder with the encoder's trace, and applied
 // by the decoder's output processing (phase D6) with the gains their formulas

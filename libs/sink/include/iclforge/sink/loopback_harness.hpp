@@ -8,7 +8,7 @@
 
 #include "iclforge/sink/sink.hpp"
 
-// The pass-through path end to end, in one process (planning/hearth-android.md, phase 1d, AR1): a
+// The pass-through path end to end, in one process: a
 // Sendspin server session packs an AC-3 or E-AC-3 elementary stream into IEC 61937 bursts the way
 // Hearth's server does, sends each as a burst chunk over a loopback WebSocket to an
 // iclforge::sink::Sink whose extension-role output is the PassthroughOutput, whose link is a model

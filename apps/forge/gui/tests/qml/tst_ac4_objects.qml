@@ -3,7 +3,7 @@ import QtTest
 
 import ForgeGui
 
-// AC-4 objects on the encoder page (planning/ac4.md, I5b), each new control from the
+// AC-4 objects on the encoder page, each new control from the
 // keyboard: object mode under the AC-4 codec (the codec picker takes E-AC-3 and AC-4 in
 // it, never AC-3), the AC-4 tab's object controls (the coding, the dialnorm in whole dB,
 // the CRC) with the controls that describe channels switched off, the writer's limits in

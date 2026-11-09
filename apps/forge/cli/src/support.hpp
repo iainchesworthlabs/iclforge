@@ -162,7 +162,7 @@ struct Options {
     // scoring a provisional reading (libs/truehd/ERRATA.md question 101); empty is the library's.
     std::string truehd_reading;
     // 'decode' only: `strict` makes a decode that lost frames or units after the first one decoded
-    // exit with kExitInput, after writing what it could decode (planning/ac4.md, option D). Without
+    // exit with kExitInput, after writing what it could decode. Without
     // it such a decode exits 0 and warns where it always did.
     bool strict = false;
     // 'truehd-encode' only: iclforge::truehd::EncoderConfig's choices. Unset means the encoder's
@@ -201,8 +201,7 @@ struct Options {
     // syntax trace to this path - one line per syntax element the encoder
     // wrote or the decoder read, frame, substream, bit offset, width, value
     // and name, tab-separated, in the shape tools/references/ac4_syntax.py's
-    // `trace` command writes, so the three can be compared line by line
-    // (planning/ac4.md, the encoder's ladder, item 1).
+    // `trace` command writes, so the three can be compared line by line.
     std::string syntax_trace_path;
     // 'ac4-encode' only: codec-mode=, "auto" (or empty), "simple", "aspx",
     // "aspx-acpl-1", "aspx-acpl-2", "aspx-acpl-3", "scpl", "aspx-scpl" or
@@ -1006,9 +1005,8 @@ void warn_associated_not_mixed(const Options& meta, std::string_view command,
 void warn_karaoke_not_applied(const Options& meta, std::string_view command,
                               std::string_view why);
 
-// karaoke given with an AC-4 stream: Annex C is AC-3's (and, by analogy, E-AC-3's:
-// planning/karaoke-eac3.md), AC-4 has no karaoke mode, and the reproduction is not
-// applied. The words `decode` uses for the same case.
+// karaoke given with an AC-4 stream: Annex C is AC-3's (and, by analogy, E-AC-3's), AC-4 has
+// no karaoke mode, and the reproduction is not applied. The words `decode` uses for the same case.
 void warn_karaoke_not_ac3(const Options& meta, std::string_view codec);
 
 // karaoke given to `spatial`, which places an E-AC-3 stream's objects and decodes
@@ -1037,7 +1035,7 @@ void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
 [[nodiscard]] bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
                                       const iclforge::ac3::DecodedFrame& frame);
 
-// The same question of an assembled E-AC-3 programme (planning/karaoke-eac3.md, D1 to D3): the
+// The same question of an assembled E-AC-3 programme: the
 // decoder's own rule, iclforge::ac3::is_karaoke_programme(), says whether it is one independent
 // substream flagged karaoke with no object layer, and the stage's channel count says whether
 // the reproduction changed anything.

@@ -46,8 +46,7 @@
 //      none reproduces AC-3's alone). A sink whose decoder is not told how plays the coded
 //      channels, and a group would then play two things: that sink is sent PCM decoded here
 //      instead, with the reproduction applied, and where it takes no PCM it is sent the stream
-//      as it is and the reason says it is not reproduced (planning/karaoke-phase2.md, W7;
-//      planning/karaoke-eac3.md, D6).
+//      as it is and the reason says it is not reproduced.
 //   2. Else PCM, if the sink offers `player@v1` with a PCM format that
 //      carries the stream's rate and if the policy allows it. The layout is
 //      the one the sink is configured to (its own reported `layout`, else the
@@ -59,7 +58,7 @@
 //
 // What this does not decide: whether the sink can SUSTAIN a PCM stream. An
 // ESP32-C6 does on a quiet link and drops out on a busy one, its buffer being
-// a fifth of a second (planning/esp32-sink-compatibility-matrix.md), a fact
+// a fifth of a second, a fact
 // about the board that the sink does not state yet. The caller passes it as
 // `pcm_fallback` and `pcm_caveat`: the one place that turns the fallback off
 // for a board, or for a person who asked for "never decode in Hearth", is
@@ -227,8 +226,8 @@ struct GroupFormPlan {
 
 // The policy for one sink: whether it may be sent PCM decoded here when it cannot take the
 // stream as it is, and what to say about it. An ESP32-C6 is sent PCM with a caveat, its buffer
-// being short enough that a busy WiFi drops the stream out (planning/esp32-sink-compatibility-
-// matrix.md): the sink does not state that, so it is read from the hardware it names, until the
+// being short enough that a busy WiFi drops the stream out: the sink does not state that, so it is
+// read from the hardware it names, until the
 // board can say it. A sink the person has set to Opus (SinkFacts::opus_fallback) that lists it is
 // sent that instead. This is the place a person's own "never decode in Hearth" setting will be
 // read as well.

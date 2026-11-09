@@ -21,7 +21,7 @@
 #include "iclforge/sink/decoding_output.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
 
-// The decoding output on TrueHD (planning/truehd-parity-hearth-player.md, H5): the chunks of access
+// The decoding output on TrueHD: the chunks of access
 // units a server sends, decoded and rendered to the sink's layout, against iclforge::truehd::Decoder
 // run directly over the same units, which is the library the oracle of the whole feature is (the
 // fixtures' decode equals FFmpeg's strict decode, testdata/truehd/manifest.json).

@@ -13,7 +13,7 @@ the LSB bypass) the stream the encoder tool writes must
   * give a 7.1 bed that, without noise, is the render ERRATA.md entry 70 defines, computed here from
     the definition and not from the encoder.
 
-Moving objects (EncoderConfig::object_paths; the notes in libs/truehd/notes) are held the same way.
+Moving objects (EncoderConfig::object_paths) are held the same way.
 For each of MOTION_CONFIGURATIONS (a slow path and a step path; the matrices'
 coefficients held between updates, or sliding with the extension's slopes) the stream the encoder
 tool writes must decode, by the reference, to the objects, and its bed must be within the

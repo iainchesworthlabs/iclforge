@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# A test binary per project (planning/monorepo.md, (e)): iclforge-<project>-tests, built from the
+# A test binary per project: iclforge-<project>-tests, built from the
 # project's tests/ directory, and the umbrella target iclforge-tests that builds them all.
 #
 # ctest names a test by its Catch2 test case, not by its binary, so the names are what one binary

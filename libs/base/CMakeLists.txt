@@ -75,8 +75,7 @@ endif()
 # the generic header for why that is what makes the bit-exactness claim testable.
 #
 # The directories were src/forge/src/internal/arch/ until libs/ac4/src/core's QMF
-# banks took vector kernels of their own (planning/ac4.md, D14a, and decision 31's
-# "the vector types" in a header-only target both consumers link): iclforge::base_headers below
+# banks took vector kernels of their own: iclforge::base_headers below
 # carries the include path, so linking it is all a consumer does.
 #
 # ICLFORGE_SIMD forces a directory. `generic` in particular is what a
@@ -125,8 +124,8 @@ endif()
 # MantExp, and the cross-platform-identical float transcendentals) and the SIMD directory, as a
 # header-only target: iclforge::ac3, its minimum-footprint archive, libs/ac4/src/core and libs/dsp
 # include them, and the minimum-footprint profile and AC-4 link no iclforge::base, so they take the
-# include path from this target rather than from the library. One copy of Fixed32, which decision
-# 31 of planning/ac4.md asks for, without AC-4 linking the AC-3 codec to reach it. Not installed and
+# include path from this target rather than from the library. One copy of Fixed32, without AC-4 linking
+# the AC-3 codec to reach it. Not installed and
 # not exported, as iclforge::warnings is not: in-tree build plumbing. The arithmetic headers are in
 # internal/, which only this target puts on an include path, so the library installs its include/
 # whole (cmake/InstallLibrary.cmake).
@@ -262,7 +261,7 @@ endif()
 
 # --- Version + git stamp ---------------------------------------------------
 # The family's version, which every library of the package shares (iclforge/base/version.hpp; AC-3's
-# until planning/consolidation.md's C6).
+# until it moved here).
 find_package(Git QUIET)
 set(ICLFORGE_VERSION_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/include/iclforge/base/version.hpp.in")
 set(ICLFORGE_VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/iclforge/base/version.hpp")

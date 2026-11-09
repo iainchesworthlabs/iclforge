@@ -73,7 +73,7 @@ using Location = iclforge::ac3::eac3::chanmap::Location;
 constexpr std::size_t kBlock = Playout::kBlockFrames;
 static_assert(kBlock == iclforge::ac3::kSamplesPerBlock, "the player writes the decoder's block");
 constexpr std::size_t kMaxSlots = OutputLayout::kMaxSlots;
-// A burst is always 1,536 samples (planning/hearth-sendspin-extension.md).
+// A burst is always 1,536 samples.
 constexpr std::uint64_t kBurstFrames = 1536;
 // An AC-4 chunk is one frame, which lasts what its frame rate says: 2,048 samples at frame rate 13
 // and 48 kHz, until the first decoded frame says.

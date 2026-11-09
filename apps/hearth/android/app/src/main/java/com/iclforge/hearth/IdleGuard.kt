@@ -1,10 +1,10 @@
 package com.iclforge.hearth
 
 /**
- * The idle screen's rule from planning/hearth-sink-screen.md (Motion): "after a quiet period it dims
+ * The idle screen's rule (Motion, in the sink screen's design): "after a quiet period it dims
  * and moves a few u every minute, so a screen on for hours does not hold one image (an OLED TV is the
  * reason)". A sink holds the display on for as long as it is open (FLAG_KEEP_SCREEN_ON: a display that
- * sleeps takes its HDMI audio route with it, planning/hearth-android-findings.md F12), so what is on it
+ * sleeps takes its HDMI audio route with it), so what is on it
  * when nothing changes stays on it.
  *
  * Pure: the caller says how long nothing has changed and applies the answer to its view.

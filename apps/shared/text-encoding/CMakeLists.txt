@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::app_text_encoding (planning/karaoke-formats-options.md, D16): the legacy code pages a
+# iclforge::app_text_encoding: the legacy code pages a
 # lyrics file can be read in, converted to UTF-8 by the operating system's own conversion, as the
 # decoder libs/lyrics asks a program for. Internal: forge's `lyrics-encoding=` and the Forge GUI's
 # Lyrics row link it, and it is not installed or packaged.

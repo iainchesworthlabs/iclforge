@@ -931,8 +931,8 @@ TEST_CASE("stream decoder: an independent-only decoder plays a unit's first subs
     CHECK_FALSE(std::ranges::equal(from_units, collect(whole, units)));
 }
 
-// Annex C's karaoke reproduction through the stream decoder (planning/karaoke.md, P2 to P5 and
-// P10): a 3/2 stream with an LFE, flagged bsmod 7, whose five full-bandwidth channels are L, M,
+// Annex C's karaoke reproduction through the stream decoder: a 3/2 stream with an LFE, flagged
+// bsmod 7, whose five full-bandwidth channels are L, M,
 // R, V1 and V2 as tones at different frequencies, so that what reaches each speaker names the
 // parts in it.
 namespace {
@@ -1180,7 +1180,7 @@ TEST_CASE("stream decoder: the unit report says whether karaoke was reproduced",
     }
 }
 
-// The same programme as karaoke_units(), as E-AC-3 (planning/karaoke-eac3.md, E4a and E4c): one
+// The same programme as karaoke_units(), as E-AC-3: one
 // independent substream, 3/2 + LFE, flagged `bsmod`, the same tones in the same channels. The
 // reproduction is the decoder's for an E-AC-3 programme of one independent substream (D1 to D3),
 // and the engine's bed has to be the shape it gives, or the renderer is handed four channels for a

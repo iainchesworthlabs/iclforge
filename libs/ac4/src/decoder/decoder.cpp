@@ -1203,7 +1203,7 @@ struct Decoder::Impl {
     // so that a frame allocates none of them once the first has sized them.
     std::vector<detail::PresentationPlan> plans;
     Capture frame_capture;
-    // The frame read ahead (planning/ac4.md, D14i): decode()'s `next`, read on the executor's
+    // The frame read ahead: decode()'s `next`, read on the executor's
     // other lane while the frame before it is reconstructed, into a capture, plans and scratch of
     // its own, so that nothing the reconstruction reads is written. Its reports are made when
     // the following decode() takes it (take_ahead()), which is when a decode() without `next`

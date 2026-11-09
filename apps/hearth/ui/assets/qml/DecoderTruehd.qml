@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The TrueHD and MLP decoder page (planning/truehd-parity-hearth-player.md, H3): the controls
+// The TrueHD and MLP decoder page: the controls
 // DecoderSettings::truehd holds, read from and written straight back to
 // HearthController.decoderSettings, as DecoderAc4.qml does for AC-4. A change reaches the playing
 // item at its next restart, because a TrueHD decoder is built with its presentation and its

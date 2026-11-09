@@ -309,7 +309,6 @@ Music Assistant has no such words at all. On a stream with them, the loud-to-qui
 from 31.3 dB to 23.9 dB (AC-3 and E-AC-3) and from 26.0 dB to 17.6 dB (AC-4). A board with a screen offers the choice as *Late night* under *Preferences*, in the Sound group, greyed with the
 reason where the build has no player; *Reset preferences* puts it back on `standard`. Every board with a Sendspin player
 answers the route; a board with no AC-4 decoder (the C6) is sent PCM for AC-4 and so has nothing to compress there.
-What was measured, and what was not, is in `planning/hearth-late-night.md`.
 
 ## Groups
 
@@ -430,5 +429,3 @@ an earlier one-minute run a 108-byte allocation did, with no effect on the strea
   every setting, the REST routes, and the measurements.
 - [ESP32-S3](../platforms/bare-metal/esp32-s3.md): the decoder on this part, and its timing and
   memory.
-- [The plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-reference-player.md):
-  what Hearth is building, and in what order.

@@ -9,7 +9,7 @@
 #include "iclforge/dsp/detail/complex.hpp"
 
 // What the decoder's tools ask of its scalar beyond arithmetic, so that one source serves the
-// double, float and fixed-point tiers (planning/ac4.md, D14d).
+// double, float and fixed-point tiers.
 //
 // At double and float each name below is the scalar itself or the expression the tools wrote
 // before the fixed tier existed: an energy is a Real, energy_of() is norm(), apply_gain() is a

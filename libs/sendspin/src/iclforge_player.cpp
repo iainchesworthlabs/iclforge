@@ -105,7 +105,7 @@ constexpr std::array<Named<KaraokeVocals>, 4> kKaraokeVocals{{
 
 constexpr std::int32_t kMaxOutputDelay = 5000;
 // The largest chunk limit a sink may state: past AC-4's longest burst chunk (17 + 131,056 bytes)
-// and one WebSocket message's 65,518 (planning/hearth-sendspin-extension.md, Encryption).
+// and one WebSocket message's 65,518.
 constexpr std::int32_t kMaxChunkBytes = 1 << 20;
 // The most channels a sink may state it decodes: past AC-4's immersive beds and a few objects.
 constexpr std::int32_t kMaxCodedChannels = 64;

@@ -4,8 +4,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The singer view (planning/karaoke-design.md, K5; the design sheet's "Hearth:
-// singer view"): the lyric view made full screen, dark, for a room rather than
+// The singer view: the lyric view made full screen, dark, for a room rather than
 // a desk. F11 opens it (Main.qml puts the window full screen with it) and Escape
 // leaves; the position bar, the transport, the queue and the vocals chooser stay at
 // the bottom so a singer can move about in the song, pause, skip, pick the next song
@@ -234,8 +233,8 @@ Popup {
                     textColor: root.ink
                 }
 
-                // The tune as notes and the singer's voice over them (planning/karaoke-
-                // microphone.md, M5): only with the microphone on and a tune to follow, so that a
+                // The tune as notes and the singer's voice over them: only with the microphone on
+                // and a tune to follow, so that a
                 // room that has not asked for it sees the words and nothing else.
                 PitchRibbon {
                     objectName: "lyricScreenRibbon"

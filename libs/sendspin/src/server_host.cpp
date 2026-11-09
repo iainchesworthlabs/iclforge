@@ -64,7 +64,7 @@ constexpr std::int64_t kLongestUnit = 150'000;
 // stream is sent units of at most kShortUnit. On a board with such a buffer, a unit's bytes
 // arriving late stalls the whole unit, and the longer the unit the more often and the longer the
 // stall: an ESP32-C6, 48 KB, dropped out a median 2 times in 15 s on 10 ms units and 22 on 21 ms
-// ones, the same stream over the same link (planning/esp32-sink-compatibility-matrix.md).
+// ones, the same stream over the same link.
 constexpr std::int64_t kShallowBuffer = 1'000'000;
 constexpr std::int64_t kShortUnit = 10'000;
 constexpr std::chrono::seconds kRedialAfter{10};
@@ -344,8 +344,8 @@ class HostConnection final : public ServerListener, public std::enable_shared_fr
             }
             const bool offers_pcm =
                 client.player_support && contains(client.supported_roles, kPlayerRole);
-            // The extension role only on a long-term PSK connection, and never beside player@v1
-            // (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1). A client the
+            // The extension role only on a long-term PSK connection, and never beside player@v1.
+            // A client the
             // host was asked to play PCM to (use_pcm()) takes player@v1 instead, where it offers
             // it.
             if (client.psk == hs::PskCategory::kLongTerm && client.iclforge_support &&
@@ -354,7 +354,7 @@ class HostConnection final : public ServerListener, public std::enable_shared_fr
             } else if (offers_pcm) {
                 roles.emplace_back(kPlayerRole);
             }
-            // The other roles by policy (planning/hearth-sendspin-extension.md, Other roles).
+            // The other roles by policy.
             bool source_allowed = false;
             {
                 const std::lock_guard lock(host_->mutex);

@@ -2,7 +2,7 @@
 'use strict';
 
 // The Speakers section: a level and a distance for each speaker the layout in force has at an output, and a test
-// tone out of each (planning/p4x-preferences.md), driven through the page against the stand-in device. The routes
+// tone out of each, driven through the page against the stand-in device. The routes
 // are GET and PUT /trim and GET and POST /identify; what the firmware writes for them is held to here, key for key,
 // against the headers that write it.
 

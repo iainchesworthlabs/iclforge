@@ -187,7 +187,7 @@ class Board final : public iclforge::prefs::Backend {
         return sound_set_trim_text(statements).empty();
     }
 
-    // Late night (planning/hearth-late-night.md): stored, and the Sendspin player follows from the next stream.
+    // Late night: stored, and the Sendspin player follows from the next stream.
     [[nodiscard]] bool late_night() const override {
         return settings().dynamic_range == iclforge::ac3::DynamicRange::kLateNight;
     }

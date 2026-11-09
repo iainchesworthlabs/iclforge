@@ -8,7 +8,7 @@
 #include "iclforge/audio/capture_timeline.hpp"
 
 // iclforge::audio::CaptureTimeline (capture_timeline.hpp): the time of any frame of a capture from
-// the stamps its packets carried (planning/karaoke-microphone.md, MI6). Device-free: the stamps are
+// the stamps its packets carried. Device-free: the stamps are
 // made here, so every platform checks the same arithmetic whether or not its backend gives any.
 
 namespace {

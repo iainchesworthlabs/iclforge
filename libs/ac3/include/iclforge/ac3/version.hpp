@@ -2,8 +2,8 @@
 
 #include "iclforge/base/version.hpp"
 
-// The family's version is iclforge::base's (iclforge/base/version.hpp, since
-// planning/consolidation.md's C6); these names are kept for a release.
+// The family's version is iclforge::base's (iclforge/base/version.hpp); these
+// names are kept for a release.
 
 namespace iclforge::ac3 {
 

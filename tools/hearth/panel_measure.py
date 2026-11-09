@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure what the screen costs on a booked board, from the board's own numbers.
 
-The kit protocol of planning/p4x-meters-view.md ("Kit protocol"), as a program a session can run
+The kit protocol, as a program a session can run
 unattended. A stream is played to the board over Sendspin by the repository's test server (the way
 the product plays, and the only path the Meters view's tap listens to); while it plays, this
 changes what the screen shows on a schedule (the speakers view in its glow and pulse styles, the
@@ -824,7 +824,7 @@ def measure_row(
                 "title": row.title,
                 "layout": row.layout,
                 "outputs": row.outputs,
-                "error": "needs --atmos: an E-AC-3 JOC file (planning/p4x-meters-view.md)",
+                "error": "needs --atmos: an E-AC-3 JOC file",
             }
         programme = atmos
     else:

@@ -8,7 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * AR1 on the device's runtime (planning/hearth-android.md, phase 1d): the bytes the pass-through
+ * AR1 on the device's runtime: the bytes the pass-through
  * output hands its link are the bursts the host wrote. Each case runs the native loopback harness in
  * this process: a server session packs a Dolby-encoded fixture into IEC 61937 bursts, sends them
  * over a loopback WebSocket to the app's sink core with the pass-through output over a model device,

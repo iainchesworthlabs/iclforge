@@ -11,8 +11,8 @@
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 
-// libs/lyrics/include/iclforge/lyrics/stage.hpp: what a screen shows of a song at one position
-// (planning/karaoke-p4x-panel.md, D2). Each expectation is the arithmetic of the format worked out
+// libs/lyrics/include/iclforge/lyrics/stage.hpp: what a screen shows of a song at one position.
+// Each expectation is the arithmetic of the format worked out
 // from the file below, not what the code happens to answer.
 
 namespace {

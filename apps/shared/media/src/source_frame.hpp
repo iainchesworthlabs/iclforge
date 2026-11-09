@@ -19,8 +19,8 @@
 // with the last sample held).
 //
 // `forge encode` has always held it, in four loops of its own; the Forge GUI
-// wrote zero in four of its own, so one plan gave two different last frames
-// (planning/karaoke-phase2.md, W1). This is the one place that says which, for
+// wrote zero in four of its own, so one plan gave two different last frames.
+// This is the one place that says which, for
 // both: compiled straight into forge, forge-gui and iclforge-app-media-tests,
 // as sink_wait.hpp beside it is, so a test can hold the policy and a window's
 // bytes can be compared with the command line's.

@@ -312,7 +312,7 @@ TEST_CASE("network group sink: PCM and a burst reach real sinks through the wrap
     CHECK(different == 0);
 }
 
-// --- the lyrics a group's members hold (W7d, planning/karaoke-phase2.md) ------------------------
+// --- the lyrics a group's members hold (W7d) ------------------------
 
 TEST_CASE("LyricsAnchors: a first sample is an anchor, and playing on is not one until it is stale",
           "[hearth][group][lyrics]") {
@@ -430,7 +430,7 @@ TEST_CASE("LyricsAnchors: a seek is an anchor at once, and a new item forgets th
     CHECK(fresh->position_ms == 0);
 }
 
-// --- what is playing, for the members that show it (D7, planning/hearth-android.md) ---------------
+// --- what is playing, for the members that show it (D7) ---------------
 
 TEST_CASE("network group sink: the item playing reaches a member that shows it, and goes when the group closes",
           "[hearth][group][websocket][metadata]") {

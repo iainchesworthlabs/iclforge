@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
 # The TrueHD decoder on a chip: what it costs on an ESP32-C6, -S3 or -P4, measured.
 #
-# planning/truehd-parity-esp32-sinks.md estimated these from a host and a ratio taken from the AC-3
-# decoder's board tables; this program replaces the estimates. It decodes the committed TrueHD
+# These were estimated from a host and a ratio taken from the AC-3 decoder's board tables;
+# this program replaces the estimates. It decodes the committed TrueHD
 # fixtures (testdata/truehd) from flash, checks each decode against the PCM hash FFmpeg's strict decode
 # gives (testdata/truehd/manifest.json), and prints what each cost: microseconds and CPU cycles an
 # access unit (the slowest and the mean), the real-time factor, the heap the decoder holds and the stack

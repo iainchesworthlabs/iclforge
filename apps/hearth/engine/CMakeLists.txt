@@ -1,4 +1,4 @@
-# hearth_engine (planning/hearth-reference-player.md, A3): the player's
+# hearth_engine: the player's
 # engine, with no Qt in it. The application's window (A5) will be a client of
 # this library rather than the place any of it lives, the same split
 # apps/crucible/{engine,ui} already keeps - and the same reason: everything
@@ -58,7 +58,7 @@ endif()
 if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     target_sources(hearth_engine PRIVATE src/pairing_store.cpp src/server_identity.cpp src/network_sinks.cpp
                                             src/network_group_sink.cpp)
-    # A Hearth sink's firmware (planning/esp32-ota.md, O5): the board's own HTTP routes over
+    # A Hearth sink's firmware: the board's own HTTP routes over
     # cpp-httplib, configured as libs/sendspin configures it, and the board's own headers for what
     # GET /firmware says and what an image must be (libs/device's firmware_image.hpp and
     # firmware_status.hpp, free of ESP-IDF, which the board includes too), so that this app holds an
@@ -75,7 +75,7 @@ endif()
 # From apps/shared/media/src, which has no library target: the container facts an item's
 # loader hands over (container_input.hpp, whose functions the application's
 # loader compiles), probe's JSON stream summary, which the media information
-# writes as forge probe does, and Ac4ObjectRenderer (planning/ac4.md, I5),
+# writes as forge probe does, and Ac4ObjectRenderer,
 # the same iclforge::render::LayoutRenderer-based panner forge's own 'decode'
 # plays AC-4 objects through, compiled in here so the engine's AC-4 path can
 # take it up too.

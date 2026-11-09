@@ -6,7 +6,7 @@ import android.net.NetworkCapabilities
 import java.net.Inet4Address
 
 /**
- * Where the box is on the network, for the idle screen (planning/hearth-sink-screen.md, S1): its IPv4
+ * Where the box is on the network, for the idle screen: its IPv4
  * address on the active network and what kind of network that is. The name of a Wi-Fi network needs a
  * location permission, which a sink has no other use for, so the kind is what is said.
  */

@@ -3,8 +3,7 @@
 
 // The page on a twelve-slot board - CI's sdkconfig.ci-http714 shape under QEMU,
 // with the stream set (firmware/hearth-sink/www/) served
-// beside it - and what it says a layout does with a stream: planning/
-// esp32-device-ui.md's "The output layout". CI runs it after
+// beside it - and what it says a layout does with a stream. CI runs it after
 // tools/checks/check_stream_set.py has played the set, with the device's
 // layout at 7.1.4, and it leaves the layout at 7.1.4.
 
@@ -78,7 +77,7 @@ test('the page says what each output layout does with each stream', async ({ pag
     await expect(page.locator('#next')).toBeHidden();
 
     // 2.0: the decoder's fold. Of a 5.1 stream: folding 7.1.4 needs more
-    // internal RAM than this shape has without PSRAM (planning/esp32-stream-set.md).
+    // internal RAM than this shape has without PSRAM.
     await choose('2.0');
     await play('layout-51.ec3');
     await expect(page.locator('#output')).toHaveText('2.0, 2 slots: folded to two channels by the decoder (Lo/Ro)');

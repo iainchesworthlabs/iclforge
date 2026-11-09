@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import Hearth
 
 // Pinned to the bottom of every page, the way every round-1 artboard shows
-// it (planning/hearth-design.md). None of these buttons is inside a
+// it. None of these buttons is inside a
 // Repeater, so the native-Button-in-a-Repeater hang the family has hit
 // elsewhere does not apply here.
 Rectangle {

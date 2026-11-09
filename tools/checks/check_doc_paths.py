@@ -79,7 +79,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from urllib.parse import unquote
 
-MARKDOWN_GLOBS = ("docs/**/*.md", "planning/*.md")
+MARKDOWN_GLOBS = ("docs/**/*.md",)
 MARKDOWN_FILES = ("README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "ROADMAP.md")
 # Files whose links must be absolute rather than resolvable from this tree,
 # with the reason the inverted rule applies to them.
@@ -95,7 +95,7 @@ LITERAL_GLOBS = (
     "tools/**/*.ps1",
 )
 # The prefixes the literal check treats as a repo-relative path.
-# "src" stays: there is no top-level src/ since planning/monorepo.md's C7-1, so a literal that
+# "src" stays: there is no top-level src/ since the monorepo re-layout, so a literal that
 # starts with it is a path nothing moved, and is reported unless FOREIGN_PATHS says whose it is.
 LITERAL_PREFIXES = ("docs", "apps", "libs", "external", "notices", "src", "tools")
 
@@ -114,44 +114,33 @@ FOREIGN_PATHS = {
     "src/main/assets/signing.key": "relative to the Android app module, not the repo root",
 }
 
-# Paths a plan proposes but the tree does not have yet. A brace token expands to
+# Paths a page proposes but the tree does not have yet. A brace token expands to
 # one path per alternative (see expand_braces), so these are listed individually
 # and, like FOREIGN_PATHS, printed on every run. A path that lands should be
-# deleted from here, which is what makes the plan's own prose fall due. Only a page that is not in
-# PROSE_PATHS_UNCHECKED needs an entry: that table already excuses the prose of the other plans.
+# deleted from here, which is what makes the page's own prose fall due. Only a page that is not in
+# PROSE_PATHS_UNCHECKED needs an entry: that table already excuses the prose of the other pages.
 PLANNED_PATHS = {
     "libs/ac3/include/iclforge/ac3/decoder/associated_service.hpp": (
-        "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
+        "proposed for decode-time associated-service mixing, not created yet"
     ),
     "libs/ac3/src/decoder/associated_service.cpp": (
-        "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
+        "proposed for decode-time associated-service mixing, not created yet"
     ),
 }
 
 # Script trees whose literals are not references into this tree. tools/adapt holds the rewrite
-# rules of the re-layout in planning/layout.md, for adapting a branch to it: every rule names a
+# rules of the re-layout, for adapting a branch to it: every rule names a
 # path of the tree it reads and a path of the tree it writes, and the first is the tree before the
 # re-layout. Printed on every run, like the two tables above; it goes when the scripts do.
 UNCHECKED_LITERAL_TREES = {
     "tools/adapt/": "the layout scripts name the paths of the tree as it was before the re-layout",
 }
 
-# Markdown pages whose prose deliberately names paths that do not exist: a plan
-# proposing a layout, or a phase record describing the tree as it was before a
-# rename. Their *links* are still checked - only the paths written in prose and
-# code spans are exempt, because those pages are not claiming the tree looks
-# like that today.
+# Markdown pages whose prose deliberately names paths that do not exist: a
+# phase record describing the tree as it was before a rename. Their *links* are
+# still checked - only the paths written in prose and code spans are exempt,
+# because those pages are not claiming the tree looks like that today.
 PROSE_PATHS_UNCHECKED = {
-    "planning/recasting.md": "plan; proposes a layout that does not exist yet",
-    "planning/player-appliance.md": "plan; proposes an apps tree that does not exist",
-    "planning/host-plugin.md": "study; proposes an Assay component and its own docs tree",
-    "planning/qc-report.md": "plan; proposes source files it would add",
-    "planning/layout.md": "study; proposes a layout, paths and names that do not exist yet",
-    "planning/consolidation.md": "plan; proposes merged libraries and paths that do not exist yet",
-    "planning/monorepo.md": "study; proposes a layout, projects and paths that do not exist yet",
-    "planning/layout-inventory.md": (
-        "inventory; a dated snapshot of the tree, naming the paths the proposed layout moves"
-    ),
     "docs/crucible/design/promotion.md": (
         "phase record; names the layout from before Crucible's promotion"
     ),
@@ -177,7 +166,7 @@ HTTP_URL = re.compile(r"^https?://", re.IGNORECASE)
 #
 # What a #fragment has to match. A heading's id is not the heading, it is what
 # a slugifier made of it, and this repo's pages are read through two of them:
-# mkdocs builds docs/, GitHub renders the root pages and planning/. The two
+# mkdocs builds docs/, GitHub renders the root pages. The two
 # agree on ordinary prose and differ on the edges - mkdocs (python-markdown's
 # `toc`, which mkdocs.yml selects by configuring `toc` with nothing but
 # `permalink`) folds non-ASCII to ASCII, collapses a run of hyphens to one and
@@ -185,7 +174,7 @@ HTTP_URL = re.compile(r"^https?://", re.IGNORECASE)
 # non-ASCII and counts with `-1`. So a fragment is accepted when it matches
 # under either. That is deliberately the loose reading: CONTRIBUTING.md and
 # ROADMAP.md are genuinely read both ways (docs/ includes them verbatim via
-# pymdownx.snippets), CHANGELOG.md and planning/ only ever on GitHub, and a
+# pymdownx.snippets), CHANGELOG.md only ever on GitHub, and a
 # check that picked one slugifier per file would fail a link that resolves
 # perfectly well where the file is actually read. The cases this gate exists
 # for - a heading renamed out from under a link, in one branch or across two -
@@ -455,7 +444,7 @@ def slug_mkdocs(text: str) -> str:
 
 
 def slug_github(text: str) -> str:
-    """GitHub's, which the root pages and planning/ are read through.
+    """GitHub's, which the root pages are read through.
 
     Keeps the non-ASCII and, unlike mkdocs', keeps every hyphen it is given: the
     ' - ' in a CHANGELOG heading stays three hyphens rather than becoming one.

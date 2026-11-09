@@ -1,4 +1,4 @@
-# The speakers view on a computer, before and after planning/p4x-speakers-options.md. Two programs, over the same
+# The speakers view on a computer, before and after the speakers-view options. Two programs, over the same
 # synthetic music (scene.hpp: a groove panned onto 2.0, 5.1, 7.1.4 and 9.1.6, and for 7.1.4 objects that fly):
 #
 #   speakers_options  draws the speakers as they were (the 5 Hz glow, kept in compare.cpp), the responsive glow and the

@@ -1,7 +1,6 @@
 // A display with no panel behind it: LVGL draws into a frame buffer in PSRAM, which is what a board
 // with no screen runs to see the screen (GET /panel.bmp reads it back) and to measure what drawing
-// it costs. See display.hpp and planning/karaoke-p4x-panel.md, "Measuring on the board with no
-// panel".
+// it costs. See display.hpp.
 //
 // What it leaves out is the glass's own cost: the DSI host reading the whole frame out of PSRAM
 // sixty times a second (74 MB/s of the bus the decoder fetches its code from), and the 2D engine

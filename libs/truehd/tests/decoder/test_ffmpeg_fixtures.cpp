@@ -15,7 +15,7 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/elementary.hpp"
 
-// The interoperability proof (planning/truehd.md, "Oracles"): streams FFmpeg's encoders wrote
+// The interoperability proof: streams FFmpeg's encoders wrote
 // (tools/generators/gen_truehd_ffmpeg.py), decoded here, against the SHA-256 of what FFmpeg's
 // strict decode of the same file gives. The codec is lossless, so the digests are equal or the
 // decode is wrong.

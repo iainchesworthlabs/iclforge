@@ -44,7 +44,7 @@
 # The control surface (include/iclforge/control.hpp, src/control.cpp) is here
 # too, on esp_http_server, with the web page it serves: ui/iclforge_ui.html and
 # ui/iclforge_ui.js, embedded gzipped (tools/gzip_asset.py: 22 KB where they are 69 KB as written, on every
-# board) and sent from flash with Content-Encoding: gzip (planning/esp32-device-ui.md). IDF names an embedded
+# board) and sent from flash with Content-Encoding: gzip. IDF names an embedded
 # file's symbols after its base name, hence the component's name on both. Like the rest of this archive
 # they reach a firmware only when something in it uses Control.
 #
@@ -61,7 +61,7 @@
 # lwIP then needs to link. How it finds a socket's IPv4 peer depends on
 # whether lwIP has IPv6 (src/peer/ipv4_peer.hpp).
 # src/firmware.cpp is the update over the network behind Control's firmware
-# routes (include/iclforge/firmware.hpp, planning/esp32-ota.md): like the rest
+# routes (include/iclforge/firmware.hpp): like the rest
 # of this archive it reaches a firmware only when something in it makes a
 # Firmware. src/log.cpp keeps the console's recent output for GET /log
 # (include/iclforge/log.hpp), once the firmware calls log_start().
@@ -361,15 +361,14 @@ set(ICLFORGE_MINIMAL_HOT_O2 ON CACHE BOOL
 # The player's own source with them, under the same switch: the render onto the
 # layout and the calls into the sink run there, six times a frame, and the
 # header-only renderer compiles into it. Measured on a board with the example's sinks
-# alongside it: 1.5 ms a frame less at twelve slots, for 4,400 bytes of flash
-# (planning/esp32-714-realtime.md, decision 11).
+# alongside it: 1.5 ms a frame less at twelve slots, for 4,400 bytes of flash.
 if(ICLFORGE_MINIMAL_HOT_O2)
     set_source_files_properties(src/player.cpp PROPERTIES COMPILE_OPTIONS "-O2")
 endif()
 
 # WHICH ARITHMETIC. idf_component.yml says the decode arithmetic follows the
 # part: single precision where there is a floating-point unit, the fixed-point
-# tier where there is not (planning/arithmetic-tiers.md). This is where a
+# tier where there is not. This is where a
 # project that has not chosen gets that. libs/ac3/minimal.cmake builds float32
 # for every value except `fixed`, including no value at all, so without this a
 # project for a part with no FPU decodes in float, where every floating-point

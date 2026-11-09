@@ -22,8 +22,8 @@
 // This is the ESP-IDF-specific layer of iclforge - the part that cannot live in
 // the library because it is made of FreeRTOS tasks, a ring buffer between them
 // and a pair of seams for the two things that differ per product: where the
-// bitstream comes from and where the audio goes. planning/esp32-player.md says
-// why it is here and not in the library or in an example.
+// bitstream comes from and where the audio goes. That is why it is here and not
+// in the library or in an example.
 //
 // The shape, and the reason for it. A fetch task on one core reads the source
 // into a ring; a decode task on the other drains the ring through
@@ -49,8 +49,7 @@
 // Both decoders, chosen per access unit. Eac3Decoder reads Annex E and accepts
 // a plain AC-3 syncframe as one access unit of one substream, but it does not
 // survive a fold (its inner FrameDecoder is built with the fold applied, and
-// the §E3.8.2 assembly then refuses the two-channel core - recorded as a
-// hand-over in planning/esp32-player.md), so a unit that is exactly one AC-3
+// the §E3.8.2 assembly then refuses the two-channel core), so a unit that is exactly one AC-3
 // syncframe goes to FrameDecoder itself.
 //
 // And AC-4, when the component is built with CONFIG_ICLFORGE_AC4 (its Kconfig):
@@ -149,8 +148,8 @@ struct PlayerConfig {
     // The decode task's stack in PSRAM, when the part has it, rather than in
     // internal SRAM. For a part whose internal RAM is what Wi-Fi leaves it: an
     // ESP32-S3 with Wi-Fi and the player up has no internal block over 31,744
-    // bytes, and an AC-4 5.1 play with A-CPL overflowed a stack of 28,672
-    // (planning/ac4.md, D14c). Needs CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM.
+    // bytes, and an AC-4 5.1 play with A-CPL overflowed a stack of 28,672.
+    // Needs CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM.
     // The task parks at its end and stop() deletes it with
     // vTaskDeleteWithCaps(), the only call that frees a stack made that way.
     bool decode_stack_in_psram = false;
@@ -160,8 +159,7 @@ struct PlayerConfig {
     // the sink starts with two frames queued rather than one. A play's first
     // frames decode more slowly than the rest, and with one frame queued an
     // ESP32-S3 playing 7.1.4 over WiFi ran its DAC dry in each play's first
-    // ten frames and never after (planning/esp32-714-realtime.md, decision
-    // 14). Costs a frame more before a play is heard - 32 ms at 48 kHz - and
+    // ten frames and never after. Costs a frame more before a play is heard - 32 ms at 48 kHz - and
     // a copy of the unit while it is held, 1 KB a channel for each of its six
     // blocks, in PSRAM where the part has it and freed once the unit plays.
     bool hold_first_unit = false;
@@ -182,7 +180,7 @@ struct PlayerConfig {
 
 #if CONFIG_ICLFORGE_AC4
     // How a stream that opens with an AC-4 sync word is decoded
-    // (CONFIG_ICLFORGE_AC4; planning/ac4.md, D14b). Its output layout is served
+    // (CONFIG_ICLFORGE_AC4). Its output layout is served
     // as an AC-3 stream's is: the decoder's own fold for a stereo or mono
     // layout (`stereo_fold` above), the renderer placing the decoded bed for
     // any other.
@@ -227,8 +225,8 @@ struct StreamInfo {
     bool objects_rendered = false;  // and this player is placing them
     int slots = 0;                  // what the sink is handed: the layout's
 
-    // How this play serves its layout, for a report such as the web page's
-    // (planning/esp32-device-ui.md, "The output layout"). `layout` is the
+    // How this play serves its layout, for a report such as the web page's.
+    // `layout` is the
     // layout's text; `render` is "loro", "ltrt" or "mono" for the decoder's
     // fold, "channels" for the coded channels placed, "objects" for the
     // objects placed; `coded` names the stream's channels by Table E2.5

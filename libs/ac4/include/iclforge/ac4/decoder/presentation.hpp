@@ -19,7 +19,7 @@ namespace iclforge::ac4 {
 
 // --- What the decoder reports of a stream ---------------------------------------
 //
-// planning/ac4.md's "Media information": each presentation of the table of
+// Media information: each presentation of the table of
 // contents, and the metadata of the one decode() selects, as the frames read
 // so far have sent it. Values a stream sends only in I-frames are kept until a
 // change of source.

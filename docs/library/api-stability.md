@@ -49,7 +49,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac3/io/elementary.hpp`, `stream_accumulator.hpp`, `metadata_edit.hpp`, `probe.hpp`, `object_strip.hpp`, `dec3.hpp`, `wav.hpp` | Public. |
 | `iclforge/ac3/meta/bsi.hpp`, `drc.hpp`, `loudness.hpp`, `mixing.hpp`, `qc.hpp` | Public. |
 | `iclforge/render/spatial.hpp` | Public. |
-| `iclforge/render/layout.hpp`, `render.hpp`, `routing.hpp`, `trim_delay.hpp`, `identify.hpp`, `float_biquad.hpp` | **Experimental** — the output layout, renderer and speaker management the ESP32 player and Hearth share ([Hearth reference-player plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-reference-player.md)), outside the `v1.0.0` freeze while Hearth's phases settle their shape; see [Experimental modules](#experimental-modules). |
+| `iclforge/render/layout.hpp`, `render.hpp`, `routing.hpp`, `trim_delay.hpp`, `identify.hpp`, `float_biquad.hpp` | **Experimental** — the output layout, renderer and speaker management the ESP32 player and Hearth share, outside the `v1.0.0` freeze while Hearth's phases settle their shape; see [Experimental modules](#experimental-modules). |
 | `iclforge/ac3/oba/atmos.hpp`, `joc.hpp`, `oamd.hpp`, `motion.hpp`, `scene.hpp`, `scene_osc.hpp` | Public — `iclforge::objects::oba::joc` included, now that AP2 folded it into `iclforge::oba` proper. |
 | `iclforge/objects/joc_domain.hpp` | Public — `joc::Domain` is selected through `AtmosConfig` and `reconstruct()`, as it was in `joc.hpp`. |
 | `iclforge/objects/emdf.hpp` | Public. |
@@ -187,9 +187,8 @@ re-layout, and its speaker management is new with it.
 
 The AC-4 codec, its inspector, decoder and encoder (`iclforge::ac4`,
 [AC-4](ac4.md)), is Experimental too. Their API has the form
-[planning/ac4.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md) set, and
-the immersive layouts, core decoding and objects came as fields after the ones channel-based
-streams needed. The core its decoder and encoder share has private headers and so no tier. `iclforge::containers::iamf`, the
+channel-based streams needed, and
+the immersive layouts, core decoding and objects came as fields after those. The core its decoder and encoder share has private headers and so no tier. `iclforge::containers::iamf`, the
 IAMF reader and writer, is Experimental as a new module.
 
 `iclforge::adm` are a different case: also opt-in

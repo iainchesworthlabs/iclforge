@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# iclforge::sink - a Sendspin sink a program runs (planning/hearth-android.md, D3): it listens on a
+# iclforge::sink - a Sendspin sink a program runs: it listens on a
 # WebSocket and advertises _sendspin._tcp, pairs by its pairing PSK and a dynamic or static code,
 # admits servers as the specification ranks them, keeps the identity and the pairing records, answers
 # the roles a server lists, and hands each stream it is sent to an output the program supplies. Its

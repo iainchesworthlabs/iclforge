@@ -1,4 +1,4 @@
-// The Meters view. See meters_screen.hpp, planning/p4x-meters-view.md and the prototype in preview/meters_options/ that drew it first.
+// The Meters view. See meters_screen.hpp and the prototype in preview/meters_options/ that drew it first.
 //
 // Every bar is a rectangle that is resized when its pixel height moved and left alone otherwise, so that a step redraws the bars that changed and
 // the ticks that moved (the speakers view's rule: LVGL redraws the rectangles that are invalid, and with the invalid-area table raised to 256 in the
@@ -175,7 +175,7 @@ struct Value {
 
 // A chart: a buffer in LVGL's heap that LVGL shows as an image and the view writes by the rows that changed (iclforge/meters_draw.hpp), so that an
 // update is one area for LVGL to draw and copy, not one for each part of each bar. The first drawing, an object for each of them, took 130 to 440 ms an
-// update on the kit (planning/p4x-meters-view.md, "Kit results").
+// update on the kit.
 struct Chart {
     lv_obj_t* object = nullptr;
     lv_draw_buf_t* buffer = nullptr;

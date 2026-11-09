@@ -267,7 +267,7 @@ bool refuses_lfe_only(std::string_view in_path, std::size_t object_channels,
     return true;
 }
 
-// atmos-adm/atmos-iab with codec=ac4 (planning/ac4.md, I5): iclforge::objects::oba::ObjectPlacement
+// atmos-adm/atmos-iab with codec=ac4: iclforge::objects::oba::ObjectPlacement
 // (this project's E-AC-3/Atmos object model) and iclforge::ac4::ObjectProperties (TS 103 190-2
 // Annex F) share one room coordinate system - X 0 (left wall) to 1 (right), Y 0 (front) to 1
 // (back), Z -1 (floor) to 1 (ceiling), confirmed against
@@ -890,7 +890,7 @@ int run_atmos_encode_multi(std::string_view in_path, std::string_view out_path,
 
 namespace {
 
-// atmos-encode with codec=ac4 (planning/ac4.md, I5b): the source's channels as AC-4 objects, A-JOC
+// atmos-encode with codec=ac4: the source's channels as AC-4 objects, A-JOC
 // coded by default or, with coding=direct, direct-coded, written as a raw stream or, for an
 // .mp4/.m4a/.mov name, an MP4 file. Which channels are objects follows src=/map= as it does for
 // E-AC-3 (object_slots_from_assignment, with a channel mapped to a speaker a dynamic object held
@@ -1334,7 +1334,7 @@ int run_atmos_adm(std::string_view in_path, std::string_view out_path, std::uint
     }
     warn_summed_lfe(in_path, lfe.size());
 
-    // codec=ac4 (planning/ac4.md, I5): AC-4 as this command's output codec, the ADM master's
+    // codec=ac4: AC-4 as this command's output codec, the ADM master's
     // bed/object channels going into E9's object encoder rather than AtmosEncoder below.
     if (meta.take_codec == iclforge::ac3::plan::Codec::kAc4) {
         return run_atmos_objects_to_ac4("ADM BWF", source->sample_rate, source->is_bed,
@@ -1487,7 +1487,7 @@ int run_atmos_iab(std::string_view in_path, std::string_view out_path, std::uint
     }
     warn_summed_lfe(in_path, lfe.size());
 
-    // codec=ac4 (planning/ac4.md, I5): AC-4 as this command's output codec, the IAB file's
+    // codec=ac4: AC-4 as this command's output codec, the IAB file's
     // Bed/Object channels going into E9's object encoder rather than AtmosEncoder below.
     if (meta.take_codec == iclforge::ac3::plan::Codec::kAc4) {
         return run_atmos_objects_to_ac4("IAB", source->sample_rate, source->is_bed, source->paths,

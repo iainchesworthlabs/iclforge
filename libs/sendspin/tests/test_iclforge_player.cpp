@@ -13,8 +13,8 @@
 #include "iclforge/sendspin/frames.hpp"
 #include "iclforge/sendspin/json.hpp"
 
-// _iclforge_player@v1's objects (planning/hearth-sendspin-extension.md, The role
-// _iclforge_player@v1): each writer's text byte for byte against the page's tables, each reader
+// _iclforge_player@v1's objects: each writer's text byte for byte against the page's tables, each
+// reader
 // against what it must refuse and what it must let through, and the settings a sink refuses with
 // the revision it names.
 
@@ -165,7 +165,7 @@ TEST_CASE("iclforge_player: the support object", "[sendspin][iclforge]") {
     REQUIRE(later.has_value());
     CHECK(later->data_types == std::vector<ac::DataType>{ac::DataType::kEac3});
     CHECK(read_text(R"({"data_types":["eac3"],"sample_rates":[48000],"future":{},)" + outputs + management + tail));
-    // AC-4 (planning/ac4.md, D11).
+    // AC-4.
     const std::optional<ac::Support> with_ac4 =
         read_text(R"({"data_types":["ac3","eac3","ac4"],"sample_rates":[48000],)" + outputs +
                   management + tail);

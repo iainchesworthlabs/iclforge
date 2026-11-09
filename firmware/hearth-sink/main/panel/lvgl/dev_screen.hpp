@@ -4,7 +4,7 @@
 
 #include "lvgl.h"
 
-// The developer view (planning/karaoke-p4x-panel.md, "The developer view"): a screen of what the
+// The developer view: a screen of what the
 // board is and how it is doing, opened by three taps on the board's name in the footer and closed by
 // a tap. It sits on top of the lyric screen as an object tree of its own, built when it is opened
 // and deleted when it is closed, so that the lyric screen and the idle screen are as they were with

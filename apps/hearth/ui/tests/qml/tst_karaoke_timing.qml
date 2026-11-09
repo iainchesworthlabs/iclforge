@@ -8,7 +8,7 @@ import HearthTest
 
 import "HearthTestHelpers.js" as H
 
-// Timing the lyrics (LyricTimingDialog.qml; planning/karaoke-phase2.md, W6).
+// Timing the lyrics (LyricTimingDialog.qml).
 //
 // The session, the estimate, the reaction time and the save are tested where they live
 // (libs/lyrics/tests/test_timing.cpp, apps/hearth/ui/tests/test_karaoke_controller.cpp). What is

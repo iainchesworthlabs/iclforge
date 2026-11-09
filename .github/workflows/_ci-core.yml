@@ -303,8 +303,7 @@ jobs:
   # a second run of everything.
   #
   # Nightly only, like coverage and for its reason: a long build for a number that moves slowly.
-  # Whether it also belongs in the run after a merge is the owner's call once its time is known
-  # (planning/work-packages/WP7-library-surfaces-and-ci.md, question 1).
+  # Whether it also belongs in the run after a merge is the owner's call once its time is known.
   #
   # The last step runs tools/dev/qt-sandbox-setup.sh for Hearth's private prefix, so that script's
   # pinned downloads, their checksums and the repository's httplib patch are exercised every night
@@ -708,7 +707,7 @@ jobs:
         if: always()
         continue-on-error: true
         uses: ./.github/actions/save-vcpkg-cache
-  # iclforge::sendspin (libs/sendspin, planning/hearth-reference-player.md A4): ICLFORGE_BUILD_HEARTH
+  # iclforge::sendspin (libs/sendspin): ICLFORGE_BUILD_HEARTH
   # defaults ON (root CMakeLists.txt), with vcpkg's "hearth" feature - cpp-httplib, mdns, mbedTLS,
   # libFLAC and Opus - selected by default too, via CMakePresets.json's "core" fragment. Every
   # build-and-test leg builds and tests it without being asked, so the [sendspin] and [hearth]
@@ -782,8 +781,8 @@ jobs:
           ./build/config-linux-gcc/bin/iclforge-sendspin-tests "[sendspin]"
           ./build/config-linux-gcc/bin/iclforge-hearth-tests "[hearth]"
 
-      # A4's exit with the stand-in for Sendspin's reference player
-      # (planning/hearth-sendspin-extension.md, Decisions): a host pairs with a scripted
+      # A4's exit with the stand-in for Sendspin's reference player:
+      # a host pairs with a scripted
       # aiosendspin 9.1.1 player over loopback and plays it PCM, FLAC and Opus, which the script
       # checks against the programme. The SDK, PyAV, numpy and Pillow come from
       # tools/sendspin/requirements.txt, a pip-compile lock with hashes (requirements.in beside it).
@@ -819,7 +818,7 @@ jobs:
               --testsink ./build/config-linux-gcc/bin/hearth-testsink --pair "$pair"
           done
 
-      # The Music Assistant fork's side (planning/ma-atmos-e2e.md): aiosendspin 10.2.1, the release the
+      # The Music Assistant fork's side: aiosendspin 10.2.1, the release the
       # fork runs, in a venv of its own from tools/sendspin/requirements-as10.txt (the 9.1.1 lock above
       # stays until aiosendspin_exit.py and aiosendspin_group_exit.py pass on 10.2.1). The server
       # script pairs with the test sink by token and by code; the ma_role package's pytest cases
@@ -838,7 +837,7 @@ jobs:
           "$py" -m pytest -q tools/sendspin/ma_role/tests
           "$py" tools/sendspin/ma_role_harness.py             --testsink ./build/config-linux-gcc/bin/hearth-testsink
 
-      # planning/ac4.md, phase I2: AC-4's output level, downmixes and dialogue enhancement held to
+      # AC-4's output level, downmixes and dialogue enhancement held to
       # Part 1's formulas through Hearth's engine - the player, session and stream decoder the
       # window plays with (apps/hearth/render) - with each of forge's options as the Decoder
       # page's setting for it, on the committed streams and on the encoder's. The stream's values
@@ -1045,8 +1044,8 @@ jobs:
       # than a hardcoded `for lib in ...` list: this project's own SHARED targets each produce a
       # bare, unversioned libFOO.so symlink (alongside the real, version-suffixed libFOO.so.X.Y.Z)
       # directly in the build tree under libs/<component>/, with no install step needed to see it.
-      # (src/<component>/ before planning/monorepo.md's C7-1, which is what a comparison point older
-      # than that has, so each build is searched in whichever of the two it has.)
+      # (src/<component>/ before the move to libs/, which is what an older comparison point
+      # has, so each build is searched in whichever of the two it has.)
       # Scoped to those directories specifically - not the whole build tree - so a FetchContent'd
       # third-party dependency's own .so (e.g. a hypothetical libadm.so, if ICLFORGE_BUILD_ADM
       # were ever turned on for this preset) is never picked up: those build under .../_deps/,
@@ -1351,7 +1350,7 @@ jobs:
       # TrueHD and MLP are lossless, so FFmpeg's strict decode is held to bit for bit: the decoder on
       # testdata/truehd (with the independent Python reference beside it), the encoder's streams
       # (forge truehd-encode over the quick matrix of rates, layouts, widths and signals), and the
-      # containers in both directions (planning/truehd.md, libs/containers/ERRATA.md).
+      # containers in both directions.
       - name: TrueHD and MLP decode against FFmpeg (bit-exact)
         run: python3 tools/checks/verify_truehd_interop.py --forge build/config-linux-llvm/bin/forge --reference --require-ffmpeg
 
@@ -1419,7 +1418,6 @@ jobs:
       # sources DEE encoded the committed streams from, rebuilt from the
       # committed FLAC fixtures (which is what needs this job's ffmpeg and
       # numpy): the lag, the level, per-channel SNR floors and tone routing.
-      # planning/ac4.md, the decoder's ladder, item 3.
       # Workspace-relative, not runner.temp: this job runs in a container, and
       # runner.temp names the host's path, which a step inside the container
       # writes somewhere upload-artifact never looks.
@@ -1441,26 +1439,26 @@ jobs:
           path: ac4-quality/ac4-decode-quality.json
           if-no-files-found: error
 
-      # planning/ac4.md, phase D6: the output level and each downmix held to
+      # The output level and each downmix held to
       # Part 1's formulas with each committed stream's own dialnorm and mix
       # gains, read from the decoder's syntax trace.
       - name: AC-4 output level and downmix gains against Part 1's formulas
         run: python3 tools/checks/gain_ac4_decode.py --cli build/config-linux-llvm/bin/forge
 
-      # planning/ac4.md, phase E5: the same, and dialogue enhancement's gains,
+      # The same, and dialogue enhancement's gains,
       # on streams the encoder writes here with each metadata option those
       # read, at several frame rates.
       - name: AC-4 output gains against Part 1's formulas on the encoder's streams
         run: python3 tools/checks/gain_ac4_decode.py --cli build/config-linux-llvm/bin/forge --encoder
 
-      # planning/ac4.md, phase D7: each presentation of several substreams in
+      # Each presentation of several substreams in
       # the multiplexed streams, fitted on its substreams decoded alone, held to
       # the mixing formulas with the stream's gains, pans and dialogue
       # enhancement read from the syntax trace.
       - name: AC-4 presentation mixes against Part 1's and Part 2's formulas
         run: python3 tools/checks/mix_ac4_decode.py --cli build/config-linux-llvm/bin/forge
 
-      # planning/ac4.md, the encoder's ladder, item 4: the encoder's own streams
+      # The encoder's own streams
       # of the programme fixtures and synthetic signals, decoded by this
       # project's decoder, against SNR, log-spectral distance and ViSQOL
       # floors pinned at the first measurement. The race against DEE's streams
@@ -1484,7 +1482,7 @@ jobs:
           path: ac4-quality/ac4-encode-quality.json
           if-no-files-found: error
 
-      # The AC-4 decoder in float (planning/ac4.md, D14a): the two scorers above
+      # The AC-4 decoder in float: the two scorers above
       # again with a decoder built ICLFORGE_DECODE_SCALAR=float, at the same pins,
       # and the float decode against the double one on every committed stream,
       # below and above A-SPX's crossover, at the floors pinned in
@@ -1507,7 +1505,7 @@ jobs:
             --double-cli build/config-linux-llvm/bin/forge \
             --float-cli build/decode-scalar-float/bin/forge
 
-      # The AC-4 decoder's fixed-point tier (planning/ac4.md, D14d), the same three
+      # The AC-4 decoder's fixed-point tier, the same three
       # questions: the scorers at the same pins, and the fixed decode against the
       # double one at the floors in testdata/ac4/scalar-agreement-fixed.json.
       - name: Build a fixed-point forge
@@ -1617,8 +1615,7 @@ jobs:
           ICLFORGE_CLI: build/config-linux-llvm/bin/forge
         run: python3 tools/ci/fuzz_eac3_encoder_space.py --seconds 120
 
-      # The same question asked of ac4-encode (planning/ac4.md, the encoder's
-      # ladder, item 7). FFmpeg has no AC-4 decoder, so its part is framing:
+      # The same question asked of ac4-encode. FFmpeg has no AC-4 decoder, so its part is framing:
       # its raw AC-4 and mov demuxers read what the encoder wrote. What reads
       # the audio is the three traces - the encoder's, the decoder's and
       # tools/references/ac4_syntax.py's, which must agree record for record -

@@ -5,7 +5,7 @@
 // the folds to stereo), compared sample by sample.
 //
 // And a decoder that is told the frame after the one it decodes (Decoder::decode()'s `next`)
-// reads it on the second thread while it reconstructs the first (planning/ac4.md, D14i): the same
+// reads it on the second thread while it reconstructs the first: the same
 // streams, the same samples, and what presentations(), metadata(), refusal_reason() and
 // latency_samples() report after each call, against a decoder that is not told.
 

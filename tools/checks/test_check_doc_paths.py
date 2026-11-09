@@ -591,10 +591,10 @@ class LinkAnchors(unittest.TestCase):
 
     def test_percent_encoded_fragment_resolves(self) -> None:
         """A non-ASCII anchor arrives percent-encoded and has to be decoded first."""
-        _write(self.root, "planning/target.md", "## žlutý kůň\n")
+        _write(self.root, "docs/target.md", "## žlutý kůň\n")
         _write(
             self.root,
-            "planning/page.md",
+            "docs/page.md",
             "[a](target.md#%C5%BElut%C3%BD-k%C5%AF%C5%88)\n",
         )
         report = check_doc_paths.check_tree(self.root)
@@ -636,27 +636,6 @@ class MergedBranchAnchors(unittest.TestCase):
         self.assertEqual(len(report.problems), 1)
         self.assertIn("docs/performance-trend.md:3:", report.problems[0])
         self.assertIn("objects-and-what-it-took-to-fit-them", report.problems[0])
-
-
-class PlanningAnchors(unittest.TestCase):
-    """planning/ is unpublished but links into docs/, one directory up."""
-
-    def setUp(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self._tmp.name)
-        self.addCleanup(self._tmp.cleanup)
-
-    def test_a_plan_link_into_docs_is_checked(self) -> None:
-        _write(self.root, "docs/platforms/esp32.md", "## How much memory there actually is\n")
-        _write(
-            self.root,
-            "planning/topology.md",
-            "[live](../docs/platforms/esp32.md#how-much-memory-there-actually-is)\n\n"
-            "[dead](../docs/platforms/esp32.md#how-much-memory-there-is)\n",
-        )
-        report = check_doc_paths.check_tree(self.root)
-        self.assertEqual(len(report.problems), 1)
-        self.assertIn("planning/topology.md:3:", report.problems[0])
 
 
 class Main(unittest.TestCase):

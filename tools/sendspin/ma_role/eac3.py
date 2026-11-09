@@ -5,8 +5,7 @@ A Python port of what Hearth's server does to an E-AC-3 stream before it goes to
 syncframes, join an independent substream's syncframe and its dependents' into an access unit,
 collect access units until their blocks total six (1,536 samples, 32 ms at 48 kHz), and write
 the burst the sink takes: Pc 0x0015, Pd the payload's length in BYTES, and the payload, which is
-the access units' bytes in stream order, with no sync words, byte swapping or stuffing
-(planning/hearth-sendspin-extension.md, Burst chunks).
+the access units' bytes in stream order, with no sync words, byte swapping or stuffing.
 
 `tests/golden/eac3_bursts.txt` holds the packer's own payload digests for two fixtures, and the
 C++ test `iec61937: the E-AC-3 burst vectors ...` holds that file to the packer, so this module

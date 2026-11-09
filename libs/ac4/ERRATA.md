@@ -1429,7 +1429,7 @@ decodes those streams' coded pair as L and R and leaves Ls and Rs silent.
 
 ### Reconstruction
 
-The readings the decoding of clause 5 takes. Phase D2 of `planning/ac4.md` decodes the audio spectral
+The readings the decoding of clause 5 takes. Phase D2 decodes the audio spectral
 frontend, stereo processing, the inverse transform and frame alignment for mono and stereo in the SIMPLE
 codec mode; later phases add theirs. The Python reference transcribes the syntax only, so these are the
 decoder's readings alone, and the evidence for each is DEE's streams scored against their sources and
@@ -1562,7 +1562,7 @@ clause's formula.
 
 ### The QMF domain
 
-The readings phase D3 of `planning/ac4.md` takes for the QMF banks, companding and A-SPX decoding (Part 1
+The readings phase D3 takes for the QMF banks, companding and A-SPX decoding (Part 1
 clause 5.7). They are the decoder's alone, as under "Reconstruction". The evidence is DEE's 2.0 legs at 48
 to 144 kbps and its native-rate immersive stereo (IMS) legs in G0's gold set, scored against their sources
 (`tools/checks/score_ac4_decode.py`), the text, or a test in `libs/ac4/tests/core/test_aspx.cpp` and
@@ -2428,7 +2428,7 @@ output level and DRC (5.7.9) and the downmix (6.2.17), and after it, the sample 
   between two ranges is taken to its nearest whole dB. Portable speakers and portable headphones share a
   range; the system says which. A mode the stream does not configure, whether asked for by name or
   chosen, compresses nothing, and no mode applies below -31 or above 0 unless the stream adds one there.
-- **Evidence:** Text; planning/ac4.md's decision 12 records the edges as inclusive.
+- **Evidence:** Text; the edges are recorded as inclusive.
 
 #### The default profiles' smoothing
 
@@ -2531,7 +2531,7 @@ output level and DRC (5.7.9) and the downmix (6.2.17), and after it, the sample 
 - **Reading:** G_DE runs from 0 to the stream's G_max: at 0 or below the tool leaves the signal as it is,
   and above G_max it applies G_max. An I-frame whose `b_de_data_present` is 0 leaves no parameters, and
   the tool does nothing until parameters come.
-- **Evidence:** Text; planning/ac4.md's control table gives G_DE as 0 dB up to the stream's cap.
+- **Evidence:** Text; the control table gives G_DE as 0 dB up to the stream's cap.
 
 #### The sample rate converter's filter and output grid
 

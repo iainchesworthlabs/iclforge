@@ -1,7 +1,6 @@
 """A4's exit with aiosendspin 9.1.1: Hearth's server plays PCM, FLAC and Opus to a scripted player.
 
-planning/hearth-reference-player.md, A4's exit, with the stand-in for Sendspin's reference player
-that planning/hearth-sendspin-extension.md's Decisions chose. For each codec this starts the
+A4's exit, with the stand-in for Sendspin's reference player. For each codec this starts the
 scripted player in aiosendspin_player.py on a loopback port, runs iclforge-hearth-tests' hidden
 [aiosendspin] case (apps/hearth/engine/tests/test_aiosendspin.cpp) with the player's URL, token
 and a directory, and checks what the player took against the programme and start time the case wrote

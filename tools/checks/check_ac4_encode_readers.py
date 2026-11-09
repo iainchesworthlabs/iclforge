@@ -1,7 +1,6 @@
 """Readers outside this project against forge's AC-4 encoder: MediaInfo and DEE's muxer.
 
-planning/ac4.md, the encoder's ladder, item 3, as phases E1 to E6 need it. For each configuration
-below, mono to 5.1, the A-CPL modes, the experimental options of 5.X and 7.X and of A-CPL, and
+For each configuration below, mono to 5.1, the A-CPL modes, the experimental options of 5.X and 7.X and of A-CPL, and
 phase E5's frame rates, rate modes, I-frames and metadata, `forge ac4-encode` writes a raw stream
 and an MP4 file, and:
 

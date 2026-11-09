@@ -27,8 +27,7 @@ using iclforge::ac3::eac3::chanmap::Location;
 // own allocations.
 constexpr std::size_t kHeapFloorBytes = 200 * 1024;
 
-// The probe's high-water mark was 60,944 B; the owner's decision (planning/truehd-parity-esp32-sinks.md,
-// question 22) is at least 64 KiB.
+// The probe's high-water mark was 60,944 B; the owner's decision is at least 64 KiB.
 constexpr std::size_t kStackBytes = 64 * 1024;
 
 // A TrueHD channel as the renderer's location. The same mapping apps/hearth/engine/src/

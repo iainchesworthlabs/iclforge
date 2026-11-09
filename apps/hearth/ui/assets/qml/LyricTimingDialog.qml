@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// Timing the lyrics (planning/karaoke-phase2.md, W6; the findings' "W3: word timing").
+// Timing the lyrics.
 //
 // Two passes over the item as it plays. Lines: Space stamps the next line as it starts, which alone
 // turns plain words into a file that is followed line by line. Words: Estimate gives every stamped

@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
-# hearth - the desktop reference player's window
-# (planning/hearth-reference-player.md, A5). Qt is a PREBUILT dependency
+# hearth - the desktop reference player's window.
+# Qt is a PREBUILT dependency
 # discovered by cmake/FindQt6.cmake, never vcpkg (qt-integration-convention),
 # the same as apps/forge/gui and apps/crucible. QUIET, and a warning rather than a
 # hard failure, so a core-only or Hearth-engine-only build still configures

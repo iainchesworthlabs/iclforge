@@ -9,8 +9,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 
 // What the Karaoke flow decides from the parts an author supplies, Qt-free so
-// iclforge-forge-gui-tests holds it (planning/karaoke-design.md, K6; planning/
-// karaoke.md, A2, A3 and A8).
+// iclforge-forge-gui-tests holds it.
 //
 // A karaoke stream (ETSI TS 102 366 Annex C, Table C.2.1) is a main service
 // with bsmod 7 and a coding mode above 1/0 whose channels are not speakers but
@@ -45,7 +44,7 @@ namespace forge_gui {
 
 // The lyrics file beside `media_path`: the same name in the same folder with the extension `.lrc`
 // and, where there is none, `.srt`, `.ass` or `.kar`, matched without regard to case, which is where
-// Hearth looks for it (planning/karaoke.md, L1; iclforge::lyrics::find_lyrics_file). Empty when
+// Hearth looks for it. Empty when
 // there is none.
 [[nodiscard]] std::string karaoke_lyrics_beside(const std::string& media_path);
 

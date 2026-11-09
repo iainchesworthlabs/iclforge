@@ -6,8 +6,7 @@ import Hearth
 
 // The output picker (issue #828): a modal listing this computer's PCM
 // devices, what they can carry over passthrough, and the Sendspin groups
-// made on the Network page (planning/hearth-design.md's own artboard,
-// docs/hearth/design/screenshots/output-picker.png). Modelled on
+// made on the Network page. Modelled on
 // AboutDialog.qml's shape (modal, centred, squared border) rather than
 // introducing a second dialog style.
 //

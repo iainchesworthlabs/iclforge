@@ -474,7 +474,7 @@ void Capture::Impl::launch(ComPtr<IAudioClient> client, ComPtr<IAudioCaptureClie
                 UINT32 frames = 0;
                 DWORD packet_flags = 0;
                 // The packet's own capture time, which a consumer needs to know where in a
-                // playback a voice was sung (planning/karaoke-microphone.md, MI6): the
+                // playback a voice was sung: the
                 // performance counter's reading, in 100 ns, at the packet's first frame.
                 UINT64 device_position = 0;
                 UINT64 qpc_position = 0;

@@ -1,4 +1,4 @@
-# hearth-render (planning/ac4.md, I2): one item through Hearth's engine - the player, session and
+# hearth-render: one item through Hearth's engine - the player, session and
 # stream decoder the window plays it with - into a WAV file, so tools/checks/gain_ac4_decode.py
 # --engine holds what the engine puts out to the formulas it holds forge decode's to. Qt-free; never
 # installed or packaged.

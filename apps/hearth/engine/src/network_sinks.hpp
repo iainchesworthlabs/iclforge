@@ -20,8 +20,8 @@
 #include "network_view.hpp"
 #include "pairing_store.hpp"
 
-// Discovery, connection, pairing and groups (planning/hearth-reference-player.md,
-// A6). Owns this computer's Sendspin server identity, browses `_sendspin._tcp`,
+// Discovery, connection, pairing and groups. Owns this computer's Sendspin server identity,
+// browses `_sendspin._tcp`,
 // keeps a connection to each sink it can, pairs on request, and makes the
 // groups a person builds on the Network page; the window polls status() and
 // calls tick() the way HearthController polls Engine::status() (A5's own
@@ -276,7 +276,7 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // know, and no sink is made to wait: the commands are sent as they are.
     void apply_lyrics(const std::string& group_id, const LyricsUpdate& update);
 
-    // A member's request for the singer's karaoke choice (D8, planning/hearth-android.md), as the
+    // A member's request for the singer's karaoke choice (D8), as the
     // host heard it: the sink asked through its own control (a remote, a touch screen), and the keys
     // are cut to the ones it listed. The singer's choice is the application's to hold, so this class
     // only says who asked, in which group: `group_id` is the group the sink is a member of, empty

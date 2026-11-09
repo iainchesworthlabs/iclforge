@@ -10,8 +10,8 @@
 #include <string>
 #include <string_view>
 
-// What an update over the network checks before it writes anything
-// (planning/esp32-ota.md, "An update, on the board"): that the bytes arriving
+// What an update over the network checks before it writes anything:
+// that the bytes arriving
 // are the head of an ESP-IDF application image, that the image is for this
 // chip, this chip revision, this project and this flash size; what the
 // request's Content-Digest says the whole file's SHA-256 is; and that the
@@ -56,7 +56,7 @@ struct ImageHead {
     std::uint8_t flash_size = 0;     // esp_image_flash_size_t: 2 is 4 MB, 4 is 16 MB
     bool hash_appended = false;      // the build appended the image's SHA-256
     // esp_app_desc_t's secure_version (CONFIG_BOOTLOADER_APP_SECURE_VERSION): the floor an update
-    // from a release will not go under (planning/esp32-ota.md, O10). Not ESP-IDF's anti-rollback.
+    // from a release will not go under. Not ESP-IDF's anti-rollback.
     std::uint32_t secure_version = 0;
     std::string version;
     std::string project;
@@ -425,7 +425,7 @@ namespace detail {
 
 // Whether a request's Host header names this board: an IPv4 address, an IPv6
 // address in brackets, or one of `names` bare or ending ".local", each with or
-// without a port and a trailing dot (planning/esp32-ota.md, "Routes"). A page
+// without a port and a trailing dot. A page
 // that points its own host name at the board's address sends that name here,
 // which is what this refuses. An empty header passes: no browser sends one.
 [[nodiscard]] inline bool host_is_the_board(std::string_view host, std::span<const std::string> names) {

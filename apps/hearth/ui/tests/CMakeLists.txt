@@ -115,7 +115,7 @@ target_link_libraries(hearth_qmltests PRIVATE
     # same in-process Sink apps/hearth/engine/tests/test_testsink.cpp pairs over loopback.
     hearth_testsink
     # The AC-4 encoder, for TestServices.writeAc4Stream(): the AC-4 decoder
-    # page's suite plays tones it writes (planning/ac4.md, I2).
+    # page's suite plays tones it writes.
     iclforge::ac4
     iclforge::containers
     iclforge::warnings iclforge::fmt

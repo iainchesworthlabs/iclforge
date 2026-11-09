@@ -5,8 +5,7 @@
 #include <type_traits>
 
 // The project's own complex type, in place of std::complex<Real>
-// (planning/ac4.md, "D14a": "a complex type of the project's own in place of
-// std::complex<Real> (a fixed-point type cannot instantiate std::complex)").
+// (a fixed-point type cannot instantiate std::complex).
 // AC-4's QMF-domain code (the analysis/synthesis pair, the transforms, A-SPX's
 // high-frequency generator, A-CPL's and A-JOC's decorrelation) is templated on
 // Real and names its sample through this type or the QmfValue alias built on

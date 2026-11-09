@@ -31,7 +31,7 @@
 # complementary "best" tier of a shared C6/S3/P4 sink family on one PCB: C6 =
 # good (5.1, one DAC), S3 = better (7.1.4, both DACs at 16-bit), P4 = best
 # (9.1.6 with full Annex E tools desired, both DACs at 32-bit on one wide TDM
-# controller) - see planning/esp32-sink-tiers.md. This project is that plan's
+# controller). This project is the sink family's
 # Phase P1: the probe and a board timing table, no network yet.
 #
 # Dual-core RISC-V (RV32IMAFC) with a single-precision FPU - the `F` in

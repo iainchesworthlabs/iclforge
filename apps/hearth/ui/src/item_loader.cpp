@@ -32,7 +32,7 @@ namespace {
 
 // The files Hearth reads, which is also what list_folder_items() lists:
 // the elementary streams (AC-3 and E-AC-3, which io::scan() splits, AC-4,
-// whose sync frames Session::open() splits - planning/ac4.md, I2 - and TrueHD and
+// whose sync frames Session::open() splits, and TrueHD and
 // MLP, which Session::open() indexes) and the three containers
 // apps/shared/media/src/container_input.hpp demuxes.
 constexpr std::array<std::string_view, 8> kMediaExtensions{".ac3", ".ec3", ".ac4", ".thd",

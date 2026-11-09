@@ -11,8 +11,8 @@
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/render/layout.hpp"
 
-// Meters on what the output plays (planning/hearth-reference-player.md,
-// Monitor): a level meter per output slot - peak, hold, RMS and a clip latch,
+// Meters on what the output plays: a level meter per output slot - peak, hold, RMS and a clip
+// latch,
 // iclforge::ac3::analysis::LevelMeter's - and the programme's loudness from
 // iclforge::ac3::meta::LoudnessMeter, measured as the blocks are rendered and released
 // only when the device's clock reaches them.

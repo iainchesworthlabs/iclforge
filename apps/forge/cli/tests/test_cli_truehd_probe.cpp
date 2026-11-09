@@ -14,7 +14,7 @@
 
 // What `forge probe json=1` says of every TrueHD and MLP stream in testdata/truehd (the FFmpeg
 // fixtures and the hand-built ones), held against a golden document for each, and the fields the
-// report gained when it moved to apps/shared/media (planning/truehd-parity-forge.md, row M1).
+// report gained when it moved to apps/shared/media.
 //
 // A golden is the document without its `generator` and `file` members, which name the build and the
 // checkout. To rewrite them after a change that is meant (and reviewed), create

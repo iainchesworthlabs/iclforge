@@ -93,10 +93,7 @@ requests after those: the file, its reader and the guard
 ([#1403](https://github.com/iainchesworthlabs/iclforge/pull/1403)), CI building from the file
 ([#1406](https://github.com/iainchesworthlabs/iclforge/pull/1406)), the profile id in the image and
 the boot budget line ([#1412](https://github.com/iainchesworthlabs/iclforge/pull/1412)) and the v3.x
-P4 profile ([#1452](https://github.com/iainchesworthlabs/iclforge/pull/1452)). The design record is
-[`planning/esp32-platform-profiles.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md)
-([#1369](https://github.com/iainchesworthlabs/iclforge/pull/1369)); it also has the board suite and
-its figures, which this page leaves out.
+P4 profile ([#1452](https://github.com/iainchesworthlabs/iclforge/pull/1452)).
 
 ## The profiles
 
@@ -285,7 +282,7 @@ overlay touches.
 are no board's image: the bare-metal probes' builds, the lists a fragment's header gives as its
 own example, and the P4 build that draws the screen into a frame buffer with no panel.
 `sink_profile.py check-docs` reads the firmware's README and fragments, the Hearth pages, the
-ESP32 platform pages and the ESP32 planning notes, and fails on a `sdkconfig.defaults;sdkconfig...`
+ESP32 platform pages, and fails on a `sdkconfig.defaults;sdkconfig...`
 list that is neither a profile's, nor listed here, nor a CI test configuration (`sdkconfig.ci*`).
 The same command with `--write` regenerates the profile table in the firmware's README.
 
@@ -417,8 +414,7 @@ line:
 kconfig: [kconfig] firmware/hearth-sink/main/Kconfig.projbuild: CONFIG_ICLFORGE_EXAMPLE_NEW_STACK_BYTES
 is new and the guard watches it, and it is in c6-16mb, c6-4mb, p4-rev1, p4-rev3,
 s3-n16r8, which neither lock nor free it: lock its value in profiles.json (the hash
-moves: baselines are re-recorded or accepted, planning/esp32-platform-profiles.md 'Changing a
-profile'), or name it in `free`
+moves: baselines are re-recorded or accepted), or name it in `free`
 ```
 
 The fix is one of two edits to `profiles.json`: lock the key in every profile named, at the value
@@ -611,8 +607,6 @@ to the file. The `ESP32 profiles` job picks the new profile up from `sink_profil
 
 ## Where to go next
 
-- [`planning/esp32-platform-profiles.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md)
-  is the design record, with the board suite, its tolerances and each baseline's figures.
 - [The firmware's README](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#build-profiles)
   has the generated profile table and everything else about `hearth_sink`.
 - [Testing and benchmarking the ESP32 boards](board-bench.md) covers what is tested where, the

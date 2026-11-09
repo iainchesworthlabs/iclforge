@@ -7,8 +7,8 @@
 
 #include "media_session.hpp"
 
-// apps/crucible/ui/src/media_session.cpp: what a media session implies and whose it is
-// (planning/karaoke-phase2.md, D9). The platform readers are held where they run (a real session,
+// apps/crucible/ui/src/media_session.cpp: what a media session implies and whose it is.
+// The platform readers are held where they run (a real session,
 // by hand, and the QML suite with a scripted snapshot); this holds the arithmetic and the matching.
 
 namespace {

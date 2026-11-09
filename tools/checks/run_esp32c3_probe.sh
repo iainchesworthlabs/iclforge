@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Build and run the minimum-footprint decoder probe for ESP32-C3, under QEMU,
 # then gate on what it reports. The third sibling of run_baremetal_probe.sh
-# and run_esp32s3_probe.sh, and the fixed-point tier's own leg
-# (planning/arithmetic-tiers.md, Phase D).
+# and run_esp32s3_probe.sh, and the fixed-point tier's own leg.
 #
 #   . $IDF_PATH/export.sh
 #   tools/checks/run_esp32c3_probe.sh                 # the fixed tier

@@ -1879,8 +1879,8 @@ def case_noise1_bypass():
 
 # --- moving objects: the object substream's matrices change from block to block -----------------
 #
-# The arithmetic of libs/truehd/src/encoder/object_bed.cpp, written again from the notes
-# (libs/truehd/notes/feature-truehd-atmos-encoder-matrices.md): an object's gain into each bed row
+# The arithmetic of libs/truehd/src/encoder/object_bed.cpp, written again from the rule:
+# an object's gain into each bed row
 # is a path of integer knots; the coefficient of its mixing matrix is minus the gain at 2^-12; the
 # decoder's running coefficients and slopes (SUBSTREAM3.md section 3) are followed access unit by
 # access unit, a section is sent only where a coefficient has drifted from the path or the path

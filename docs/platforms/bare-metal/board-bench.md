@@ -21,11 +21,7 @@ firmware, a decoder it links, or the tools around it.
 
 A *profile* is one locked build of the firmware for one board (`firmware/hearth-sink/profiles.json`,
 read by `tools/hearth/sink_profile.py`). An image carries its profile's id and a 12-digit hash of
-the profile's fragments and locked values, and reports both in `GET /hardware`. The design records
-for this page are
-[`planning/esp32-platform-profiles.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-platform-profiles.md)
-and
-[`planning/esp32-board-bench.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-board-bench.md).
+the profile's fragments and locked values, and reports both in `GET /hardware`.
 
 ## What is tested where
 
@@ -82,8 +78,7 @@ The `esp` lane runs two parts under QEMU, in Espressif's `espressif/idf:v6.1` im
   onto 7.1.4 over QEMU's Ethernet" plays every stream not marked as needing PSRAM (two are)
   through `POST /play`, and `tools/checks/check_stream_set.py` holds each play to the manifest:
   `result=pass`, no byte skipped for sync, the stream's access units, and every slot within
-  1% + 20 of the host's level. The plan is
-  [`planning/esp32-stream-set.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-stream-set.md);
+  1% + 20 of the host's level;
 - the release shape: the `s3-n16r8` profile's own fragments with one overlay, `qemu-net`, which
   changes what QEMU has no hardware for and nothing else. The step "Play the S3 board's release
   shape over QEMU's Ethernet" holds the build to the profile (`sink_profile.py verify --overlay
@@ -625,9 +620,8 @@ Each with where it was learned.
 address, serial port, lock file and `mac_tail`. A bench file of your own needs nothing else. The
 repository's own `bench.json` is held by `tools/hearth/test_bench.py`: names, addresses, ports,
 locks and MAC tails are unique, every board a profile names (`boards` in `profiles.json`) is on
-the bench with the profile's chip, and the number of boards and the table in
-`planning/esp32-board-bench.md` match the file, so a board added there changes the test and that
-table in the same pull request. Run the profile's existing baseline against the new board as a
+the bench with the profile's chip, and the number of boards matches the file, so a board added there changes the test
+in the same pull request. Run the profile's existing baseline against the new board as a
 cross-check before recording anything from it.
 
 **A new profile** needs a play list before it can have a baseline. `suite.json` must have an

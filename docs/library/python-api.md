@@ -602,7 +602,7 @@ Failures raise `TruehdError`, a `ValueError`, with the library's error kind as `
 
 **TrueHD and MLP.** `iclforge::truehd` has no Python binding yet: the decoder, the encoder and MAT carriage are in the C++
 library, the [C API](c-api.md#truehd-and-mlp) and `forge`, and the wheel does not link the library. E-AC-3, AC-4 and the
-containers are bound above; the TrueHD binding is a follow-up on the C API ([the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd.md#not-done-in-t2c)).
+containers are bound above; the TrueHD binding is a follow-up on the C API.
 
 `FrameEncoder`/`AtmosEncoder`'s self-check `trace` hook (`iclforge::ac3::verify::FrameTrace`) and
 `AtmosEncoder`'s `bed()`/`parameters()` introspection accessors are internal verification

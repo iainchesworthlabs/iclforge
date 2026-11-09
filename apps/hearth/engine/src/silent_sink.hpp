@@ -7,7 +7,7 @@
 
 #include "pcm_sink.hpp"
 
-// An output that plays to nothing (planning/karaoke-microphone.md, MI2; `hearth --sing`).
+// An output that plays to nothing.
 //
 // It is a PcmSink with a device's behaviour and no device: it takes the rendered blocks, lets
 // them "play" at the rate of the steady clock, and drops them, and it reports a position as a

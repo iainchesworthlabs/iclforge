@@ -7,9 +7,8 @@ import QtCore
 
 import ForgeGui
 
-// Karaoke - the fourth entry beside Guided, Advanced and Expert
-// (planning/karaoke-design.md, K6; the design sheet's "Forge GUI: Karaoke flow,
-// Parts" and "Hear"): four steps - Parts, Levels, Hear, Save - that build a
+// Karaoke - the fourth entry beside Guided, Advanced and Expert:
+// four steps - Parts, Levels, Hear, Save - that build a
 // karaoke AC-3 (ETSI TS 102 366 Annex C) from the recordings a singer's backing
 // track is made of.
 //

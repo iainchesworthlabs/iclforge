@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # iclforge::lyrics - timed lyrics: an LRC file (UTF-8 or UTF-16) read into lines of timed words, the
 # file's place beside a media item, and the stateless cursor that says which line and word a playing
-# position is in (planning/karaoke-phase2.md, W13a; planning/karaoke.md, L1 to L6); and the picture of
+# position is in; and the picture of
 # a CD+G file (W13f).
 #
 # Standard library only, so that Hearth's window, Crucible, the sink firmware and the browser can all

@@ -1,6 +1,6 @@
 #pragma once
 
-// Object audio streams for the decoder's tests (phase D10 of planning/ac4.md):
+// Object audio streams for the decoder's tests:
 // ETSI TS 103 190-2 V1.3.1's A-JOC substreams (audio_data_ajoc(), clause
 // 6.2.3.4) and direct-coded object substreams (audio_data_objs(), 6.2.3.2) with
 // their object audio metadata (6.2.8), in a presentation of one object group

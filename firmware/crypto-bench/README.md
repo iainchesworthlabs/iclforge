@@ -27,12 +27,12 @@ boards (360 MHz); a revision 3 kit takes `firmware/hearth-sink/sdkconfig.p4-rev3
 
 The project uses the Hearth sink's partition table, so a build's `app` and `otadata` are at the
 offsets the boards already have, and `bench_flash.py flash --app-only` writes those two and leaves
-the bootloader, the table and NVS (the board's pairings and stored network) alone. The rules for the
-boards are `planning/esp32-board-bench.md`: book the board, and put back what was on it.
+the bootloader, the table and NVS (the board's pairings and stored network) alone. The rule for the
+boards: book the board, and put back what was on it.
 
 1. `bench.py status --probe`, then `bench.py lock take BOARD --session ID --purpose "crypto bench"`
    (and the older lease file `D:\ac3bld\board-<name>.lock`, whose names for the S3s are the other
-   way round: planning/esp32-board-bench.md and D:\ac3bld\BOARD-LOCKS.md). `bench.py snapshot BOARD`
+   way round: see D:\ac3bld\BOARD-LOCKS.md). `bench.py snapshot BOARD`
    and `GET /layout`, `GET /slot-width`: **the layout and the slot width are runtime settings, not
    in the flash, and any reset - the read in step 2 included - puts them back to 2.0 and 32.**
 2. Read `otadata` (0x10000, 0x2000) and the first megabyte of `ota_0` (0x20000, 0x100000) with

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-// The app's one sink (planning/hearth-android.md, phase 1b): iclforge::sink::Sink with outputs that
+// The app's one sink: iclforge::sink::Sink with outputs that
 // count what they are given and drop it. The pass-through output replaces them in phase 1c; until
 // then a stream a server sends is accepted, paired, timed and counted, and nobody hears it.
 //

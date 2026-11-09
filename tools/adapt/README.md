@@ -1,7 +1,6 @@
 # Adapting an open branch to the re-laid-out tree
 
-The tree was re-laid out in stages (planning/layout.md, planning/consolidation.md,
-planning/monorepo.md). The scripts that did it are retired (planning/monorepo.md, decision 13): they are
+The tree was re-laid out in stages. The scripts that did it are retired: they are
 in the history at `8d2507bae`, the last commit that has `tools/n1b/`. What stays is what an open
 branch that predates the moves needs.
 
@@ -46,7 +45,7 @@ A branch that changed files in the old places meets, when it merges the new tree
    spelt differently in every file), look the new path up with `moves.py <commit> | grep <old path>`.
 
 `adapt_branch.ps1` is the older procedure, for a branch that predates stages S2 and S3 of
-planning/layout.md: it runs those stages' own scripts (`n1b_apply.py`, `n1b_cmake.py`, `n1b_paths.py`,
+the re-layout: it runs those stages' own scripts (`n1b_apply.py`, `n1b_cmake.py`, `n1b_paths.py`,
 `n1b_names.py`, here with the move map of S2 in `layoutdef.py`) on the branch, records their commits as
 merged with `git merge -s ours`, and then merges the tip. The stages after S3 (S4, N1A, S5, S6, C0 to C7)
 have no scripts here: their scripts are in the history, and a branch that predates them takes the merge

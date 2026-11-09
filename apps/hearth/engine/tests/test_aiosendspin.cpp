@@ -29,8 +29,7 @@
 #include "iclforge/sendspin/server_host.hpp"
 #include "iclforge/sendspin/server_store.hpp"
 
-// A4's exit with aiosendspin 9.1.1 (planning/hearth-reference-player.md, A4's exit;
-// planning/hearth-sendspin-extension.md, Decisions): the server's half, which
+// A4's exit with aiosendspin 9.1.1: the server's half, which
 // tools/sendspin/aiosendspin_exit.py runs once for each codec against the scripted player in
 // tools/sendspin/aiosendspin_player.py, passing the player's URL, its SP:0 token and a directory in
 // the environment. The host pairs with the player by the token, which makes the pairing PSK flow

@@ -445,7 +445,7 @@ this row instead reads `UNAVAILABLE HERE`):
 
 | Command | What it does |
 |---|---|
-| `atmos-adm` | A real ADM BWF master (professional delivery format Netflix's and Apple's own Atmos ingest pipelines require) straight to DD+ JOC E-AC-3 — no WAV, no hand-authored keyframe file: [`iclforge::adm::build`](../../library/adm-bridge.md) classifies every channel as a bed speaker feed or a dynamic object and builds its own `iclforge::objects::oba::ObjectPath` straight from the file's authored BS.2076-2 §10.3 position/gain automation, driven frame by frame the same way `atmos-encode` drives an authored `[paths.txt]`. With `codec=ac4` (planning/ac4.md, I5), every bed/object channel becomes an AC-4 dynamic object instead (A-JOC by default, `coding=direct` for direct-coded object substreams), its position sampled once a frame (frame_rate_index 13 is the object substream's only rate) |
+| `atmos-adm` | A real ADM BWF master (professional delivery format Netflix's and Apple's own Atmos ingest pipelines require) straight to DD+ JOC E-AC-3 — no WAV, no hand-authored keyframe file: [`iclforge::adm::build`](../../library/adm-bridge.md) classifies every channel as a bed speaker feed or a dynamic object and builds its own `iclforge::objects::oba::ObjectPath` straight from the file's authored BS.2076-2 §10.3 position/gain automation, driven frame by frame the same way `atmos-encode` drives an authored `[paths.txt]`. With `codec=ac4`, every bed/object channel becomes an AC-4 dynamic object instead (A-JOC by default, `coding=direct` for direct-coded object substreams), its position sampled once a frame (frame_rate_index 13 is the object substream's only rate) |
 
 ```bash
 forge atmos-adm master.wav out.ec3 448
@@ -481,7 +481,7 @@ Atmos stream needs a speaker feed or an object beside it.
 
 #### AC-4 objects from a WAV
 
-`atmos-encode` takes `codec=ac4` too (planning/ac4.md, I5b), and writes the objects it makes of a
+`atmos-encode` takes `codec=ac4` too, and writes the objects it makes of a
 WAV file's channels, or of `src=`, `map=` and `offset=`, as AC-4 objects: A-JOC-coded unless
 `coding=direct` asks for direct-coded object substreams, a raw stream (with Part 2 Annex G's CRC
 unless `crc=off`) or, for an `.mp4`, `.m4a` or `.mov` output name, an MP4 file.
@@ -547,7 +547,7 @@ usage block at the top of this page is from a *default* build, where this row in
 
 | Command | What it does |
 |---|---|
-| `atmos-iab` | A real Immersive Audio Bitstream (SMPTE ST 2098-2) master — a bare elementary `.iab` file or a real MXF Track File alike, sniffed automatically by its first byte — straight to DD+ JOC E-AC-3: [`iclforge::adm::build_iab`](../../library/adm-bridge.md#bridging-iab) classifies every Bed channel/Object and builds its own `iclforge::objects::oba::ObjectPath` from the file's own per-frame panning, driven frame by frame the same way `atmos-adm` drives an ADM master. `codec=ac4`/`coding=` work exactly as `atmos-adm`'s own do (planning/ac4.md, I5) |
+| `atmos-iab` | A real Immersive Audio Bitstream (SMPTE ST 2098-2) master — a bare elementary `.iab` file or a real MXF Track File alike, sniffed automatically by its first byte — straight to DD+ JOC E-AC-3: [`iclforge::adm::build_iab`](../../library/adm-bridge.md#bridging-iab) classifies every Bed channel/Object and builds its own `iclforge::objects::oba::ObjectPath` from the file's own per-frame panning, driven frame by frame the same way `atmos-adm` drives an ADM master. `codec=ac4`/`coding=` work exactly as `atmos-adm`'s own do |
 
 ```bash
 forge atmos-iab master.iab out.ec3 448
@@ -734,8 +734,7 @@ AC-3 karaoke stream is made at), so a player is told the level the author set an
 its own default; `bsmod=7` on mono is Table 5.7's voice-over and on `1+1` a service Annex A and
 Annex G prohibit, and both encoders write them as asked with a warning. This reproduction is this
 project's by analogy with Annex C and by that decoder; a player built on FFmpeg flags the stream
-as karaoke and plays the vocals from the surround channels, as it does an AC-3 one
-(`planning/karaoke-eac3-findings.md` has the clauses and the measurements).
+as karaoke and plays the vocals from the surround channels, as it does an AC-3 one.
 
 `karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
 reproduction with the listener choosing which vocals are heard rather than the stream's own
@@ -1016,8 +1015,8 @@ substream's segments (terminators and the end marker). Nothing derived from the 
 signature or protection byte is printed. `libs/truehd/ERRATA.md` ("Atmos, spec v3.6", section H) says which field answers which open
 question.
 
-`detail=matrix` (TrueHD and MLP) decodes the stream, lenient, and lists every block header that sends matrices or `output_shift`, in all four substreams and with no cap on the count, so a substream with none reads as none and never as cut off. It opens with a `matrix` line (the headers listed) and one line per substream (matrix sets, matrices, `output_shift` headers and how many of those hold a shift other than 0). Each header then prints its place (`unit`, `sub`, `block` in its segment, `sample` before it in the unit and whether it carries a restart header). An `output_shift` line gives the shift of each matrix channel with the output channel the restart header's `ch_assign` sends it to (`m3->out5:-1`); the decoder applies the values as sent. A `matrix_set` line gives the section (matrix channels, count, and for the object audio matrices whether it has the extension, sends coefficients and sends deltas), and a `matrix` line each matrix: `out`, `frac_bits`, `f_shift` (the real coefficient is the raw value over 2 to the `scale`, shown as `2^-N`), `lsb_bypass`, `noise_shift`, the reserved `field_2b` and `field_m4`, the extension's `ext_width` and `ext_field2`, the coefficients as sent (`m<channel>:raw`, `n0` and `n1` for the two noise channels) and the extension's slopes (the per-unit change of each coefficient, `-` when the matrix has none). `json=1` adds a `matrix` member with the same figures. Counts and header fields only, never audio.
-
+`detail=matrix` (TrueHD and MLP) decodes the stream, lenient, and lists every block header that sends matrices or `output_shift`, in all four substreams and with no cap on the count, so a substream with none reads as none and never as cut off. It opens with a `matrix` line (the headers listed) and one line per substream (matrix sets, matrices, `output_shift` headers and how many of those hold a shift other than 0). Each header then prints its place (`unit`, `sub`, `block` in its segment, `sample` before it in the unit and whether it carries a restart header). An `output_shift` line gives the shift of each matrix channel with the output channel the restart header's `ch_assign` sends it to (`m3->out5:-1`); the decoder applies the values as sent. A `matrix_set` line gives the section (matrix channels, count, and for the object audio matrices whether it has the extension, sends coefficients and sends deltas), and a `matrix` line each matrix: `out`, `frac_bits`, `f_shift` (the real coefficient is the raw value over 2 to the `scale`, shown as `2^-N`), `lsb_bypass`, `noise_shift`, the reserved `field_2b` and `field_m4`, the extension's `ext_width` and `ext_field2`, the coefficients as sent (`m<channel>:raw`, `n0` and `n1` for the two noise channels) and the extension's slopes (the per-unit change of each coefficient, `-` when the matrix has none). `json=1` adds a `matrix` member with the same figures. Counts and header fields only, never audio.
+
 `detail=rate` (TrueHD and MLP) runs the arrival model of TH spec §3.4 and §18 over the stream's access units and prints, for each restart
 interval, its bitrate (kbit/s), the rate of its largest access unit, the least headroom any unit has before it would arrive more than 75 ms
 after its slot (milliseconds, three decimals; negative means late) and how many units were late, after a summary line for the whole stream.
@@ -1077,8 +1076,7 @@ options, each only here:
 | `truehd-control-2ch=`, `-6ch=`, `-8ch=` | `on` or `off`, the presentation's control-enabled bit |
 | `truehd-heavy-drc-start-up-gain=`, `truehd-drc-start-up-gain=` | the two DRC start-up gains, signed: -32 to 31 and -64 to 63 (TH spec section 12.3) |
 
-`src=`, `map=` and `offset=` take the channels of several WAVs, with the grammar of the other encoders and TrueHD's channel names for the places
-(`planning/truehd-parity-forge.md`, question 16, option A): `map=<source>.<channel>:<place>,...`, source 0 the positional input and each `src=` the next, channels
+`src=`, `map=` and `offset=` take the channels of several WAVs, with the grammar of the other encoders and TrueHD's channel names for the places: `map=<source>.<channel>:<place>,...`, source 0 the positional input and each `src=` the next, channels
 counted from 0, the place one of `L R C LFE Ls Rs Lvh Rvh Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Cvh LFE2` in any case. `map=0.0:L,0.1:R,1.0:C,2.0:LFE,2.1:Ls,2.2:Rs` puts the
 two channels of the input and the first channel of each of two `src=` files into 5.1. The places named have to make one channel assignment (TH spec section 13.1: the pairs
 L R, Ls Rs, Lvh Rvh, Lc Rc, Lrs Rrs, Lsd Rsd, Lw Rw, and the singles C, LFE, Cs, Ts, Cvh, LFE2), and the stream's channels are in that assignment's order whatever the order of the map;

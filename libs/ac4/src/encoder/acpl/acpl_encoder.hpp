@@ -162,7 +162,7 @@ class AcplEncoder {
 
    private:
     // The core's own complex type: Slot crosses into dsp::tiered::QmfAnalysis<Real>
-    // (push_slot()), which takes it since D14a (planning/ac4.md). Spectrum
+    // (push_slot()), which takes it since D14a. Spectrum
     // is the encoder's own DFT bins, built from Slot's history but never
     // itself passed to the core, so it keeps std::complex<double>.
     using Slot = std::array<dsp::tiered::Complex<double>, dsp::tiered::kQmfSubbands>;

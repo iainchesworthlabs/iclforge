@@ -1,7 +1,7 @@
 // The lyric screen on a computer (see CMakeLists.txt): lyric_screen.cpp, as the board runs it, fed a
 // document and a position instead of the Sendspin player, drawn by LVGL's software renderer into a
-// 1024 by 600 buffer and written as one 24-bit BMP a scenario. The scenarios are the screens of
-// planning/karaoke-p4x-panel.md, "The screens", S1 to S9.
+// 1024 by 600 buffer and written as one 24-bit BMP a scenario. The scenarios are the panel's
+// screens, S1 to S9.
 
 #include <algorithm>
 #include <cstdint>
@@ -50,7 +50,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// The display the screen is drawn on: the kit's 1024 by 600 for the screens of planning/karaoke-p4x-panel.md, and
+// The display the screen is drawn on: the kit's 1024 by 600 for the panel's screens, and
 // then each size the Adjust and Preferences sheets are checked at (open_display()).
 int g_width = 1024;
 int g_height = 600;
@@ -1043,7 +1043,7 @@ int check_system_group(int width, int height, const fs::path& out, const std::st
     return failures;
 }
 
-// The display and time preferences at one size (planning/p4x-preferences.md), driven by taps the way a person does:
+// The display and time preferences at one size, driven by taps the way a person does:
 // the brightness steps, the clock's hours and seconds are chosen, the night schedule is a switch and a pair of times in
 // an editor of its own, and the time zone a region and then a city. Each editor is held to what the sheet is held to
 // (audit()). The sheet is open, for the kit. Returns the number of failures, having said each.
@@ -1275,7 +1275,7 @@ int check_display_and_time(lv_obj_t* prefs, int width, int height, const fs::pat
     return failures;
 }
 
-// --- Sound: the Identify speakers button and the Speakers sheet (planning/hearth-speaker-trim-identify.md) --------------------
+// --- Sound: the Identify speakers button and the Speakers sheet --------------------
 
 namespace st = iclforge::render::speaker_trim;
 
@@ -1698,7 +1698,7 @@ int check_sound_group(int width, int height, const fs::path& out, const std::str
     return failures;
 }
 
-// The Adjust and Preferences sheets at one display size (planning/p4x-preferences.md): drawn for the kit and for a
+// The Adjust and Preferences sheets at one display size: drawn for the kit and for a
 // board whose screen has no touch, held to a fingertip's size and to text that is not cut off (audit()), and driven by
 // taps the way a person does. Returns the number of failures, having said each.
 // Every touch target under `root` can be brought onto the glass: scrolled to, it is on the screen and inside every box
@@ -2055,7 +2055,8 @@ int check_layout_sheet(int width, int height, const fs::path& out, const std::st
     return failures;
 }
 
-// The Meters view at a display size, in each room the product has (planning/p4x-meters-view.md): the representation the rule gives for
+// The Meters view at a display size, in each room the product has: the representation the rule
+// gives for
 // the width and the room's outputs, twenty updates a second, no fall to ten, and the pixels LVGL flushes a second, which is what keeps
 // the invalid-area table at 256 honest: with LVGL's 32 every spectrum update redraws the whole glass (11 to 12 million pixels a second
 // at 1024 by 600), and a change that lost the 256 would show here as a number several times the bound. One picture a room.
@@ -2377,7 +2378,7 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         pump(6);
     }
 
-    // The night schedule (planning/p4x-preferences.md): by the board's own time, the no-lyrics view goes dark as the dark
+    // The night schedule: by the board's own time, the no-lyrics view goes dark as the dark
     // view does, a touch lights it for 30 seconds, and a board that does not know the time is never dark by accident.
     {
         g_caps = iclforge::variants::p4_rev3_kit();
@@ -2428,7 +2429,7 @@ int check_sheets(int width, int height, const fs::path& out, const std::string& 
         pump(6);
     }
 
-    // The waiting screen (planning/p4x-now-playing.md, "The waiting screen"): nothing playing, the board set up. Lit for the
+    // The waiting screen: nothing playing, the board set up. Lit for the
     // dim time, then the view chosen (a dim, the clock, or dark); a touch brings the status back and the time begins again;
     // a board still to be set up, and one told to stay lit, are never dimmed; a screen already dimmed as the stream ends
     // stays so, and the status is not lit between two songs.
@@ -3384,7 +3385,7 @@ int main(int argc, char** argv) {
         {"s10-script-undrawable", [&] { hold(mixed, 4'000); }},
         {"s11-notes-dropped", [&] { hold(mixed, 1'200); }},
         {"s12-cyrillic-greek", [&] { hold(cyrillic_greek, 3'500); }},
-        // The pulse style (planning/p4x-speakers-options.md): the filled circle grows and shrinks a little with its
+        // The pulse style: the filled circle grows and shrinks a little with its
         // level, here in the same rooms as the glow above; the style is put back to glow after the scenarios.
         {"s18-speakers-2-0-pulse", [&] {
              g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kPulse;
@@ -3398,7 +3399,8 @@ int main(int argc, char** argv) {
                                  .objects = 15},
                        kSevenOneFour);
          }, 10'000'000},
-        // The Meters view (planning/p4x-meters-view.md): a spectrum of what the tap hears, a groove over the room, and the channels in the
+        // The Meters view: a spectrum of what the tap hears, a groove over the room, and the
+        // channels in the
         // representation the display's width and the room's outputs ask for.
         {"s19-meters-2-0", [&] {
              g_settings.speakers_style = iclforge::nowview::SpeakersStyle::kGlow;
@@ -3412,7 +3414,7 @@ int main(int argc, char** argv) {
                        kSevenOneFour, 768);
          }, 10'000'000},
         {"s19-meters-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix, 640); }, 10'000'000},
-        // The footer names the stream under every view (planning/p4x-now-playing.md, "The stream is named"): TrueHD 7.1 from Music
+        // The footer names the stream under every view: TrueHD 7.1 from Music
         // Assistant at 5.2 Mb/s under the speakers with no title said, the title card, the Meters view and the lyrics, and PCM under lyrics.
         {"s20-footer-speakers-truehd", [&] {
              g_settings.view = iclforge::nowview::View::kSpeakers;

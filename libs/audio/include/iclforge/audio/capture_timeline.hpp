@@ -7,7 +7,7 @@
 
 #include "iclforge/audio/capture.hpp"
 
-// Where in time each frame of a capture was captured (planning/karaoke-microphone.md, MI6).
+// Where in time each frame of a capture was captured.
 //
 // A capture hands out stamps, one per packet: "frame N of the stream was captured at time T". A
 // consumer wants the time of a frame in the middle of a packet, or of a frame whose packet is not

@@ -12,7 +12,7 @@ namespace iclforge::ac3::internal {
 // Fixed32 (src/forge/src/core/fixed32.hpp): Q7.24 in a 32-bit integer, for a
 // part with no floating-point unit at all - the ESP32-C3, a Cortex-M3 - where
 // even float is a compiled subroutine. Its guarantee is a stated SNR to the
-// double decode (planning/arithmetic-tiers.md, 100 dB the target) and PCM
+// double decode and PCM
 // that is bit-identical on every platform, integer arithmetic having no
 // rounding mode or C library to differ by.
 //

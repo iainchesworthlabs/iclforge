@@ -13,7 +13,7 @@
 
 #include "iclforge/sink/loopback_harness.hpp"
 
-// AR1 (planning/hearth-android.md): the bytes the pass-through output hands its link are the burst the
+// AR1: the bytes the pass-through output hands its link are the burst the
 // host wrote, for every fixture, through the transport, the sink and the output. The harness
 // (iclforge/sink/loopback_harness.hpp) packs each stream as Hearth's server does, sends it over a
 // loopback WebSocket to a sink whose extension-role output is the PassthroughOutput over a model of

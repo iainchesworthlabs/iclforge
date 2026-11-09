@@ -4,7 +4,7 @@
 
 #include "lvgl.h"
 
-// The Speaker layout sheet (planning/p4x-layout-builder.md): the page the Preferences' "Speaker layout" row opens. Two ways
+// The Speaker layout sheet: the page the Preferences' "Speaker layout" row opens. Two ways
 // in to one choice. QUICK PICKS are the layouts a home has, as chips in two groups (around you, with heights); BUILD
 // YOURS is how many speakers are around you, how many subwoofers, how many heights and how the heights are mounted, as
 // buttons. Both set the same working layout, drawn as the room it makes beside the buttons (iclforge/render/room_plan.hpp)

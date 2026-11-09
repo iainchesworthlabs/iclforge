@@ -13,8 +13,8 @@
 // A play starts with nothing in the sink's queue but its first unit's blocks,
 // one frame of audio, and the units after it decode more slowly than the rest
 // while the caches warm. On an ESP32-S3 playing 7.1.4 over WiFi that ran the
-// DAC dry in a play's first ten frames and never after
-// (planning/esp32-714-realtime.md, "The decisions on the board"). Held until
+// DAC dry in a play's first ten frames and never after.
+// Held until
 // the second unit arrives, the first reaches the sink together with it, so the
 // DAC starts with two frames queued.
 //

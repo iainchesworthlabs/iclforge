@@ -7,7 +7,7 @@
 // not iclforge::ac3::internal::decode_scalar_t's mechanism.
 //
 // Fixed32: Q7.24 in a 32-bit integer, for the ESP32-C6 and -C3, which have no
-// floating-point unit (planning/ac4.md, D14d). A block exponent travels with each
+// floating-point unit. A block exponent travels with each
 // transform block and each QMF slot where a value at one absolute scale would lose
 // a small value's bits; the kernels that need one take it through the overload sets
 // of tiered/real_functions.hpp, and the floating tiers' exponents are zero.

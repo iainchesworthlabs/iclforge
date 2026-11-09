@@ -31,7 +31,7 @@
 #include "session.hpp"
 #include "transport.hpp"
 
-// The engine thread (planning/hearth-reference-player.md, A3): a Player on a
+// The engine thread: a Player on a
 // thread of its own, driven by commands from any other thread, reporting what
 // it did as snapshots any other thread can read.
 //
@@ -113,7 +113,7 @@ struct EngineStatus {
     std::string note{};
     std::string error{};
 
-    // The speaker setup (planning/hearth-reference-player.md, A5's Speakers
+    // The speaker setup (A5's Speakers
     // page; Player::set_trim_db() and friends). trim_db/delay_ms are one
     // entry per render layout slot (index i is slot i, not necessarily
     // output i - the routing patch below may send it elsewhere), always

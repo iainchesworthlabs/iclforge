@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-// CD+G, the picture of a karaoke disc (planning/karaoke-phase2.md, W13f and decision D11): a `.cdg`
+// CD+G, the picture of a karaoke disc: a `.cdg`
 // file is the subcode channel of a CD ripped on its own, a stream of 24-byte packets, 300 of them
 // a second, that draw a 300 by 216 picture in 16 colours. It carries NO TEXT: the words are pixels,
 // and what a player can do is show the picture against the audio's position. That is all this does.

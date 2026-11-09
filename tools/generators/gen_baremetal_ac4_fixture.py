@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Generate firmware/baremetal/ac4_fixture.hpp - the AC-4 bitstreams the bare-metal
-AC-4 probe decodes, and the per-channel levels it checks them against
-(planning/ac4.md, D14a).
+AC-4 probe decodes, and the per-channel levels it checks them against.
 
 The probe runs on a target with no filesystem, so its input is linked in. Every
 stream is a committed one, read as it is, and the levels are what this project's
@@ -26,8 +25,7 @@ The streams are the table STREAMS below. What each is for:
   - ac4_20_companding: a stereo stream DEE wrote at 48 kbit/s, whose A-SPX
     runs the companding tool (b_compand_on in every frame): the one fixture
     that reaches float pow and exp2 in the decoder, so that its pinned hash
-    is what holds decision 26 for the streams with companding (planning/ac4.md,
-    D14a4).
+    is what holds decision 26 for the streams with companding.
 
 The levels are the WAV that `forge decode` writes, read back per channel and put
 in the order the decoder hands its channels over in (the speakers of
@@ -183,7 +181,7 @@ def main() -> int:
         "//",
         "// The AC-4 bitstreams firmware/baremetal/ac4_probe.cpp decodes and the per-channel "
         + "levels",
-        "// it checks them against (planning/ac4.md, D14a). Every stream is a committed one, read",
+        "// it checks them against. Every stream is a committed one, read",
         "// as it is (STREAMS in the generator names each); the expected levels are what this",
         "// project's own decoder writes for it, so they are a REGRESSION reference (has this",
         "// build moved?), not an independent oracle.",

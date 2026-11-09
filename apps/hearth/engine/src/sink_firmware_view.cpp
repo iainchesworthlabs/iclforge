@@ -189,7 +189,7 @@ FirmwarePanel to_firmware_panel(const SinkFirmware::Snapshot& snapshot, std::str
     const bool on_trial = firmware.trial || (firmware.running && firmware.running->state == "trial");
     const bool idle = snapshot.answering && !updating && !firmware.upload;
     panel.can_update = idle && firmware.other.has_value() && !on_trial;
-    // On trial, a rollback gives the trial up (planning/esp32-ota.md, Routes).
+    // On trial, a rollback gives the trial up.
     panel.can_rollback = idle && (on_trial || (firmware.other && firmware.other->state == "valid"));
     // A restart on trial would roll back, which the board refuses.
     panel.can_restart = idle && !on_trial;

@@ -1,5 +1,5 @@
 """Unit tests for installer_site.py, which puts a release's sink firmware into the
-documentation site for the browser installer (planning/esp32-ota.md, O9).
+documentation site for the browser installer.
 
 stdlib unittest, as ci.yml's script-lint job runs it. The release is the four
 images CI publishes, packaged by package_firmware.py from sink_build_fixture.py's

@@ -12,7 +12,7 @@
 #include "cdg_frame_source.hpp"
 #include "cdg_frames.hpp"
 
-// The lyrics of the item playing (planning/karaoke-design.md, K5): a third QML
+// The lyrics of the item playing: a third QML
 // singleton beside HearthController and NetworkController, so that
 // hearth_controller.cpp does not grow. What it wraps is apps/hearth/engine/src/
 // iclforge/lyrics/lyrics.hpp, the Qt-free reader and cursor; this class turns a file into
@@ -33,8 +33,7 @@ class KaraokeController : public iclforge::apps::CdgFrameSource {
     // "none": no `name.lrc` beside the item (or nothing playing); "timed": a
     // file whose lines have times; "plain": a file with no times, shown whole
     // and not followed; "picture": no lyrics file, and a `name.cdg` beside the
-    // item, the picture of a CD+G disc (planning/karaoke-phase2.md, W13f; it
-    // carries no text, so it is shown and not read); "error": a file that could
+    // item, the picture of a CD+G disc; "error": a file that could
     // not be read, with errorText.
     Q_PROPERTY(QString status READ status NOTIFY lyricsChanged)
     // The file's name, and for "error" the reason as the reader wrote it. Empty
@@ -54,11 +53,11 @@ class KaraokeController : public iclforge::apps::CdgFrameSource {
     // spacing). Empty unless the status is "timed" or "plain".
     Q_PROPERTY(QVariantList lines READ lines NOTIFY lyricsChanged)
     Q_PROPERTY(int lineCount READ lineCount NOTIFY lyricsChanged)
-    // A duet (planning/karaoke-phase2.md, W11b). Each line also carries `singer`: "" for a
+    // A duet. Each line also carries `singer`: "" for a
     // line that says nothing, else "v1", "v2" or "both". hasSingers is whether any does.
     Q_PROPERTY(bool hasSingers READ hasSingers NOTIFY lyricsChanged)
-    // A CD+G disc beside the item, with or without a lyrics file (planning/karaoke-phase2.md, W13f;
-    // the owner's answer to C12, 2026-10-12): whether one is there and could be read, and its file
+    // A CD+G disc beside the item, with or without a lyrics file: whether one is there and could
+    // be read, and its file
     // name. With no lyrics file the status is "picture" and the picture is all there is; with one
     // the status is the file's, and the words are shown unless the singer chose the picture.
     Q_PROPERTY(bool hasPicture READ hasPicture NOTIFY lyricsChanged)
@@ -88,7 +87,7 @@ class KaraokeController : public iclforge::apps::CdgFrameSource {
     Q_PROPERTY(int delayMs READ delayMs WRITE setDelayMs NOTIFY delayChanged)
     Q_PROPERTY(int maxDelayMs READ maxDelayMs CONSTANT)
 
-    // ---- timing the lyrics (planning/karaoke-phase2.md, W6) -------------------------
+    // ---- timing the lyrics -------------------------
     // A session over a copy of the item's words, in which a person presses a
     // key as each line and then each word is sung; saving writes the item's
     // `.lrc`. The displayed lyrics above are not touched until a save, so the
@@ -113,9 +112,9 @@ class KaraokeController : public iclforge::apps::CdgFrameSource {
     // the stored time is the sound's. Kept across starts, 0 to maxReactionMs.
     Q_PROPERTY(int reactionMs READ reactionMs WRITE setReactionMs NOTIFY reactionChanged)
     Q_PROPERTY(int maxReactionMs READ maxReactionMs CONSTANT)
-    // The singers' names as the file being timed will carry them (`[v1:]` and `[v2:]`, planning/
-    // karaoke-phase2.md, W11c): what the file said, then what was typed. They are the file's, so
-    // they are saved with it; the names typed on the Karaoke page are for the run and are not.
+    // The singers' names as the file being timed will carry them (`[v1:]` and `[v2:]`): what the
+    // file said, then what was typed. They are the file's, so they are saved with it; the names
+    // typed on the Karaoke page are for the run and are not.
     // Brackets and control characters are taken out, since a tag ends at the first `]`. Empty
     // while nothing is being timed.
     Q_PROPERTY(QString timingFirstName READ timingFirstName WRITE setTimingFirstName NOTIFY timingChanged)

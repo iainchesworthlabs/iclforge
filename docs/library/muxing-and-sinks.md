@@ -222,9 +222,7 @@ KID, and `Reader::refused_tracks()` or `list_refused_tracks()` supplies the trac
 beside a readable one is listed in `Demuxed::skipped` with its `Protection`. A track that holds a clear
 sample entry beside a protected one, the layout of a clear lead-in, is refused whole: the entry a
 sample belongs to is named per chunk or per fragment, and reading only the clear entry would return
-a truncated programme as if it were all of it. Nothing here decrypts or reads a key. See
-[the CENC audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-conformance.md)
-and [the read-side plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/cenc-read-side.md).
+a truncated programme as if it were all of it. Nothing here decrypts or reads a key.
 
 **The `dec3`/`dac3` box comes back parsed.** `ReadTrack::codec_config` is a `CodecConfig`, the read
 twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgecontainersmp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,

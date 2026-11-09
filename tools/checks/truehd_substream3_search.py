@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Which reading of the block header parses the object substream (substream 3) of a TrueHD stream.
 
-For the owner to run on a disc excerpt on the owner's machine (planning/work-packages/WP1, step 1).
+For the owner to run on a disc excerpt on the owner's machine.
 It reads nothing but the stream given and prints parameters and counts: no sample, no residual bit.
 The stream is an elementary TrueHD stream (a `.thd`, or `ffmpeg -c copy` out of the disc's `.m2ts`).
 

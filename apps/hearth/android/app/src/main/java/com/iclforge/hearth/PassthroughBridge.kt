@@ -10,8 +10,8 @@ import java.nio.ByteBuffer
 
 private const val TAG = "PassthroughBridge"
 
-// One burst, and how many of them the track holds: the device does not start until it is full
-// (planning/hearth-android-findings.md, F12: not before 8 bursts, 256 ms), so this is also the time
+// One burst, and how many of them the track holds: the device does not start until it is full,
+// so this is also the time
 // to the first sound, and the most the sink can be ahead of the link.
 private const val AC3_BURST_BYTES = 6144
 private const val EAC3_BURST_BYTES = 24576
@@ -136,7 +136,7 @@ class PassthroughBridge {
     /**
      * Whether the route takes either burst form now, without logging: what the starting screen asks
      * twice a second, to say "waiting for the receiver" while a display's sleep or a receiver's
-     * standby has taken the HDMI route (planning/hearth-android-findings.md, F12).
+     * standby has taken the HDMI route.
      */
     fun routeAvailable(): Boolean {
         if (Build.VERSION.SDK_INT < 29) return false

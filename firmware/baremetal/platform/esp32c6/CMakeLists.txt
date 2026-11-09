@@ -1,7 +1,6 @@
 # ---------------------------------------------------------------------------
 # The ESP32-C6 shape of the minimum-footprint probe: the fixed-point tier on the
-# part Hearth's smaller sink is built for (planning/hearth-reference-player.md,
-# chip C, phase C1).
+# part Hearth's smaller sink is built for.
 #
 # The same shape as the esp32c3 sibling beside it, which points at the esp32s3
 # project for the arguments all three share; this file says only what differs.

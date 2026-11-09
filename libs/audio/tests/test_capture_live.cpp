@@ -12,8 +12,7 @@
 #include "iclforge/audio/capture_timeline.hpp"
 #include "iclforge/audio/monitor.hpp"
 
-// Capture's stamps and timing against a real device (libs/audio/src/backend/*/capture.cpp;
-// planning/karaoke-microphone.md, MI6).
+// Capture's stamps and timing against a real device (libs/audio/src/backend/*/capture.cpp).
 //
 // Hidden: the tag starts with a dot, so `iclforge-tests` does not run this. It needs a sound card
 // and plays about a second of quiet tone through the default output. It captures that output in

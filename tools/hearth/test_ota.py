@@ -8,7 +8,7 @@ the tool uses from scripted state: GET /hardware, /status and /firmware,
 PUT /firmware, /firmware/mode and /firmware/rollback, and POST /restart. After
 an upload, its GET /firmware follows a script, one answer a request, with
 DOWN for a request that gets no answer while the board restarts. The cases are
-the rules the tool's header and planning/esp32-ota.md set out: an image that
+the rules the tool's header sets out: an image that
 checks out, and a damaged or cut-short one refused before any board is
 contacted; each pre-flight refusal; an update that is accepted, one that rolls
 back, and one that does not come back; and several boards, where the first to
@@ -59,7 +59,7 @@ OLD_ELF = hashlib.sha256(b"the image the board runs").digest()
 NEW_ELF = hashlib.sha256(b"the image pushed").digest()
 OLD_IMAGE_SHA = "ab" * 32
 
-# The 16 MB table (planning/esp32-ota.md, "Flash layout").
+# The 16 MB table.
 TABLE = (
     ("nvs", 1, 0x02, 0x9000, 0x6000),
     ("phy_init", 1, 0x01, 0xF000, 0x1000),

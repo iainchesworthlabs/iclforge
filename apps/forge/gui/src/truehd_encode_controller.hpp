@@ -13,7 +13,7 @@
 
 #include "background_jobs.hpp"
 
-// The Forge window's TrueHD encode (planning/truehd-parity-forge.md, row U1): a WAV coded losslessly
+// The Forge window's TrueHD encode: a WAV coded losslessly
 // into a bare .thd stream by the encode `forge truehd-encode` runs (apps/shared/media/src/
 // truehd_encode_core.hpp). It is its own surface, reached from the header like Open stream and QC,
 // and deliberately not a fourth entry of the encoder workbench's codec list: the workbench plans an

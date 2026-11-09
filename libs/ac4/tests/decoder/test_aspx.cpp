@@ -345,9 +345,9 @@ TEST_CASE("companding's gains are libm's at double and the project's own functio
     // they always were; at float they are 2^(e log2 L) and 2^(1 / alpha) through
     // iclforge::internal::scalar_exp2 and scalar_log2, plain float multiplies and adds, and the
     // samples that come out are pinned to the bit: the C libraries' powf and exp2f differ in
-    // the last bit on some inputs, and a Cortex-M3 or an ESP32 must give the host's samples
-    // (planning/ac4.md, D14a4). At Fixed32 the level and the gains are MantExp's, and its own
-    // log2 and exp2 (planning/ac4.md, D14d).
+    // the last bit on some inputs, and a Cortex-M3 or an ESP32 must give the host's samples.
+    // At Fixed32 the level and the gains are MantExp's, and its own
+    // log2 and exp2.
     std::vector<QmfValue> ext(static_cast<std::size_t>(kExtSlots) * 64);
     const auto slot = [&](int ts, int sb) -> QmfValue& {
         return ext[static_cast<std::size_t>(ts + aspx::kTsOffsetHfadj) * 64 +

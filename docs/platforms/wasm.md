@@ -87,9 +87,8 @@ WSL2/Emscripten 6.0.6 toolchain `build-wasm` uses:
 
 ## Microphone in the decode demo
 
-A karaoke stream decoded in the decode demo gains a **Microphone** card
-([`planning/karaoke-microphone.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md),
-M7): a singer's pitch against the tune, with the library's own arithmetic and not a second
+A karaoke stream decoded in the decode demo gains a **Microphone** card:
+a singer's pitch against the tune, with the library's own arithmetic and not a second
 implementation in JavaScript. It is the tracker, reference melody and scorer of `libs/pitch` (standard
 library only, the library Hearth's microphone is built on), bound into the decode module by
 `apps/demos/wasm/pitch_bindings.cpp`; the module grew by about 26 KB raw (736 to 762 KB).

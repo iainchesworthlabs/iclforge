@@ -61,7 +61,7 @@ CONFIG_PM_SLEEP_CLK_ICG_ENABLE=n
 # on 2026-09-24 at the Info log level, 1,152 short of the window. A later
 # ESP-IDF that grows it past the window fails the build and says so;
 # CONFIG_BOOTLOADER_LOG_LEVEL_WARN took it to 20,896 bytes in the same
-# measurement. planning/esp32-ota.md has the table.
+# measurement.
 
 # Quad I/O to the flash. The AC-4 decoder's code and the tables it reads are
 # larger than the caches, so every frame refills thousands of 64-byte lines
@@ -81,8 +81,8 @@ CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 # frame is in the queue, so a queue that holds less than a frame takes to decode runs dry in
 # every frame: a 5.1 A-SPX stream folded to 2.0, 35 ms to decode of its 42.7, took 13.5 s for
 # 10.1 s of audio through the default queue, and the sink counted 236 underruns and 3.5 s of
-# silence; through this one it counted 1 underrun of 11 ms, the first frame's (planning/ac4.md,
-# D14e). The queue is internal RAM, 24 KB at 2.0 (two 32-bit slots); a wide TDM frame (16 slots)
+# silence; through this one it counted 1 underrun of 11 ms, the first frame's. The queue is
+# internal RAM, 24 KB at 2.0 (two 32-bit slots); a wide TDM frame (16 slots)
 # would be 196 KB, which the AC-4 decoder leaves no room for, so size it down with that
 # layout (it does not start on this chip revision).
 CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_DESCRIPTORS=12
@@ -95,8 +95,7 @@ CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_FRAMES=256
 # with small ones, and at the start of a play the chunks arrive faster than the server task reads
 # them. The refused segment comes again 250 ms or more later, and the stream's first chunk with it:
 # on the v3.2 kit 7 plays in 20 over Wi-Fi and 16 in 20 over the cable lost the first part of their
-# first second, and with 32 entries (128 bytes a socket) none of 40 did
-# (planning/karaoke-p4x-panel.md, "What the glitches were").
+# first second, and with 32 entries (128 bytes a socket) none of 40 did.
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
 
 # The TCP receive window, 16 segments rather than lwIP's 4 (5,760 bytes): a window caps a stream at window / round-trip
@@ -141,7 +140,7 @@ CONFIG_SPIRAM_USE_MALLOC=y
 # Whether a hot buffer was among that depended on how full main RAM was at the moment it
 # was allocated: the 29.97 fps frame-rate converter's history and output vectors were,
 # after one sequence of plays and not after another, and the converter took 94 ms a frame
-# where it takes 12 with them in PSRAM (planning/ac4.md, D14a6). Without the region the
+# where it takes 12 with them in PSRAM. Without the region the
 # same allocations go to PSRAM, behind the cache, and the heap is 32 KB smaller. Nothing
 # here asks for MALLOC_CAP_RTCRAM, so this option is the only way a buffer gets into that
 # memory.
@@ -187,7 +186,7 @@ CONFIG_ICLFORGE_EXAMPLE_I2S_BCLK_GPIO=20
 CONFIG_ICLFORGE_EXAMPLE_I2S_WS_GPIO=21
 CONFIG_ICLFORGE_EXAMPLE_I2S_DOUT_GPIO=22
 
-# The firmware's code and constants in PSRAM (planning/ac4.md, D14g). The decoder's code and
+# The firmware's code and constants in PSRAM. The decoder's code and
 # the tables it reads (0.8 MB of .flash.rodata, among them the Huffman and QMF tables) are
 # larger than the caches, and a cache line comes from the flash at 4 bits a clock where the
 # PSRAM's hex bus takes it at 200 MHz. With the firmware copied into PSRAM at start-up and

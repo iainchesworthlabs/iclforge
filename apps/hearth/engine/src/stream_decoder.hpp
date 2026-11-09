@@ -26,8 +26,7 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "decoder_settings.hpp"
 
-// Access units in, rendered blocks out (planning/hearth-reference-player.md,
-// A3: "a session per item: ... decoder, renderer ...").
+// Access units in, rendered blocks out.
 //
 // One AC-3 syncframe or one E-AC-3 access unit at a time, decoded and placed
 // onto the output layout a 256-frame block at a time, with nothing copied
@@ -69,7 +68,7 @@
 // protection gain - restart for that one frame; everything else, dialnorm
 // included, is exactly what the decoder would have applied.
 //
-// AC-4 (planning/ac4.md, I2; objects and the immersive layout control, I5): a
+// AC-4: a
 // unit that starts with an AC-4 sync word is one sync frame, which goes to
 // iclforge::ac4::Decoder through its public API alone (iclforge/ac4/decoder/decoder.hpp): decode()
 // reads the whole frame at once - channels, and, where a presentation carries
@@ -90,7 +89,7 @@
 // stays true. The unit report says what the frame was: its presentation, its
 // speakers as an acmod, its dialnorm and DRC mode and the decoder's latency.
 
-// TrueHD and MLP (planning/truehd-parity-hearth-player.md, row 6): a unit is one access unit, which
+// TrueHD and MLP: a unit is one access unit, which
 // the session says is one with a UnitCodec because its first bytes are a length and a check nibble
 // and say nothing else. iclforge::truehd::Decoder gives it as 24-bit integers; they become floats
 // by 2^-23, which is exact, and go to the layout renderer as one block of the unit's own length -
@@ -399,8 +398,8 @@ private:
     [[nodiscard]] std::expected<std::size_t, std::string> decode_ac4(
         std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported,
         std::uint32_t unit_samples);
-    // Places a whole decoded AC-4 frame - its channels, or, where it carries objects
-    // (planning/ac4.md, I5), Ac4ObjectRenderer's render of both together - a kBlockSamples chunk at
+    // Places a whole decoded AC-4 frame - its channels, or, where it carries objects,
+    // Ac4ObjectRenderer's render of both together - a kBlockSamples chunk at
     // a time, the same bed-tracking and fold-or-render choice the old per-block sink made. AC-4's
     // object substream is frame_rate_index 13 only (2 048 samples, an exact multiple of 256), so
     // every frame this delivers ends on a whole block; a frame at another rate (no encoder here
@@ -472,7 +471,7 @@ private:
     // has said. With the output asked for as coded, ac4_output() then asks the decoder for 7.X.4.
     bool ac4_source_known_ = false;
     bool ac4_screen_pair_ = false;
-    // Objects (planning/ac4.md, I5): built the first time a presentation carries any, and rebuilt
+    // Objects: built the first time a presentation carries any, and rebuilt
     // whenever the configured layout or the stream's own rate changes under it - both tracked
     // alongside it since Ac4ObjectRenderer takes them at construction and reports neither back.
     std::optional<iclforge::apps::Ac4ObjectRenderer> ac4_objects_;

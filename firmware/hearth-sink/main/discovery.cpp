@@ -18,7 +18,7 @@
 namespace player {
 namespace {
 
-// planning/hearth-sendspin-extension.md, row T4: a player advertises
+// A player advertises
 // _sendspin._tcp with the path the server opens its WebSocket on, and the
 // PLAYER column's port, kSendspinPort (sendspin.hpp), which the Sendspin
 // player listens on.

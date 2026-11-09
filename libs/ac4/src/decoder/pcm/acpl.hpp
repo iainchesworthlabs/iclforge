@@ -45,8 +45,8 @@ namespace iclforge::ac4::detail {
 
 // The scalar Pseudocode 109 runs at in this stage: float at the float tier, where the chip's FPU is
 // single precision and a double operation is a call into software (the interpolations were a fifth
-// of a 5.1 A-CPL mode 3 frame on the ESP32-P4: planning/ac4.md, D14h); double at the double tier,
-// which is the pseudocode's, and at Fixed32, whose pins D14h leaves where they are.
+// of a 5.1 A-CPL mode 3 frame on the ESP32-P4); double at the double tier,
+// which is the pseudocode's, and at Fixed32, whose pins it leaves where they are.
 using InterpReal = std::conditional_t<std::is_same_v<Real, float>, float, double>;
 
 // The most acpl_data_1ch() one element carries: the immersive element's four, six

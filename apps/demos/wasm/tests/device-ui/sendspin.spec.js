@@ -1,8 +1,8 @@
 // @ts-check
 'use strict';
 
-// The Sendspin player's part of the page (planning/hearth-reference-player.md,
-// B3): what GET /status's "sendspin" object shows - the server, the link, the
+// The Sendspin player's part of the page: what GET /status's "sendspin" object shows - the server,
+// the link, the
 // clock, how the stream plays, a level per output, a pairing in progress -
 // and the pairing actions, POST /pairing's reset, cancel and forget, with the
 // list of paired servers GET /pairing gives, against the stand-in device.
@@ -242,7 +242,7 @@ test.describe('the pairing actions', () => {
     });
 });
 
-// GET /pairing's list (planning/esp32-device-ui.md, decision 28): each server
+// GET /pairing's list: each server
 // the board is paired with, by the name its hello gave, and a Forget for each
 // that sends POST /pairing "forget" and its server_id.
 test.describe('the paired servers', () => {

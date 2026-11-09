@@ -1,7 +1,7 @@
 """Check the mixes of forge's AC-4 presentations against Part 1's and Part 2's formulas.
 
 For each presentation of several substreams in the multiplexed streams under
-testdata/ac4/presentations/ (planning/ac4.md, phase D7; libs/ac4/tests/decoder/mux.hpp builds
+testdata/ac4/presentations/ (libs/ac4/tests/decoder/mux.hpp builds
 them from DEE's tone legs and the encoder's tone streams), this decodes the presentation with
 `forge decode presentation-id=`, and each of its substreams alone through the single-group
 presentations the streams also carry, and holds the mix to the matrix the texts give. The

@@ -21,7 +21,7 @@
 #include "truehd_stream.hpp"
 #include "truehd_test_support.hpp"
 
-// TrueHD sent as MAT to a local output (planning/truehd-parity-hearth-player.md, H6 and entry 127):
+// TrueHD sent as MAT to a local output:
 // the player packs a TrueHD item's access units 24 to a burst, the link opens as kMat at the item's
 // rate, two items at one rate join into one stream of bursts, a rate change reopens, and a seek
 // starts the bursts at the restart unit before the place asked for. The oracle is the item itself:

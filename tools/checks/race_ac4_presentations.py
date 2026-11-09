@@ -1,4 +1,4 @@
-"""The race of the encoder's presentations against DEE's substreams (planning/ac4.md, phase E6).
+"""The race of the encoder's presentations against DEE's substreams.
 
 DEE writes one presentation of one substream, so its side of the race is phase D7's test
 multiplexer over the gold set's legs of music and effects, dialogue and associated audio, each a

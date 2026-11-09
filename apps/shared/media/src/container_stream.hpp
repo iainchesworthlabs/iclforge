@@ -12,9 +12,8 @@
 #include "container_input.hpp"
 
 // A container's audio track read where it lies, a window at a time, for a file that does not fit
-// in memory (planning/truehd-parity-hearth-player.md row 5 and question 9: a two hour remux's
-// TrueHD track alone is about 4.5 GB, and elementary_stream_from_bytes holds the file and then a
-// copy of the track).
+// in memory (a two hour remux's TrueHD track alone is about 4.5 GB, and
+// elementary_stream_from_bytes holds the file and then a copy of the track).
 //
 // The container readers say where each frame of the track lies in the file. This keeps those places
 // (ExtentMap) and nothing of the frames, and ExtentSource reads the track back as one stream by its

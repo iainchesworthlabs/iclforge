@@ -610,7 +610,7 @@ constexpr std::size_t kMaxParameterBands = static_cast<std::size_t>(kNumBands.ba
     // decoder reads the matrix directly, as it always did.
     using Scalar = internal::decode_scalar_t;
     // Every scalar but double reads the narrowed copy; the fixed-point tier
-    // converts each read from it (planning/arithmetic-tiers.md, Phase C).
+    // converts each read from it.
     constexpr bool kNarrowed = !std::is_same_v<Scalar, double>;
     if constexpr (kNarrowed) {
         state.matrix_scratch.resize(params.matrix.size());
@@ -1321,8 +1321,7 @@ constexpr std::size_t kMaxParameterBands = static_cast<std::size_t>(kNumBands.ba
 // reconstruct_qmf's twenty-four-slot frame in single precision - the same §6.6.5 ramp, the
 // same §6.6.6 sum over the five bed channels in the same order, over dsp::QmfAnalysisF and
 // QmfSynthesisF - for the parts whose FPU is single precision, where reconstruct_qmf's double
-// arithmetic is a software routine per operation (planning/ac4.md D14i's measurements, and
-// 381 ms of a 397 ms ESP32-S3 frame for four objects). It differs from the double result by
+// arithmetic is a software routine per operation. It differs from the double result by
 // float rounding, about 140 dB below the signal (libs/ac3/tests/oba/test_joc_single.cpp).
 //
 // Two things are done once that the double form does a slot at a time: the frame's matrix is

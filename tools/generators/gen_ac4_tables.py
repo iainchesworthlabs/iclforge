@@ -118,7 +118,7 @@ REPO = Path(__file__).resolve().parent.parent.parent
 # The headers are public and sit in the include tree; the sources sit beside the other sources.
 HEADER_DIR = REPO / "libs" / "ac4" / "src" / "core" / "tables"
 SOURCE_DIR = REPO / "libs" / "ac4" / "src" / "core" / "tables"
-# The QMF banks are dsp's (planning/consolidation.md, decision 14), and their window with them;
+# The QMF banks are dsp's, and their window with them;
 # Annex D's file holds A-SPX's noise table beside it.
 QMF_DIR = REPO / "libs" / "dsp" / "src" / "tiered" / "tables"
 SPEC_TXT = "ts_10319001v010401p.txt"

@@ -105,8 +105,7 @@ TEST_CASE("decoder settings: every control reaches the configuration", "[hearth]
 
 TEST_CASE(
     "decoder settings: AC-4's immersive layout and core decoding reach "
-    "iclforge::ac4::DecoderConfig "
-    "(planning/ac4.md, I5)",
+    "iclforge::ac4::DecoderConfig",
     "[hearth][decoder-settings]") {
     DecoderSettings settings;
     settings.ac4.immersive_layout = iclforge::ac4::DownmixTarget::k5X4;

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "The locked build profiles of hearth_sink's ESP32 boards (planning/esp32-platform-profiles.md). tools/hearth/sink_profile.py is the only reader: `defaults` gives a build's SDKCONFIG_DEFAULTS, `verify` holds a configured build to its profile, `snapshot --write` records what a build resolved. A profile changes in a pull request that edits this file, the fragment or the Kconfig default, and carries a board run.",
+  "note": "The locked build profiles of hearth_sink's ESP32 boards. tools/hearth/sink_profile.py is the only reader: `defaults` gives a build's SDKCONFIG_DEFAULTS, `verify` holds a configured build to its profile, `snapshot --write` records what a build resolved. A profile changes in a pull request that edits this file, the fragment or the Kconfig default, and carries a board run.",
   "watch": [
     "*STACK*",
     "*IN_PSRAM*",
@@ -88,7 +88,7 @@
         "ESP_CONSOLE*"
       ],
       "fragment": "qemu-net",
-      "note": "the release shape on QEMU (planning/esp32-platform-profiles.md): Ethernet in place of Wi-Fi, the capture sink in place of I2S, quad PSRAM in place of octal, the console on UART0; nothing about stacks, rings, caches or features"
+      "note": "the release shape on QEMU: Ethernet in place of Wi-Fi, the capture sink in place of I2S, quad PSRAM in place of octal, the console on UART0; nothing about stacks, rings, caches or features"
     }
   },
   "profiles": {

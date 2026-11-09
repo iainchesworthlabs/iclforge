@@ -119,8 +119,7 @@ def check_play(play, entry, slots):
         problems.append(f"{play['resync']} bytes skipped looking for a sync word")
     # Played and held together: a stream using transient pre-noise processing
     # ends with its last unit held back, and the block form the player decodes
-    # through has no way to release it (planning/esp32-player.md, the
-    # hand-over to the decoder core).
+    # through has no way to release it.
     decoded = play["units"] + play.get("held", 0)
     if entry.get("units") is not None and decoded != entry["units"]:
         problems.append(f"{decoded} access units decoded, the stream has {entry['units']}")

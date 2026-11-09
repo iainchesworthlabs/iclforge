@@ -270,7 +270,7 @@ class ICLFORGE_CONTAINERS_EXPORT Ac4BurstPacker {
 // ---------------------------------------------------------------------------
 // A burst from its parts.
 //
-// A receiver of a Sendspin `_iclforge_player@v1` burst chunk (planning/hearth-sendspin-extension.md)
+// A receiver of a Sendspin `_iclforge_player@v1` burst chunk
 // holds what the packers above chose and none of what they added: Pc, Pd and the payload's
 // bytes in stream order, without Pa and Pb, the word swap or the stuffing to the repetition
 // period. A sink that bitstreams to a link has to put them back, and has to put back the burst
@@ -307,9 +307,8 @@ class ICLFORGE_CONTAINERS_EXPORT Ac4BurstPacker {
 
 // A null-data burst (IEC 61937-1's data type 0) of `period_bytes`: Pa, Pb, a Pc of 0 and a Pd of
 // 0, then zeros. What a link carries while there is no burst to send, in place of PCM silence:
-// a receiver that sees zeros leaves its Dolby mode, and one that sees these does not
-// (planning/hearth-android-findings.md, F12: on one receiver, zeros lost the lock in half a
-// second and took 0.8 s to return, and null bursts of 1, 3 and 6 s never dropped it). The
+// a receiver that sees zeros leaves its Dolby mode, and one that sees these does not.
+// The
 // length is the period of the stream the link carries, which burst_period_bytes() gives; a
 // length under 8 or not a whole number of IEC 60958 frames is kNotAFrame, and over 131,072 (AC-4
 // HBR16's longest period) is kFrameTooLarge.

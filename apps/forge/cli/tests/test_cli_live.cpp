@@ -1091,7 +1091,7 @@ TEST_CASE("for an E-AC-3 stream spdif leaves karaoke to the receiver, spatial ig
         const auto out = read_log(log);
         INFO(out);
         // A receiver decodes what spdif wraps, and E-AC-3's karaoke is reproduced there as AC-3's
-        // is (planning/karaoke-eac3.md): the same words as for an AC-3 stream.
+        // is: the same words as for an AC-3 stream.
         CHECK(out.find("warning: karaoke is ignored by spdif: it wraps the coded stream") !=
               std::string::npos);
         CHECK(out.find("the receiver reproduces it") != std::string::npos);

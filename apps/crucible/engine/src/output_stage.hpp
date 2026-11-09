@@ -61,8 +61,7 @@ struct OutputStageConfig {
     // hot switch takes and how long a receiver that lost lock waits to regain
     // it. 128 is the encoder's own default and the one its tests and FFmpeg's
     // decode cover; 8 would cost about 3% more bytes for a 6.7 ms interval
-    // and waits for a receiver to confirm it locks on it (planning/
-    // truehd-parity-crucible.md, question 8).
+    // and waits for a receiver to confirm it locks on it.
     int truehd_restart_interval_units = 128;
     // The rate the TrueHD stream is declared not to exceed. 18 Mbit/s is
     // Blu-ray's; the bed's raw PCM is 6.9 Mbit/s, so only a limit set far
@@ -75,7 +74,7 @@ struct OutputStageConfig {
     // device waiting on the next batch: a gap on the link, which a receiver reads as a lost lock.
     // The bursts are held until at least this much is in hand (rounded up to whole 20 ms bursts)
     // and then handed over together. It is added start-up delay for this mode and no other; 0
-    // hands every burst over as it comes (planning/truehd-parity-crucible.md, question 16).
+    // hands every burst over as it comes.
     int truehd_prefill_ms = 150;
 };
 

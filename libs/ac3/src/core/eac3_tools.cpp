@@ -610,7 +610,7 @@ struct EcplTables<float> {
 };
 
 // The fixed-point tier's copies of the same four tables, narrowed from the
-// same double ones (planning/arithmetic-tiers.md). Every entry is at most one
+// same double ones. Every entry is at most one
 // in magnitude, so the format holds them with the whole of its fraction.
 template <>
 struct EcplTables<iclforge::internal::Fixed32> {
@@ -842,7 +842,7 @@ void ecpl_channel_spectrum_impl(std::span<const Scalar, 256> prev_mant,
     }
 }
 
-// --- the fixed-point tier (planning/arithmetic-tiers.md, Phase C) ----------
+// --- the fixed-point tier ----------
 //
 // Separate bodies rather than branches inside the templates above, for two
 // reasons. The arithmetic differs in kind: Q7.24 is an absolute format, so

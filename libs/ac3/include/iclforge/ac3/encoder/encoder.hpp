@@ -90,7 +90,7 @@ struct EncoderConfig {
     // (choose_delta_segments) and then weighed: the frame is fitted with and
     // without them and whichever reaches the higher SNR offset wins. false
     // skips both the choosing and the second fit, which is the first level of
-    // the encoders' effort axis (planning/arithmetic-tiers.md): what a part
+    // the encoders' effort axis: what a part
     // with a frame to spare on the search gives up is a correction that
     // ordinary material drops on most frames anyway, and what it saves on an
     // ESP32-S3 is measured on the ESP32-S3 page. A stream encoded without it

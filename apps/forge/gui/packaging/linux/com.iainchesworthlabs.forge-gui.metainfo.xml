@@ -7,8 +7,7 @@
   account, as the macOS bundle id (com.iainchesworthlabs.forge-gui) and the Android application
   ids do; it was forge-gui.desktop before any release carried it.
 
-  No <provides><mediatype> for .ac3/.ec3 (Hearth phase A7,
-  planning/hearth-reference-player.md): hearth is the reference player
+  No <provides><mediatype> for .ac3/.ec3 (Hearth phase A7): hearth is the reference player
   and claims both now, in its own metainfo.xml and .desktop's MimeType=.
   forge-gui still opens a stream handed to it on the command line - the file
   dialog and drag-and-drop inside the window are unaffected - it no longer

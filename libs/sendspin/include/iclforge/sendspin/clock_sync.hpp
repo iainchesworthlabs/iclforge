@@ -36,7 +36,7 @@ class SendspinTimeFilter;
 // and an ARP round can all delay a reply the same way, can agree with each other as tightly as
 // a run of accurate ones and read as converged regardless. Convergence is therefore taken in
 // two steps: once the error estimate has stayed under kConvergedError for kConvergedUpdates
-// updates in a row (planning/hearth-sendspin-extension.md, Q4), one more burst - a learning
+// updates in a row, one more burst - a learning
 // interval later, so genuinely apart in time from the run before it - must measure within
 // kConvergedError of that run's own last raw measurement, not the filter's error estimate
 // again, before the filter counts as converged. A run whose confirming burst disagrees is not

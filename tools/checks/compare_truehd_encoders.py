@@ -10,7 +10,7 @@ For every source of the corpus:
     writes that layout at all;
   * where a gold set is given (--set), the stream the Dolby Encoding Engine wrote of the same source
     is read from it. Its bytes are counted and `forge probe` prints its summary fields; nothing else
-    about it is read (README rule 4 of planning/work-packages: a Dolby stream is a test input).
+    about it is read (a Dolby stream is a test input).
 
 The corpus is the legs of the gold set's manifest (the 13 committed in testdata/truehd-dee are the
 default set, and the part CI can run: DEE's licence ends on 2026-11-06 and the full set stays on the

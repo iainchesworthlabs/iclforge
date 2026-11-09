@@ -32,7 +32,7 @@ namespace {
 
 namespace ac = sendspin::player;
 
-// Samples in every burst (planning/hearth-sendspin-extension.md, Burst chunks).
+// Samples in every burst.
 constexpr std::uint64_t kSamplesPerBurst = 1536;
 
 // The layout an access unit decodes to, from its headers alone: each syncframe's acmod and lfeon,

@@ -18,9 +18,7 @@ page. This page is the reference.
     first burst, so the first seconds of an item are silent on it. A network sink that lists `truehd` is sent the stream's access
     units, 24 to a chunk, and decodes them itself (tested against the Hearth test sink only); every other sink is sent PCM or Opus,
     converted to a rate it lists. Hearth for Android and the ESP32 sinks do not take TrueHD. The decode is lossless and 24 bits wide, and what reaches the output is float32
-    through the operating system's mixer, so it is not a bit-exact path. How the work is staged is in the
-    [parity audit](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/truehd-parity-hearth-player.md);
-    what the library has is in [TrueHD and MLP](../library/truehd.md); the roadmap row is
+    through the operating system's mixer, so it is not a bit-exact path. What the library has is in [TrueHD and MLP](../library/truehd.md); the roadmap row is
     [TrueHD and E-AC-3 as equals](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed).
 
     The audio library can now open the eight-channel MAT link for TrueHD (ALSA, PipeWire and WASAPI; Android has a bridge that has not
@@ -559,8 +557,7 @@ at 360 MHz takes 2.0 and 5.1 in real time and states 6 channels
 ESP32-S3 with the 64 KB data cache takes 2.0 and states 2 channels and 25 frames a second
 ([on the S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). Neither decodes a
 presentation's objects, and the desktop player decodes what is past a sink's limits and sends it
-PCM. The published ESP32-P4 (v1.x and v3.x) and ESP32-S3 images carry the decoder and list `ac4` (since 2026-10-29; what it cost each
-board is measured in `planning/ac4-in-release-images.md`), and an ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4
+PCM. The published ESP32-P4 (v1.x and v3.x) and ESP32-S3 images carry the decoder and list `ac4` (since 2026-10-29), and an ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4
 programmes as PCM.
 
 ## Where it runs

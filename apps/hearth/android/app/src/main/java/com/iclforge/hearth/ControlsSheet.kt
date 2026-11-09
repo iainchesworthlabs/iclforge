@@ -3,7 +3,7 @@ package com.iclforge.hearth
 import android.view.KeyEvent
 
 /**
- * The controls sheet of planning/hearth-sink-screen.md (S9): the lyric delay, "-" and "+", and the text
+ * The controls sheet (S9 of the sink screen): the lyric delay, "-" and "+", and the text
  * size, small, medium and large: what a sink owns of its own screen (SS10). It is opened by the D-pad's
  * centre (or a tap), moved about by the D-pad's four directions with a focus ring on one control, and
  * hides itself after [Tokens.SHEET_HIDE_MS] without a key.

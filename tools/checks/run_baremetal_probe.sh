@@ -33,7 +33,7 @@ HOST=0
 # AC-3 encode / E-AC-3 encode fit in an ESP32-S3's internal SRAM at once), so
 # this picks a preset rather than adding a fixture.
 DIRECTION=decoder
-# --ac4: the third profile, the AC-4 decoder (planning/ac4.md, D14a) in float, with its own
+# --ac4: the third profile, the AC-4 decoder in float, with its own
 # probe (firmware/baremetal/ac4_probe.cpp) and its own presets, since AC-4 shares nothing with
 # iclforge::ac3 and an image carries one probe. --ac4 --scalar=fixed is the same probe on the
 # decoder's fixed-point tier (D14d), with ceilings of its own.
@@ -98,7 +98,7 @@ declare -A ICOUNT_CEILING=(
     [eac3_atmos_render]=36000000
 )
 # The fixed-point tier's (--scalar=fixed --icount), measured 2026-09-10 on the
-# same leg with the same headroom rule (planning/arithmetic-tiers.md). Integer
+# same leg with the same headroom rule. Integer
 # arithmetic where the float tier's is software floating point, so most rows
 # are a third to a half of the float table's. The two object rows are the
 # exception, and not because of the tier: JOC's reconstruction runs in float
@@ -135,13 +135,13 @@ declare -A ICOUNT_CEILING_ENCODE=(
     [eac3_ecpl]=104000000
 )
 # The AC-4 decoder's rows (--ac4), in float on the same soft-float leg, measured 2026-09-30 with
-# GCC 14.2.1 under QEMU 10.2.1 (planning/ac4.md, D14a; docs/performance-trend.md's AC-4 table).
+# GCC 14.2.1 under QEMU 10.2.1.
 # Each is the measured figure and about a tenth over it: the counts, the allocation counts and the
 # peaks are deterministic for these fixed streams, so a tenth only has to absorb a deliberate
 # change, and a change past one stops here to be explained in that table.
 #
 # Thumb-2 instructions per frame (--ac4 --icount), the generic seam's portable vector types
-# and all. Measured again 2026-10-03 with the decoder's memory work in (planning/ac4.md): 25.2 M,
+# and all. Measured again 2026-10-03 with the decoder's memory work in: 25.2 M,
 # 35.1 M, 87.2 M, 100.7 M, 161.8 M and 29.3 M, from 54.8 M, 57.3 M, 116.7 M, 122.9 M, 206.3 M and
 # 58.8 M. A figure is the average over a fixture's three or four frames, the first included, and
 # the first no longer builds the inverse transform's tables in software floating point: they
@@ -286,7 +286,7 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     # comment gives. Measured 2026-10-02 (D14e): image 691,896 bytes (689,244 .text, 392 .data,
     # 2,260 .bss), 8,448 more than at D14a5 (683,448, which was 198,416 more than the tree before
     # it, 196,464 of them the sample rate converter's float tables, which the compiler builds
-    # into the image; planning/ac4.md, D14a5); peak heap 1,800,312 (the 5.1.4 fixture); 0
+    # into the image); peak heap 1,800,312 (the 5.1.4 fixture); 0
     # retained; the stack a decode used, read by painting, 19,480 bytes on the Cortex-M3 and
     # 23,920 on the x86-64 host, whose frames are larger. Every ceiling a tenth or so over its
     # figure.
@@ -296,7 +296,7 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     # flash where they were built on the heap (dsp/transform_tables.hpp), and 2,400 bytes of
     # .bss the probe's own stage-timer tables hold now that it names the stage at a peak.
     #
-    # 830,000 since planning/consolidation.md's C4 (decision 15): one bit reader for every codec
+    # 830,000 since the consolidation (C4): one bit reader for every codec
     # put base's CRC-16 table (512 bytes) and its windowed reads in the inspector, and the
     # stage-timer build reached 825,596 bytes, which C3 had left 700 under the old 825,000.
     ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-830000}
@@ -330,7 +330,7 @@ if [[ "$ICOUNT" == "1" ]]; then
     QEMU_ICOUNT=(-icount "shift=0,sleep=off")
 fi
 
-# --scalar=<float|fixed>: the decode arithmetic (planning/arithmetic-tiers.md).
+# --scalar=<float|fixed>: the decode arithmetic.
 # The profile's default is float; `fixed` is the tier for a part with no FPU,
 # and its probe is the same probe in its own build directory, so the two never
 # share a cache. Its PCM hashes (<codec>.pcm_hash) are identical on every leg

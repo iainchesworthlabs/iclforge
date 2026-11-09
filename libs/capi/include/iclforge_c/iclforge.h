@@ -1586,7 +1586,7 @@ ICLFORGE_C_EXPORT iclforge_qc_verdict_t iclforge_evaluate_qc_gate(
  * (mono, stereo, 5.0, 5.1, 5.0.4, 5.1.4) and, given an objects configuration
  * (iclforge_ac4_objects_config_t, in the encoder section below), the one
  * object substream iclforge::ac4::Encoder writes with experimental.objects: A-JOC, or
- * direct-coded objects (planning/ac4.md phases E9 and I4b). The decoder's
+ * direct-coded objects. The decoder's
  * object accessors below read whatever object audio a stream carries. */
 
 /* --- shared enums -------------------------------------------------------- */
@@ -2157,8 +2157,7 @@ typedef struct iclforge_ac4_objects_config {
 ICLFORGE_C_EXPORT void iclforge_ac4_objects_config_init(iclforge_ac4_objects_config_t* config);
 
 /* Mirrors iclforge::ac4::EncoderConfig::Experimental: syntax only this project's readers
- * have read from this encoder, off unless asked for (planning/ac4.md, "What
- * the encoder writes by default"). Not mirrored: drc_gains and three_zero,
+ * have read from this encoder, off unless asked for. Not mirrored: drc_gains and three_zero,
  * which need the DRC modes and the substream list this struct does not
  * carry, noise_fill, frame_rate_fraction, nine_x_4 (9.0.4 and 9.1.4: 13 or 14 input channels), and
  * twenty_two_two (the 22.2 element, 24 input channels). */
@@ -2183,8 +2182,7 @@ typedef struct iclforge_ac4_experimental {
  * drc, downmix, dialogue), several substreams and presentations
  * (EncoderConfig::substreams, presentations), EMDF payloads and the syntax
  * trace. A config left at these defaults writes DEE's own shape for the
- * channel count given (planning/ac4.md, "What the encoder writes by
- * default"). Call iclforge_ac4_encoder_config_init() first so every field this
+ * channel count given. Call iclforge_ac4_encoder_config_init() first so every field this
  * struct doesn't set explicitly carries the same default EncoderConfig{}
  * does. The struct and the arrays it points to are read only while
  * iclforge_ac4_encoder_create() and iclforge_ac4_encoder_refusal_reason()
@@ -2434,7 +2432,7 @@ ICLFORGE_C_EXPORT iclforge_status_t iclforge_ac4_verify_stream(
     iclforge_ac4_signature_outcome_t* out_outcome, iclforge_bytes_t** out_detail);
 
 /* --------------------------------------------------------------------- *
- * Lyrics (iclforge::lyrics, planning/karaoke-phase2.md, W13)
+ * Lyrics (iclforge::lyrics)
  * --------------------------------------------------------------------- */
 
 /* Timed lyrics for a karaoke stream: the words of a song with the times they are sung at, read

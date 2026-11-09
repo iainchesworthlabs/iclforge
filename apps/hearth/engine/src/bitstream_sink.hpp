@@ -12,8 +12,7 @@
 #include "iclforge/audio/passthrough.hpp"
 #include "transport.hpp"
 
-// Where a bitstreamed item goes (planning/hearth-reference-player.md, A3:
-// "Passthrough, reusing PassthroughSink").
+// Where a bitstreamed item goes.
 //
 // The PCM sink's counterpart for the other kind of payload: IEC 61937
 // bursts, each one AC-3 frame or six E-AC-3 blocks' worth of access units,

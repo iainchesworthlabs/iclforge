@@ -5,7 +5,7 @@ and ASPX_ACPL_3, and DEE's immersive stereo (IMS), at frame_rate_index 13, and I
 25 and 29.97 fps through the sample rate converter (see
 libs/ac4/include/iclforge/ac4/decoder/decoder.hpp) - this decodes the stream with `forge decode`,
 aligns the output with its reference by cross-correlation, fits a least-squares gain per channel,
-and checks (planning/ac4.md, the decoder's ladder, item 3):
+and checks:
 
   lag      the output lags the source by the leg's LAG: DEE's encoder delay plus this decoder's,
            1 313 samples at index 13 (Part 1 Table 188's d_pcm, the QMF banks' 577 samples and six

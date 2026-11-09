@@ -9,7 +9,7 @@
 
 #include "dev_screen.hpp"
 
-// The editors of the Preferences sheet (planning/p4x-preferences.md): the entries whose value is not one of a few
+// The editors of the Preferences sheet: the entries whose value is not one of a few
 // buttons but a pair of times or a place in a list. An entry says which it wants (iclforge::prefs::Pref::editor); the
 // sheet draws its value as a button and a tap on that opens the editor, which covers the sheet whole and has a Done of
 // its own. What is chosen goes to the board through iclforge::prefs::set_value(), as a tap on any row does, so a

@@ -18,7 +18,7 @@
 #include "json_sink.hpp"
 
 // The report of a TrueHD or MLP elementary stream: what `forge probe` says of one, held where Hearth
-// and the Forge window can call it too (planning/truehd-parity-forge.md, row M1). Wire facts only:
+// and the Forge window can call it too. Wire facts only:
 // every number is read from the access units' headers, the major sync and the restart headers, or
 // from a decode when the caller asks for the lossless check. Nothing here is a verdict on the
 // specification: the channel meaning of TH spec §14 is carried as the library parses it

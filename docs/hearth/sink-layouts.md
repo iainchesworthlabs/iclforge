@@ -95,11 +95,7 @@ nothing playing the change is made at the touch.
 
 ![The question asked while a stream plays: Changing the speakers makes the music drop out for a moment. Change to 1.0? Change or Cancel](screenshots/p4-panel-prefs-layout-confirm.png)
 
-How it was designed, and what the board can honestly tell apart, is in
-[planning/p4x-layout-builder.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-layout-builder.md).
-
 ## Changing the layout
 
 `PUT /layout` with a name or a list sets it, and the board keeps it over a restart. What it does to a
-stream that is playing depends on how the stream arrives, and is described, with its open question,
-in [planning/p4x-layout-options.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-layout-options.md#what-a-layout-change-does-to-a-playing-stream).
+stream that is playing depends on how the stream arrives.

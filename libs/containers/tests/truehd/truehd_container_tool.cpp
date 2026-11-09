@@ -1,6 +1,5 @@
 // A small command-line tool over the TrueHD container code, for
-// tools/checks/verify_truehd_containers.py to drive against FFmpeg without the forge CLI
-// (planning/truehd.md, phase T2c: the CLI is a later phase).
+// tools/checks/verify_truehd_containers.py to drive against FFmpeg without the forge CLI.
 //
 //   iclforge-truehd-container-tool mux   <mp4|mp4frag|mkv|ts|mat> <in.thd> <out>
 //   iclforge-truehd-container-tool demux <mp4|mkv|ts|mat>          <in>     <out.thd>

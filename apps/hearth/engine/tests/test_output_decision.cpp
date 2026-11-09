@@ -310,7 +310,7 @@ TEST_CASE("output decision: no outputs at all, and an item that cannot be bitstr
 
 TEST_CASE("output decision: an AC-4 item is decoded here whatever is pinned",
           "[hearth][output-decision][ac4]") {
-    // planning/ac4.md, I2: AC-4 decodes to PCM for every output of this
+    // I2: AC-4 decodes to PCM for every output of this
     // machine, and no IEC 61937 link carries it, even to a receiver that takes
     // AC-3 - AC-4 is not transcoded - or to one that says it takes E-AC-3.
     const std::vector<EndpointFacts> endpoints{receiver("Onkyo", /*eac3=*/true, /*ac3=*/true,
@@ -369,7 +369,7 @@ TEST_CASE("output decision: every mode and capability source describes itself",
     }
 }
 
-// TrueHD and MLP (planning/truehd-parity-hearth-player.md, H1): decoded here for every output,
+// TrueHD and MLP: decoded here for every output,
 // and the decision says by name why it is not sent as it is.
 TEST_CASE("output decision: a TrueHD item is decoded here, and the reason says passthrough of it is not available",
           "[hearth][output-decision][truehd]") {
@@ -426,7 +426,7 @@ TEST_CASE("output decision: a TrueHD item pinned to a bitstream output is decode
 }
 
 // ---------------------------------------------------------------------------------------------
-// TrueHD as MAT to a local output (planning/truehd-parity-hearth-player.md, H6) and the fallback
+// TrueHD as MAT to a local output and the fallback
 // chain when it cannot be (H8). Every platform is "not run" (mat_status.hpp), and the decision says
 // so; a test stands in for a platform that has been run.
 // ---------------------------------------------------------------------------------------------

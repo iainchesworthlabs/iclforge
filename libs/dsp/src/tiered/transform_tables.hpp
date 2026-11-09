@@ -7,8 +7,8 @@
 #include "iclforge/dsp/tiered/real.hpp"
 #include "iclforge/dsp/detail/complex.hpp"
 
-// The inverse transform's tables at the float and fixed-point tiers, in flash
-// (planning/ac4.md, the decoder's memory): for a block of N lines, the roots of the N/2-point
+// The inverse transform's tables at the float and fixed-point tiers, in flash:
+// for a block of N lines, the roots of the N/2-point
 // FFT's passes in Fft's order, Pseudocode 60's pre-twiddle, the fixed tier's post-twiddle and
 // KBD_LEFT(N). The values are what Fft, Imdct and TransformSet compute when they build their
 // own (tools/generators/gen_ac4_transform_tables.py computes the doubles the same way, and
@@ -18,7 +18,7 @@
 // samples, each halved down to a sixteenth where Table 186 has the length. Any other length,
 // and every length at double, builds its tables when it is constructed: in software floating
 // point on a part with no double-precision unit, which took an ESP32-S3 0.4 s at the first frame
-// of a stream of 1,920 or 1,536 samples a frame (planning/ac4.md, the converter warm-up).
+// of a stream of 1,920 or 1,536 samples a frame.
 
 namespace iclforge::dsp::tiered {
 

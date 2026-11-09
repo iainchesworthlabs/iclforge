@@ -24,7 +24,7 @@
 # percentage, every figure reported before the script exits so the log shows
 # the whole picture rather than only the first miss. One row, because
 # apps/crucible IS the component - it sits beside libs/ac3 and apps/forge/cli/src,
-# not as a tree of components (planning/recasting.md). The
+# not as a tree of components. The
 # per-file breakdown printed under it is reported and never gated, the way
 # apps/forge/cli/src's per-command breakdown is: one floor on the aggregate is what
 # stops a regression, and a floor per file would be twenty-five numbers to

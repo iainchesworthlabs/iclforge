@@ -14,7 +14,7 @@ import android.view.View
 import kotlin.math.max
 
 /**
- * The screens a sink has when there are no words to show (planning/hearth-sink-screen.md): S0 starting
+ * The screens a sink has when there are no words to show: S0 starting
  * ("waiting for the network" or "for the receiver", and what to check), S1 idle (the name large, the
  * address and network, who it is paired with or waiting for, the code a server asked to pair by, and the
  * formats the route takes) and S10 attention (one sentence of what happened and what the person can

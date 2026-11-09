@@ -5,16 +5,14 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The Media information page (planning/hearth-reference-player.md, Media
-// information; docs/hearth/design/screenshots/media-ac3.png, media-eac3-
+// The Media information page (docs/hearth/design/screenshots/media-ac3.png, media-eac3-
 // joc.png, media-ac4.png): what the picked queue item's own file says about
 // itself, read once for the whole file (HearthController.inspectedMedia,
 // backed by apps/hearth/engine/src/media_info.hpp's MediaInfo off a thread of
 // its own). Defaults to the item playing now; the "Showing" picker can ask
 // about any other queue item instead. An AC-4 item's presentations and
 // metadata are what iclforge::ac4::Decoder reads of the whole stream
-// (apps/shared/media/src/probe_json.hpp's Ac4Summary; planning/ac4.md, "Media
-// information").
+// (apps/shared/media/src/probe_json.hpp's Ac4Summary).
 Item {
     id: root
 
@@ -713,7 +711,7 @@ Item {
                         visible: root.ac4 !== undefined && (root.ac4?.presentations ?? []).length > 0
 
                         // The design's table, as the decoder reads each
-                        // presentation (planning/ac4.md, Media information).
+                        // presentation.
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Theme.gap
@@ -861,8 +859,7 @@ Item {
                     }
 
                     // The metadata of the presentation a decoder selects with
-                    // no preferences, as the stream's frames sent it
-                    // (planning/ac4.md, Media information).
+                    // no preferences, as the stream's frames sent it.
                     Card {
                         ordinal: root.cardOrdinal(root.ac4?.hasAjoc === true ? 5 : 4)
                         title: qsTr("Metadata")

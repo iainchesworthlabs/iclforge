@@ -13,8 +13,7 @@
 #include "iclforge/render/routing.hpp"
 #include "transport.hpp"
 
-// Where a session's rendered audio goes (planning/hearth-reference-player.md,
-// A3).
+// Where a session's rendered audio goes.
 //
 // The engine talks to this and never to a platform API. One implementation
 // drives iclforge::audio::PcmOutput (A2), which opens a local device at its own
@@ -70,7 +69,7 @@ public:
     virtual bool pause() = 0;
     virtual bool resume() = 0;
 
-    // The Speakers page (planning/hearth-reference-player.md, A5): where each
+    // The Speakers page: where each
     // rendered slot comes out, and what the device is. Non-pure with inert
     // defaults - a sink built before these existed (a test fake, mainly)
     // keeps compiling and simply does not support them, rather than every

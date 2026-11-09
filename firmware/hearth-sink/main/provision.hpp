@@ -3,7 +3,7 @@
 #include <string_view>
 
 // Improv Wi-Fi over the console serial port: how a board with nothing stored
-// is told which network to join (planning/hearth-reference-player.md, B2).
+// is told which network to join.
 //
 // A browser page at improv-wifi.com, or ESPHome's tooling, opens the same port
 // the console prints on, asks the board what it is, and hands it an SSID and a

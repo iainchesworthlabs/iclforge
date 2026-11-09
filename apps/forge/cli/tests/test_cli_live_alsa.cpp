@@ -829,7 +829,7 @@ TEST_CASE("identify stops at the slot where its output went away",
 }
 
 // ---------------------------------------------------------------------------
-// AC-4 (planning/ac4.md, phase I1): record and live take codec=ac4, and
+// AC-4: record and live take codec=ac4, and
 // monitor decodes AC-4. A take's frames are checked by decoding them back,
 // through each container they were written into.
 // ---------------------------------------------------------------------------

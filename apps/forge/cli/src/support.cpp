@@ -4344,7 +4344,7 @@ void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
                        vocals_name(output.karaoke_vocals), karaoke_levels_words(output));
     } else if (reproduced) {
         // The levels the decoder used: the stream's Lo/Ro surround level where it sent mixmdate,
-        // and -3 dB where it did not (planning/karaoke-eac3.md, D2).
+        // and -3 dB where it did not.
         const double slev = first.mixing.has_value()
                                 ? ac3::meta::coefficient(first.mixing->lorosurmixlev)
                                 : ac3::meta::level::kMinus3dB;

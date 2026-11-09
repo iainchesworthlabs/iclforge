@@ -242,8 +242,7 @@ struct DownmixConfig {
     double back_db = -3.0;
 };
 
-// Where dialogue enhancement's parameters come from (planning/ac4.md,
-// decision 18: no speech detector).
+// Where dialogue enhancement's parameters come from.
 enum class DialogueSource : std::uint8_t {
     // The channels DialogueConfig marks carry dialogue alone: their
     // parameters are 1 in every band.
@@ -350,8 +349,7 @@ struct EmdfPayload {
 // each, and what its metadata says of it over time in the terms Part 2 Annex F
 // gives a renderer, which the encoder writes as object audio metadata (clause
 // 6.2.8). The applications convert the scene descriptions they read into
-// these. Behind experimental.objects (planning/ac4.md, "What the encoder
-// writes by default"). libs/ac4/ERRATA.md records the readings the writer
+// these. Behind experimental.objects. libs/ac4/ERRATA.md records the readings the writer
 // takes: the downmix, the metadata's timing and the md_compat objects need.
 
 // The loudspeaker a bed object plays from: Part 2 Table 66's
@@ -625,8 +623,7 @@ struct EncoderConfig {
     // own.
     SyntaxTrace trace{};
     // Syntax only this project's readers have read from this encoder, off
-    // unless asked for (planning/ac4.md, "What the encoder writes by
-    // default"): each leaves the list when a reader outside the project
+    // unless asked for: each leaves the list when a reader outside the project
     // agrees with the encoder's use of it.
     struct Experimental {
         // In the ASPX mode, a pair coded as sum and balance (aspx_balance)

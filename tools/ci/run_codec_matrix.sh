@@ -785,7 +785,7 @@ else
     run atmos-adm atmos_adm_fixture.wav atmos_adm.ec3 256
     run decode atmos_adm.ec3 atmos_adm.wav
     run_ffmpeg_check atmos_adm.ec3
-    # codec=ac4 (planning/ac4.md, I5): the same ADM master to an AC-4 A-JOC object substream
+    # codec=ac4: the same ADM master to an AC-4 A-JOC object substream
     # (coding=, default ajoc), then back out through decode's own objects_dir/adm_out - the round
     # trip the phase's exit criterion names. Neither ffprobe (no AC-4 decoder) nor
     # run_ac4_frames_check (defined later in this file, in the plain-AC-4 section below) is
@@ -814,7 +814,7 @@ else
     run atmos-iab atmos_iab_fixture.iab atmos_iab.ec3 256
     run decode atmos_iab.ec3 atmos_iab.wav
     run_ffmpeg_check atmos_iab.ec3
-    # codec=ac4, coding=direct (planning/ac4.md, I5): the direct-coded option atmos-adm's own AC-4
+    # codec=ac4, coding=direct: the direct-coded option atmos-adm's own AC-4
     # leg above does not take, over an IAB source instead of ADM - see that leg's own comment for
     # why there is no run_ac4_frames_check/run_ffmpeg_check this early in the file.
     run atmos-iab atmos_iab_fixture.iab atmos_iab.ac4 256 codec=ac4 coding=direct
@@ -1176,7 +1176,7 @@ cmp -s atmos_4.ec3 remux_atmos.ec3 || {
 }
 run_ffmpeg_check remux_atmos.ec3
 
-# --- AC-4 (planning/ac4.md, phases E1 to E5) ----------------------------------
+# --- AC-4 ----------------------------------
 # FFmpeg has no AC-4 decoder, so its part here is framing: its raw AC-4 and mov
 # demuxers must find as many frames as forge's own decoder decodes from what
 # ac4-encode wrote. The audio itself is scored by tools/checks/score_ac4_encode.py
@@ -1208,7 +1208,7 @@ for kbps in 192 384; do
 done
 run ac4-encode "$FIXTURES/reference_51.wav" ac4_51_256.mp4 256 dialnorm=auto
 run_ac4_frames_check ac4_51_256.mp4
-# 5.1.4 (planning/ac4.md, phase E8/I5): the immersive element, ASPX_ACPL_2 below 480 kbps as DEE's
+# 5.1.4: the immersive element, ASPX_ACPL_2 below 480 kbps as DEE's
 # own streams are. eac3_514.wav (the eac3-sine/decode loop's own "514" leg) is reused as a real
 # 10-channel source the same way atmos-cbi's own leg below does - a channel COUNT match is all
 # this smoke-coverage script needs; tools/checks/score_ac4_encode.py scores the actual audio.
@@ -1216,7 +1216,7 @@ run ac4-encode eac3_514.wav ac4_514_256.ac4 256
 run_ac4_frames_check ac4_514_256.ac4 -f ac4
 run decode ac4_514_256.ac4 i5_ac4_514.wav
 run probe ac4_514_256.ac4
-# Objects (planning/ac4.md, phase I5): experimental=objects/objects=<scene>, E9's own CLI surface
+# Objects: experimental=objects/objects=<scene>, E9's own CLI surface
 # (apps/forge/cli/src/commands/ac4_encode_objects.cpp), A-JOC by default and direct-coded as the explicit
 # second leg - then back through decode's objects_dir, unconditionally available (unlike adm_out,
 # which needs -DICLFORGE_BUILD_ADM=ON and is covered by the atmos-adm/atmos-iab AC-4 legs above).
@@ -1237,7 +1237,7 @@ run ac4-encode "$FIXTURES/reference_stereo.wav" ac4_objects_direct.ac4 128 exper
     objects=ac4_objects_scene_direct.txt
 run_ac4_frames_check ac4_objects_direct.ac4 -f ac4
 run decode ac4_objects_direct.ac4 ac4_objects_direct.wav ac4_objects_direct_dir
-# atmos-encode codec=ac4 (planning/ac4.md, phase I5b): a WAV file's channels as AC-4 objects, the
+# atmos-encode codec=ac4: a WAV file's channels as AC-4 objects, the
 # command the Forge GUI's encoder page echoes. A-JOC in a raw stream and direct-coded in an MP4
 # file (atmos-encode writes the MP4 itself), each read back by ffprobe's demuxer and by decode.
 run atmos-encode bootstrap_51.wav atmos_enc_ajoc.ac4 256 6 codec=ac4
@@ -1400,7 +1400,7 @@ run ac4-encode "$FIXTURES/reference_51.wav" ac4_51_25.mp4 256 frame-rate=25 loro
     drc=music-standard drc-portable-headphones=speech
 run_ac4_frames_check ac4_51_25.mp4
 
-# --- AC-4 through the rest of forge (planning/ac4.md, phase I1) ---------------
+# --- AC-4 through the rest of forge ---------------
 # Every other command that reads or writes AC-4, on the streams ac4-encode
 # wrote above; tools/checks/check_matrix_coverage.py holds each one to a leg
 # here. FFmpeg checks what it can read: the AC-3 and E-AC-3 a transcode writes
@@ -1469,7 +1469,7 @@ run_ac4_fmp4_check i1_ac4_fmp4 ac4_51_192.ac4
 run fmp4 ac4_stereo_2997.mp4 i1_ac4_fmp4_2997 20
 run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
 
-# --- TrueHD and MLP (iclforge::truehd, planning/truehd.md) ----------------------------------------
+# --- TrueHD and MLP (iclforge::truehd) -------------------------------------------------------------
 # The lossless codec makes every check here exact: a decode is the source sample for sample or it
 # is wrong, so these are comparisons of bytes, not SNR floors. FFmpeg's strict decode is the
 # independent oracle (CONTRIBUTING.md's "Oracles", #2): the PCM forge writes must equal the PCM
@@ -1673,7 +1673,7 @@ for refused in "metadata $th_in th_refused.thd dialnorm=27" \
     }
 done
 
-# --- decode strict (planning/ac4.md, option D) --------------------------------------------------------
+# --- decode strict --------------------------------------------------------
 # A decode that loses frames exits 0 and warns; with `strict` it writes what it could decode and exits 2
 # when a frame or unit was lost after the first one decoded. An AC-3 stream with a damaged frame
 # (concealed under conceal=), and a TrueHD stream with bytes in the middle that are not a unit (a lenient
@@ -1719,7 +1719,7 @@ cmp -s strict_junk.wav strict_junk_strict.wav || {
     exit 1
 }
 
-# --- TrueHD encoding (iclforge::truehd::Encoder, planning/truehd.md phase T2a) -------------------
+# --- TrueHD encoding (iclforge::truehd::Encoder) --------------------------------------------------
 # FFmpeg makes the sources, a different sine in each channel, with the speaker mask of the layout
 # (forge reads the channels' meaning from it: 7.1 is FL FR FC LFE BL BR SL SR, which forge codes as
 # L R C LFE Lrs Rrs Ls Rs; ERRATA 33 says how FFmpeg orders such a stream). Every stream is

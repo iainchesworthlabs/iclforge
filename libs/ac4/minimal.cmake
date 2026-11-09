@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # The minimum-footprint profile's AC-4 archive (ICLFORGE_MINIMAL_AC4, beside
-# the profile's options; planning/ac4.md, D14b): what a decode reads, and no
+# the profile's options): what a decode reads, and no
 # encoder. Included by CMakeLists.txt, which holds the source lists and the
 # options every build of the library takes; iclforge_add_library() makes the
 # static archive alone in the profile, with its compile options and code that
@@ -28,8 +28,7 @@ target_compile_options(iclforge_ac4_objects PRIVATE "$<$<CXX_COMPILER_ID:GNU>:-W
 # (named for the AC-3 and E-AC-3 decoders' -O2 in libs/ac3/minimal.cmake, whose
 # switch this is). A size-optimised build is what the profile is; these are the
 # files a stage timer showed the optimiser paying for, and it costs flash and
-# not SRAM (planning/ac4.md, D14e has what it bought on the ESP32-P4 and what it
-# cost).
+# not SRAM.
 #
 # The kernels of a frame's transform and filter at -O3: on the ESP32-P4's
 # in-order core -O3 beat -O2 on these by 2.7 ms a 5.1 frame (it unrolls the

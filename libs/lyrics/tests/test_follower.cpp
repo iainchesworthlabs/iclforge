@@ -6,7 +6,7 @@
 #include "iclforge/lyrics/follower.hpp"
 
 // libs/lyrics/include/iclforge/lyrics/follower.hpp: the document a sink holds and the playhead the
-// server's anchors move (planning/karaoke-phase2.md, W7d). The lines and words are the reader's and
+// server's anchors move. The lines and words are the reader's and
 // the cursor's, tested in test_lyrics.cpp; what is held here is which item an anchor is for, what a
 // new document does to the old one, and what a sink would report.
 

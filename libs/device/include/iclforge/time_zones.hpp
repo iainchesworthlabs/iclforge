@@ -1,6 +1,6 @@
 #pragma once
 
-// The time zones a board offers by name (planning/p4x-now-playing.md, stage 3 and the Preferences programme): a
+// The time zones a board offers by name: a
 // region and a city ("Australia/Melbourne") and the POSIX string that zone's rules end in
 // (iclforge/wall_clock.hpp reads it; the board's C library applies it). The data is time_zone_data.hpp, written
 // by tools/hearth/gen_time_zones.py from IANA's tzdata and checked in; this header is what is done with it.

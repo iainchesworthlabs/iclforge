@@ -13,8 +13,8 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 
 // A bare TrueHD (or MLP) stream wrapped as Matroska, MP4 or a Blu-ray transport stream: the writers
-// `forge mkv`, `mp4`, `ts` and `truehd-encode` use, and the Forge window's TrueHD encode (planning/
-// truehd-parity-forge.md, rows U1 and U8). Nothing here prints or writes a file; a problem comes back
+// `forge mkv`, `mp4`, `ts` and `truehd-encode` use, and the Forge window's TrueHD encode. Nothing
+// here prints or writes a file; a problem comes back
 // as a sentence the caller says its own way.
 //
 // The containers library knows no codec, so the facts a track description needs (the access units,

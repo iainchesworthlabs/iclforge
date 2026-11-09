@@ -1,6 +1,6 @@
 #pragma once
 
-// The clock view of the P4X panel (planning/p4x-now-playing.md, stage 3): the time zone a board is given and
+// The clock view of the P4X panel: the time zone a board is given and
 // the words the view says. Standard library only, so that the host tests it (libs/device/tests/test_wall_clock.cpp):
 // the zone is what PUT /timezone takes and NVS holds, and a board that read one wrong would show the wrong
 // time to someone who trusts a clock.
@@ -542,7 +542,7 @@ inline constexpr std::int64_t kNotBefore = 1767225600;
 // --- whether to ask --------------------------------------------------------------------------------------
 
 // What PUT /time-sync takes: `on` or `off`, with or without a line ending. A board keeps its time with a time
-// server by default (planning/p4x-now-playing.md, stage 3); `off` is for a board that must contact none.
+// server by default; `off` is for a board that must contact none.
 [[nodiscard]] constexpr std::optional<bool> parse_time_sync(std::string_view body) {
     body = detail::trimmed(body);
     if (body == "on") {

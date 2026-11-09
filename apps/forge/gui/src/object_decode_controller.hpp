@@ -135,8 +135,8 @@ class ObjectDecodeController : public QObject {
     Q_PROPERTY(int auditioningIndex READ auditioningIndex NOTIFY auditionChanged)
     // AC-4: whether the file inspected is AC-4, its presentations, the one
     // the decoder chose with no preference, and that presentation's bed and
-    // dynamic objects. Read-only: exporting AC-4 objects is a later phase
-    // (planning/ac4.md, I5), which the dialog says in its own text.
+    // dynamic objects. Read-only: exporting AC-4 objects is a later phase,
+    // which the dialog says in its own text.
     Q_PROPERTY(bool isAc4 READ isAc4 NOTIFY resultChanged)
     Q_PROPERTY(QStringList presentationNames READ presentationNames NOTIFY resultChanged)
     Q_PROPERTY(int decodedPresentation READ decodedPresentation NOTIFY resultChanged)

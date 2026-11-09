@@ -11,7 +11,7 @@
 
 #include "board_info.hpp"
 
-// The no-lyrics screens (planning/p4x-now-playing.md): what the panel shows while a song with no
+// The no-lyrics screens: what the panel shows while a song with no
 // lyrics plays. The speakers view, the title card and the clock view live here, each as an object tree the
 // lyric screen puts on its stage and (the speakers and the clock) brings up to date once a frame, the way
 // dev_screen.cpp is a screen of its own; the numbers (where each speaker goes, how a level makes it glow,

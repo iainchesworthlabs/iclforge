@@ -439,9 +439,7 @@ move to wherever the packet says," never a compromised process.
 (`hearth-testsink` on a computer, or `hearth_sink` on an ESP32-S3, ESP32-C6 or ESP32-P4 board)
 accepts WebSocket connections on port 8928 and advertises `_sendspin._tcp`; Hearth's server
 listens on 8927, advertises `_sendspin-server._tcp`, and dials the players it finds. Anyone on the
-network can open a connection to either, and anyone can send them mDNS packets. The protocol, and
-where Hearth departs from it, is in
-[`planning/hearth-sendspin-extension.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-sendspin-extension.md).
+network can open a connection to either, and anyone can send them mDNS packets.
 
 **A peer without a key reaches the handshake and little more.** After the handshake's text
 frames, every message is sealed with Noise `KKpsk2` under a PSK both ends hold: a pairing
@@ -502,8 +500,7 @@ key:
 A page on another site, opened by someone on the same network, can send the board requests that
 need no CORS preflight, such as `POST /play` with a text body. Forgetting one server that way
 needs its whole server_id, which such a page cannot read from `GET /pairing`.
-[`planning/esp32-device-ui.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-device-ui.md)
-records that exposure and the decision to leave it. The page puts every string from `/status` into
+That exposure is left as it is. The page puts every string from `/status` into
 the document as text, never as markup.
 
 **A board keeps its keys in NVS, unencrypted.** Its X25519 identity, its pairing PSK, up to eight

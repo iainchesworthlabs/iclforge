@@ -8,7 +8,7 @@
 
 #include "iclforge/base/crc16.hpp"
 
-// planning/consolidation.md's C4 made one CRC-16 of the four the tree had: AC-3's table (now
+// The consolidation made one CRC-16 of the four the tree had: AC-3's table (now
 // base's), and the bit-at-a-time registers of the AC-4 scanner, the AC-4 sync frame writer and the
 // EMDF signer. One of those, as the scanner had it, is the oracle here.
 

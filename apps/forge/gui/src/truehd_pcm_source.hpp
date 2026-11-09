@@ -18,7 +18,7 @@
 #include "truehd_stream.hpp"
 
 // The decoded audio of a TrueHD or MLP file, a window at a time, for the Forge window's player and
-// QC (planning/truehd-parity-forge.md, row U2 and question 12). A two-hour film at 48 kHz and eight
+// QC. A two-hour film at 48 kHz and eight
 // channels is about 11 GB decoded, and the stream itself is larger than a machine may hold, so
 // nothing here keeps more than one access unit's samples ahead of the caller: the file is read a
 // window at a time by the TruehdCursor Hearth plays from (apps/shared/media/src/truehd_stream.hpp),

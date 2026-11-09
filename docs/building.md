@@ -782,8 +782,7 @@ the Cortex-M3 leg, and CI holds both to the pinned ones in
 `testdata/fixed-probe-pcm-hashes.json` (`tools/checks/check_probe_hashes.py`). The
 Catch2 suite is not one of its gates: two of the encoder's mirror self-checks compare the
 encoder's model against a real decode at a tolerance set for the double decoder, and fail under
-the fixed one. The plan, phases, and measurements are in
-[`planning/arithmetic-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/arithmetic-tiers.md).
+the fixed one.
 
 **And the encoders' analysis front end, on its own axis.**
 `libs/ac3/variants/encode-scalar-{float64,float32}/` carries `encode_scalar_t`: the type
@@ -1423,7 +1422,7 @@ carry the types, not a copy of each kernel:
 | `to_fixed25_block` | `libs/ac3/src/core/exponents.cpp` | Batched form of `to_fixed25`, about 9,100 calls a frame. SSE2/NEON only, same reason as `dft512` above. |
 
 **The FFT itself is not part of this seam.** `libs/dsp/include/iclforge/dsp/detail/fft_stockham.hpp`
-is the family's one FFT (planning/consolidation.md decision 20): the Stockham autosort passes
+is the family's one FFT: the Stockham autosort passes
 AC-4's plan runs at every length, which AC-3's transforms run at 64, 128 and 512 points with radix
 4 and a trailing radix-2 pass where `log2(P)` is odd, every unit factor's product left out. Its
 input and output are in natural order, so no permutation pass is needed at either end. That is an

@@ -1,4 +1,4 @@
-# The panel (planning/karaoke-p4x-panel.md): LVGL drawing the lyric screen. Over sdkconfig.p4 (and
+# The panel: LVGL drawing the lyric screen. Over sdkconfig.p4 (and
 # sdkconfig.p4-rev3 for a chip that has the panel), with one of sdkconfig.panel-null or
 # sdkconfig.panel-dsi after it:
 #

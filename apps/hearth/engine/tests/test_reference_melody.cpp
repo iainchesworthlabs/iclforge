@@ -15,7 +15,7 @@
 #include "reference_melody.hpp"
 
 // apps/hearth/engine/src/reference_melody.*: the melody a singer is scored against, taken from the
-// karaoke stream's own channels (planning/karaoke-microphone.md, D9). The stream is the
+// karaoke stream's own channels. The stream is the
 // repository's own example (examples/karaoke/auld-lang-syne, made by
 // tools/generators/gen_karaoke_example.py from arithmetic): a guide melody on a clarinet-like tone,
 // a lead vocal on the same tune, and a second vocal a diatonic third below it.

@@ -740,8 +740,8 @@ struct DecodedAccessUnit {
     std::optional<Concealment> concealed = std::nullopt;
 };
 
-// Whether a programme is one Eac3Decoder reproduces karaoke for, when OutputConfig::karaoke asks
-// (planning/karaoke-eac3.md, D1 to D3): its own bsmod and acmod say it is karaoke (Annex C.2.1),
+// Whether a programme is one Eac3Decoder reproduces karaoke for, when OutputConfig::karaoke asks:
+// its own bsmod and acmod say it is karaoke (Annex C.2.1),
 // it was assembled from exactly one substream (an independent one: the chanmap of a dependent has
 // no V1 or V2, and what a decoder does with one there is nowhere specified), and it carries no
 // object layer. The decoder, the CLI and Hearth ask this one rule, so none of them re-derives it.

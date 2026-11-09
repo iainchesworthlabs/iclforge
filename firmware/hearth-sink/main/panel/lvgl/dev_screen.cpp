@@ -1,4 +1,4 @@
-// The developer view. See dev_screen.hpp and planning/karaoke-p4x-panel.md.
+// The developer view. See dev_screen.hpp.
 //
 // What it shows, and the words and numbers for it, are iclforge/dev_view.hpp's (libs/device, tested
 // on the host): this file lays the rows out, draws them, and handles the taps. The rows are labels

@@ -1,5 +1,5 @@
 # The screen's read-back and touch server (main/panel/lvgl/panel.cpp) on, for an image that is run on
-# a bench (planning/esp32-platform-profiles.md, "panel-capture"): GET :8081/panel.bmp, GET :8081/panel,
+# a bench: GET :8081/panel.bmp, GET :8081/panel,
 # POST :8081/panel/tap and POST :8081/panel/demo, which is what tools/hearth/screen_script.py drives a
 # board's screen by and what the screenshots of a board come from. Given after the profile's own
 # fragments:

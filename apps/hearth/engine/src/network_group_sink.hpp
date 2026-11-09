@@ -29,9 +29,7 @@ namespace iclforge::sendspin {
 class Group;
 }  // namespace iclforge::sendspin
 
-// Where a network group's programme goes (planning/hearth-reference-player.md,
-// A6: "a group of two test sinks and the reference Python player plays one
-// programme").
+// Where a network group's programme goes.
 //
 // A group needs BOTH forms from the one decode at once: rendered PCM for a
 // member playing player@v1 (iclforge::sendspin::Group::push()), and the item's own
@@ -51,10 +49,10 @@ class Group;
 
 namespace iclforge::hearth {
 
-// What the open group's members that show what is playing (metadata@v1) are told of an item (D7,
-// planning/hearth-android.md): the engine knows a title, and an artist and an album only from the
-// item's lyrics file, whose tags a sink reads from the document too. A field it does not know is left
-// out and not guessed.
+// What the open group's members that show what is playing (metadata@v1) are told of an item
+// (D7): the engine knows a title, and an artist and an album only from the item's lyrics file,
+// whose tags a sink reads from the document too. A field it does not know is left out and not
+// guessed.
 struct NowPlaying {
     // The item's name as the engine shows it, or the lyrics file's [ti:] when it has one.
     std::string title{};
@@ -121,10 +119,9 @@ public:
     // applied where the PCM is made. Nothing when the group is not open, or has no applier.
     virtual void set_karaoke(const KaraokeChoice& choice) { static_cast<void>(choice); }
 
-    // The lyrics of the item playing, for the members that hold them (W7d, planning/karaoke-
-    // phase2.md): `item` is a number that is new with every document, and `document` an LRC text
-    // (iclforge::lyrics::write_lrc), empty when the item has none. Nothing when the group is not
-    // open or has no applier.
+    // The lyrics of the item playing, for the members that hold them (W7d): `item` is a number
+    // that is new with every document, and `document` an LRC text (iclforge::lyrics::write_lrc),
+    // empty when the item has none. Nothing when the group is not open or has no applier.
     virtual void set_lyrics(std::int64_t item, const std::string& document) {
         static_cast<void>(item);
         static_cast<void>(document);
@@ -213,8 +210,7 @@ public:
 // The real one: resolves `group_name` through `resolve` at each open() -
 // which iclforge::sendspin::Group backs a name, and whether that has changed
 // since the last open, is NetworkController's own business (the
-// HearthController<->NetworkController coupling, still to land - see
-// planning/hearth-reference-player.md#a6-network-outputs-in-the-application),
+// HearthController<->NetworkController coupling, still to land),
 // not this sink's.
 using GroupResolver = std::function<std::shared_ptr<sendspin::Group>(const std::string& group_name)>;
 

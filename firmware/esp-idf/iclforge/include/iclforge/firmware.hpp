@@ -13,7 +13,7 @@
 #include "iclforge/firmware_status.hpp"
 #include "iclforge/firmware_trial.hpp"
 
-// Updates over the network (planning/esp32-ota.md): the routes Control
+// Updates over the network: the routes Control
 // forwards here, flash mode, the upload into the slot that is not running,
 // the trial of an image an update wrote, and the report of all of it.
 //
@@ -39,7 +39,7 @@ struct httpd_req;
 
 namespace iclforge {
 
-// An image the board fetches for itself (planning/esp32-ota.md, O10, "The flow on the board"):
+// An image the board fetches for itself:
 // firmware_pull.hpp downloads it from a release whose signed index it has verified and hands the
 // bytes here as they arrive. They are written as PUT /firmware's body is - the same checks of the
 // image's head before anything is erased, the same erase-as-you-go writes, the same read-back and
@@ -82,7 +82,7 @@ struct FirmwareFacts {
 };
 
 struct FirmwareHooks {
-    // Flash mode's teardown (planning/esp32-ota.md, "Flash mode"): end any
+    // Flash mode's teardown: end any
     // play, tell servers the board is going and stop the Sendspin player,
     // close the sink, withdraw the mDNS service. Run once, from the task an
     // upload or PUT /firmware/mode runs on; returns when it is done. Nothing

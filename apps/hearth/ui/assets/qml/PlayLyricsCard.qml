@@ -3,8 +3,7 @@ import QtQuick.Layouts
 
 import Hearth
 
-// The words of the item playing, on the Play page (planning/karaoke.md, "Found while
-// building": a lyric view beside the queue). A singer who has put a song in the queue sees
+// The words of the item playing, on the Play page. A singer who has put a song in the queue sees
 // the line being sung without a trip to the Karaoke page, and the Play page's monitor does not
 // have to be left to do it.
 //

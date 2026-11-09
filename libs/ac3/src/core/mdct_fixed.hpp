@@ -14,8 +14,8 @@
 // the QMF's constants are made with them): dsp's own, which this reads where it is.
 #include "../../../dsp/src/tiered/portable_math.hpp"
 
-// The fixed-point tier's §7.9.4 inverse pair (planning/arithmetic-tiers.md,
-// Phase B): the same pre-twiddle, N/4-point FFT, post-twiddle and window as
+// The fixed-point tier's §7.9.4 inverse pair: the same pre-twiddle, N/4-point FFT, post-twiddle
+// and window as
 // mdct.cpp's fast branch, transcribed step for step, in Fixed32.
 //
 // No scaling inside the transform. The spec's inverse is an unscaled sum

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The browser installer's firmware, from a release (planning/esp32-ota.md, O9 and decision 15).
+"""The browser installer's firmware, from a release.
 
     python tools/hearth/installer_site.py --release latest --out docs/assets/sink-installer
 

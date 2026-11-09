@@ -454,6 +454,5 @@ well.
 **Not done.** Signing for release: the package is test-signed with the certificate the build
 makes. A run on a physical machine and under memory integrity. The KASAN pass, which was not
 repeated on the renamed driver. A guest sleep and resume. The move of the driver under
-`apps/crucible/`, which Phase 7 of [the recasting
-plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/recasting.md) allowed and
+`apps/crucible/`, which was allowed and
 nobody took.

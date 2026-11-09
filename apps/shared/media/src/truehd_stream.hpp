@@ -15,8 +15,8 @@
 #include "iclforge/truehd/decoder/decoder.hpp"
 #include "iclforge/truehd/io/access_unit.hpp"
 
-// A TrueHD or MLP stream as a program plays it from a ByteSource (planning/truehd-parity-hearth-player.md,
-// rows 5 and 14; Hearth's session and Forge's window): an index of the places a decoder can join the stream, and a cursor that hands out access
+// A TrueHD or MLP stream as a program plays it from a ByteSource: an index of the places a decoder
+// can join the stream, and a cursor that hands out access
 // units from any of them.
 //
 // What the stream is made of decides the shape. An access unit holds 40, 80 or 160 samples (at 48,

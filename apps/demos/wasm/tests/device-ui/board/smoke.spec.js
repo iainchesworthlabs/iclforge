@@ -1,8 +1,8 @@
 // @ts-check
 'use strict';
 
-// The page as a device serves it, driving that device - planning/
-// esp32-device-ui.md's test on the target. CI's ESP32 job runs it against the
+// The page as a device serves it, driving that device (the test on the target). CI's
+// ESP32 job runs it against the
 // emulated board through QEMU's port forward (ICLFORGE_DEVICE_URL), after the
 // boot play has finished, and then checks the console: the play this test
 // starts must come out at the volume this test sets.

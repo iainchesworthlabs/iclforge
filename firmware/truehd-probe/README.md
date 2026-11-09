@@ -9,8 +9,7 @@ the decoder holds and the stack the task reached. The last line is `result=pass`
 
 No network, no I2S, no PSRAM: the numbers are the decoder's alone, as `firmware/baremetal`'s probe gives them
 for the AC-3 decoder. The decoder's sources are compiled `-O2` (`TRUEHD_PROBE_OPT=Os` for the size build).
-Results from the boards are in `results/`; the analysis is in
-`planning/truehd-parity-esp32-sinks.md`.
+Results from the boards are in `results/`.
 
 ## Build
 

@@ -19,8 +19,8 @@
 // conversion can and should afford a proper windowed-sinc polyphase FIR
 // kernel instead of a cheap two-tap interpolation.
 //
-// The filter is the AC-4 sample rate converter's (libs/dsp/src/tiered/resampler.hpp,
-// planning/consolidation.md decision 22): a Kaiser-windowed sinc designed for the
+// The filter is the AC-4 sample rate converter's (libs/dsp/src/tiered/resampler.hpp):
+// a Kaiser-windowed sinc designed for the
 // ratio in lowest terms, the passband to 0.86 of the lower rate's Nyquist
 // frequency, the stopband from it, 100 dB down.
 

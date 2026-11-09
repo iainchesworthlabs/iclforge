@@ -27,15 +27,15 @@
 #include "iclforge/sendspin/stream_roles.hpp"
 #include "iclforge/sendspin/transport.hpp"
 
-// One connection from a Sendspin server to a client: the server half of libs/sendspin
-// (planning/hearth-reference-player.md, A4), one per client in hearth's engine.
+// One connection from a Sendspin server to a client: the server half of libs/sendspin,
+// one per client in hearth's engine.
 //
 // The session runs the handshake as the Noise initiator, sends server/hello, reads the
-// client's client/hello (and with it the client's dialect, planning/hearth-sendspin-extension.md,
+// client's client/hello (and with it the client's dialect,
 // Music Assistant and aiosendspin 9.1.1), answers client/time the moment it arrives, and
 // passes client/state, client/goodbye and client/leave to its listener. Everything else is the
 // engine's to decide and the session's to carry out: the activation, the streams of player@v1 and
-// _iclforge_player@v1 (planning/hearth-sendspin-extension.md, The role _iclforge_player@v1) and
+// _iclforge_player@v1 and
 // their chunks, group updates, commands, pairing, unpairing and re-handshakes.
 //
 // The calls that send check what the specification requires of them at that moment - an

@@ -105,11 +105,11 @@ void set_speed(FakeRoom& room, double speed);
 // The level of the tone at `hz` in rendered slot `slot`, in dB against full
 // scale, over the last kToneWindow samples the engine submitted - a Hann-
 // windowed DFT at that one frequency, so a suite can hold what it hears to a
-// formula tone by tone (planning/ac4.md, I2). -infinity with nothing there.
+// formula tone by tone. -infinity with nothing there.
 inline constexpr std::size_t kToneWindow = 16384;
 [[nodiscard]] double tone_level_db(const FakeRoom& room, std::size_t slot, double hz);
 
-// An AC-4 stream of tones as iclforge::ac4::Encoder writes it (planning/ac4.md, I2), in
+// An AC-4 stream of tones as iclforge::ac4::Encoder writes it, in
 // sync frames at `path`, for the AC-4 decoder page's suite; false, with
 // `error` set, where it could not be written. `kind`:
 //   "tones"          5.1 for 20 seconds, a tone a channel (L 440, R 620, C

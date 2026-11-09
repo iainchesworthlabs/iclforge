@@ -1,5 +1,5 @@
-// Tests for firmware_update.hpp: the part of "Check for updates" that is data and rules
-// (planning/esp32-ota.md, O10). The sample index and signature file are a throwaway CA's, made by
+// Tests for firmware_update.hpp: the part of "Check for updates" that is data and rules.
+// The sample index and signature file are a throwaway CA's, made by
 // tools/hearth/sign_index.py selftest (the same files as tools/hearth/testdata/update_index/ec/):
 // the signing tool wrote them and this suite reads them, so the two cannot drift. The cases of
 // versions and of what an index may hold are also in tools/hearth/test_index_verify.py: one rule,

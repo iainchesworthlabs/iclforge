@@ -1,4 +1,4 @@
-// The Preferences sheet's editors. See prefs_editors.hpp and planning/p4x-preferences.md.
+// The Preferences sheet's editors. See prefs_editors.hpp.
 //
 // Two editors, for the two kinds of value the buttons of a row cannot hold:
 //   - a pair of times (the night schedule): a row each for From and To, each a minus, the time and a plus. A tap steps a

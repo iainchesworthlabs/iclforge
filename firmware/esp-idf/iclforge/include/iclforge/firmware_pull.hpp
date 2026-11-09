@@ -8,7 +8,7 @@
 
 #include "iclforge/firmware_update.hpp"
 
-// Updates from GitHub releases (planning/esp32-ota.md, O10): a board looks at a small signed index
+// Updates from GitHub releases: a board looks at a small signed index
 // of its channel, and installs the image it names when there is a newer one.
 //
 //   GET  /firmware/available     the flow's state (firmware_update.hpp's render_status)

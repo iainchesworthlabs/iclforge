@@ -21,8 +21,7 @@
 #include "stream_decoder.hpp"
 #include "truehd_index.hpp"
 
-// One queue item, opened (planning/hearth-reference-player.md, A3: "a session
-// per item: container input, access units, decoder ...").
+// One queue item, opened.
 //
 // The session owns the item's bytes and what a scan found in them - its
 // access units, how many samples each codes, its rate and width - and walks
@@ -57,7 +56,7 @@
 // MPEG-TS through apps/shared/media/src/container_input.hpp, whose functions the engine
 // does not compile) and a test supplies over memory.
 //
-// AC-4 (planning/ac4.md, I2): the units are the stream's sync frames, and
+// AC-4: the units are the stream's sync frames, and
 // each one's length the samples iclforge::ac4::Decoder puts out for it, which
 // ac4_stream.hpp works out before anything is decoded. What differs is where
 // a decoder can start. An AC-4 decoder needs the configuration an I-frame
@@ -73,7 +72,7 @@
 // out, its latency included, as `forge decode` writes them. A frame waiting
 // for an I-frame puts out nothing, and plays as silence of its length.
 //
-// TrueHD and MLP (planning/truehd-parity-hearth-player.md, rows 5 and 14): 1,200 units a second, so
+// TrueHD and MLP: 1,200 units a second, so
 // the units are not listed one by one. truehd_index.hpp indexes the units a decoder can join at,
 // and every unit has the same length, so a unit's start is its number times that; the session holds
 // that index and a cursor on the stream's source (which an ItemLoader may give as a file read in
