@@ -5573,10 +5573,10 @@ std::vector<std::vector<double>> SubstreamCoder::internal(
     std::vector<std::vector<double>> out(input.size());
     std::vector<double> samples;
     for (std::size_t c = 0; c < input.size(); ++c) {
-        samples.assign(input[c].begin(), input[c].end());
         if (through.empty()) {
-            out[c] = samples;
+            out[c].assign(input[c].begin(), input[c].end());
         } else {
+            samples.assign(input[c].begin(), input[c].end());
             through[c].process(samples, out[c]);
         }
     }
