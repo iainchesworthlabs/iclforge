@@ -31,6 +31,7 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder_object_downmix.cpp
     encoder/test_encoder_object_downmix_adversarial.cpp
     encoder/test_encoder_object_downmix_scaled.cpp
+    encoder/test_encoder_object_downmix_interop.cpp
     encoder/test_encoder_object_motion.cpp
     encoder/test_bed_pan.cpp
     encoder/test_render_bed.cpp
