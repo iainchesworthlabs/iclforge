@@ -253,6 +253,8 @@ struct EncoderConfig {
     // the bed they give is within the rounding of the 2^-14 coefficients only where the chain's
     // coefficients stay small. Empty: the render as before.
     std::vector<double> object_downmix{};
+    // Where object_downmix's gains are applied (object_paths.hpp). kChain is the stream as before.
+    ObjectDownmixScaling object_downmix_scaling = ObjectDownmixScaling::kChain;
     // The 16-channel fields of the major sync (§14.2). `sixteench_channel_count` is filled in by
     // the encoder: the object channels, less the LFE of a dynamic-object-only programme, which is
     // how the owner's discs count them. Used only with object_channels.

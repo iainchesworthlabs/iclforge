@@ -692,7 +692,8 @@ struct Encoder::Impl {
         }
         if (!config.object_downmix.empty()) {
             auto built = detail::build_downmix_chain(config.object_downmix, config.object_channels,
-                                                     config.object_noise_shift);
+                                                     config.object_noise_shift,
+                                                     config.object_downmix_scaling);
             if (built) {
                 downmix_chain = std::move(*built);
             }
@@ -842,7 +843,8 @@ std::string_view Encoder::refusal_reason(const EncoderConfig& config) {
                    "bypass, split mixes or update interval";
         }
         const auto chain = detail::build_downmix_chain(config.object_downmix, config.object_channels,
-                                                       config.object_noise_shift);
+                                                       config.object_noise_shift,
+                                                       config.object_downmix_scaling);
         if (!chain) {
             return chain.error();
         }
@@ -1338,17 +1340,18 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
     const std::vector<StageSpec> object_stages{StageSpec{0, objects - 1}};
     const std::vector<Channel> no_layout;
     const DownmixPlan no_downmix;
-    // The bed rows of a general downmix that are exactly zero: the chain leaves the object in the row
-    // (TH spec 10.2.1d) and one matrix with no coefficients in each substream that decodes the row
-    // sets it to 0 (the matrices of a substream do not reach the rows the object substream reads).
+    // The bed rows of a general downmix that the lower substreams change after decoding them. A row
+    // that is exactly zero: the chain leaves the object in the row (TH spec 10.2.1d) and one matrix
+    // with no coefficients in each substream that decodes the row sets it to 0. A row coded above
+    // its downmix gain (ObjectDownmixScaling::kBedSubstreams): the matrix has the scale as the
+    // row's own coefficient. The matrices of a substream do not reach the rows the object substream
+    // reads.
     std::vector<int> bed_zero_rows;
     std::vector<MatrixSpec> zero_matrices;
     if (bed_chain && downmix_chain) {
-        bed_zero_rows = downmix_chain->zero_rows;
-        for (const int row : bed_zero_rows) {
-            MatrixSpec zero;
-            zero.out_ch = static_cast<std::uint8_t>(row);
-            zero_matrices.push_back(zero);
+        zero_matrices = downmix_chain->bed_matrices;
+        for (const MatrixSpec& matrix : zero_matrices) {
+            bed_zero_rows.push_back(matrix.out_ch);
         }
     }
     const auto prepare = [&](const Program& program) -> std::expected<void, EncodeError> {
@@ -1503,13 +1506,21 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
             stage.coded.assign(coded_rows.begin() + stage.spec.first_row,
                                coded_rows.begin() + stage.spec.out_rows());
         }
-        // The last substream's decode is the source, whatever the matrices before it did.
+        // The last substream's decode is the source, whatever the matrices before it did; a row
+        // a general downmix zeroes or scales is the source row through its one matrix.
+        std::vector<Plane> wanted_rows = rows;
+        for (const MatrixSpec& matrix : zero_matrices) {
+            apply_matrix(matrix, wanted_rows, quants[static_cast<std::size_t>(matrix.out_ch)]);
+            if (!within_24_bits(wanted_rows[matrix.out_ch],
+                                shifts[static_cast<std::size_t>(matrix.out_ch)])) {
+                return std::unexpected(make_error(
+                    EncodeErrorKind::kUnsupported,
+                    "object_downmix: the bed or a coded row does not fit 24 bits for this audio "
+                    "(lower the objects' levels or the downmix gains)"));
+            }
+        }
         for (std::size_t k = 0; k < work.back().outputs.size(); ++k) {
-            const bool zeroed = std::ranges::find(bed_zero_rows, static_cast<int>(k)) !=
-                                bed_zero_rows.end();
-            const Plane& output = work.back().outputs[k];
-            if (zeroed ? !std::ranges::all_of(output, [](std::int32_t v) { return v == 0; })
-                       : output != rows[k]) {
+            if (work.back().outputs[k] != wanted_rows[k]) {
                 return std::unexpected(
                     make_error(EncodeErrorKind::kInternal,
                                "the matrices do not give back the source channels"));
@@ -2056,12 +2067,18 @@ std::expected<std::vector<HeldUnit>, EncodeError> Encoder::Impl::code_interval(
 
     // The interval fits (or may be written as it is): the decoder sees it now, and not before, so
     // that a try that was thrown away never reached it.
-    // The bed the decoder gives back: the rows as coded, except the rows a general downmix zeroes.
+    // The bed the decoder gives back: the rows as coded, except the rows a general downmix zeroes
+    // or scales, which are what the last bed substream's matrices make of them.
     std::vector<Plane> expected_bed;
     if (verifier && !bed_zero_rows.empty()) {
         expected_bed.assign(input.begin(), input.begin() + channels);
+        const StageWork& last_bed = work[stages.size() - 1];
         for (const int row : bed_zero_rows) {
-            std::ranges::fill(expected_bed[static_cast<std::size_t>(row)], 0);
+            const auto k = static_cast<std::size_t>(row);
+            for (std::size_t t = 0; t < expected_bed[k].size(); ++t) {
+                expected_bed[k][t] = static_cast<std::int32_t>(
+                    static_cast<std::uint32_t>(last_bed.outputs[k][t]) << last_bed.shifts[k]);
+            }
         }
     }
     const std::span<const Plane> bed_expected =

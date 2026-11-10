@@ -221,7 +221,7 @@ Gains ring_pan_rows(int n, Lcg& rng) {
 }  // namespace
 
 TEST_CASE("adversarial: a DC downmix decodes to the bed worked out by hand",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-dc]") {
+          "[.][object-downmix-adversarial][adv-dc]") {
     // objects: e -> 100000 * (e + 1), constant. By hand:
     //   L   = 0.75*200000 + 0.5*900000  + 0.3*1000000 =  900000
     //   R   = 0.75*300000 + 0.5*1000000 + 0.3*1100000 = 1055000
@@ -260,7 +260,7 @@ TEST_CASE("adversarial: a DC downmix decodes to the bed worked out by hand",
 }
 
 TEST_CASE("adversarial: the bed of noisy objects in LSBs, 24 and 16 bit sources",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-lsb]") {
+          "[.][object-downmix-adversarial][adv-lsb]") {
     const Gains rows = fixture_rows();
     const int frames = 40 * kUnits * 3 + 11;
     for (const int source_bits : {24, 16}) {
@@ -288,7 +288,7 @@ TEST_CASE("adversarial: the bed of noisy objects in LSBs, 24 and 16 bit sources"
 }
 
 TEST_CASE("adversarial: silent objects and the matrices' noise",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-silence]") {
+          "[.][object-downmix-adversarial][adv-silence]") {
     const Gains rows = fixture_rows();
     const int frames = 40 * kUnits * 2;
     const std::vector<std::int32_t> pcm(static_cast<std::size_t>(frames) * 12, 0);
@@ -318,7 +318,7 @@ TEST_CASE("adversarial: silent objects and the matrices' noise",
 }
 
 TEST_CASE("adversarial: a downmix that cannot clip, at full scale",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-headroom]") {
+          "[.][object-downmix-adversarial][adv-headroom]") {
     // every row's gains add to at most 1 in magnitude, so no bed row can pass full scale
     Gains rows = fixture_rows();
     for (int r = 0; r < 3; ++r) {
@@ -342,7 +342,7 @@ TEST_CASE("adversarial: a downmix that cannot clip, at full scale",
 }
 
 TEST_CASE("adversarial: what each chain realises, from its matrices",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-fuzz]") {
+          "[.][object-downmix-adversarial][adv-fuzz]") {
     SECTION("the fixture") {
         const Gains rows = fixture_rows();
         const auto chain = detail::build_downmix_chain(flatten(rows), 12, 0);
@@ -438,7 +438,7 @@ TEST_CASE("adversarial: what each chain realises, from its matrices",
 }
 
 TEST_CASE("adversarial: object counts and the lower presentations",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-edges]") {
+          "[.][object-downmix-adversarial][adv-edges]") {
     SECTION("9 and 16 objects through a stream") {
         Lcg rng{5};
         for (const int n : {9, 16}) {
@@ -516,7 +516,7 @@ TEST_CASE("adversarial: object counts and the lower presentations",
 }
 
 TEST_CASE("adversarial: single rows of unequal gains, coded-row headroom, worst accepted chain",
-          "[truehd][encoder][.][object-downmix-adversarial][adv-more]") {
+          "[.][object-downmix-adversarial][adv-more]") {
     SECTION("four to seven single rows whose gains differ") {
         Lcg rng{404};
         for (const int singles : {4, 5, 6, 7}) {

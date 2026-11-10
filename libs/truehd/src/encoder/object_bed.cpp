@@ -1274,10 +1274,256 @@ std::expected<ChainResult, std::string_view> design_chain(const std::vector<Form
     return result;
 }
 
+// The decoder's chain: the encoder's primitives last to first, each inverted.
+std::vector<MatrixSpec> decoder_matrices(const std::vector<ChainOp>& ops, int noise_shift) {
+    std::vector<MatrixSpec> matrices;
+    for (std::size_t i = ops.size(); i-- > 0;) {
+        const ChainOp& op = ops[i];
+        MatrixSpec matrix;
+        matrix.out_ch = static_cast<std::uint8_t>(op.out);
+        matrix.frac_bits = kChainFracBits;
+        matrix.f_shift = static_cast<std::int8_t>(op.f_shift);
+        matrix.field_m4 = static_cast<std::uint8_t>(noise_shift);
+        matrix.present[static_cast<std::size_t>(op.out)] = true;
+        matrix.coeff[static_cast<std::size_t>(op.out)] = 1 << (kChainFracBits - op.f_shift);
+        for (const auto& [row, raw] : op.terms) {
+            matrix.present[static_cast<std::size_t>(row)] = true;
+            matrix.coeff[static_cast<std::size_t>(row)] = -raw;
+        }
+        matrices.push_back(matrix);
+    }
+    return matrices;
+}
+
+// The sum of the magnitudes of each coded row's gains on the objects, after `ops`.
+std::vector<double> coded_row_gains(std::vector<Form> forms, const std::vector<ChainOp>& ops) {
+    for (const ChainOp& op : ops) {
+        apply_op(forms, op);
+    }
+    std::vector<double> gains;
+    for (const Form& form : forms) {
+        double sum = 0.0;
+        for (const double g : form) {
+            sum += std::abs(g);
+        }
+        gains.push_back(sum);
+    }
+    return gains;
+}
+
+// A bed row's realised gains may be this far from the wanted ones: a few steps of the 2^-14 grids
+// of the lower substreams' coefficients and the main primitive's (never reached in the tests).
+constexpr double kScaledReach = 2e-4;
+constexpr std::int32_t kBedCoefficientMaxRaw = (1 << (kChainFracBits + 1)) - 1;  // under 2
+
+// ObjectDownmixScaling::kBedSubstreams. The downmix is factored as bed = B * coded, where the
+// coded bed rows are made in substream 3's chain and B is applied by the lower substreams:
+//   coded[d] = the pivot object of row d, plus shares of at most 1 of objects no earlier row took
+//              (one main primitive, which reads rows that are still plain objects);
+//   bed[d]   = own[d] * coded[d] + sum over the rows t before d of cross[d][t] * coded[t].
+// The rows are taken substream by substream, so a row only needs rows of its own or an earlier
+// substream (the 2 channel and 5.1 presentations decode the same bed rows as the 7.1 one). The pivot of a
+// row is the object with the largest gain left once the earlier rows are out of it; a row with
+// nothing left (a zero row, or a combination of earlier rows such as the second speaker of a lone
+// panned object) has no pivot and own coefficient 0. Nothing is written to the rows substream 3
+// codes, and no coded bed row's gain on an object passes 1, whatever the downmix.
+std::expected<DownmixChain, std::string_view> build_scaled_chain(const std::vector<Form>& target,
+                                                                 int objects, int noise_shift) {
+    const auto n = static_cast<std::size_t>(objects);
+    const auto bed = static_cast<std::size_t>(kBedChannels);
+    const double grid = std::ldexp(1.0, -kChainFracBits);
+    constexpr std::string_view kProblemBedRange =
+        "object_downmix: a bed row needs a coefficient of 2 or more in the lower substreams";
+    const auto on_grid = [&](double value) { return std::round(value / grid); };
+
+    std::vector<Form> coded(bed, Form(n, 0.0));  // as realised, on the objects
+    std::vector<int> pivot(bed, -1);
+    std::vector<std::vector<std::int32_t>> cross(bed, std::vector<std::int32_t>(bed, 0));
+    std::vector<std::int32_t> own(bed, 0);
+    // each row's main primitive, on the objects it reads (their matrix channels come after)
+    std::vector<std::vector<std::pair<int, std::int32_t>>> shares(bed);
+    std::vector<bool> taken(n, false);
+    std::vector<std::size_t> order;  // the rows as they are taken
+    std::vector<bool> done(bed, false);
+    // What is left of row d once the rows taken so far are out of it, the multiples of them it
+    // took (on the grid, so the rounding of each is seen by the next) and the free object with
+    // the most left.
+    struct Reduced {
+        Form rest;
+        std::vector<double> multiples;  // raw, in the order of `order`
+        std::size_t best = 0;
+        double most = 0.0;
+    };
+    const auto reduce = [&](std::size_t d) {
+        Reduced reduced;
+        reduced.rest = target[d];
+        reduced.best = n;
+        for (const std::size_t t : order) {
+            double raw = 0.0;
+            if (pivot[t] >= 0) {
+                raw = on_grid(reduced.rest[static_cast<std::size_t>(pivot[t])]);
+                for (std::size_t e = 0; e < n; ++e) {
+                    reduced.rest[e] -= raw * grid * coded[t][e];
+                }
+            }
+            reduced.multiples.push_back(raw);
+        }
+        for (std::size_t e = 0; e < n; ++e) {
+            if (!taken[e] && (reduced.best == n || std::abs(reduced.rest[e]) > reduced.most)) {
+                reduced.best = e;
+                reduced.most = std::abs(reduced.rest[e]);
+            }
+        }
+        return reduced;
+    };
+    // the rows of substream 0, then substream 1's, then substream 2's; inside a substream the row
+    // with the most left goes first, which keeps the multiples the later ones take small
+    constexpr std::array<std::size_t, 4> kGroupEnds{0, 2, 6, 8};
+    for (std::size_t step = 0; step < bed; ++step) {
+        std::size_t group = 0;
+        while (order.size() >= kGroupEnds[group + 1]) {
+            ++group;
+        }
+        std::size_t d = bed;
+        Reduced chosen;
+        for (std::size_t candidate = kGroupEnds[group]; candidate < kGroupEnds[group + 1];
+             ++candidate) {
+            if (done[candidate]) {
+                continue;
+            }
+            Reduced reduced = reduce(candidate);
+            if (d == bed || reduced.most > chosen.most) {
+                d = candidate;
+                chosen = std::move(reduced);
+            }
+        }
+        for (std::size_t i = 0; i < order.size(); ++i) {
+            if (!(std::abs(chosen.multiples[i]) <= kBedCoefficientMaxRaw)) {
+                return std::unexpected(kProblemBedRange);
+            }
+            cross[d][order[i]] = static_cast<std::int32_t>(chosen.multiples[i]);
+        }
+        const Form& rest = chosen.rest;
+        const std::size_t best = chosen.best;
+        done[d] = true;
+        order.push_back(d);
+        const double raw = best == n ? 0.0 : on_grid(rest[best]);
+        if (!(std::abs(raw) <= kBedCoefficientMaxRaw)) {
+            return std::unexpected(kProblemBedRange);
+        }
+        if (raw != 0.0) {
+            own[d] = static_cast<std::int32_t>(raw);
+            pivot[d] = static_cast<int>(best);
+            taken[best] = true;
+            coded[d][best] = 1.0;
+            for (std::size_t e = 0; e < n; ++e) {
+                // |share| is at most 1 up to the rounding of the pivot
+                const double share = taken[e] ? 0.0 : on_grid(rest[e] / (raw * grid));
+                if (share != 0.0) {
+                    shares[d].emplace_back(static_cast<int>(e), static_cast<std::int32_t>(share));
+                    coded[d][e] = share * grid;
+                }
+            }
+        }
+        for (std::size_t e = 0; e < n; ++e) {
+            double realised = own[d] * grid * coded[d][e];
+            for (std::size_t t = 0; t < bed; ++t) {
+                realised += cross[d][t] * grid * coded[t][e];
+            }
+            if (std::abs(realised - target[d][e]) > kScaledReach) {
+                return std::unexpected(kProblemReach);
+            }
+        }
+    }
+
+    // ch_assign: a row with a pivot holds it, the other objects fill the remaining matrix channels
+    std::vector<int> element_at(n, -1);
+    for (std::size_t d = 0; d < bed; ++d) {
+        element_at[d] = pivot[d];
+    }
+    std::size_t next_free = 0;
+    for (std::size_t position = 0; position < n; ++position) {
+        if (element_at[position] >= 0) {
+            continue;
+        }
+        while (taken[next_free]) {
+            ++next_free;
+        }
+        element_at[position] = static_cast<int>(next_free);
+        taken[next_free] = true;
+    }
+    std::vector<int> position_of(n, 0);
+    DownmixChain chain;
+    std::vector<Form> start(n, Form(n, 0.0));
+    for (std::size_t position = 0; position < n; ++position) {
+        const auto element = static_cast<std::size_t>(element_at[position]);
+        position_of[element] = static_cast<int>(position);
+        start[position][element] = 1.0;
+        chain.assign[position] = static_cast<std::uint8_t>(element);
+    }
+
+    // The main primitives in the order the rows were taken: each reads objects no earlier row
+    // took, which sit in rows the encoder has not written yet (bed rows taken later) or never
+    // writes (substream 3's).
+    std::vector<ChainOp> ops;
+    for (const std::size_t d : order) {
+        const bool zero = std::ranges::all_of(
+            target[d], [](double g) { return std::abs(g) < kChainNegligible; });
+        if (zero) {
+            chain.zero_rows.push_back(static_cast<int>(d));
+        }
+        if (!shares[d].empty()) {
+            ChainOp op;
+            op.out = static_cast<int>(d);
+            for (const auto& [element, raw] : shares[d]) {
+                op.terms.emplace_back(position_of[static_cast<std::size_t>(element)], raw);
+            }
+            ops.push_back(std::move(op));
+        } else if (pivot[d] >= 0 && own[d] != (1 << kChainFracBits) &&
+                   std::ranges::all_of(cross[d], [](std::int32_t c) { return c == 0; })) {
+            ++chain.single_rows;
+        }
+    }
+    // The lower substreams' matrices, the row taken last first: a row reads the rows taken before
+    // it as coded, so it is made before they are.
+    for (std::size_t i = bed; i-- > 0;) {
+        const std::size_t d = order[i];
+        const bool plain = own[d] == (1 << kChainFracBits) &&
+                           std::ranges::all_of(cross[d], [](std::int32_t c) { return c == 0; });
+        if (plain) {
+            continue;  // the row as coded is the downmix row
+        }
+        MatrixSpec matrix;
+        matrix.out_ch = static_cast<std::uint8_t>(d);
+        bool any = own[d] != 0;
+        for (std::size_t t = 0; t < bed; ++t) {
+            any = any || cross[d][t] != 0;
+        }
+        if (any) {
+            matrix.frac_bits = kChainFracBits;
+            for (std::size_t t = 0; t < bed; ++t) {
+                if (cross[d][t] != 0) {
+                    matrix.present[t] = true;
+                    matrix.coeff[t] = cross[d][t];
+                }
+            }
+            if (own[d] != 0) {
+                matrix.present[d] = true;
+                matrix.coeff[d] = own[d];
+            }
+        }
+        chain.bed_matrices.push_back(matrix);
+    }
+    chain.row_gain = coded_row_gains(start, ops);
+    chain.matrices = decoder_matrices(ops, noise_shift);
+    return chain;
+}
+
 }  // namespace
 
 std::expected<DownmixChain, std::string_view> build_downmix_chain(std::span<const double> downmix,
-                                                                  int objects, int noise_shift) {
+                                                                  int objects, int noise_shift,
+                                                                  ObjectDownmixScaling scaling) {
     if (objects <= kBedChannels || objects > kMaxChannels) {
         return std::unexpected("the object downmix needs 9 to 16 channels");
     }
@@ -1297,6 +1543,9 @@ std::expected<DownmixChain, std::string_view> build_downmix_chain(std::span<cons
             }
             target[r][e] = gain;
         }
+    }
+    if (scaling == ObjectDownmixScaling::kBedSubstreams) {
+        return build_scaled_chain(target, objects, noise_shift);
     }
 
     // Which element sits in which matrix channel (ch_assign): each bed row takes the element of
@@ -1398,28 +1647,19 @@ std::expected<DownmixChain, std::string_view> build_downmix_chain(std::span<cons
     }
 
     DownmixChain chain;
+    for (const int row : zero_rows) {
+        MatrixSpec matrix;
+        matrix.out_ch = static_cast<std::uint8_t>(row);
+        chain.bed_matrices.push_back(matrix);
+    }
     chain.zero_rows = std::move(zero_rows);
     chain.single_rows = singles;
     chain.group_rows = chosen->group;
     for (std::size_t position = 0; position < n; ++position) {
         chain.assign[position] = static_cast<std::uint8_t>(element_at[position]);
     }
-    // the decoder's chain: the encoder's primitives last to first, each inverted
-    for (std::size_t i = chosen->ops.size(); i-- > 0;) {
-        const ChainOp& op = chosen->ops[i];
-        MatrixSpec matrix;
-        matrix.out_ch = static_cast<std::uint8_t>(op.out);
-        matrix.frac_bits = kChainFracBits;
-        matrix.f_shift = static_cast<std::int8_t>(op.f_shift);
-        matrix.field_m4 = static_cast<std::uint8_t>(noise_shift);
-        matrix.present[static_cast<std::size_t>(op.out)] = true;
-        matrix.coeff[static_cast<std::size_t>(op.out)] = 1 << (kChainFracBits - op.f_shift);
-        for (const auto& [row, raw] : op.terms) {
-            matrix.present[static_cast<std::size_t>(row)] = true;
-            matrix.coeff[static_cast<std::size_t>(row)] = -raw;
-        }
-        chain.matrices.push_back(matrix);
-    }
+    chain.row_gain = coded_row_gains(start, chosen->ops);
+    chain.matrices = decoder_matrices(chosen->ops, noise_shift);
     return chain;
 }
 

@@ -43,4 +43,20 @@ enum class ObjectExtension : std::uint8_t {
     kSlopes,
 };
 
+// Where the gains of EncoderConfig::object_downmix are applied.
+enum class ObjectDownmixScaling : std::uint8_t {
+    // Inside substream 3's chain of primitive matrices (tuning, overlap and main primitives). The
+    // chain has determinant 1, so every bed row below unity is paid for by the rows substream 3
+    // codes: they hold several times one object and pass 24 bits long before the bed does.
+    kChain,
+    // Each bed row is coded with its pivot object at 1 and shares of at most 1 of other objects (one
+    // main primitive a row, none for a row that is one scaled object), and a matrix in each lower
+    // substream that decodes the row makes the downmix row of it and the bed rows before it, as a
+    // zero row's matrix sets it to 0. The rows substream 3 codes are the objects as they are, and
+    // a row that is a combination of other rows (the second speaker of a lone panned object) is
+    // carried. Refused: a coefficient of 2 or more in a lower substream's matrix. No decoder
+    // outside this library has read it.
+    kBedSubstreams,
+};
+
 }  // namespace iclforge::truehd
