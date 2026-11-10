@@ -209,6 +209,14 @@ struct BlockContext {
 [[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<BlockHeaderSpec, Error> read_block_header(
     BitReader& reader, const BlockContext& context);
 
+// The same, into a header the caller keeps (a decoder reads one for every block and has no need of a
+// 6 KB value built, returned and copied each time). Every field of `header` is set as
+// read_block_header would set it, except what a block cannot have changed and nothing reads: the
+// channels outside min_chan..max_chan, and the matrices from `matrices->count` on, are left as they
+// were. On an error `header` holds a partial read.
+[[nodiscard]] ICLFORGE_TRUEHD_EXPORT std::expected<void, Error> read_block_header_into(
+    BitReader& reader, const BlockContext& context, BlockHeaderSpec& header);
+
 ICLFORGE_TRUEHD_EXPORT void write_block_header(BitWriter& writer, const BlockContext& context,
                                                const BlockHeaderSpec& header);
 
