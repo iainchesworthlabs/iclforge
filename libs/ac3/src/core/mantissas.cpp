@@ -1,6 +1,7 @@
 #include "iclforge/ac3/core/mantissas.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -128,6 +129,34 @@ void MantissaBlockWriter::reset() {
     bit_count_ = 0;
 }
 
+namespace {
+
+// What one bin of each bap adds to the four running totals of
+// mantissa_bits_per_block, packed into one 64-bit word of four 16-bit fields:
+// bits 0..15 count the bap-1 bins, 16..31 the bap-2 bins, 32..47 the bap-4
+// bins, 48..63 the bits of the directly coded ones (kBapBits, 0 for baps 0, 1,
+// 2 and 4). Adding one entry per bin is branch-free and has no per-bin
+// decision for the CPU to mispredict, where a switch on a bap value that
+// changes every few bins mispredicted on a large share of them. 128 bytes.
+constexpr std::array<std::uint64_t, 16> kBapTally = [] {
+    std::array<std::uint64_t, 16> t{};
+    for (std::size_t bap = 1; bap < t.size(); ++bap) {
+        switch (bap) {
+            case 1: t[bap] = std::uint64_t{1}; break;
+            case 2: t[bap] = std::uint64_t{1} << 16; break;
+            case 4: t[bap] = std::uint64_t{1} << 32; break;
+            default: t[bap] = static_cast<std::uint64_t>(kBapBits[bap]) << 48; break;
+        }
+    }
+    return t;
+}();
+
+// A field must not overflow its 16 bits between two unpackings. The direct
+// field grows by at most 16 a bin, so 4095 bins (65520) is the longest run.
+constexpr std::size_t kTallyRun = 4095;
+
+}  // namespace
+
 std::size_t mantissa_bits_per_block(
     std::span<const std::span<const std::uint8_t>> channel_baps) {
     ICLFORGE_ZONE_SCOPED_N("mantissa_bits_per_block");
@@ -136,14 +165,34 @@ std::size_t mantissa_bits_per_block(
     std::size_t count2 = 0;
     std::size_t count4 = 0;
     for (const auto& baps : channel_baps) {
-        for (const auto bap : baps) {
-            switch (bap) {
-                case 0: break;
-                case 1: ++count1; break;
-                case 2: ++count2; break;
-                case 4: ++count4; break;
-                default: direct += static_cast<std::size_t>(kBapBits[bap]); break;
+        const std::uint8_t* p = baps.data();
+        std::size_t left = baps.size();
+        while (left > 0) {
+            const std::size_t run = std::min(left, kTallyRun);
+            // Four independent accumulators: the adds do not wait on one another.
+            std::uint64_t t0 = 0;
+            std::uint64_t t1 = 0;
+            std::uint64_t t2 = 0;
+            std::uint64_t t3 = 0;
+            std::size_t i = 0;
+            for (; i + 4 <= run; i += 4) {
+                t0 += kBapTally[p[i] & 15U];
+                t1 += kBapTally[p[i + 1] & 15U];
+                t2 += kBapTally[p[i + 2] & 15U];
+                t3 += kBapTally[p[i + 3] & 15U];
             }
+            for (; i < run; ++i) {
+                t0 += kBapTally[p[i] & 15U];
+            }
+            // Each accumulator saw at most `run` bins, so no field overflowed.
+            for (const std::uint64_t t : {t0, t1, t2, t3}) {
+                count1 += static_cast<std::size_t>(t & 0xFFFFU);
+                count2 += static_cast<std::size_t>((t >> 16) & 0xFFFFU);
+                count4 += static_cast<std::size_t>((t >> 32) & 0xFFFFU);
+                direct += static_cast<std::size_t>(t >> 48);
+            }
+            p += run;
+            left -= run;
         }
     }
     return direct + 5 * ((count1 + 2) / 3) + 7 * ((count2 + 2) / 3) + 7 * ((count4 + 1) / 2);
