@@ -1909,7 +1909,7 @@ The player's path after the decoder ran once for each access unit, which is 40 s
 AC-3 block of 256 samples is 187 times a second. It now takes the units of a run together, up to the player's
 256-sample block (240 samples at 48 and 96 kHz), and on a part with PSRAM decodes and converts the chunk before it
 renders the first block (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_BLOCK_SAMPLES` and
-`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_DECODE_AHEAD`; 0 and off are the former path). On the host the samples it gives
+`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_DECODE_AHEAD`; 0 for both is the former path). On the host the samples it gives
 the sink are the same, bit for bit, as the former path's (`firmware/esp-idf/iclforge-host-tests`). What it does to the
 burst time on the board has not been measured.
 

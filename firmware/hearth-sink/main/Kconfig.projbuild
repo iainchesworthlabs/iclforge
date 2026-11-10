@@ -1002,13 +1002,14 @@ config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_BLOCK_SAMPLES
         what to measure it against.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_DECODE_AHEAD
-    bool "TrueHD: decode and convert a chunk's access units before rendering the first"
-    default y
+    int "TrueHD: decode and convert a chunk's access units before rendering the first (1) or not (0)"
+    default 1
+    range 0 1
     help
-        With it on, a part with PSRAM decodes and converts to float all the units of a chunk (up to
+        With 1, a part with PSRAM decodes and converts to float all the units of a chunk (up to
         24: 960 samples a channel at 48 kHz, 23 KB of PSRAM for 6 channels, held to 64 KiB) before it
         renders the first block, so that the decoder's code runs through the chunk and the player's
-        through its blocks, where the two took turns for every block. Off, or on a part with no
+        through its blocks, where the two took turns for every block. With 0, or on a part with no
         PSRAM, a block of units is converted, rendered, and the next converted. The samples out are
         the same, bit for bit. Measured on the host only; on a board the effect is the thing to
         measure (the S3 runs its code from PSRAM through a 32 KB instruction cache).
