@@ -78,17 +78,6 @@ const std::array<CodebookShape, kCodebooks>& shapes() {
     return kShapes;
 }
 
-// Whether every line of a band fits codebook `cb`'s values.
-[[nodiscard]] bool fits(const CodebookShape& s, int cb, std::int32_t max_abs) noexcept {
-    if (cb == 11) {
-        return true;
-    }
-    if (s.is_unsigned) {
-        return max_abs <= s.max_value;
-    }
-    return max_abs <= s.max_value && -max_abs >= s.min_value;
-}
-
 // Pseudocode 19 in reverse: the index of the codeword for `dim` values.
 [[nodiscard]] std::size_t codeword_index(const CodebookShape& s, int cb, std::span<const std::int32_t> values) {
     std::array<int, 4> v{};
@@ -130,31 +119,186 @@ struct ExtCode {
     return code;
 }
 
-// The bits of one band's lines in codebook `cb`: codewords, sign bits and
-// escapes.
-[[nodiscard]] std::size_t band_cost(std::span<const std::int32_t> q, int cb) {
-    const CodebookShape& s = shapes()[static_cast<std::size_t>(cb)];
-    const std::span<const HuffCode> codes = tables::kAsfSpectrumCodes[static_cast<std::size_t>(cb)];
-    const auto dim = static_cast<std::size_t>(s.dim);
-    std::size_t bits = 0;
-    for (std::size_t k = 0; k + dim <= q.size(); k += dim) {
-        const std::span<const std::int32_t> values = q.subspan(k, dim);
-        bits += codes[codeword_index(s, cb, values)].bits;
-        if (s.is_unsigned) {
-            for (const std::int32_t x : values) {
-                bits += x != 0 ? 1U : 0U;
-                if (cb == 11 && std::abs(x) >= kEscape) {
-                    bits += ext_code(std::abs(x)).bits;
-                }
+constexpr std::size_t kNever = std::numeric_limits<std::size_t>::max() / 4;
+
+// Codebooks that share a shape (dimension, signedness and range: Tables A.2 to
+// A.12 pair them up) index their codewords alike and differ only in the
+// codeword lengths, so a band is walked once for both. `bits` holds the two
+// books' lengths side by side, by index.
+struct PriceGroup {
+    int limit = 0;  // the largest magnitude a book of the group codes directly
+    int mod = 0, mod2 = 0, mod3 = 0;
+    int base = 0;   // what cb_off adds to the index
+    std::array<std::array<std::uint8_t, 2>, 289> bits{};
+};
+
+// Signed quads (books 1, 2), unsigned quads (3, 4), signed pairs (5, 6),
+// unsigned pairs (7, 8) and (9, 10), then book 11 on its own.
+struct Pricing {
+    std::array<PriceGroup, 6> group{};
+};
+
+[[nodiscard]] Pricing build_pricing() {
+    Pricing p;
+    const std::array<std::array<int, 2>, 6> books{{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 11}}};
+    for (std::size_t i = 0; i < books.size(); ++i) {
+        PriceGroup& g = p.group[i];
+        const CodebookShape& s = shapes()[static_cast<std::size_t>(books[i][0])];
+        g.limit = books[i][0] == 11 ? std::numeric_limits<int>::max() : s.max_value;
+        g.mod = s.mod;
+        g.mod2 = s.mod2;
+        g.mod3 = s.mod3;
+        g.base = s.dim == 4 ? s.off * (s.mod3 + s.mod2 + s.mod + 1) : s.off * (s.mod + 1);
+        for (std::size_t j = 0; j < 2; ++j) {
+            const std::span<const HuffCode> codes =
+                tables::kAsfSpectrumCodes[static_cast<std::size_t>(books[i][j])];
+            for (std::size_t k = 0; k < codes.size() && k < g.bits.size(); ++k) {
+                g.bits[k][j] = codes[k].bits;
             }
         }
     }
-    return bits;
+    return p;
 }
 
+[[nodiscard]] const Pricing& pricing() {
+    static const Pricing kPricing = build_pricing();
+    return kPricing;
+}
+
+// The two quad groups' lengths over `quads` tuples, and how many lines are not
+// zero (a sign bit each, in the unsigned books).
+template <bool WithSigned>
+void price_quads(const std::int32_t* d, std::size_t quads, const Pricing& p, std::array<std::uint32_t, 4>& acc,
+                 std::uint32_t& nonzero) {
+    const PriceGroup& sg = p.group[0];
+    const PriceGroup& ug = p.group[1];
+    for (std::size_t i = 0; i < quads; ++i, d += 4) {
+        const int a0 = std::abs(d[0]);
+        const int a1 = std::abs(d[1]);
+        const int a2 = std::abs(d[2]);
+        const int a3 = std::abs(d[3]);
+        const auto ui = static_cast<std::size_t>(a0 * ug.mod3 + a1 * ug.mod2 + a2 * ug.mod + a3 + ug.base);
+        acc[2] += ug.bits[ui][0];
+        acc[3] += ug.bits[ui][1];
+        nonzero += static_cast<std::uint32_t>((a0 != 0) + (a1 != 0) + (a2 != 0) + (a3 != 0));
+        if constexpr (WithSigned) {
+            const auto si = static_cast<std::size_t>(d[0] * sg.mod3 + d[1] * sg.mod2 + d[2] * sg.mod + d[3] + sg.base);
+            acc[0] += sg.bits[si][0];
+            acc[1] += sg.bits[si][1];
+        }
+    }
+}
+
+// The pair groups' lengths: acc[0], [1] books 5 and 6, [2], [3] books 7 and 8,
+// [4], [5] books 9 and 10, [6] book 11 (which codes magnitudes past 16 as 16
+// and an escape). Only the groups the band fits are read.
+template <bool Signed, bool Group78, bool Group910>
+void price_pairs(const std::int32_t* d, std::size_t pairs, const Pricing& p, std::array<std::uint32_t, 7>& acc,
+                 std::uint32_t& nonzero) {
+    const PriceGroup& sg = p.group[2];
+    const PriceGroup& g78 = p.group[3];
+    const PriceGroup& g910 = p.group[4];
+    const PriceGroup& g11 = p.group[5];
+    for (std::size_t i = 0; i < pairs; ++i, d += 2) {
+        const int a0 = std::abs(d[0]);
+        const int a1 = std::abs(d[1]);
+        nonzero += static_cast<std::uint32_t>((a0 != 0) + (a1 != 0));
+        acc[6] += g11.bits[static_cast<std::size_t>(std::min(a0, kEscape) * g11.mod + std::min(a1, kEscape))][0];
+        if constexpr (Group910) {
+            const auto index = static_cast<std::size_t>(a0 * g910.mod + a1);
+            acc[4] += g910.bits[index][0];
+            acc[5] += g910.bits[index][1];
+        }
+        if constexpr (Group78) {
+            const auto index = static_cast<std::size_t>(a0 * g78.mod + a1);
+            acc[2] += g78.bits[index][0];
+            acc[3] += g78.bits[index][1];
+        }
+        if constexpr (Signed) {
+            const auto index = static_cast<std::size_t>(d[0] * sg.mod + d[1] + sg.base);
+            acc[0] += sg.bits[index][0];
+            acc[1] += sg.bits[index][1];
+        }
+    }
+}
+
+// The bits of one band's lines in every codebook the band fits (kNever in the
+// others; codebook 0 for a band of zeros): codewords, sign bits and escapes.
+void price_band(std::span<const std::int32_t> q, std::int32_t max_abs, const Pricing& p,
+                std::array<std::size_t, kCodebooks>& cost) {
+    cost.fill(kNever);
+    if (max_abs == 0) {
+        cost[0] = 0;
+    }
+    const std::int32_t* d = q.data();
+    if (max_abs <= p.group[1].limit) {
+        std::array<std::uint32_t, 4> acc{};
+        std::uint32_t nonzero = 0;
+        if (max_abs <= p.group[0].limit) {
+            price_quads<true>(d, q.size() / 4, p, acc, nonzero);
+            cost[1] = acc[0];
+            cost[2] = acc[1];
+        } else {
+            price_quads<false>(d, q.size() / 4, p, acc, nonzero);
+        }
+        cost[3] = acc[2] + nonzero;
+        cost[4] = acc[3] + nonzero;
+    }
+    std::array<std::uint32_t, 7> acc{};
+    std::uint32_t nonzero = 0;
+    const std::size_t pairs = q.size() / 2;
+    if (max_abs <= p.group[2].limit) {
+        price_pairs<true, true, true>(d, pairs, p, acc, nonzero);
+        cost[5] = acc[0];
+        cost[6] = acc[1];
+    } else if (max_abs <= p.group[3].limit) {
+        price_pairs<false, true, true>(d, pairs, p, acc, nonzero);
+    } else if (max_abs <= p.group[4].limit) {
+        price_pairs<false, false, true>(d, pairs, p, acc, nonzero);
+    } else {
+        price_pairs<false, false, false>(d, pairs, p, acc, nonzero);
+    }
+    if (max_abs <= p.group[3].limit) {
+        cost[7] = acc[2] + nonzero;
+        cost[8] = acc[3] + nonzero;
+    }
+    if (max_abs <= p.group[4].limit) {
+        cost[9] = acc[4] + nonzero;
+        cost[10] = acc[5] + nonzero;
+    }
+    std::size_t bits = acc[6] + nonzero;
+    if (max_abs >= kEscape) {
+        for (std::size_t k = 0; k < pairs * 2; ++k) {
+            if (std::abs(d[k]) >= kEscape) {
+                bits += ext_code(std::abs(d[k])).bits;
+            }
+        }
+    }
+    cost[11] = bits;
+}
+
+// How far the fast power may sit from an integer boundary before the exact one
+// decides. sqrt(y sqrt y) is within a few ulp (some 1e-12 at the top of the
+// range) of std::pow(y, 0.75), so a result more than this from a boundary
+// floors to the same integer either way.
+constexpr double kBoundaryMargin = 1e-9;
+constexpr double kFastLimit = 8000.0;
+
 [[nodiscard]] std::int32_t quantize_line(double x, double inverse_gain) {
-    const double scaled = std::pow(std::abs(x) * inverse_gain, 0.75) + kRounding;
-    const auto magnitude = static_cast<std::int32_t>(std::min(scaled, static_cast<double>(kMaxQuant)));
+    const double y = std::abs(x) * inverse_gain;
+    const double fast = std::sqrt(y * std::sqrt(y)) + kRounding;
+    std::int32_t magnitude = -1;
+    if (fast < kFastLimit) {
+        const auto whole = static_cast<std::int32_t>(fast);
+        const double fraction = fast - static_cast<double>(whole);
+        if (fraction > kBoundaryMargin && fraction < 1.0 - kBoundaryMargin) {
+            magnitude = whole;
+        }
+    }
+    if (magnitude < 0) {  // too close to call, past the range, or not a number
+        const double scaled = std::pow(y, 0.75) + kRounding;
+        magnitude = static_cast<std::int32_t>(std::min(scaled, static_cast<double>(kMaxQuant)));
+    }
     return x < 0.0 ? -magnitude : magnitude;
 }
 
@@ -166,6 +310,18 @@ struct ExtCode {
         max_abs = std::max(max_abs, std::abs(out[k]));
     }
     return max_abs;
+}
+
+// Buffers code_track reuses from one call to the next on a thread.
+struct Scratch {
+    std::vector<std::array<std::size_t, kCodebooks>> cost;
+    std::vector<std::size_t> prefix, ahead, header, best;
+    std::vector<int> lowest, from, book;
+};
+
+[[nodiscard]] Scratch& scratch_buffers() {
+    thread_local Scratch scratch;
+    return scratch;
 }
 
 // A band's mean square as the decoder reconstructs it: sign(q) |q|^(4/3) at
@@ -342,57 +498,95 @@ CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>
     // Codebooks and sections, by exact cost: each band priced in every
     // codebook its values fit, then the cheapest division into sections,
     // counting each section's header.
+    const Pricing& prices = pricing();
+    Scratch& scratch = scratch_buffers();
     for (std::size_t g = 0; g < groups; ++g) {
         const int bands = grouped.max_sfb[g];
         const int width = section_bits_width(group_transf_index(layout, g));
-        std::vector<std::array<std::size_t, kCodebooks>> cost(static_cast<std::size_t>(bands));
-        constexpr std::size_t kNever = std::numeric_limits<std::size_t>::max() / 4;
-        for (int b = 0; b < bands; ++b) {
-            const auto bi = static_cast<std::size_t>(b);
+        const auto count = static_cast<std::size_t>(bands);
+        const std::size_t stride = count + 1;
+        std::vector<std::array<std::size_t, kCodebooks>>& cost = scratch.cost;
+        cost.resize(count);
+        for (std::size_t bi = 0; bi < count; ++bi) {
             const std::size_t begin = grouped.offset[g][bi];
             const std::size_t end = grouped.offset[g][bi + 1];
-            const std::span<const std::int32_t> q = std::span<const std::int32_t>(t.q).subspan(begin, end - begin);
-            for (int cb = 0; cb < kCodebooks; ++cb) {
-                std::size_t c = kNever;
-                if (cb == 0) {
-                    c = max_abs[g][bi] == 0 ? 0 : kNever;
-                } else if (fits(shapes()[static_cast<std::size_t>(cb)], cb, max_abs[g][bi])) {
-                    c = band_cost(q, cb);
-                }
-                cost[bi][static_cast<std::size_t>(cb)] = c;
+            price_band(std::span<const std::int32_t>(t.q).subspan(begin, end - begin), max_abs[g][bi], prices,
+                       cost[bi]);
+        }
+        // Per codebook, over the bands in order: prefix[cb][b] the cost of
+        // bands [0, b) (the unpriced ones count nothing), and lowest[cb][e]
+        // the first band from which a section of cb can run up to e, -1 where
+        // band e - 1 is not priced.
+        std::vector<std::size_t>& prefix = scratch.prefix;
+        std::vector<int>& lowest = scratch.lowest;
+        std::vector<std::size_t>& ahead = scratch.ahead;
+        std::vector<std::size_t>& header = scratch.header;
+        prefix.resize(kCodebooks * stride);
+        lowest.resize(kCodebooks * stride);
+        ahead.resize(kCodebooks * stride);
+        header.resize(stride);
+        for (std::size_t len = 1; len < stride; ++len) {
+            header[len] = section_header_bits(static_cast<int>(len), width);
+        }
+        for (std::size_t cb = 0; cb < kCodebooks; ++cb) {
+            std::size_t* p = prefix.data() + cb * stride;
+            int* low = lowest.data() + cb * stride;
+            p[0] = 0;
+            low[0] = -1;
+            for (std::size_t b = 0; b < count; ++b) {
+                const std::size_t c = cost[b][cb];
+                const bool priced = c < kNever;
+                p[b + 1] = p[b] + (priced ? c : 0);
+                low[b + 1] = !priced ? -1 : (low[b] >= 0 ? low[b] : static_cast<int>(b));
             }
         }
         // best[b]: the cheapest coding of bands [0, b); from[b] and book[b]
         // say where its last section started and which codebook it took.
-        std::vector<std::size_t> best(static_cast<std::size_t>(bands) + 1, kNever);
-        std::vector<int> from(static_cast<std::size_t>(bands) + 1, 0);
-        std::vector<int> book(static_cast<std::size_t>(bands) + 1, 0);
+        // A section [start, end) in cb costs best[start] + prefix[end] -
+        // prefix[start] + header, so ahead[cb][start] holds the part that
+        // does not depend on end. The candidates are met in the same order as
+        // ever (end, then cb, then start downwards, a later one winning only
+        // by being cheaper) so the same ones win ties.
+        std::vector<std::size_t>& best = scratch.best;
+        std::vector<int>& from = scratch.from;
+        std::vector<int>& book = scratch.book;
+        best.assign(stride, kNever);
+        from.assign(stride, 0);
+        book.assign(stride, 0);
         best[0] = 0;
-        for (int end = 1; end <= bands; ++end) {
-            for (int cb = 0; cb < kCodebooks; ++cb) {
-                std::size_t run = 0;
-                for (int start = end - 1; start >= 0; --start) {
-                    const std::size_t c = cost[static_cast<std::size_t>(start)][static_cast<std::size_t>(cb)];
-                    if (c >= kNever) {
-                        break;
-                    }
-                    run += c;
-                    const std::size_t total =
-                        best[static_cast<std::size_t>(start)] + run + section_header_bits(end - start, width);
-                    if (total < best[static_cast<std::size_t>(end)]) {
-                        best[static_cast<std::size_t>(end)] = total;
-                        from[static_cast<std::size_t>(end)] = start;
-                        book[static_cast<std::size_t>(end)] = cb;
+        for (std::size_t end = 1; end <= count; ++end) {
+            for (std::size_t cb = 0; cb < kCodebooks; ++cb) {
+                ahead[cb * stride + end - 1] = best[end - 1] - prefix[cb * stride + end - 1];
+            }
+            std::size_t cheapest = kNever;
+            int cheapest_start = 0;
+            int cheapest_book = 0;
+            for (std::size_t cb = 0; cb < kCodebooks; ++cb) {
+                const int earliest = lowest[cb * stride + end];
+                if (earliest < 0) {
+                    continue;
+                }
+                const std::size_t at_end = prefix[cb * stride + end];
+                const std::size_t* before = ahead.data() + cb * stride;
+                for (std::size_t start = end; start-- > static_cast<std::size_t>(earliest);) {
+                    const std::size_t total = before[start] + at_end + header[end - start];
+                    if (total < cheapest) {
+                        cheapest = total;
+                        cheapest_start = static_cast<int>(start);
+                        cheapest_book = static_cast<int>(cb);
                     }
                 }
             }
+            best[end] = cheapest;
+            from[end] = cheapest_start;
+            book[end] = cheapest_book;
         }
         std::vector<Section> sections;
         for (int end = bands; end > 0; end = from[static_cast<std::size_t>(end)]) {
             sections.push_back(Section{book[static_cast<std::size_t>(end)], from[static_cast<std::size_t>(end)], end});
         }
         std::reverse(sections.begin(), sections.end());
-        t.cb[g].assign(static_cast<std::size_t>(bands), 0);
+        t.cb[g].assign(count, 0);
         for (const Section& section : sections) {
             t.section_bits += section_header_bits(section.end - section.start, width);
             for (int b = section.start; b < section.end; ++b) {
