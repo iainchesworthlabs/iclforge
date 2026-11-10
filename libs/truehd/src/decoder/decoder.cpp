@@ -128,6 +128,51 @@ struct SubstreamState {
     bool noise_filled = false;  // `noise_buffer` holds this access unit's values
 };
 
+template <typename T>
+void reinit(T& member) noexcept {
+    std::destroy_at(&member);
+    std::construct_at(&member);
+}
+
+// What a restart makes of a substream's state: everything as a new SubstreamState has it, but the
+// filter histories, which stay (`carry_history`) or are cleared. In place, with no temporary.
+void reset_for_restart(SubstreamState& state, bool carry_history) noexcept {
+    state.running = false;
+    state.block_header_first_bit = 0;
+    state.block_header_end_bit = 0;
+    reinit(state.restart);
+    reinit(state.context);
+    reinit(state.object_last);
+    state.object_have = false;
+    state.block_size = kDefaultBlockSize;
+    state.matrix_count = 0;
+    reinit(state.matrices);
+    reinit(state.output_shift);
+    reinit(state.output_source);
+    reinit(state.quant_step);
+    for (ChannelState& channel : state.channels) {
+        reinit(channel.fir);
+        reinit(channel.iir);
+        channel.huff_offset = 0;
+        channel.huff_type = 0;
+        channel.huff_lsbs = kMaxHuffLsbs;
+        if (!carry_history) {
+            reinit(channel.fir_history);
+            reinit(channel.iir_history);
+        }
+    }
+    state.interval_fold = 0;
+    state.object_updates = 0;
+    state.peak_coded = 0;
+    state.peak_bed = 0;
+    state.peak_out = 0;
+    reinit(state.column_fold);
+    state.interval_open = false;
+    state.noise_seed = 0;
+    reinit(state.noise_buffer);
+    state.noise_filled = false;
+}
+
 struct SegmentResult {
     bool waiting = false;
     int samples = 0;
@@ -199,6 +244,7 @@ struct Decoder::Impl {
     std::vector<std::byte> extra_data;
     std::vector<Channel> layout_eight;  // the channels of the major sync's eight-channel assignment
     std::vector<Channel> layout_six;    // ... of its six-channel assignment
+    BlockHeaderSpec header_scratch;     // the block header being read (kilobytes: not a local)
 
     [[nodiscard]] bool strict() const noexcept { return config.strictness == Strictness::kStrict; }
 
@@ -415,18 +461,13 @@ std::expected<void, Error> Decoder::Impl::begin_restart(int index, SubstreamStat
     // residuals of its IIR filter across it, so a stream whose first block after a restart is
     // filtered decodes to FFmpeg's samples only if this decoder does the same. A substream that was
     // not running (the first restart, or the first after an error) starts from zero.
-    // The new state is built on the heap, with the histories copied across, and moved in: a
-    // SubstreamState on the stack, and a copy of the old channels beside it, took 31 KB of it
-    // (PREfast's C6262, alerts 9861 and 9862).
+    // The state is rebuilt where it stands, member by member, the histories left in place or
+    // cleared: a SubstreamState on the stack, and a copy of the old channels beside it, took 31 KB
+    // of it (PREfast's C6262, alerts 9861 and 9862), and one on the heap was an allocation in every
+    // restart of a stream that is otherwise allocation free. reset_for_restart lists every member
+    // of SubstreamState: a member added to it must be added there too.
     const bool carry_history = state.running && !config.readings.zero_histories_at_restart;
-    auto fresh = std::make_unique<SubstreamState>();
-    if (carry_history) {
-        for (std::size_t c = 0; c < kMaxChannels; ++c) {
-            fresh->channels[c].fir_history = state.channels[c].fir_history;
-            fresh->channels[c].iir_history = state.channels[c].iir_history;
-        }
-    }
-    state = *fresh;
+    reset_for_restart(state, carry_history);
     state.running = true;
     state.restart = *header;
     state.output_source = output_source;
@@ -689,7 +730,9 @@ std::expected<void, Error> Decoder::Impl::decode_block(int index, SubstreamState
     }
 
     // The residuals, and the bits that put back the LSBs a matrix dropped.
-    std::array<std::uint64_t, kMaxBlockSize> bypass{};
+    // Not cleared: read_residuals sets the entry of every sample of the block, and nothing reads
+    // them before it has.
+    std::array<std::uint64_t, kMaxBlockSize> bypass;
     {
         ICLFORGE_ZONE_SCOPED_N("truehd_residuals");
         if (!kernels::read_residuals(reader, block, min_chan, max_chan, plans.data(), bypass_count,
@@ -972,7 +1015,9 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
     SegmentResult result;
     bool first_block = true;
     unsigned blocks_in_segment = 0;  // blocks of this segment read so far (for the block header log)
-    std::string segment_trace;  // lab: where each block of the segment starts and ends
+    // Lab: where each block of the object substream's segment starts and ends. Built for that
+    // substream alone (its error context is the only reader), so that the others allocate nothing.
+    std::string segment_trace;
     state.noise_filled = false;
     while (true) {
         bool block_header = false;  // lab: what this block's header carried
@@ -999,10 +1044,15 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
             state.context.object_previous = state.object_have ? &state.object_last : nullptr;
             const std::size_t header_start = reader.bit_position();
             state.block_header_first_bit = header_start;
-            segment_trace += "[block starts at " + std::to_string(header_start) + "]";
-            auto header = read_block_header(reader, state.context);
+            if (index == kObjectSubstream) {
+                segment_trace += "[block starts at " + std::to_string(header_start) + "]";
+            }
+            // Read into the decoder's one header: a value returned from the reader and copied on
+            // was several kilobytes moved for each block.
+            auto read = read_block_header_into(reader, state.context, header_scratch);
+            const BlockHeaderSpec* const header = &header_scratch;
             state.block_header_end_bit = reader.bit_position();
-            if (!header) {
+            if (!read) {
                 if (index == kObjectSubstream && counters.object_error_context.empty()) {
                     // Lab: where in the segment the object block header failed, and the state it
                     // was read against (counts and widths only).
@@ -1020,13 +1070,13 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
                         }
                     }
                     text += ", error \"";
-                    text.append(header.error().detail);
+                    text.append(read.error().detail);
                     text += "\"; blocks of the segment: ";
                     text += segment_trace;
                     counters.object_error_context = std::move(text);
                 }
                 state.running = false;
-                return std::unexpected(header.error());
+                return std::unexpected(read.error());
             }
             if (header->matrices && state.context.object_matrices) {
                 state.object_last = *header->matrices;
@@ -1181,8 +1231,10 @@ std::expected<SegmentResult, Error> Decoder::Impl::decode_segment(
         }
         const std::size_t data_end = reader.bit_position();
         const bool last = reader.read(1) != 0;
-        segment_trace += " size " + std::to_string(state.block_size) + " data ends " +
-                         std::to_string(data_end) + (last ? " last" : " not last") + ";";
+        if (index == kObjectSubstream) {
+            segment_trace += " size " + std::to_string(state.block_size) + " data ends " +
+                             std::to_string(data_end) + (last ? " last" : " not last") + ";";
+        }
         if (reader.overflowed()) {
             state.running = false;
             return std::unexpected(

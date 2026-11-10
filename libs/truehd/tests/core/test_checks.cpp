@@ -2,6 +2,10 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <random>
+#include <span>
 #include <vector>
 
 #include "iclforge/truehd/core/crc.hpp"
@@ -19,7 +23,124 @@ std::vector<std::byte> bytes_of(std::initializer_list<unsigned> values) {
     return out;
 }
 
+// The checks as they were before they took several bytes a step: the byte loop for the parity and the
+// CRC-8 (polynomial 0x63, initial value 0x3C) one bit at a time, which needs no table to be right.
+std::uint8_t reference_parity(std::span<const std::byte> payload) {
+    std::uint8_t xor_all = 0;
+    for (const std::byte b : payload) {
+        xor_all ^= static_cast<std::uint8_t>(b);
+    }
+    return static_cast<std::uint8_t>(xor_all ^ 0xA9U);
+}
+
+std::uint8_t reference_crc(std::span<const std::byte> payload) {
+    if (payload.empty()) {
+        return 0;
+    }
+    std::uint8_t reg = 0x3C;
+    for (std::size_t i = 0; i + 1 < payload.size(); ++i) {
+        reg = static_cast<std::uint8_t>(reg ^ static_cast<std::uint8_t>(payload[i]));
+        for (int bit = 0; bit < 8; ++bit) {
+            reg = (reg & 0x80U) != 0 ? static_cast<std::uint8_t>((reg << 1U) ^ 0x63U)
+                                     : static_cast<std::uint8_t>(reg << 1U);
+        }
+    }
+    return static_cast<std::uint8_t>(reg ^ static_cast<std::uint8_t>(payload.back()));
+}
+
+// Pseudo-random buffers (a fixed seed) of every length 0 to 64 and some long ones, each taken at
+// every offset 0 to 15 of a buffer, so that the words and the steps of the check meet every
+// alignment and every remainder. `check` is given the span.
+template <typename Check>
+void for_each_random_span(Check&& check) {
+    std::mt19937 rng(0x7D1C0DE5U);
+    constexpr std::size_t kPad = 16;
+    const std::size_t lengths[] = {65, 100, 127, 128, 129, 255, 256, 257, 500, 1000, 1023, 1024, 4093};
+    std::vector<std::size_t> all;
+    for (std::size_t n = 0; n <= 64; ++n) {
+        all.push_back(n);
+    }
+    all.insert(all.end(), std::begin(lengths), std::end(lengths));
+    std::vector<std::byte> buffer;
+    for (const std::size_t n : all) {
+        for (int round = 0; round < 6; ++round) {
+            buffer.resize(n + kPad);
+            for (std::byte& b : buffer) {
+                // Round 0 is all ones and round 1 all zeros: the extremes of a register.
+                b = static_cast<std::byte>(round == 0 ? 0xFFU : (round == 1 ? 0U : rng() & 0xFFU));
+            }
+            for (std::size_t offset = 0; offset < kPad; ++offset) {
+                check(std::span<const std::byte>(buffer).subspan(offset, n));
+            }
+        }
+    }
+}
+
 }  // namespace
+
+TEST_CASE("the word-wise substream parity matches the byte loop", "[truehd][checks]") {
+    std::size_t spans = 0;
+    for_each_random_span([&](std::span<const std::byte> payload) {
+        ++spans;
+        REQUIRE(substream_parity(payload) == reference_parity(payload));
+    });
+    CHECK(spans > 5000);
+}
+
+TEST_CASE("the byte-wise block header CRC matches the bit-by-bit CRC", "[truehd][checks]") {
+    // The register as it was: one bit at a time, a bit past the data reading as zero.
+    const auto reference = [](std::span<const std::byte> data, std::size_t first_bit,
+                              std::size_t end_bit) {
+        std::uint8_t reg = 0xA2;
+        for (std::size_t bit = first_bit; bit < end_bit; ++bit) {
+            const std::size_t byte = bit >> 3U;
+            const unsigned in =
+                byte < data.size()
+                    ? (std::to_integer<unsigned>(data[byte]) >> (7U - (bit & 7U))) & 1U
+                    : 0U;
+            const bool top = (reg & 0x80U) != 0;
+            reg = static_cast<std::uint8_t>((reg << 1U) | in);
+            if (top) {
+                reg ^= 0x1DU;
+            }
+        }
+        return reg;
+    };
+    std::mt19937 rng(0x5EED0001U);
+    std::size_t cases = 0;
+    for (std::size_t size = 0; size <= 40; ++size) {
+        std::vector<std::byte> data(size);
+        for (std::byte& b : data) {
+            b = static_cast<std::byte>(rng() & 0xFFU);
+        }
+        // Every start in the first two bytes, and ends from before the start to past the data.
+        for (std::size_t first = 0; first < 17; ++first) {
+            for (std::size_t end = 0; end <= size * 8 + 17; ++end) {
+                ++cases;
+                REQUIRE(block_header_crc(data, first, end) == reference(data, first, end));
+            }
+        }
+    }
+    CHECK(cases > 10000);
+    // Long ones, from an odd bit.
+    std::vector<std::byte> longer(3000);
+    for (std::byte& b : longer) {
+        b = static_cast<std::byte>(rng() & 0xFFU);
+    }
+    for (std::size_t first : {0U, 3U, 7U, 8U, 13U}) {
+        REQUIRE(block_header_crc(longer, first, longer.size() * 8 - 5) ==
+                reference(longer, first, longer.size() * 8 - 5));
+    }
+}
+
+TEST_CASE("the multi-byte substream CRC matches the bit-by-bit CRC", "[truehd][checks]") {
+    std::size_t spans = 0;
+    for_each_random_span([&](std::span<const std::byte> payload) {
+        ++spans;
+        REQUIRE(substream_crc(payload) == reference_crc(payload));
+    });
+    CHECK(spans > 5000);
+}
 
 TEST_CASE("the substream parity is the XOR of the payload with 0xA9", "[truehd][checks]") {
     CHECK(substream_parity(bytes_of({})) == 0xA9);
