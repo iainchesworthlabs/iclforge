@@ -443,7 +443,10 @@
       // 120, not the 90 the other legs get: the first run after a stage that rewrites most
       // sources starts with a cold compiler cache, and this leg reached the limit inside its
       // packaging step (91 minutes; the build, the tests and the gold-reference gate had passed).
-      "timeout_minutes": 120
+      // 240 for a release: on the 2026-11-10 tag run the build alone took 96 minutes on a cold
+      // cache and only 964 of 5,715 tests had run when the 120 ran out. A hosted job may run for
+      // six hours, and the universal macOS package, and with it Darwin.dmg, waits on this leg.
+      "timeout_minutes": 240
     }
   ]
 }
