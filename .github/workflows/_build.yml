@@ -517,12 +517,24 @@ jobs:
               continue
             fi
             if lipo -info "$a" >/dev/null 2>&1 && lipo -info "$x" >/dev/null 2>&1; then
-              if [ "$(lipo -archs "$a")" = "$(lipo -archs "$x")" ] && cmp -s "$a" "$x"; then
-                # The same Mach-O file in both installs, so there is nothing to merge and lipo
-                # refuses ("have the same architectures"). Qt ships libworkerscriptplugin.dylib
-                # for x86_64 only, in the arm64 install too; the app uses no WorkerScript. It is
-                # already in merged/ from the rsync baseline above, byte for byte.
-                echo "::warning::$rel is the same $(lipo -archs "$a") file in both installs - left unmerged"
+              if [ "$(lipo -archs "$a")" = "$(lipo -archs "$x")" ]; then
+                # Two Mach-O files of the SAME architectures cannot be merged: lipo refuses
+                # ("have the same architectures"). Qt ships libworkerscriptplugin.dylib for
+                # x86_64 only, and it is in the arm64 install too; the app uses no WorkerScript.
+                # Each install is ad-hoc code-signed on its own, so the two copies differ in their
+                # signature bytes even when the code is the same, and a byte comparison says
+                # nothing. The x64 copy is already in merged/ from the rsync baseline above and
+                # stays; whether the code differs once the signatures are removed is reported.
+                sa="$(mktemp)"; sx="$(mktemp)"
+                cp "$a" "$sa"; cp "$x" "$sx"
+                codesign --remove-signature "$sa" >/dev/null 2>&1 || true
+                codesign --remove-signature "$sx" >/dev/null 2>&1 || true
+                if cmp -s "$sa" "$sx"; then
+                  echo "::warning::$rel is the same $(lipo -archs "$a") code in both installs - left unmerged (the x64 copy is kept)"
+                else
+                  echo "::warning::$rel is $(lipo -archs "$a") only in both installs and its code DIFFERS between them - the x64 copy is kept; nothing of this architecture can be merged"
+                fi
+                rm -f "$sa" "$sx"
               else
                 lipo -create "$a" "$x" -output "$m"
               fi
@@ -804,7 +816,10 @@ jobs:
     # unlike that matrix, this is the one Linux leg that pins an
     # OLDER base on purpose.
     container: ubuntu:22.04
-    timeout-minutes: 90
+    # 150, not 90: this leg builds the whole tree and runs every test on a hosted runner. It took
+    # 47 and 75 minutes on the first two v0.11.0-beta.1 tag runs and was cancelled at 90 on the
+    # third, 80 minutes into the build, with 985 of 5,781 tests run.
+    timeout-minutes: 150
 
     steps:
       # Same reasoning as _ci-linux.yml's "Bootstrap container"
