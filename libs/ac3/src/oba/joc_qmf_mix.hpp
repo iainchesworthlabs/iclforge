@@ -54,9 +54,9 @@ using Rows = std::array<std::array<double, dsp::kQmfSubbands>, kNumChannels5X>;
 }
 
 // x / divisor in each lane: a division, not a multiplication by the reciprocal, which rounds
-// differently. The seam has no vector division, so this is two scalar ones.
+// differently.
 [[nodiscard]] inline Lane2 divide(Lane2 x, double divisor) noexcept {
-    return Lane2::set(x.lane0() / divisor, x.lane1() / divisor);
+    return x / Lane2::broadcast(divisor);
 }
 
 // The delayed tail: older + tail_frac * (previous - older). With no stored snapshot the

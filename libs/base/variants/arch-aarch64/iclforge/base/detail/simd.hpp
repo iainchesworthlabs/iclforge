@@ -52,6 +52,7 @@ struct f64x2 {
 [[nodiscard]] inline f64x2 operator+(f64x2 a, f64x2 b) { return f64x2{vaddq_f64(a.v, b.v)}; }
 [[nodiscard]] inline f64x2 operator-(f64x2 a, f64x2 b) { return f64x2{vsubq_f64(a.v, b.v)}; }
 [[nodiscard]] inline f64x2 operator*(f64x2 a, f64x2 b) { return f64x2{vmulq_f64(a.v, b.v)}; }
+[[nodiscard]] inline f64x2 operator/(f64x2 a, f64x2 b) { return f64x2{vdivq_f64(a.v, b.v)}; }
 [[nodiscard]] inline f64x2 operator-(f64x2 a) { return f64x2{vnegq_f64(a.v)}; }
 
 // FRINTA: "round to integral, to nearest with ties away from zero" - the
