@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <span>
 
 #include "iclforge/ac3/core/exponents.hpp"
@@ -112,6 +113,10 @@ struct ExponentRunInput {
 // costs a D45 set - whose groups are four bins apart - four times the ground a
 // D15 set gives up over the same span. Modelling the grouping alone makes the
 // coarse strategies look nearly free, and they are not.
+//
+// This is the whole-spectrum statement of the model. The planner itself builds
+// only the groups its coded bins read (limited_group_exponents below), and the
+// tests hold the two to each other.
 inline void banded_run_exponents(std::span<const std::uint8_t> run_min, ExpStrategy strategy,
                                  bool coupling, std::span<std::uint8_t> out) {
     const auto bins = static_cast<int>(run_min.size());
@@ -157,6 +162,129 @@ inline void banded_run_exponents(std::span<const std::uint8_t> run_min, ExpStrat
     }
 }
 
+// How far one group's exponent can reach through §8.2.10's +-2 limiter. A
+// limited exponent is the smaller of its own group's minimum and every other
+// group's minimum plus twice the distance to it; no group minimum exceeds
+// kMaxExponent, so a group 12 or more away adds at least 24 and never wins.
+inline constexpr int kLimiterReach = (kMaxExponent - 1) / 2;
+
+// banded_run_exponents' arithmetic for the groups the planner reads, and no
+// more: the limited exponent of group i (pre[0] is the transmitted absolute
+// exponent or coupling reference, pre[1 + n] the n-th group, as there), for
+// every group up to `needed` inclusive. `needed` is the last group any coded
+// bin falls in, so what lies beyond it, and beyond the limiter's reach of it,
+// is neither grouped nor limited. The result at every group <= needed is the
+// one banded_run_exponents gives; groups past it are not written.
+//
+// The template parameter is log2 of the group size (D15, D25, D45 = 0, 1, 2).
+template <int Shift>
+inline void limited_group_exponents(const std::uint8_t* run_min, int bins, bool coupling,
+                                    int needed, std::uint8_t* pre) {
+    constexpr int group = 1 << Shift;
+    const int first = coupling ? 0 : 1;
+    const int real_diffs = (bins - first + group - 1) >> Shift;
+    const int top = std::min(real_diffs, needed + kLimiterReach);
+    const int full = (bins - first) >> Shift;  // groups with all `group` bins inside
+    // The minimum of group i (1-based) when every bin of it is inside.
+    const auto group_min = [&](int i) {
+        const std::uint8_t* p = run_min + first + ((i - 1) << Shift);
+        if constexpr (Shift == 0) {
+            return static_cast<int>(p[0]);
+        } else if constexpr (Shift == 1) {
+            return static_cast<int>(std::min(p[0], p[1]));
+        } else {
+            return static_cast<int>(std::min(std::min(p[0], p[1]), std::min(p[2], p[3])));
+        }
+    };
+    const auto tail_min = [&](int i) {  // the last group, when it is cut short
+        int value = kMaxExponent;
+        for (int bin = first + ((i - 1) << Shift); bin < bins; ++bin) {
+            value = std::min(value, static_cast<int>(run_min[bin]));
+        }
+        return value;
+    };
+    int value = 0;
+    if (coupling) {
+        if (real_diffs > 0) {
+            const int group_one = full >= 1 ? group_min(1) : tail_min(1);
+            value = std::clamp(group_one & ~1, 0, kMaxExponent);
+        }
+    } else {
+        value = std::min<int>(run_min[0], kMaxAbsoluteExponent);
+    }
+    pre[0] = static_cast<std::uint8_t>(value);
+    // Forward: no group more than 2 above its predecessor.
+    const int body = std::min(top, full);
+    for (int i = 1; i <= body; ++i) {
+        value = std::min(group_min(i), value + 2);
+        pre[i] = static_cast<std::uint8_t>(value);
+    }
+    if (top > body) {
+        value = std::min(tail_min(top), value + 2);
+        pre[top] = static_cast<std::uint8_t>(value);
+    }
+    // Backward: no group more than 2 above its successor.
+    for (int i = top; i-- > 0;) {
+        value = std::min(static_cast<int>(pre[i]), value + 2);
+        pre[i] = static_cast<std::uint8_t>(value);
+    }
+    if (coupling && top > 0) {
+        pre[0] &= static_cast<std::uint8_t>(~1);  // the transmitted reference stays even
+    }
+}
+
+// Eight bytes at a time, with no instruction set behind it: the lane-wise
+// unsigned minimum of two words. Each lane's difference is taken without a
+// borrow crossing into its neighbour, and the borrow out of the top bit is
+// the "x is less than y" mask the select needs.
+[[nodiscard]] inline std::uint64_t min_of_bytes(std::uint64_t x, std::uint64_t y) {
+    constexpr std::uint64_t kHigh = 0x8080808080808080ULL;
+    const std::uint64_t diff = ((x | kHigh) - (y & ~kHigh)) ^ ((x ^ ~y) & kHigh);
+    const std::uint64_t below = ((~x & y) | (~(x ^ y) & diff)) & kHigh;
+    // 0xFF in every lane whose top bit is set: 0x100 - 0x01 per lane.
+    const std::uint64_t mask = (below << 1) - (below >> 7);
+    return (x & mask) | (y & ~mask);
+}
+
+// run_min[0, n) = the lane-wise minimum of itself and `row`; true when any
+// entry moved.
+inline bool lower_minimum(const std::uint8_t* row, std::uint8_t* run_min, int n) {
+    std::uint64_t moved = 0;
+    int i = 0;
+    for (; i + 8 <= n; i += 8) {
+        std::uint64_t held = 0;
+        std::uint64_t incoming = 0;
+        std::memcpy(&held, run_min + i, 8);
+        std::memcpy(&incoming, row + i, 8);
+        const std::uint64_t lowest = min_of_bytes(held, incoming);
+        moved |= held ^ lowest;
+        std::memcpy(run_min + i, &lowest, 8);
+    }
+    for (; i < n; ++i) {
+        if (row[i] < run_min[i]) {
+            run_min[i] = row[i];
+            moved = 1;
+        }
+    }
+    return moved != 0;
+}
+
+// One block's contribution to a run's waste over the bins [0, n): what each bin
+// gives up between its own exponent and the set exponent `held` that stands in
+// for it, bounded by the precision it was given. A bin with no precision has a
+// cap of 0 and adds nothing, so the sum can run straight along the bins - one
+// byte per bin, no list of which are coded, and a form compilers can run
+// several bins at a time.
+[[nodiscard]] inline int row_waste(const std::uint8_t* exps, const std::uint8_t* held,
+                                   const std::uint8_t* cap, int n) {
+    unsigned waste = 0;
+    for (int bin = 0; bin < n; ++bin) {
+        const auto lost = static_cast<std::uint8_t>(exps[bin] - held[bin]);
+        waste += lost < cap[bin] ? lost : cap[bin];
+    }
+    return static_cast<int>(waste);
+}
+
 // The best plan for one stream, by exhaustive dynamic programming over every
 // partition of its blocks and (where the frame form allows it) every strategy
 // for every run.
@@ -192,22 +320,36 @@ inline void banded_run_exponents(std::span<const std::uint8_t> run_min, ExpStrat
 // programme over the same candidate runs, differing only in which strategies
 // a run may take, so plan_exponent_runs_both scores both in one pass: each
 // candidate's exponent set and its waste are computed once and offered to
-// whichever form admits it. What each form is offered, and in what order, is
-// exactly what its own pass would have seen, so the plans are the plans the
-// separate passes found - the tie-breaking is the same strict comparison in
-// the same sequence.
+// whichever form admits it.
 //
-// Four things keep the pass short without changing its answer. A candidate's
-// waste is never negative, so a run whose exponent set alone already costs
-// as much as the best plan found for its end block cannot improve on it:
-// the set's cost is the lower bound, and a candidate below it is skipped
-// before its set is built. A bin allocated no precision loses none, so only
-// the coded bins are summed - at low rates a minority of them. A run's
-// banded set depends only on its per-bin minimum, so while extending the run
-// by a block moves no minimum the set stands, and the extended run's waste is
-// the waste so far plus the new block's row. And that row is summed along
-// the block's own exponents rather than bin by bin down a column, which is
-// the order they are laid out in.
+// The plan each form ends with is the cheapest, and among equally cheap ones
+// the one whose last run starts earliest (and, for the same start, the finer
+// strategy): exactly the plan a pass that tried every run in order of start
+// block, strategies finest first, and took a candidate only when it scored
+// strictly below the best so far would have kept. The runs are tried in the
+// opposite order here - by end block, nearest start first - and a candidate
+// that ties the best so far takes over when it starts earlier, which comes to
+// the same plan.
+//
+// Four things keep the pass short without changing its answer. A bin
+// allocated no precision loses none, so no sum runs past the last coded bin,
+// and a strategy's set is only built as far as that bin needs. A run's set
+// depends only on its per-bin minimum, so while extending the run by a block
+// moves no minimum the set stands, and the extended run's waste is the waste
+// so far plus the new block's row. The waste of a run is never less than
+//
+//   - its waste under a finer strategy (a coarser set is never higher: a
+//     group's exponent is at most each of its bins' minima, and limiting only
+//     lowers it), nor
+//   - the sum of the wastes of any two runs it splits into under the same
+//     strategy (each piece's minimum is at least the whole's, so the piece's
+//     blocks lose no more than they do in the whole),
+//
+// and both are known for something already scored; so is its set's cost, and
+// the two together bound a candidate's score from below before its set is
+// built. A candidate whose bound is already above the best for its end block
+// can neither win nor tie, and is skipped. Last, a block's row is summed along
+// its own exponents a byte at a time, which a compiler can do several at once.
 //
 // Complexity was blocks^2 * strategies passes over the bins per form - about
 // 32k operations for a 253-bin channel, twice per stream per frame.
@@ -237,79 +379,139 @@ struct ExponentRunPlans {
     hoisted.best[0] = 0;
     per_block.best[0] = 0;
 
-    // The bins whose waste can be non-zero: those allocated at least one bit
-    // of precision. A bin with none loses nothing whatever the set, so it is
-    // left out of every waste sum - and at low rates that is most of them.
-    std::array<std::uint16_t, 256> coded{};
-    std::size_t coded_count = 0;
+    // Each bin's precision cap: a bin allocated none (cap 0) loses nothing
+    // whatever the set, which is what lets the waste sums run along the bins
+    // without a list of the coded ones. The last coded bin bounds all the work:
+    // nothing past it is summed, and a strategy's set is only built as far as
+    // the group that bin falls in (plus the limiter's reach, see
+    // limited_group_exponents). At low rates that is a fraction of the bins.
     std::array<std::uint8_t, 256> cap{};
-    for (std::size_t bin = 0; bin < bins; ++bin) {
-        const int c = in.precision.empty() ? kMaxExponent : in.precision[bin];
+    int coded_end = 0;  // one past the last coded bin
+    for (int bin = 0; bin < in.bins; ++bin) {
+        const int c =
+            in.precision.empty() ? kMaxExponent : in.precision[static_cast<std::size_t>(bin)];
         if (c > 0) {
-            coded[coded_count++] = static_cast<std::uint16_t>(bin);
-            cap[bin] = static_cast<std::uint8_t>(c);
+            cap[static_cast<std::size_t>(bin)] = static_cast<std::uint8_t>(c);
+            coded_end = bin + 1;
         }
     }
-    // One block's contribution to a run's waste under a banded set.
-    const auto row_waste = [&](int blk, const std::array<std::uint8_t, 256>& banded) {
-        const auto exps = in.exps.subspan(static_cast<std::size_t>(blk) * bins, bins);
-        int waste = 0;
-        for (std::size_t i = 0; i < coded_count; ++i) {
-            const std::size_t bin = coded[i];
-            waste += std::min(static_cast<int>(exps[bin]) - banded[bin], static_cast<int>(cap[bin]));
+    // Strategy k's group size is 1 << k. Bin b falls in group
+    // (b + (1 << k) - first) >> k, so the last group anything is read from is:
+    static_assert(exponent_group_size(ExpStrategy::kD15) == 1 &&
+                  exponent_group_size(ExpStrategy::kD25) == 2 &&
+                  exponent_group_size(ExpStrategy::kD45) == 4);
+    const int first_bin = in.coupling ? 0 : 1;
+    std::array<int, 3> needed_groups{};
+    // How many bins of run_min the sets need: the planner keeps the running
+    // minimum no further than the longest of them reaches.
+    int min_end = 0;
+    for (int k = 0; k < 3; ++k) {
+        const int group = 1 << k;
+        needed_groups[static_cast<std::size_t>(k)] =
+            coded_end == 0 ? -1 : (coded_end - 1 + group - first_bin) >> k;
+        if (coded_end > 0) {
+            const int real_diffs = (in.bins - first_bin + group - 1) >> k;
+            const int top = std::min(
+                real_diffs, needed_groups[static_cast<std::size_t>(k)] + kLimiterReach);
+            min_end = std::max(min_end, std::min(in.bins, first_bin + top * group));
         }
-        return waste;
-    };
+    }
 
     std::array<std::uint8_t, 256> run_min{};
-    // Per strategy, the banded set and the waste for the run as it stood the
-    // last time the strategy was scored from this start block: banded
-    // depends only on run_min, so while the minimum has not moved it holds,
-    // and the waste of the extended run is the waste so far plus the new
-    // rows. `covered` is how many blocks from `a` the cached waste spans.
+    // The group exponents of whichever strategy is being built, before they
+    // are laid out along the bins.
+    std::array<std::uint8_t, 264> groups{};
+    // Per strategy, the set laid out along the bins (held[bin] is the
+    // exponent bin `bin` is transmitted at) and the waste for the run as it
+    // stood the last time the strategy was scored for this end block: the
+    // set depends only on run_min, so while the minimum has not moved it
+    // holds, and the waste of the run extended by a block in front is the
+    // waste so far plus that block's row. The cached waste spans the blocks
+    // [covered_from, b). held starts 8 bytes in so D15's coupling form, whose
+    // groups sit one before the bins they cover, can be built in place.
     struct StrategyCache {
-        std::array<std::uint8_t, 256> banded{};
+        std::array<std::uint8_t, 8 + 256 + 8> storage{};
         long long waste = 0;
-        int covered = 0;
+        int covered_from = 0;
         bool valid = false;
     };
     std::array<StrategyCache, 3> cache{};
-
-    for (int a = 0; a < blocks; ++a) {
-        const auto ua = static_cast<std::size_t>(a);
-        const bool hoisted_open = hoisted.best[ua] < kUnreachable;
-        const bool per_block_open = per_block.best[ua] < kUnreachable;
-        if (!hoisted_open && !per_block_open) {
-            continue;
+    // Build strategy k's set for the current run_min into its cache entry.
+    const auto build_set = [&](std::size_t k, StrategyCache& c) {
+        const int needed = needed_groups[k];
+        if (needed < 0) {
+            return;  // nothing is coded: no waste to measure
         }
-        for (std::size_t bin = 0; bin < bins; ++bin) {
-            run_min[bin] = kMaxExponent;
+        std::uint8_t* held = c.storage.data() + 8;
+        if (k == 0) {
+            // One group per bin: the groups ARE the bins, shifted by one for a
+            // coupling channel (whose reference sits before bin 0).
+            limited_group_exponents<0>(run_min.data(), in.bins, in.coupling, needed,
+                                       in.coupling ? held - 1 : held);
+            return;
+        }
+        // D25 / D45: build the groups, then repeat each across its bins. The
+        // last group may reach a little past the bins; the storage has room.
+        const int group = 1 << k;
+        std::uint8_t* pre = groups.data();
+        if (k == 1) {
+            limited_group_exponents<1>(run_min.data(), in.bins, in.coupling, needed, pre);
+        } else {
+            limited_group_exponents<2>(run_min.data(), in.bins, in.coupling, needed, pre);
+        }
+        int bin = 0;
+        if (!in.coupling) {
+            held[0] = pre[0];  // the absolute exponent is bin 0's own
+            bin = 1;
+        }
+        for (int g = 1; g <= needed; ++g, bin += group) {
+            if (k == 1) {
+                const auto pair = static_cast<std::uint16_t>(pre[g] * 0x0101U);
+                std::memcpy(held + bin, &pair, sizeof pair);
+            } else {
+                const std::uint32_t quad = pre[g] * 0x01010101U;
+                std::memcpy(held + bin, &quad, sizeof quad);
+            }
+        }
+    };
+
+    // The waste of every run [a, b) under strategy k, as far as it is known:
+    // exact where the candidate was scored, a lower bound where it was
+    // skipped, 0 where nothing is known. A waste is at most 6 blocks * 256
+    // bins * 24 steps, so 16 bits hold it.
+    std::array<std::array<std::array<std::uint16_t, 3>, kMaxPlanBlocks + 1>, kMaxPlanBlocks + 1>
+        known{};
+
+    // Runs are scored by their END block, nearest start first: best[b] is
+    // final before any run starting at b is scored, and a run that starts
+    // earlier is the previous run with one more block in front.
+    for (int b = 1; b <= blocks; ++b) {
+        const auto ub = static_cast<std::size_t>(b);
+        for (int bin = 0; bin < min_end; ++bin) {
+            run_min[static_cast<std::size_t>(bin)] = kMaxExponent;
         }
         for (auto& c : cache) {
             c.valid = false;
         }
-        for (int b = a + 1; b <= blocks; ++b) {
-            const auto ub = static_cast<std::size_t>(b);
-            // Extend the run to cover block b - 1, noting whether any bin's
-            // minimum moved (then every cached set is stale).
-            const auto row = in.exps.subspan(static_cast<std::size_t>(b - 1) * bins, bins);
-            bool moved = false;
-            for (std::size_t bin = 0; bin < bins; ++bin) {
-                if (row[bin] < run_min[bin]) {
-                    run_min[bin] = row[bin];
-                    moved = true;
-                }
+        for (int a = b - 1; a >= 0; --a) {
+            const auto ua = static_cast<std::size_t>(a);
+            // A forced boundary inside the run rules it out, and every longer
+            // run too.
+            if (a < b - 1 && in.boundary[ua + 1]) {
+                break;
             }
-            if (moved) {
+            // Extend the run to cover block a, noting whether any bin's
+            // minimum moved (then every cached set is stale).
+            const std::uint8_t* row = in.exps.data() + ua * bins;
+            if (lower_minimum(row, run_min.data(), min_end)) {
                 for (auto& c : cache) {
                     c.valid = false;
                 }
             }
-            // A forced boundary inside the run rules it out - but only after
-            // the running minimum has been extended, so the next b still sees
-            // the right state.
-            if (b - 1 > a && in.boundary[static_cast<std::size_t>(b - 1)]) {
-                break;
+            const bool hoisted_open = hoisted.best[ua] < kUnreachable;
+            const bool per_block_open = per_block.best[ua] < kUnreachable;
+            if (!hoisted_open && !per_block_open) {
+                continue;
             }
             const int span = b - a;
             const ExpStrategy fixed = strategy_for_span(span);
@@ -345,45 +547,55 @@ struct ExponentRunPlans {
                     ngrps = exponent_group_count(strategy, in.bins);
                 }
                 const long long set_cost = 4 + 7LL * ngrps;
-                // The lower bound: with no waste at all this candidate would
-                // score best[a] + set_cost, and it has to beat best[b]
-                // strictly to be taken.
+                // What the run's waste is at least: the same run under a
+                // finer strategy (its set is never coarser), and any two
+                // pieces of it scored apart (each piece's minimum is higher,
+                // so its blocks lose less than they do in the whole).
+                int least = k > 0 ? known[ua][ub][k - 1] : 0;
+                for (int m = a + 1; m < b; ++m) {
+                    least = std::max(least, known[ua][static_cast<std::size_t>(m)][k] +
+                                                known[static_cast<std::size_t>(m)][ub][k]);
+                }
+                // The lower bound: this candidate scores at least
+                // best[a] + least + set_cost. It is taken when that is below
+                // best[b], or equal to it: runs are scored nearest start
+                // first, and the plan wanted is the one with the earliest
+                // start among equals.
                 const bool hoisted_can_win =
-                    for_hoisted && hoisted.best[ua] + set_cost < hoisted.best[ub];
+                    for_hoisted && hoisted.best[ua] + least + set_cost <= hoisted.best[ub];
                 const bool per_block_can_win =
-                    for_per_block && per_block.best[ua] + set_cost < per_block.best[ub];
+                    for_per_block && per_block.best[ua] + least + set_cost <= per_block.best[ub];
                 if (!hoisted_can_win && !per_block_can_win) {
+                    known[ua][ub][k] = static_cast<std::uint16_t>(std::min(least, 0xFFFF));
                     continue;
                 }
                 StrategyCache& c = cache[k];
                 if (!c.valid) {
-                    banded_run_exponents(std::span{run_min}.first(bins), strategy, in.coupling,
-                                         std::span{c.banded}.first(bins));
+                    build_set(k, c);
                     c.waste = 0;
-                    c.covered = 0;
+                    c.covered_from = b;
                     c.valid = true;
                 }
-                for (int blk = a + c.covered; blk < b; ++blk) {
-                    c.waste += row_waste(blk, c.banded);
+                for (int blk = a; blk < c.covered_from; ++blk) {
+                    c.waste += row_waste(in.exps.data() + static_cast<std::size_t>(blk) * bins,
+                                         c.storage.data() + 8, cap.data(), coded_end);
                 }
-                c.covered = span;
+                c.covered_from = a;
                 const long long waste = c.waste;
-                if (hoisted_can_win) {
-                    const long long score = hoisted.best[ua] + waste + set_cost;
-                    if (score < hoisted.best[ub]) {
-                        hoisted.best[ub] = score;
-                        hoisted.from[ub] = a;
-                        hoisted.via[ub] = strategy;
+                known[ua][ub][k] = static_cast<std::uint16_t>(std::min<long long>(waste, 0xFFFF));
+                const auto offer = [&](Table& table, bool can_win) {
+                    if (!can_win) {
+                        return;
                     }
-                }
-                if (per_block_can_win) {
-                    const long long score = per_block.best[ua] + waste + set_cost;
-                    if (score < per_block.best[ub]) {
-                        per_block.best[ub] = score;
-                        per_block.from[ub] = a;
-                        per_block.via[ub] = strategy;
+                    const long long score = table.best[ua] + waste + set_cost;
+                    if (score < table.best[ub] || (score == table.best[ub] && a < table.from[ub])) {
+                        table.best[ub] = score;
+                        table.from[ub] = a;
+                        table.via[ub] = strategy;
                     }
-                }
+                };
+                offer(hoisted, hoisted_can_win);
+                offer(per_block, per_block_can_win);
             }
         }
     }
