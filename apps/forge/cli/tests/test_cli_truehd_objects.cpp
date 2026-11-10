@@ -318,6 +318,27 @@ TEST_CASE("truehd-render places the objects of substream 3 on the layout by thei
         moved = moved || gains[0][i] != gains[1][i];
     }
     CHECK(moved);
+
+    // The name 7.1 is the same eight speakers in another order (L C R Ls Rs Lrs Rrs LFE), so it is the
+    // same render with the channels in that order, not the layout renderer's panning.
+    const fs::path named_wav = dir / "render_named.wav";
+    REQUIRE(run_cli("decode " + input + " " + quoted(named_wav) +
+                        " truehd-presentation=all truehd-render=7.1",
+                    log) == 0);
+    CHECK(read_text(log).find("8 channel(s) (L C R Ls Rs Lrs Rrs LFE)") != std::string::npos);
+    const Pcm24 named = read_pcm24(named_wav);
+    REQUIRE(named.channels == 8);
+    REQUIRE(named.samples.size() == fed.samples.size());
+    constexpr std::array<std::size_t, 8> list_slot_of_named{0, 2, 1, 4, 5, 6, 7, 3};
+    std::size_t differing = 0;
+    for (std::size_t n = 0; n < frames; ++n) {
+        for (std::size_t slot = 0; slot < 8; ++slot) {
+            differing +=
+                named.samples[n * 8 + slot] != fed.samples[n * 8 + list_slot_of_named[slot]] ? 1U
+                                                                                             : 0U;
+        }
+    }
+    CHECK(differing == 0);
 }
 
 TEST_CASE("truehd-render is refused without the objects it places", "[forge-cli][truehd][atmos]") {
