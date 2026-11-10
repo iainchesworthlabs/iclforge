@@ -61,7 +61,7 @@ void write_sized(BitWriter& w, const BitWriter& element, unsigned bits, std::str
 void write_metadata(BitWriter& w, const AudioSubstreamFields& f) {
     w.write(1, 0, "b_more_basic_metadata");
     write_extended_metadata(w, f.ch_mode, f.dialogue);
-    BitWriter tools = BitWriter::buffered();
+    BitWriter tools = f.keep_records ? BitWriter::buffered() : BitWriter{};
     write_dialog_enhancement(tools, f.de_config, f.de, f.de_previous, f.iframe, f.ch_mode,
                              f.de_core, f.de_core_previous);
     write_sized(w, tools, 7, "tools_metadata_size_value", "tools_metadata_size");
@@ -73,8 +73,11 @@ void write_metadata(BitWriter& w, const AudioSubstreamFields& f) {
 }
 
 [[nodiscard]] std::size_t metadata_bytes(const AudioSubstreamFields& f) {
+    // Only its length is wanted: no records.
+    AudioSubstreamFields counted = f;
+    counted.keep_records = false;
     BitWriter w;
-    write_metadata(w, f);
+    write_metadata(w, counted);
     return w.byte_size();
 }
 
@@ -132,7 +135,8 @@ std::optional<BitWriter> write_audio_substream(const AudioSubstreamFields& field
         }
         audio_size = *fitted;
     }
-    BitWriter w = BitWriter::buffered();
+    BitWriter w = fields.keep_records ? BitWriter::buffered() : BitWriter{};
+    w.reserve(substream_bytes > 0 ? substream_bytes : needed + 16);
     w.write(15, audio_size & 0x7FFFU, "audio_size_value");
     const bool more = audio_size >= 0x8000;
     w.write(1, more ? 1U : 0U, "b_more_bits");

@@ -33,6 +33,10 @@ struct Grouped {
 [[nodiscard]] Grouped regroup(std::span<const double> spectrum, const FrameLayout& layout,
                               std::array<int, 2> max_sfb);
 
+// regroup() into `out` (all of it replaced, its capacity reused).
+void regroup_into(Grouped& out, std::span<const double> spectrum, const FrameLayout& layout,
+                  std::array<int, 2> max_sfb);
+
 // The scale factor bands of a transform length at 44.1 and 48 kHz (Annex B).
 [[nodiscard]] std::span<const std::uint16_t> band_offsets(int transform_length);
 
@@ -79,6 +83,56 @@ struct CodedTrack {
 // with no band that has energy, sends the escape and no noise.
 [[nodiscard]] CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
                                     const FrameLayout& layout, bool noise_fill = false);
+
+// The buffers the section search works in: one band's cost in every codebook,
+// the running sums over the bands, and the best division so far.
+struct CoderScratch {
+    std::vector<std::array<std::size_t, 12>> cost;
+    std::vector<std::size_t> prefix, ahead, header, best;
+    std::vector<int> lowest, from, book;
+};
+
+// code_track() with the storage kept between calls, so that a coder that has
+// coded a track of a size allocates nothing coding another: the rate loop asks
+// for a track's bit count many times a frame and needs only that, and the
+// track it settles on is written into storage the caller already holds. Not
+// for use from two threads at once; every result is what code_track() gives.
+class TrackCoder {
+   public:
+    // code_track(...).bits(), without building the CodedTrack.
+    [[nodiscard]] std::size_t bits(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
+                                   const FrameLayout& layout, bool noise_fill = false);
+
+    // code_track(...), into `out` (all of it replaced; its capacity reused).
+    void code(CodedTrack& out, const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
+              const FrameLayout& layout, bool noise_fill = false);
+
+   private:
+    friend CodedTrack code_track(const Grouped&, const std::vector<std::vector<int>>&, int, const FrameLayout&, bool);
+
+    // The track as flat arrays: the bands of every group in order, group g's
+    // from band_base_[g]. With `q_out` every quantised line goes there and the
+    // sections are kept, for fill(); without it only what the bit count takes
+    // is worked out.
+    void analyse(CoderScratch& search, std::vector<std::int32_t>* q_out, const Grouped& grouped,
+                 const std::vector<std::vector<int>>& sf, int offset, const FrameLayout& layout, bool noise_fill);
+    void plan_noise_fill(const Grouped& grouped);
+    void fill(CodedTrack& out, const Grouped& grouped, bool noise_fill) const;
+
+    std::vector<std::int32_t> band_q_;  // the band being priced, when no track is kept
+    std::vector<double> level_;         // per band, the level it has if it has energy (noise fill)
+    std::vector<std::size_t> band_base_;
+    std::vector<int> sf_, cb_, dpcm_;
+    std::vector<std::int32_t> peak_;
+    std::vector<Section> sections_;
+    std::vector<std::size_t> section_base_;
+    std::size_t section_bits_ = 0;
+    std::size_t spectral_bits_ = 0;
+    std::size_t scalefac_bits_ = 0;
+    std::size_t noise_bits_ = 0;
+    bool noise_fill_ = false;
+    CoderScratch search_;
+};
 
 // asf_transform_info() and asf_psy_info(0, 0) (Tables 37 and 38).
 void write_sf_info(BitWriter& w, const FrameLayout& layout, std::array<int, 2> max_sfb);

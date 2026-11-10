@@ -34,6 +34,12 @@
 
 namespace iclforge::ac4::detail {
 
+// The working vectors thresholds() fills in, for a caller to keep between
+// calls.
+struct PsychoScratch {
+    std::vector<double> masking, z, spread;
+};
+
 class Psychoacoustics {
    public:
     Psychoacoustics(int sample_rate_hz, int frame_length);
@@ -42,6 +48,11 @@ class Psychoacoustics {
     // all the group's windows.
     [[nodiscard]] std::vector<std::vector<double>> thresholds(const Grouped& grouped,
                                                               const FrameLayout& layout) const;
+
+    // The same into `out` (all of it replaced, its capacity reused), working
+    // in `scratch`.
+    void thresholds(const Grouped& grouped, const FrameLayout& layout, std::vector<std::vector<double>>& out,
+                    PsychoScratch& scratch) const;
 
    private:
     [[nodiscard]] double full_scale_line_energy(int transform_length) const noexcept;
@@ -56,5 +67,17 @@ class Psychoacoustics {
 // spread over a uniform error), comes to the band's allowed noise.
 [[nodiscard]] std::vector<std::vector<int>> scale_factors_for(const Grouped& grouped,
                                                               const std::vector<std::vector<double>>& allowed);
+
+// What scale_factors_for() takes of a track's lines, per group and band: the
+// sum of the square roots of their magnitudes. It depends on the lines alone,
+// so a caller that asks for scale factors again at other allowances (the rate
+// loop, at each step) can work it out once.
+void band_root_sums(const Grouped& grouped, std::vector<std::vector<double>>& roots);
+
+// scale_factors_for(grouped, allowed) given band_root_sums(grouped), into `sf`
+// (all of it replaced, its capacity reused).
+void scale_factors_into(std::vector<std::vector<int>>& sf, const Grouped& grouped,
+                        const std::vector<std::vector<double>>& roots,
+                        const std::vector<std::vector<double>>& allowed);
 
 }  // namespace iclforge::ac4::detail

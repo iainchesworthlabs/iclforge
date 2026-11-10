@@ -97,6 +97,7 @@ if(NOT BUILD_SHARED_LIBS)
         encoder/test_aspx.cpp
         encoder/test_multichannel.cpp
         encoder/test_presentations_race.cpp
+        encoder/test_track_coder.cpp
         encoder/test_writer.cpp
         # decoder/test_object_render.cpp's subject is the shared media code in apps/shared/media,
         # compiled in as source. It stays here, not in that code's own tests (C7-2), because it
