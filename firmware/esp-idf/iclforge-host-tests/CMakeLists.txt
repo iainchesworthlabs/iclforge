@@ -1,6 +1,6 @@
 # Host tests of the ESP-IDF component's (../iclforge) TrueHD path (a directory of its own, so that the
 # component archive tools/packaging/pack_esp_component.py makes carries none of it): burst_player.cpp and truehd_stream.cpp compiled
-# for the host over stand-ins for the part's kernel, heap and clock (shims/, shim_runtime.cpp), and
+# for the host over stand-ins for the part's kernel, heap and clock (shims/*.shim, shim_runtime.cpp), and
 # run as the Sendspin session drives them - chunks into the player's ring, a decode task, a sink that
 # keeps what it is written. Off unless ICLFORGE_BUILD_FIRMWARE_HOST_TESTS is on (Hearth, TrueHD and
 # the tests are needed, and it is one more leg of the build to hold).
@@ -21,6 +21,15 @@ set(ICLFORGE_FW_HOST_ALT_ROOT "" CACHE PATH
 set(ICLFORGE_FW_HOST_BASE_ROOT "" CACHE PATH
     "Another copy of firmware/esp-idf/iclforge to build the host bench against as iclforge-fw-host-bench-base")
 
+# The stand-ins for the part's headers (shims/*.shim), as the headers they stand in for, in the build
+# directory: a tracked header spelled freertos/FreeRTOS.h would be the one every firmware project's
+# include of it resolves to in tools/checks/check_layering.py.
+set(ICLFORGE_FW_HOST_SHIMS sdkconfig.h esp_timer.h esp_heap_caps.h freertos/FreeRTOS.h freertos/event_groups.h
+    freertos/idf_additions.h freertos/message_buffer.h freertos/task.h)
+foreach(_shim IN LISTS ICLFORGE_FW_HOST_SHIMS)
+    configure_file("${CMAKE_CURRENT_LIST_DIR}/shims/${_shim}.shim" "${CMAKE_CURRENT_BINARY_DIR}/shims/${_shim}" COPYONLY)
+endforeach()
+
 # The component's player, from the sources of the copy at `root`, as a library of its own: it is
 # written for the part's compiler and the part's warnings, so it is built without the project's.
 function(iclforge_fw_host_player target root)
@@ -31,7 +40,7 @@ function(iclforge_fw_host_player target root)
         "${root}/src/opus_stream_none.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/shim_runtime.cpp")
     target_include_directories(${target}
-        PUBLIC "${CMAKE_CURRENT_LIST_DIR}/shims" "${CMAKE_CURRENT_LIST_DIR}" "${root}/include" "${root}/src")
+        PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/shims" "${CMAKE_CURRENT_LIST_DIR}" "${root}/include" "${root}/src")
     target_link_libraries(${target}
         PUBLIC iclforge::device iclforge::render iclforge::ac3 iclforge::truehd iclforge::sendspin iclforge::base
                iclforge::objects)

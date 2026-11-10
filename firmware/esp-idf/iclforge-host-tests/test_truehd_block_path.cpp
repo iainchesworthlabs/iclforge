@@ -395,6 +395,48 @@ TEST_CASE("a chunk that changes layout is cut into one block per layout", "[true
     REQUIRE(two);
 }
 
+TEST_CASE("a chunk that changes to other channels of the same number is cut at the change", "[truehd][block-path]") {
+    // 5.0 (L R C Ls Rs) then 4.1 (L R Ls Rs and the LFE): five channels each, so the count does not
+    // tell them apart.
+    using Location = iclforge::ac3::eac3::chanmap::Location;
+    auto bytes = fixture("truehd/truehd_c50_s16.thd");
+    const auto second = fixture("truehd/truehd_c41_s16.thd");
+    bytes.insert(bytes.end(), second.begin(), second.end());
+    const StreamRun one = through_stream(bytes, 48000, 0);
+    const StreamRun many = through_stream(bytes, 48000, 256);
+    const StreamRun ahead = through_stream(bytes, 48000, 256, 0, true);
+    REQUIRE(one.results == many.results);
+    REQUIRE(total_samples(one.collected) == total_samples(many.collected));
+    REQUIRE(bits_equal(many.collected.planes, one.collected.planes));
+    REQUIRE(bits_equal(ahead.collected.planes, one.collected.planes));
+    // The bed of each unit, as the blocks of one unit gave it.
+    std::vector<iclforge::ac3::eac3::chanmap::Layout> bed_of_unit;
+    for (const auto& b : one.collected.blocks) {
+        bed_of_unit.push_back(b.bed);
+    }
+    bool centre = false;
+    bool lfe = false;
+    for (const auto& b : many.collected.blocks) {
+        REQUIRE(b.channels == 5);
+        centre = centre || b.bed.index_of(Location::kCentre) >= 0;
+        lfe = lfe || b.bed.index_of(Location::kLfe) >= 0;
+    }
+    REQUIRE(centre);
+    REQUIRE(lfe);
+    // Every unit of a block has the bed the block names: the units of 'one' in the block's span.
+    std::size_t unit = 0;
+    for (const auto& b : many.collected.blocks) {
+        for (std::size_t u = 0; u < b.samples / 40; ++u, ++unit) {
+            REQUIRE(unit < bed_of_unit.size());
+            REQUIRE(bed_of_unit[unit].count == b.bed.count);
+            for (int k = 0; k < b.bed.count; ++k) {
+                REQUIRE(bed_of_unit[unit][k] == b.bed[k]);
+            }
+        }
+    }
+    REQUIRE(unit == bed_of_unit.size());
+}
+
 TEST_CASE("a unit refused in the middle of a chunk finds what came before it handed over", "[truehd][block-path]") {
     // 48 kHz stereo, then a 96 kHz stream: the first unit of the second is refused as another rate.
     auto bytes = fixture("truehd/truehd_st48_s24.thd");
@@ -560,6 +602,14 @@ TEST_CASE("the player ends a stream that changes layout, and one that is refused
         const auto second = fixture("truehd/truehd_st48_s24.thd");
         stream.insert(stream.end(), second.begin(), second.end());
         SECTION("5.1 then 2.0") {
+            require_same(scenario(stream, 48000, "5.1", 256));
+        }
+    }
+    {
+        auto stream = fixture("truehd/truehd_c50_s16.thd");
+        const auto second = fixture("truehd/truehd_c41_s16.thd");
+        stream.insert(stream.end(), second.begin(), second.end());
+        SECTION("5.0 then 4.1") {
             require_same(scenario(stream, 48000, "5.1", 256));
         }
     }
