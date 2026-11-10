@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <span>
 
 namespace iclforge::truehd {
@@ -36,13 +37,33 @@ constexpr std::array<std::uint8_t, 256> make_crc8_table(std::uint8_t poly) {
     return table;
 }
 
+// The substream CRC takes kCrcSlices bytes a step (slicing): table k holds the register that a byte
+// leaves after k further zero bytes, so that a register and the next kCrcSlices bytes combine in
+// kCrcSlices independent lookups. Table 0 is the plain byte-at-a-time table. Each slice is 256
+// bytes of flash.
+constexpr std::size_t kCrcSlices = 8;
+
+constexpr std::array<std::array<std::uint8_t, 256>, kCrcSlices> make_crc8_slices(
+    const std::array<std::uint8_t, 256>& table) {
+    std::array<std::array<std::uint8_t, 256>, kCrcSlices> slices{};
+    slices[0] = table;
+    for (std::size_t k = 1; k < kCrcSlices; ++k) {
+        for (std::size_t i = 0; i < 256; ++i) {
+            slices[k][i] = table[slices[k - 1][i]];
+        }
+    }
+    return slices;
+}
+
 constexpr auto kCrc16Table = make_crc16_table(0x002D);
-constexpr auto kCrc8SubstreamTable = make_crc8_table(0x63);
+constexpr auto kCrc8SubstreamSlices = make_crc8_slices(make_crc8_table(0x63));
+constexpr auto kBlockHeaderTable = make_crc8_table(0x1D);  // the block header CRC, a byte a step
 
 // A table wrong for a known input fails the build rather than a test (CONTRIBUTING.md): the first
 // entries of a CRC table are fixed by the polynomial alone.
 static_assert(kCrc16Table[1] == 0x002D);
-static_assert(kCrc8SubstreamTable[1] == 0x63);
+static_assert(kCrc8SubstreamSlices[0][1] == 0x63);
+static_assert(kBlockHeaderTable[1] == 0x1D);
 
 [[nodiscard]] std::uint8_t bit_at(std::span<const std::byte> data, std::size_t bit) noexcept {
     const std::size_t byte = bit >> 3U;
@@ -98,20 +119,62 @@ std::uint8_t block_header_crc(std::span<const std::byte> data, std::size_t first
                               std::size_t end_bit) noexcept {
     constexpr std::uint8_t kPoly = 0x1D;
     std::uint8_t reg = 0xA2;
-    for (std::size_t bit = first_bit; bit < end_bit; ++bit) {
+    const auto step = [&reg](unsigned in) noexcept {
         const bool top = (reg & 0x80U) != 0;
-        reg = static_cast<std::uint8_t>((reg << 1U) | bit_at(data, bit));
+        reg = static_cast<std::uint8_t>((reg << 1U) | in);
         if (top) {
             reg ^= kPoly;
         }
+    };
+    std::size_t bit = first_bit;
+    // The bits up to the first byte boundary, one at a time.
+    for (; bit < end_bit && (bit & 7U) != 0; ++bit) {
+        step(bit_at(data, bit));
+    }
+    // A whole byte shifts in as the register run through eight zero bits, with the byte XORed in
+    // (the byte's bits never reach the top before the eighth step). Only bytes the data holds: the
+    // bits past its end read as zero, and those go through below.
+    for (; bit + 8 <= end_bit && (bit >> 3U) < data.size(); bit += 8) {
+        reg = static_cast<std::uint8_t>(kBlockHeaderTable[reg] ^
+                                        std::to_integer<unsigned>(data[bit >> 3U]));
+    }
+    for (; bit < end_bit; ++bit) {
+        step(bit_at(data, bit));
     }
     return reg;
 }
 
 std::uint8_t substream_parity(std::span<const std::byte> payload) noexcept {
-    std::uint8_t xor_all = 0;
-    for (const std::byte b : payload) {
-        xor_all ^= static_cast<std::uint8_t>(b);
+    // XOR is the same in any order, so the payload is folded a machine word at a time (two words
+    // in flight) and the word's bytes are folded together at the end.
+    using Word = std::size_t;
+    constexpr std::size_t kWord = sizeof(Word);
+    const std::byte* const data = payload.data();
+    const std::size_t size = payload.size();
+    Word even = 0;
+    Word odd = 0;
+    std::size_t i = 0;
+    for (; i + 2 * kWord <= size; i += 2 * kWord) {
+        Word a = 0;
+        Word b = 0;
+        std::memcpy(&a, data + i, kWord);
+        std::memcpy(&b, data + i + kWord, kWord);
+        even ^= a;
+        odd ^= b;
+    }
+    if (i + kWord <= size) {
+        Word a = 0;
+        std::memcpy(&a, data + i, kWord);
+        even ^= a;
+        i += kWord;
+    }
+    Word folded = even ^ odd;
+    for (unsigned bits = kWord * 4U; bits >= 8U; bits /= 2U) {
+        folded ^= folded >> bits;
+    }
+    auto xor_all = static_cast<std::uint8_t>(folded & 0xFFU);
+    for (; i < size; ++i) {
+        xor_all ^= static_cast<std::uint8_t>(data[i]);
     }
     return static_cast<std::uint8_t>(xor_all ^ 0xA9U);
 }
@@ -120,12 +183,27 @@ std::uint8_t substream_crc(std::span<const std::byte> payload) noexcept {
     if (payload.empty()) {
         return 0;
     }
+    static_assert(kCrcSlices == 8);
+    const auto& t = kCrc8SubstreamSlices;
+    const auto& s0 = t[0];
+    const std::byte* const data = payload.data();
     std::uint8_t reg = 0x3C;
     const std::size_t run = payload.size() - 1;
-    for (std::size_t i = 0; i < run; ++i) {
-        reg = kCrc8SubstreamTable[reg ^ std::to_integer<unsigned>(payload[i])];
+    std::size_t i = 0;
+    for (; i + kCrcSlices <= run; i += kCrcSlices) {
+        reg = static_cast<std::uint8_t>(t[7][reg ^ std::to_integer<unsigned>(data[i])] ^
+                                        t[6][std::to_integer<unsigned>(data[i + 1])] ^
+                                        t[5][std::to_integer<unsigned>(data[i + 2])] ^
+                                        t[4][std::to_integer<unsigned>(data[i + 3])] ^
+                                        t[3][std::to_integer<unsigned>(data[i + 4])] ^
+                                        t[2][std::to_integer<unsigned>(data[i + 5])] ^
+                                        t[1][std::to_integer<unsigned>(data[i + 6])] ^
+                                        s0[std::to_integer<unsigned>(data[i + 7])]);
     }
-    return static_cast<std::uint8_t>(reg ^ std::to_integer<unsigned>(payload[run]));
+    for (; i < run; ++i) {
+        reg = s0[reg ^ std::to_integer<unsigned>(data[i])];
+    }
+    return static_cast<std::uint8_t>(reg ^ std::to_integer<unsigned>(data[run]));
 }
 
 std::uint8_t extra_data_check_nibble(std::uint32_t extra_data_length) noexcept {
