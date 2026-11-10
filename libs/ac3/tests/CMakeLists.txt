@@ -12,6 +12,7 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     oba/test_dee_joc_fixture.cpp
     oba/test_joc_7channel.cpp
     oba/test_joc_single.cpp
+    oba/test_joc_qmf_rules.cpp
     oba/test_atmos_motion.cpp
     core/test_bitalloc.cpp
     core/test_fixed32.cpp
@@ -125,6 +126,9 @@ target_include_directories(iclforge-ac3-tests PRIVATE "${_ac3_root}/src/core")
 # fixed-point tier's block exponent, which both decoders share and which is not
 # library surface.
 target_include_directories(iclforge-ac3-tests PRIVATE "${_ac3_root}/src/decoder")
+# test_joc_qmf_rules.cpp includes libs/ac3/src/oba/joc_qmf_mix.hpp, the mixing-coefficient loops of the QMF
+# reconstruction, to hold each to its per-element expression bit for bit.
+target_include_directories(iclforge-ac3-tests PRIVATE "${_ac3_root}/src/oba")
 
 # test_simd_kernels.cpp (SIMD kernels) needs the ONE architecture directory
 # CMake selected in libs/base/CMakeLists.txt, so the test exercises the
