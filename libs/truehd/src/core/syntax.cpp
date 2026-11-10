@@ -74,18 +74,21 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
     put_field(writer, filter.shift, 4);
     put_field(writer, filter.coeff_bits, 5);
     put_field(writer, filter.coeff_shift, 3);
+    // The order field is four bits, so a spec can ask for more taps than the arrays hold (a
+    // test writes order 9 to see the reader refuse it); the taps past the end are written as zero.
+    const auto tap = [](const std::array<std::int32_t, kMaxFirOrder>& values, int i) {
+        return static_cast<std::size_t>(i) < values.size() ? values[static_cast<std::size_t>(i)] : 0;
+    };
     for (int i = 0; i < filter.order; ++i) {
         // The value is stored shifted left; the stream carries it shifted back.
-        put_signed(writer, filter.coeff[static_cast<std::size_t>(i)] >> filter.coeff_shift,
-                   filter.coeff_bits);
+        put_signed(writer, tap(filter.coeff, i) >> filter.coeff_shift, filter.coeff_bits);
     }
     put_field(writer, filter.has_state ? 1U : 0U, 1);
     if (filter.has_state) {
         put_field(writer, filter.state_bits, 4);
         put_field(writer, filter.state_shift, 4);
         for (int i = 0; i < filter.order && filter.state_bits > 0; ++i) {
-            put_signed(writer, filter.state[static_cast<std::size_t>(i)] >> filter.state_shift,
-                       filter.state_bits);
+            put_signed(writer, tap(filter.state, i) >> filter.state_shift, filter.state_bits);
         }
     }
 }
