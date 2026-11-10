@@ -84,6 +84,12 @@ struct CodedTrack {
 [[nodiscard]] CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
                                     const FrameLayout& layout, bool noise_fill = false);
 
+// The largest magnitude among each band's lines, per group and band. A band
+// whose largest line times the inverse gain is below a half quantises to zeros,
+// whatever its other lines, so a caller that asks for a track many times at
+// other scale factors can say so once (TrackCoder's `peaks`).
+void band_peaks(const Grouped& grouped, std::vector<std::vector<double>>& peaks);
+
 // The buffers the section search works in: one band's cost in every codebook,
 // the running sums over the bands, and the best division so far.
 struct CoderScratch {
@@ -99,13 +105,22 @@ struct CoderScratch {
 // for use from two threads at once; every result is what code_track() gives.
 class TrackCoder {
    public:
+    // Room to code tracks of the shape of `grouped`, so that the first track
+    // coded allocates nothing; coding a larger one still works, and allocates.
+    void reserve(const Grouped& grouped, bool noise_fill);
+
     // code_track(...).bits(), without building the CodedTrack.
+    //
+    // `peaks`, where given, is band_peaks(grouped): a band that surely quantises to
+    // zeros is then priced without being quantised.
     [[nodiscard]] std::size_t bits(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
-                                   const FrameLayout& layout, bool noise_fill = false);
+                                   const FrameLayout& layout, bool noise_fill = false,
+                                   const std::vector<std::vector<double>>* peaks = nullptr);
 
     // code_track(...), into `out` (all of it replaced; its capacity reused).
     void code(CodedTrack& out, const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
-              const FrameLayout& layout, bool noise_fill = false);
+              const FrameLayout& layout, bool noise_fill = false,
+              const std::vector<std::vector<double>>* peaks = nullptr);
 
    private:
     friend CodedTrack code_track(const Grouped&, const std::vector<std::vector<int>>&, int, const FrameLayout&, bool);
@@ -115,7 +130,8 @@ class TrackCoder {
     // sections are kept, for fill(); without it only what the bit count takes
     // is worked out.
     void analyse(CoderScratch& search, std::vector<std::int32_t>* q_out, const Grouped& grouped,
-                 const std::vector<std::vector<int>>& sf, int offset, const FrameLayout& layout, bool noise_fill);
+                 const std::vector<std::vector<int>>& sf, int offset, const FrameLayout& layout, bool noise_fill,
+                 const std::vector<std::vector<double>>* peaks);
     void plan_noise_fill(const Grouped& grouped);
     void fill(CodedTrack& out, const Grouped& grouped, bool noise_fill) const;
 

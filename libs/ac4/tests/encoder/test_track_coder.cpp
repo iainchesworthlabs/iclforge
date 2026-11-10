@@ -99,6 +99,7 @@ TEST_CASE("AC-4 track coder bit count equals the full track's over random frames
     };
     TrackCoder coder;
     int noisy = 0;
+    std::size_t silent_bands = 0;
     for (int frame = 0; frame < 320; ++frame) {
         const FrameLayout& layout = layouts[static_cast<std::size_t>(frame % 4)];
         const bool noise_fill = frame % 3 == 0;
@@ -114,11 +115,20 @@ TEST_CASE("AC-4 track coder bit count equals the full track's over random frames
         const int offset = rng.below(9) - 4;
         const CodedTrack full = iclforge::ac4::detail::code_track(grouped, sf, offset, layout, noise_fill);
         noisy += full.noise_fill ? 1 : 0;
+        for (const auto& group : full.max_abs) {
+            silent_bands += static_cast<std::size_t>(std::count(group.begin(), group.end(), 0));
+        }
+        std::vector<std::vector<double>> peaks;
+        iclforge::ac4::detail::band_peaks(grouped, peaks);
         CAPTURE(frame, noise_fill);
         REQUIRE(coder.bits(grouped, sf, offset, layout, noise_fill) == full.bits());
+        // And told which bands cannot be anything but zeros, so as not to quantise them.
+        REQUIRE(coder.bits(grouped, sf, offset, layout, noise_fill, &peaks) == full.bits());
     }
-    // The comparison means something only if some frames did send noise levels.
+    // The comparison means something only if some frames did send noise levels,
+    // and some bands quantised to zeros (the bands that need no quantising).
     CHECK(noisy > 20);
+    CHECK(silent_bands > 2000);
 }
 
 TEST_CASE("AC-4 track coder refills reused storage with the track code_track builds", "[ac4][encoder][track_coder]") {
@@ -149,6 +159,11 @@ TEST_CASE("AC-4 track coder refills reused storage with the track code_track bui
         // A bit count in between, as the rate loop asks for many before it settles on a step.
         (void)coder.bits(grouped, sf, offset + 1, layout, noise_fill);
         coder.code(kept, grouped, sf, offset, layout, noise_fill);
-        require_same(kept, iclforge::ac4::detail::code_track(grouped, sf, offset, layout, noise_fill));
+        const CodedTrack want = iclforge::ac4::detail::code_track(grouped, sf, offset, layout, noise_fill);
+        require_same(kept, want);
+        std::vector<std::vector<double>> peaks;
+        iclforge::ac4::detail::band_peaks(grouped, peaks);
+        coder.code(kept, grouped, sf, offset, layout, noise_fill, &peaks);
+        require_same(kept, want);
     }
 }

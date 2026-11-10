@@ -2243,6 +2243,9 @@ struct SubstreamCoder {
         // Per channel, band_root_sums() of its lines: all that the scale
         // factors take of them, whatever the step.
         std::vector<std::vector<std::vector<double>>> roots;
+        // And band_peaks(): which bands quantise to zeros at a step is a
+        // question of their largest line.
+        std::vector<std::vector<std::vector<double>>> peaks;
         std::vector<std::vector<double>> capped;
         double kappa = kCaps.front();
     };
@@ -2440,9 +2443,11 @@ struct SubstreamCoder {
         p.top_level = 0.0;
         p.energy.resize(channels);
         p.roots.resize(channels);
+        p.peaks.resize(channels);
         for (const std::size_t c : p.order) {
             const detail::Channel& track = spectra[c];
             detail::band_root_sums(track.grouped, p.roots[c]);
+            detail::band_peaks(track.grouped, p.peaks[c]);
             p.energy[c].resize(track.allowed.size());
             for (std::size_t g = 0; g < track.allowed.size(); ++g) {
                 p.energy[c][g].assign(track.allowed[g].size(), 0.0);
@@ -2461,6 +2466,11 @@ struct SubstreamCoder {
             }
         }
         p.sf.resize(channels);
+        // Room for the tracks the rate loop is about to count and code, so that
+        // it allocates only when a frame needs more than any before.
+        for (const std::size_t c : p.order) {
+            track_coder.reserve(spectra[c].grouped, config.experimental.noise_fill);
+        }
         // As prepared: no tracks yet, but their places.
         std::vector<detail::CodedTrack> tracks = std::move(f.tracks);
         p.prepared = f;
@@ -2521,7 +2531,7 @@ struct SubstreamCoder {
         std::size_t total = 0;
         for (const std::size_t c : pending.order) {
             total += track_coder.bits(pending.spectra[c].grouped, pending.sf[c], 0, layout_of(c),
-                                      config.experimental.noise_fill);
+                                      config.experimental.noise_fill, &pending.peaks[c]);
         }
         return total;
     }
@@ -2575,7 +2585,7 @@ struct SubstreamCoder {
             set_step(pull, step);
             for (const std::size_t c : p.order) {
                 track_coder.code(f.tracks[c], p.spectra[c].grouped, p.sf[c], 0, layout_of(c),
-                                 config.experimental.noise_fill);
+                                 config.experimental.noise_fill, &p.peaks[c]);
             }
             return write();
         };

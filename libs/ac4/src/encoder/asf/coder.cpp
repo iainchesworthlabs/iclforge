@@ -277,6 +277,35 @@ void price_band(std::span<const std::int32_t> q, std::int32_t max_abs, const Pri
     cost[11] = bits;
 }
 
+// price_band() of `count` lines that are all zero: the same sums, each tuple
+// priced alike.
+void price_zero_band(std::size_t count, const Pricing& p, std::array<std::size_t, kCodebooks>& cost) {
+    cost.fill(kNever);
+    cost[0] = 0;
+    const std::size_t quads = count / 4;
+    const std::size_t pairs = count / 2;
+    const PriceGroup& quad_signed = p.group[0];
+    const PriceGroup& quad_unsigned = p.group[1];
+    const PriceGroup& pair_signed = p.group[2];
+    const PriceGroup& g78 = p.group[3];
+    const PriceGroup& g910 = p.group[4];
+    const PriceGroup& g11 = p.group[5];
+    const auto at = [](const PriceGroup& g, std::size_t index, std::size_t book) -> std::size_t {
+        return g.bits[index][book];
+    };
+    cost[1] = quads * at(quad_signed, static_cast<std::size_t>(quad_signed.base), 0);
+    cost[2] = quads * at(quad_signed, static_cast<std::size_t>(quad_signed.base), 1);
+    cost[3] = quads * at(quad_unsigned, static_cast<std::size_t>(quad_unsigned.base), 0);
+    cost[4] = quads * at(quad_unsigned, static_cast<std::size_t>(quad_unsigned.base), 1);
+    cost[5] = pairs * at(pair_signed, static_cast<std::size_t>(pair_signed.base), 0);
+    cost[6] = pairs * at(pair_signed, static_cast<std::size_t>(pair_signed.base), 1);
+    cost[7] = pairs * at(g78, 0, 0);
+    cost[8] = pairs * at(g78, 0, 1);
+    cost[9] = pairs * at(g910, 0, 0);
+    cost[10] = pairs * at(g910, 0, 1);
+    cost[11] = pairs * at(g11, 0, 0);
+}
+
 // How far the fast power may sit from an integer boundary before the exact one
 // decides. sqrt(y sqrt y) is within a few ulp (some 1e-12 at the top of the
 // range) of std::pow(y, 0.75), so a result more than this from a boundary
@@ -302,8 +331,18 @@ constexpr double kFastLimit = 8000.0;
     return x < 0.0 ? -magnitude : magnitude;
 }
 
-[[nodiscard]] std::int32_t quantize_band(std::span<const double> lines, int sf, std::span<std::int32_t> out) {
-    const double inverse_gain = std::pow(2.0, -0.25 * static_cast<double>(sf - 100));
+[[nodiscard]] double inverse_gain_of(int sf) {
+    return std::pow(2.0, -0.25 * static_cast<double>(sf - 100));
+}
+
+// A line quantises to zero when |x| g^-1 raised to 3/4, plus kRounding, is below
+// 1: |x| g^-1 below 0.4976. A band whose largest line is under 0.45 of a step
+// (with a margin on the line's rounding) is all zeros; a larger one, or a
+// line that is not a number, is quantised line by line as ever.
+constexpr double kAllZeroBelow = 0.45;
+
+[[nodiscard]] std::int32_t quantize_band(std::span<const double> lines, double inverse_gain,
+                                         std::span<std::int32_t> out) {
     std::int32_t max_abs = 0;
     for (std::size_t k = 0; k < lines.size(); ++k) {
         out[k] = quantize_line(lines[k], inverse_gain);
@@ -388,9 +427,62 @@ void regroup_into(Grouped& out, std::span<const double> spectrum, const FrameLay
     }
 }
 
+void band_peaks(const Grouped& grouped, std::vector<std::vector<double>>& peaks) {
+    peaks.resize(grouped.offset.size());
+    for (std::size_t g = 0; g < grouped.offset.size(); ++g) {
+        const auto bands = static_cast<std::size_t>(grouped.max_sfb[g]);
+        peaks[g].assign(bands, 0.0);
+        for (std::size_t b = 0; b < bands; ++b) {
+            double largest = 0.0;
+            bool plain = true;
+            for (std::size_t k = grouped.offset[g][b]; k < grouped.offset[g][b + 1]; ++k) {
+                const double magnitude = std::abs(grouped.lines[k]);
+                plain = plain && magnitude == magnitude;  // not a number: the band is never all zeros
+                largest = std::max(largest, magnitude);
+            }
+            peaks[g][b] = plain ? largest : std::numeric_limits<double>::infinity();
+        }
+    }
+}
+
+void TrackCoder::reserve(const Grouped& grouped, bool noise_fill) {
+    const std::size_t groups = grouped.offset.size();
+    std::size_t bands = 0;
+    std::size_t group_bands = 0;
+    std::size_t band_lines = 0;
+    for (std::size_t g = 0; g < groups; ++g) {
+        const auto count = static_cast<std::size_t>(grouped.max_sfb[g]);
+        bands += count;
+        group_bands = std::max(group_bands, count);
+        for (std::size_t b = 0; b < count; ++b) {
+            band_lines = std::max(band_lines, grouped.offset[g][b + 1] - grouped.offset[g][b]);
+        }
+    }
+    band_base_.reserve(groups + 1);
+    section_base_.reserve(groups + 1);
+    sf_.reserve(bands);
+    peak_.reserve(bands);
+    cb_.reserve(bands);
+    dpcm_.reserve(bands);
+    sections_.reserve(bands);
+    if (noise_fill) {
+        level_.reserve(bands);
+    }
+    band_q_.reserve(band_lines);
+    const std::size_t stride = group_bands + 1;
+    search_.cost.reserve(group_bands);
+    search_.prefix.reserve(kCodebooks * stride);
+    search_.ahead.reserve(kCodebooks * stride);
+    search_.header.reserve(stride);
+    search_.best.reserve(stride);
+    search_.lowest.reserve(kCodebooks * stride);
+    search_.from.reserve(stride);
+    search_.book.reserve(stride);
+}
+
 void TrackCoder::analyse(CoderScratch& search, std::vector<std::int32_t>* q_out, const Grouped& grouped,
                          const std::vector<std::vector<int>>& sf, int offset, const FrameLayout& layout,
-                         bool noise_fill) {
+                         bool noise_fill, const std::vector<std::vector<double>>* peaks) {
     const std::size_t groups = grouped.offset.size();
     // Only the track a caller keeps needs every quantised line at once; to
     // count bits, one band's are priced as soon as they are quantised.
@@ -447,12 +539,22 @@ void TrackCoder::analyse(CoderScratch& search, std::vector<std::int32_t>* q_out,
             if (!first) {
                 s = std::clamp(s, std::max(0, previous - kMaxDelta), std::min(255, previous + kMaxDelta));
             }
-            std::int32_t peak = quantize_band(lines, s, q);
+            double inverse_gain = inverse_gain_of(s);
+            if (peaks != nullptr && (*peaks)[g][b] * inverse_gain < kAllZeroBelow) {
+                // Every line quantises to zero (a kept track's are zeros
+                // already, from the assign above), and the band is priced as
+                // the zeros it is: no peak, no change to the bands after it.
+                sf_[band_base_[g] + b] = s;
+                price_zero_band(end - begin, prices, cost[b]);
+                continue;
+            }
+            std::int32_t peak = quantize_band(lines, inverse_gain, q);
             // A line past what ext_code reaches clips; coarser steps avoid it
             // where the delta from the band before allows.
             while (peak >= kMaxQuant && s < 255 && (first || s < previous + kMaxDelta)) {
                 ++s;
-                peak = quantize_band(lines, s, q);
+                inverse_gain = inverse_gain_of(s);
+                peak = quantize_band(lines, inverse_gain, q);
             }
             sf_[band_base_[g] + b] = s;
             peak_[band_base_[g] + b] = peak;
@@ -680,14 +782,16 @@ void TrackCoder::fill(CodedTrack& out, const Grouped& grouped, bool noise_fill) 
 }
 
 std::size_t TrackCoder::bits(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
-                             const FrameLayout& layout, bool noise_fill) {
-    analyse(search_, nullptr, grouped, sf, offset, layout, noise_fill);
+                             const FrameLayout& layout, bool noise_fill,
+                             const std::vector<std::vector<double>>* peaks) {
+    analyse(search_, nullptr, grouped, sf, offset, layout, noise_fill, peaks);
     return section_bits_ + spectral_bits_ + scalefac_bits_ + noise_bits_ + 1;
 }
 
 void TrackCoder::code(CodedTrack& out, const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
-                      const FrameLayout& layout, bool noise_fill) {
-    analyse(search_, &out.q, grouped, sf, offset, layout, noise_fill);
+                      const FrameLayout& layout, bool noise_fill,
+                      const std::vector<std::vector<double>>* peaks) {
+    analyse(search_, &out.q, grouped, sf, offset, layout, noise_fill, peaks);
     fill(out, grouped, noise_fill);
 }
 
@@ -695,7 +799,7 @@ CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>
                       const FrameLayout& layout, bool noise_fill) {
     TrackCoder coder;
     CodedTrack t;
-    coder.analyse(scratch_buffers(), &t.q, grouped, sf, offset, layout, noise_fill);
+    coder.analyse(scratch_buffers(), &t.q, grouped, sf, offset, layout, noise_fill, nullptr);
     coder.fill(t, grouped, noise_fill);
     return t;
 }
