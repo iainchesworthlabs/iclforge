@@ -1111,9 +1111,20 @@ struct SubstreamCoder {
 
     // The input at the internal rate, from sample index `base` of the delayed
     // signal on; the first `delay` samples of that signal are the silence
-    // ahead of the input.
+    // ahead of the input. The six buffers this and after_frame() walk (signal,
+    // source, de_programme, de_dialogue, kept_input and the A-JOC objects)
+    // hold `dead` samples ahead of that sample, already read for the last
+    // time: dropping them is a count, and they are erased together once they
+    // outnumber the rest, so the cost of a frame does not grow with the
+    // input buffered.
     std::vector<std::vector<double>> signal;
     std::int64_t base = 0;
+    std::size_t dead = 0;
+
+    // Where sample s (base <= s < signal_end()) is in each of those buffers.
+    [[nodiscard]] std::size_t at(std::int64_t s) const noexcept {
+        return static_cast<std::size_t>(s - base) + dead;
+    }
 
     // The metadata beside the audio (frame/metadata.hpp). With dialogue
     // enhancement: the input channels its parameters are for, in
@@ -1145,7 +1156,7 @@ struct SubstreamCoder {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return kept_input[c][static_cast<std::size_t>(s - base)];
+        return kept_input[c][at(s)];
     }
 
     // Each layout group's transform layouts, decided for the frame being coded
@@ -1228,7 +1239,7 @@ struct SubstreamCoder {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return ajoc->objects[k][static_cast<std::size_t>(s - base)];
+        return ajoc->objects[k][at(s)];
     }
 
     // Analyses the QMF slots of the downmix and the objects that frame f's
@@ -1459,14 +1470,14 @@ struct SubstreamCoder {
     }
 
     [[nodiscard]] std::int64_t signal_end() const noexcept {
-        return base + static_cast<std::int64_t>(signal.front().size());
+        return base + static_cast<std::int64_t>(signal.front().size() - dead);
     }
 
     [[nodiscard]] double sample(std::size_t c, std::int64_t s) const noexcept {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return signal[c][static_cast<std::size_t>(s - base)];
+        return signal[c][at(s)];
     }
 
     // Sample s of the input channel A-CPL's analysis reads k-th.
@@ -1474,7 +1485,7 @@ struct SubstreamCoder {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return source[k][static_cast<std::size_t>(s - base)];
+        return source[k][at(s)];
     }
 
     // Analyses the QMF slots of the input channels A-CPL rebuilds that frame
@@ -1676,7 +1687,7 @@ struct SubstreamCoder {
                 for (std::size_t n = 0; n < window.size(); ++n) {
                     const std::int64_t s = start + static_cast<std::int64_t>(n);
                     window[n] = s >= base && s < signal_end()
-                                    ? (*from)[static_cast<std::size_t>(s - base)]
+                                    ? (*from)[at(s)]
                                     : 0.0;
                 }
                 analysis.transform(window, layout, frame_length, frame_length, *to);
@@ -2739,15 +2750,22 @@ struct SubstreamCoder {
         if (keep_from > base) {
             const auto drop =
                 static_cast<std::size_t>(std::min(keep_from - base, signal_end() - base));
-            std::vector<std::vector<double>> none;
-            for (auto* buffers : {&signal, &source, &de_programme, &de_dialogue, &kept_input,
-                                  ajoc ? &ajoc->objects : &none}) {
-                for (std::vector<double>& channel : *buffers) {
-                    channel.erase(channel.begin(),
-                                  channel.begin() + static_cast<std::ptrdiff_t>(drop));
-                }
-            }
             base += static_cast<std::int64_t>(drop);
+            dead += drop;
+            // The dead samples go once they outnumber the live ones, so what
+            // is moved is a sample's worth for each sample taken, however
+            // much of the input is buffered.
+            if (dead > signal.front().size() - dead) {
+                std::vector<std::vector<double>> none;
+                for (auto* buffers : {&signal, &source, &de_programme, &de_dialogue, &kept_input,
+                                      ajoc ? &ajoc->objects : &none}) {
+                    for (std::vector<double>& channel : *buffers) {
+                        channel.erase(channel.begin(),
+                                      channel.begin() + static_cast<std::ptrdiff_t>(dead));
+                    }
+                }
+                dead = 0;
+            }
         }
     }
 
