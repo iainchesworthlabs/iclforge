@@ -1,8 +1,12 @@
 #pragma once
 
+#include <array>
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 
+#include "iclforge/ac3/core/exponents.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
 
@@ -49,6 +53,69 @@ ICLFORGE_AC3_EXPORT void accumulate_peak_exponents(std::span<const double> coeff
 // same pair, rounding the float coefficient itself.
 ICLFORGE_AC3_EXPORT void accumulate_peak_exponents(std::span<const float> coefficients,
                                                std::span<std::uint8_t> peak_exponents);
+
+// The same per-bin minimum, found without converting every coefficient.
+//
+// accumulate_peak_exponents() above converts all of a frame's coefficients -
+// 6 blocks of every full-bandwidth channel, some 9,100 on 5.1 - to fixed point
+// and to an exponent, to keep one number per bin. That conversion is the
+// cost, and it is not needed: the exponent is a function of the coefficient's
+// magnitude alone that never rises as the magnitude grows, so the smallest
+// exponent over the blocks is the exponent of the largest magnitude over the
+// blocks. A scan therefore keeps the largest |coefficient| per bin (a compare
+// and a select, which a compiler widens to a vector max) and converts each bin
+// once, when the exponents are read. The result is the same for every input,
+// not a close approximation of it:
+//
+//   - The exponent never rises as |c| grows. to_fixed25 rounds half away from
+//     zero and clamps, both non-decreasing in |c|; exponent_from_fixed is a
+//     leading-zero count of the magnitude, which only falls as the magnitude
+//     rises, and is capped at 0.
+//   - Sign does not matter. to_fixed25's clamps are asymmetric (+2^24-1 and
+//     -2^24), but both land on exponent 0, and below the clamp the rounding is
+//     symmetric.
+//   - Infinity clamps, so it is simply the largest magnitude.
+//   - NaN is the one value with no place in that order. to_fixed25 converts it
+//     with a float-to-int cast the language leaves undefined, and the answer
+//     depends on the CPU (x86-64 gives INT32_MIN, which is exponent 0; AArch64
+//     gives 0, which is exponent kMaxExponent and so changes nothing). A NaN
+//     is therefore kept out of the magnitude and handled the way the
+//     per-coefficient loop always handled it - by calling the very same
+//     to_fixed25 and exponent_from_fixed on it - in a floor that only a NaN
+//     ever lowers. Such a frame is already broken; what matters is that the
+//     encoder does exactly what it did.
+//
+// The state is a magnitude and a floor per bin: 256 x (sizeof(Scalar) + 1)
+// bytes, 2.3 KB for double and 1.3 KB for float.
+inline constexpr std::size_t kPeakScanBins = 256;
+
+template <std::floating_point Scalar>
+struct PeakScan {
+    // Zero is "nothing seen", which converts to kMaxExponent like an empty spectrum.
+    std::array<Scalar, kPeakScanBins> magnitude{};
+    // Only a NaN coefficient lowers it; see above.
+    std::array<std::uint8_t, kPeakScanBins> floor_exponent = [] {
+        std::array<std::uint8_t, kPeakScanBins> filled{};
+        filled.fill(static_cast<std::uint8_t>(kMaxExponent));
+        return filled;
+    }();
+};
+
+// Folds one channel-block of MDCT coefficients into `scan`. Bins past
+// kPeakScanBins are ignored, as accumulate_peak_exponents ignores those past
+// the end of its array.
+ICLFORGE_AC3_EXPORT void accumulate_peak_scan(PeakScan<double>& scan,
+                                              std::span<const double> coefficients);
+ICLFORGE_AC3_EXPORT void accumulate_peak_scan(PeakScan<float>& scan,
+                                              std::span<const float> coefficients);
+
+// Writes the exponents accumulate_peak_exponents would have left, from an
+// empty array at kMaxExponent, after the same coefficients: one per bin from
+// bin 0, for as many bins as `exponents` holds up to kPeakScanBins.
+ICLFORGE_AC3_EXPORT void peak_scan_exponents(const PeakScan<double>& scan,
+                                             std::span<std::uint8_t> exponents);
+ICLFORGE_AC3_EXPORT void peak_scan_exponents(const PeakScan<float>& scan,
+                                             std::span<std::uint8_t> exponents);
 
 // The highest bin worth coding, as an endmant (exclusive), given the frame's
 // own spectrum.

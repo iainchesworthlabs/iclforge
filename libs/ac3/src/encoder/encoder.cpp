@@ -713,13 +713,17 @@ std::expected<std::vector<std::byte>, FrameError> FrameEncoder::encode_frame(
     // immediate.
     int chbwcod = impl_->config_.chbwcod;
     if (chbwcod < 0) {
-        std::array<std::uint8_t, 253> peak_exponents{};
-        peak_exponents.fill(static_cast<std::uint8_t>(kMaxExponent));
+        // The loudest magnitude per bin over the frame, converted to an
+        // exponent once per bin rather than once per coefficient - the same
+        // exponents for every input (bandwidth.hpp, PeakScan).
+        encoder::PeakScan<internal::encode_scalar_t> scan;
         for (int ch = 0; ch < nfchans; ++ch) {
             for (int block = 0; block < kBlocksPerFrame; ++block) {
-                encoder::accumulate_peak_exponents(coeffs_at(ch, block), peak_exponents);
+                encoder::accumulate_peak_scan(scan, coeffs_at(ch, block));
             }
         }
+        std::array<std::uint8_t, 253> peak_exponents{};
+        encoder::peak_scan_exponents(scan, peak_exponents);
         chbwcod = encoder::choose_chbwcod(impl_->config_.bitrate_kbps, nfchans, peak_exponents,
                                           impl_->config_.sample_rate, impl_->chbwcod_state_);
         impl_->chbwcod_state_ = chbwcod;

@@ -7,6 +7,7 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     decoder/test_associated_service_stream.cpp
     encoder/test_assignment.cpp
     encoder/test_bandwidth.cpp
+    encoder/test_peak_scan.cpp
     oba/test_atmos.cpp
     oba/test_atmos_cbi.cpp
     oba/test_dee_joc_fixture.cpp
