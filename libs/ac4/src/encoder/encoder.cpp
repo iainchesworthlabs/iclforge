@@ -1113,17 +1113,17 @@ struct SubstreamCoder {
     // signal on; the first `delay` samples of that signal are the silence
     // ahead of the input. The six buffers this and after_frame() walk (signal,
     // source, de_programme, de_dialogue, kept_input and the A-JOC objects)
-    // hold `dead` samples ahead of that sample, already read for the last
-    // time: dropping them is a count, and they are erased together once they
-    // outnumber the rest, so the cost of a frame does not grow with the
-    // input buffered.
+    // start at `origin`, at or ahead of `base`: the samples between are read
+    // for the last time, and dropping them is moving `base`. They are erased
+    // together once they outnumber the rest, so the cost of a frame does not
+    // grow with the input buffered.
     std::vector<std::vector<double>> signal;
     std::int64_t base = 0;
-    std::size_t dead = 0;
+    std::int64_t origin = 0;  // the sample index of element 0 of each of those buffers
 
     // Where sample s (base <= s < signal_end()) is in each of those buffers.
     [[nodiscard]] std::size_t at(std::int64_t s) const noexcept {
-        return static_cast<std::size_t>(s - base) + dead;
+        return static_cast<std::size_t>(s - origin);
     }
 
     // The metadata beside the audio (frame/metadata.hpp). With dialogue
@@ -1470,7 +1470,7 @@ struct SubstreamCoder {
     }
 
     [[nodiscard]] std::int64_t signal_end() const noexcept {
-        return base + static_cast<std::int64_t>(signal.front().size() - dead);
+        return origin + static_cast<std::int64_t>(signal.front().size());
     }
 
     [[nodiscard]] double sample(std::size_t c, std::int64_t s) const noexcept {
@@ -2751,11 +2751,16 @@ struct SubstreamCoder {
             const auto drop =
                 static_cast<std::size_t>(std::min(keep_from - base, signal_end() - base));
             base += static_cast<std::int64_t>(drop);
-            dead += drop;
-            // The dead samples go once they outnumber the live ones, so what
-            // is moved is a sample's worth for each sample taken, however
-            // much of the input is buffered.
-            if (dead > signal.front().size() - dead) {
+            const auto dead = static_cast<std::size_t>(base - origin);
+            // The dead samples go at once while the live ones are few, which
+            // is all a caller feeding a frame at a time ever holds and keeps
+            // its buffers as small as they were; and once they outnumber the
+            // live ones when those are many, so that what is moved is a
+            // sample's worth for each sample taken, however much of the input
+            // is buffered.
+            constexpr std::size_t kFewLive = 16384;
+            const std::size_t live = signal.front().size() - dead;
+            if (live <= kFewLive || dead > live) {
                 std::vector<std::vector<double>> none;
                 for (auto* buffers : {&signal, &source, &de_programme, &de_dialogue, &kept_input,
                                       ajoc ? &ajoc->objects : &none}) {
@@ -2764,7 +2769,7 @@ struct SubstreamCoder {
                                       channel.begin() + static_cast<std::ptrdiff_t>(dead));
                     }
                 }
-                dead = 0;
+                origin = base;
             }
         }
     }
