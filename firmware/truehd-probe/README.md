@@ -7,9 +7,9 @@ channels interleaved), and prints, as `key=value` lines on the console, what eac
 cycles an access unit (the mean and the slowest of the least of four passes), the real-time factor, the heap
 the decoder holds and the stack the task reached. The last line is `result=pass` or `result=fail`.
 
-No network, no I2S, no PSRAM: the numbers are the decoder's alone, as `firmware/baremetal`'s probe gives them
-for the AC-3 decoder. The decoder's sources are compiled `-O2` (`TRUEHD_PROBE_OPT=Os` for the size build).
-Results from the boards are in `results/`.
+No network, no I2S, and no PSRAM unless an overlay turns it on (`sdkconfig.s3mem`, below): the numbers are the
+decoder's alone, as `firmware/baremetal`'s probe gives them for the AC-3 decoder. The decoder's sources are
+compiled `-O2` (`TRUEHD_PROBE_OPT=Os` for the size build). Results from the boards are in `results/`.
 
 ## Build
 
@@ -21,8 +21,47 @@ idf.py -B $b -DSDKCONFIG="$b\sdkconfig" -DIDF_TARGET=esp32c6 "-DSDKCONFIG_DEFAUL
 
 `sdkconfig.s3` and `sdkconfig.p4` are the other two chips. Always pass `-DSDKCONFIG`: without it `idf.py`
 writes `sdkconfig` into this directory and the next chip's build refuses it. The stack of the decoding task
-is `CONFIG_TRUEHD_PROBE_TASK_STACK_BYTES`, 128 KB by default: the decoder reaches 60 KB on the RISC-V chips and a
-48 KB stack faults on the C6 (and hangs the S3 without a message).
+is `CONFIG_TRUEHD_PROBE_TASK_STACK_BYTES`, 128 KB by default: the decoder reached 60 KB on the three chips
+(`stack_used_bytes` 60,356 to 60,944 in the earlier S3 and C6 results files, 60,368 in the P4's) and a 48 KB stack
+faults on the C6 (and hangs the S3 without a message). With the unit-cost change (draft PR #1815) the S3 and C6 results here show stack_used_bytes of 9,272 to 9,280 and
+8,804, and the S3 heap_internal_decoder_bytes is 188,740 where the earlier results file had 158,020. The probe's stack is
+still 128 KB.
+
+### The S3 with the sink's memory settings
+
+```
+$b = 'D:\ac3bld\perf-c5\probe-s3-mem'
+idf.py -B $b -DSDKCONFIG="$b\sdkconfig" -DIDF_TARGET=esp32s3 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.s3;sdkconfig.s3mem" build
+```
+
+`sdkconfig.s3mem` is an overlay after `sdkconfig.s3`: a 32 KB instruction cache, a 64 KB data cache with 64-byte
+lines, and the code and constants executed from PSRAM, which are the Hearth sink's S3 settings
+(`firmware/hearth-sink/sdkconfig.s3-fast`, `sdkconfig.s3-dcache` and the cache line of `sdkconfig.psram`) without
+`CONFIG_ESPTOOLPY_FLASHMODE_QIO`, which is the bootloader's and the probe does not replace the bootloader. PSRAM is
+mapped and kept out of `malloc` (`CONFIG_SPIRAM_USE_CAPS_ALLOC`), so the decoder's heap stays internal, as in the
+results without the overlay. The file says what each line is for and what it costs in internal RAM. It takes 55,112
+bytes of the internal heap free at start (276,820 to 221,708, line 4 of the two S3 results files).
+
+What it measured on one ESP32-S3 (hearth-47b39c, 240 MHz, DIO flash), one run of each image, the decoder of draft
+PR #1815, PCM matching the reference hash in every fixture (`results/esp32s3.txt` without the overlay,
+`results/esp32s3-mem.txt` with it); the decode time over the audio's time, below 1 keeps up:
+
+| | 5.1, 24 bit | 5.1, 16 bit | 2.0 at 192 kHz | slowest unit, 5.1 24 bit | least internal heap free |
+|---|---:|---:|---:|---:|---:|
+| `sdkconfig.s3` alone | 1.095 | 0.970 | 1.706 | 2,598.74 us | 88,064 bytes |
+| with `sdkconfig.s3mem` | 0.931 | 0.823 | 1.573 | 1,105.94 us | 32,952 bytes |
+
+A 5.1 unit at 48 kHz is 40 samples, 833 us of audio, so the slowest unit with the overlay (1,106 us) is longer than
+the unit it decodes while the mean (776 us) is shorter: a player needs the ring to ride out the slow ones. The
+probe has no Wi-Fi and no I2S; Wi-Fi's buffers come out of the same internal heap, and this is the decoder
+alone. What a play of 5.1 through the sink does with these settings has not been measured.
+
+On main's decoder (`57fef9af0`) the larger caches alone took 5.1 at 24 bit from 1.499 to 1.094, and the caches with the
+PSRAM lines aborted in the first decode and rebooted in a loop; those captures are not kept here, and why was not
+investigated.
+
+To read the console after a flash: on that S3, `esptool --after watchdog-reset` left the probe's console silent
+for the whole capture, and `--after hard-reset` printed at once. Use `hard-reset`.
 
 Two diagnostic overlays, added after the defaults: `sdkconfig.bisect` prints each step of the first unit, and
 `sdkconfig.trace` compiles the decoder with `-finstrument-functions`, turns C++ exceptions on and, when one is

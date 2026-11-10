@@ -959,11 +959,18 @@ config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD
         TrueHD itself and sends PCM.
 
         firmware/truehd-probe measured the decoder as a share of one core, 24-bit at 48 kHz, with
-        no network: the ESP32-P4 0.13 for 2.0 and 0.32 for 5.1, the ESP32-S3 0.56 for 2.0 and 1.13
-        for 5.1 (not real time), the ESP32-C6 0.34 and 0.80. The P4 lists it by default; the S3
-        played 2.0 with a burst of 0.83 of the chunk, over the 0.7 the plan asks for, so it does not
-        unless set by hand, and the C6 cannot: it has 53 KB of internal RAM free after start-up and no PSRAM,
-        against a 158 KB decoder and a 72 KiB stack.
+        no network and no I2S: the ESP32-P4 0.13 for 2.0 and 0.32 for 5.1 (before the unit-cost
+        change, draft PR #1815, and not repeated with it); with it the ESP32-S3 0.554 for 2.0 and
+        1.095 for 5.1 (not real time), and with the sink's own memory settings (32 KB instruction
+        cache, 64 KB data cache in 64-byte lines, code and constants in PSRAM, which s3-n16r8
+        has: truehd-probe/sdkconfig.s3mem) 0.432 and 0.931, the slowest 5.1 unit taking 1.11 ms
+        against the 0.83 ms of sound it decodes, 33 KB of internal heap left at the least and 2.0
+        at 192 kHz still over real time (1.573), one run of each on one board in DIO flash mode;
+        the ESP32-C6 0.367 and 0.809. A 5.1 play through the sink on an S3 has not been
+        measured. The P4 lists it by default; the S3 played 2.0 with a burst of 0.83 of the chunk,
+        over the 0.7 the plan asks for, so it does not unless set by hand, and the C6 cannot: it
+        has 53 KB of internal RAM free after start-up and no PSRAM, against a decoder of 158 KB
+        (185,244 bytes on the C6 with the unit-cost change) and a 72 KiB stack.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS
     int "Widest TrueHD presentation decoded in real time: channels (0 = no limit)"
