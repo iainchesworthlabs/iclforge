@@ -489,6 +489,55 @@ int main(int argc, char** argv) {
                     /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
                 g_sink += static_cast<double>(out[0][128]);
             }));
+
+            // The single-precision QMF reconstruction (ReconstructionState::qmf_single_precision),
+            // which a decoder built with a float decode scalar - the ESP32-S3 and ESP32-P4 images -
+            // takes for the Atmos frames it decodes. The two rows above leave the flag off and so
+            // time the double reconstruction in every build, which is why these have rows of their
+            // own: the flag is set here, so they time the same function whichever scalar the
+            // library was built with.
+            const auto single_state = [] {
+                iclforge::ac3::oba::joc::ReconstructionState state;
+                state.qmf_single_precision = true;
+                return state;
+            };
+            results.push_back(time_kernel("joc_reconstruct_qmf_single_4obj", [&] {
+                static auto state = single_state();
+                const auto out = iclforge::ac3::oba::joc::reconstruct(
+                    bed, params, state, /*fast_mdct=*/true,
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
+                g_sink += static_cast<double>(out[0][128]);
+            }));
+            results.push_back(time_kernel("joc_reconstruct_qmf_single_12obj", [&] {
+                static auto state = single_state();
+                const auto out = iclforge::ac3::oba::joc::reconstruct(
+                    bed, wide, state, /*fast_mdct=*/true,
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
+                g_sink += static_cast<double>(out[0][128]);
+            }));
+
+            // A short syncframe (section E2.3.1.4): three blocks, 768 samples, twelve QMF
+            // timeslots, which takes reconstruct_qmf_short whichever precision is asked for.
+            // The same 4 and 12 objects as above.
+            std::vector<std::span<const float>> short_bed;
+            short_bed.reserve(bed.size());
+            for (const auto& channel : bed) {
+                short_bed.push_back(channel.first(3U * 256U));
+            }
+            results.push_back(time_kernel("joc_reconstruct_qmf_short_4obj", [&] {
+                static iclforge::ac3::oba::joc::ReconstructionState state;
+                const auto out = iclforge::ac3::oba::joc::reconstruct(
+                    short_bed, params, state, /*fast_mdct=*/true,
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
+                g_sink += static_cast<double>(out[0][128]);
+            }));
+            results.push_back(time_kernel("joc_reconstruct_qmf_short_12obj", [&] {
+                static iclforge::ac3::oba::joc::ReconstructionState state;
+                const auto out = iclforge::ac3::oba::joc::reconstruct(
+                    short_bed, wide, state, /*fast_mdct=*/true,
+                    /*fast_imdct=*/true, iclforge::objects::oba::joc::Domain::kQmf);
+                g_sink += static_cast<double>(out[0][128]);
+            }));
         }
     }
 
