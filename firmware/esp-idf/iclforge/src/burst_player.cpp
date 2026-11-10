@@ -1023,12 +1023,13 @@ struct BurstPlayer::Impl {
     // several of them. The output is the same, sample for sample, as if each unit had been emitted
     // by itself: a stage whose result depends on where a block ends (a level ramp, the meter's float
     // sums and its window) is run on the unit boundaries, and the units go one at a time through
-    // all of it while anything is under way that this is not known to keep exact (a server's
-    // identify tone, the volume moving to its target).
+    // all of it while the volume is moving to its target (its ramp is over a block). The renderer,
+    // the routing, a delay line, a steady level, the identify tone (a sample at a time from a
+    // generator) and the playout's push do not care where a block ends.
     void emit(std::size_t n, std::uint32_t reached, std::size_t unit = 0) {
         if (unit == 0 || unit >= n || n % unit != 0) {
             emit_range(0, n, reached, 0);
-        } else if (identifying || target_gain.load() != gain) {
+        } else if (target_gain.load() != gain) {
             for (std::size_t at = 0; at < n; at += unit) {
                 emit_range(at, unit, reached, 0);
             }

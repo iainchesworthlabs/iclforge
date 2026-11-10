@@ -9,10 +9,15 @@
 #   iclforge-fw-host-bench    timings and a digest of the output (bench_truehd_block_path.cpp)
 #   iclforge-fw-host-stages   the cost of each stage of the path a call and a sample (bench_stages.cpp)
 #
+# ICLFORGE_FW_HOST_ALT_ROOT, when set to another copy of the component's player (a mutant, to see the
+# tests fail), runs the tests against that copy as iclforge-fw-host-tests-alt.
+#
 # ICLFORGE_FW_HOST_BASE_ROOT, when set to another copy of the component (a checkout of an earlier
 # commit's firmware/esp-idf/iclforge), builds that copy's player the same way as
 # iclforge-fw-host-bench-base, so that the digests of the two can be compared.
 
+set(ICLFORGE_FW_HOST_ALT_ROOT "" CACHE PATH
+    "Another copy of firmware/esp-idf/iclforge to run the host tests against as iclforge-fw-host-tests-alt")
 set(ICLFORGE_FW_HOST_BASE_ROOT "" CACHE PATH
     "Another copy of firmware/esp-idf/iclforge to build the host bench against as iclforge-fw-host-bench-base")
 
@@ -54,4 +59,11 @@ if(ICLFORGE_FW_HOST_BASE_ROOT)
     iclforge_fw_host_player(iclforge_fw_host_player_base "${ICLFORGE_FW_HOST_BASE_ROOT}")
     add_executable(iclforge-fw-host-bench-base bench_truehd_block_path.cpp)
     target_link_libraries(iclforge-fw-host-bench-base PRIVATE iclforge_fw_host_player_base)
+endif()
+
+if(ICLFORGE_FW_HOST_ALT_ROOT)
+    iclforge_fw_host_player(iclforge_fw_host_player_alt "${ICLFORGE_FW_HOST_ALT_ROOT}")
+    iclforge_add_test_binary(iclforge-fw-host-tests-alt PROJECT firmware SOURCES test_truehd_block_path.cpp)
+    target_link_libraries(iclforge-fw-host-tests-alt PRIVATE iclforge_fw_host_player_alt)
+    target_compile_definitions(iclforge-fw-host-tests-alt PRIVATE "ICLFORGE_TESTDATA_DIR=\"${CMAKE_SOURCE_DIR}/testdata\"")
 endif()

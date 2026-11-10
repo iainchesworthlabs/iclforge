@@ -131,6 +131,15 @@ struct TruehdStream::Impl {
     Report report;
     // The layout of the last unit that decoded, which a unit that gives nothing is silence in.
     std::optional<iclforge::ac3::eac3::chanmap::Layout> bed;
+    // What the last unit's channel list made, kept while the next unit names the same channels (a
+    // stream keeps its layout, so this is once a layout and not once a unit): the bed, or nothing
+    // for a list the renderer cannot place, and the coding mode and the LFE it makes.
+    std::array<th::Channel, iclforge::render::LayoutRenderer::kMaxCoded> listed{};
+    std::size_t listed_count = 0;
+    bool listed_known = false;
+    std::optional<iclforge::ac3::eac3::chanmap::Layout> listed_bed;
+    int listed_acmod = 0;
+    bool listed_lfe = false;
     // The planes a block's samples are converted into, one allocation (made by open(), let go by
     // close()): `plane_channels` planes of `plane_columns` floats, a channel's samples end to end.
     std::unique_ptr<float, HeapFree> plane_storage;
@@ -313,7 +322,23 @@ TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, Bloc
                 hand_over();
                 return Result::kRefused;
             }
-            const auto bed = bed_of(unit.layout);
+            // A unit names the same channels as the one before it, as a rule: the bed is worked out
+            // when they change.
+            const std::span<const th::Channel> named = unit.layout;
+            if (!(im.listed_known && named.size() == im.listed_count &&
+                  std::equal(named.begin(), named.end(), im.listed.begin()))) {
+                im.listed_bed = bed_of(named);
+                im.listed_known = named.size() <= im.listed.size();
+                if (im.listed_known) {
+                    std::copy(named.begin(), named.end(), im.listed.begin());
+                    im.listed_count = named.size();
+                }
+                if (im.listed_bed) {
+                    im.listed_acmod = acmod_of(*im.listed_bed);
+                    im.listed_lfe = im.listed_bed->index_of(Location::kLfe) >= 0;
+                }
+            }
+            const auto& bed = im.listed_bed;
             if (!bed || unit.samples <= 0 ||
                 static_cast<std::size_t>(unit.samples) > kMaxUnitSamples ||
                 static_cast<std::size_t>(unit.channels) != unit.layout.size()) {
@@ -344,8 +369,8 @@ TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, Bloc
             im.bed = bed;
             im.unit_samples = samples;
             im.report.channels = unit.channels;
-            im.report.lfe = bed->index_of(Location::kLfe) >= 0;
-            im.report.acmod = acmod_of(*bed);
+            im.report.lfe = im.listed_lfe;
+            im.report.acmod = im.listed_acmod;
             any = true;
             continue;
         }

@@ -18,6 +18,7 @@
 #include <string>
 
 #include "harness.hpp"
+#include "iclforge/render/speaker_trim.hpp"
 #include "truehd_stream.hpp"
 
 namespace {
@@ -46,6 +47,7 @@ int main(int argc, char** argv) {
     std::uint32_t rate = 48000;
     std::size_t block = 256;
     bool ahead = true;
+    bool hazards = false;
     std::size_t max_channels = 0;
     std::size_t passes = 100;
     for (int i = 1; i + 1 < argc; i += 2) {
@@ -61,6 +63,8 @@ int main(int argc, char** argv) {
             rate = static_cast<std::uint32_t>(std::strtoul(value, nullptr, 10));
         } else if (key == "--block") {
             block = std::strtoull(value, nullptr, 10);
+        } else if (key == "--hazards") {
+            hazards = std::strtoull(value, nullptr, 10) != 0;
         } else if (key == "--ahead") {
             ahead = std::strtoull(value, nullptr, 10) != 0;
         } else if (key == "--max-channels") {
@@ -119,6 +123,37 @@ int main(int argc, char** argv) {
     sc.block_samples = block;
     sc.decode_ahead = ahead;
     sc.max_channels = max_channels;
+    if (hazards) {
+        // The things that change while a stream plays and that a block's length touches: the volume
+        // moving, a trim table changing (a level ramp, delays made again), a server's identify tone.
+        sc.before_chunk = [](iclforge::BurstPlayer& player, std::size_t chunk) {
+            iclforge::render::speaker_trim::SpeakerTrimTable table;
+            if (chunk == 0) {
+                (void)table.apply_text("L level=-3; R level=-1.5 distance=2.4; C distance=2.8; Ls distance=1.9; Rs distance=2.0");
+                player.set_speaker_trim(table);
+            } else if (chunk == 6) {
+                (void)table.apply_text("L level=-6; R level=-6 distance=2.4; C level=2 distance=2.8; Ls distance=2.5");
+                player.set_speaker_trim(table);
+            } else if (chunk == 11) {
+                (void)table.apply_text("reset");
+                player.set_speaker_trim(table);
+            }
+            if (chunk == 2) {
+                player.set_volume(50, false);
+            } else if (chunk == 5) {
+                player.set_volume(100, false);
+            } else if (chunk == 8) {
+                player.set_volume(30, true);
+            } else if (chunk == 11) {
+                player.set_volume(80, false);
+            }
+            if (chunk == 4) {
+                player.identify(iclforge::sendspin::player::Identify{.output = 1, .level_db = -30.0});
+            } else if (chunk == 9) {
+                player.identify(std::nullopt);
+            }
+        };
+    }
     if (mode == "digest") {
         const fwhost::Outcome out = fwhost::run(sc);
         const auto& p = out.status.playout;
