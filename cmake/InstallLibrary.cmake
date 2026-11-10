@@ -235,6 +235,13 @@ if(ICLFORGE_BUILD_CAPI)
             "Stable C11 API over the AC-3 and E-AC-3 encoders and decoders")
         set(_iclforge_capi_pc_static_requires iclforge-ac3)
     endif()
+    # With ICLFORGE_BUILD_TRUEHD on, libiclforge_c_static.a holds truehd.cpp.o and truehd_encoder.cpp.o,
+    # which call into libiclforge_truehd_static.a (capiTargets carries its $<LINK_ONLY:...> too). The
+    # archive records no such dependency, so without this name a consumer's `pkg-config --static --libs
+    # iclforge-c` leaves the TrueHD symbols undefined.
+    if(ICLFORGE_BUILD_TRUEHD)
+        list(APPEND _iclforge_capi_pc_static_requires iclforge-truehd)
+    endif()
     iclforge_install_library(capi
         DESCRIPTION "${_iclforge_capi_pc_description}"
         STATIC_REQUIRES ${_iclforge_capi_pc_static_requires}

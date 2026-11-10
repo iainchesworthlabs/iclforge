@@ -459,6 +459,18 @@ jobs:
     permissions:
       contents: read
     steps:
+      # The "Assert the merged tree carries the CLI man page and completions"
+      # step below runs tools/ci/check_cli_docs_package.py, and this job
+      # otherwise has no checkout: the first real release run died there with
+      # "can't open file ... check_cli_docs_package.py". Only tools/ci is
+      # needed, so only that is fetched. This is the first step so that the
+      # checkout's cleaning of the workspace cannot touch the downloads.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: tools/ci
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Download arm64 runtime install tree
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
