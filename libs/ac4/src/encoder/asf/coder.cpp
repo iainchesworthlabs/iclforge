@@ -437,7 +437,7 @@ void band_peaks(const Grouped& grouped, std::vector<std::vector<double>>& peaks)
             bool plain = true;
             for (std::size_t k = grouped.offset[g][b]; k < grouped.offset[g][b + 1]; ++k) {
                 const double magnitude = std::abs(grouped.lines[k]);
-                plain = plain && magnitude == magnitude;  // not a number: the band is never all zeros
+                plain = plain && !std::isnan(magnitude);  // not a number: the band is never all zeros
                 largest = std::max(largest, magnitude);
             }
             peaks[g][b] = plain ? largest : std::numeric_limits<double>::infinity();
