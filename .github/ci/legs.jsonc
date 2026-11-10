@@ -64,6 +64,12 @@
       "conformance_vectors": true,
       // The no-ALSA pass is a second complete build and test run (17 minutes on the
       // fleet), so it and the scalar variants wait for the nightly run.
+      //
+      // 150, not the 90 the plain legs get: a release runs the deep passes with every other leg
+      // building beside it. On the 2026-11-09 dry run of v0.11.0-beta.1 the leg finished all
+      // 5,501 float32 tests at 85 minutes and was cancelled at 90 in the next gate; the tag run
+      // before it had taken 55 minutes to reach the same place.
+      "timeout_minutes": 150,
       "deep_only": ["alsa_fallback", "scalar_variants"]
     },
     {
@@ -90,9 +96,12 @@
       // a shared library does not export, which the static build cannot see, so it runs
       // in the nightly run.
       "shared_libs": true,
-      // 120, not the 90 the other legs get: the first run after a stage that rewrites most
+      // 150, not the 90 the other legs get: the first run after a stage that rewrites most
       // sources starts with a cold compiler cache, and with the shared-libs pass it ran out.
-      "timeout_minutes": 120,
+      // 120 was not enough for a release either: the v0.11.0-beta.1 tag run was cancelled at
+      // 120 minutes with 4,797 of its 5,421 shared-libs tests done, and the dry run after it
+      // ran past 1h50.
+      "timeout_minutes": 150,
       "deep_only": ["shared_libs"]
     },
     {
