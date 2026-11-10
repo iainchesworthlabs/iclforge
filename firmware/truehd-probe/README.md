@@ -54,7 +54,9 @@ PR #1815, PCM matching the reference hash in every fixture (`results/esp32s3.txt
 A 5.1 unit at 48 kHz is 40 samples, 833 us of audio, so the slowest unit with the overlay (1,106 us) is longer than
 the unit it decodes while the mean (776 us) is shorter: a player needs the ring to ride out the slow ones. The
 probe has no Wi-Fi and no I2S; Wi-Fi's buffers come out of the same internal heap, and this is the decoder
-alone. What a play of 5.1 through the sink does with these settings has not been measured.
+alone. A play through the Hearth sink with these settings, on 10 and 11 November 2026 (one run of each):
+2.0 took a burst of 11.7 to 12.0 ms for its 20 ms (0.59) and plays; 5.1 took 28.1 to 28.4 ms (1.42), against
+this probe's 18.6 ms, and does not play.
 
 On main's decoder (`57fef9af0`) the larger caches alone took 5.1 at 24 bit from 1.499 to 1.094, and the caches with the
 PSRAM lines aborted in the first decode and rebooted in a loop; those captures are not kept here, and why was not

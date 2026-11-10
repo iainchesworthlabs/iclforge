@@ -1,0 +1,20 @@
+#pragma once
+// The host build of the component's player code (iclforge-host-tests/): the heap by capability, over malloc.
+// Every allocation is recorded with its capabilities (host_control.hpp), so that a test can say where
+// an allocation would have gone on a part, and whether the part has PSRAM is a thing a test sets.
+#include <cstddef>
+#include <cstdint>
+
+inline constexpr std::uint32_t MALLOC_CAP_8BIT = 1U << 0;
+inline constexpr std::uint32_t MALLOC_CAP_INTERNAL = 1U << 1;
+inline constexpr std::uint32_t MALLOC_CAP_SPIRAM = 1U << 2;
+
+void* heap_caps_malloc(std::size_t size, std::uint32_t caps);
+void* heap_caps_calloc(std::size_t count, std::size_t size, std::uint32_t caps);
+void heap_caps_free(void* memory);
+std::size_t heap_caps_get_total_size(std::uint32_t caps);
+std::size_t heap_caps_get_free_size(std::uint32_t caps);
+std::size_t heap_caps_get_largest_free_block(std::uint32_t caps);
+std::size_t heap_caps_get_minimum_free_size(std::uint32_t caps);
+int heap_caps_monitor_local_minimum_free_size_start();
+int heap_caps_monitor_local_minimum_free_size_stop();

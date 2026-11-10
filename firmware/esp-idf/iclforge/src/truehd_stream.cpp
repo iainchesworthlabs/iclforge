@@ -97,6 +97,30 @@ constexpr std::size_t kStackBytes = 64 * 1024;
     return rate_hz >= 88200 ? 80 : 40;
 }
 
+[[nodiscard]] bool same_bed(const iclforge::ac3::eac3::chanmap::Layout& a,
+                            const iclforge::ac3::eac3::chanmap::Layout& b) {
+    if (a.count != b.count) {
+        return false;
+    }
+    for (int i = 0; i < a.count; ++i) {
+        if (a[i] != b[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// PSRAM when the part has it, internal RAM otherwise (the player's buffers are chosen the same way,
+// burst_player.cpp's bulk_caps()): asked, not learned from a failed allocation.
+[[nodiscard]] std::uint32_t plane_caps() {
+    return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0 ? (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+                                                            : (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
+struct HeapFree {
+    void operator()(float* memory) const { heap_caps_free(memory); }
+};
+
 }  // namespace
 
 struct TruehdStream::Impl {
@@ -107,10 +131,21 @@ struct TruehdStream::Impl {
     Report report;
     // The layout of the last unit that decoded, which a unit that gives nothing is silence in.
     std::optional<iclforge::ac3::eac3::chanmap::Layout> bed;
-    // One channel's samples of the unit being handed over, and the spans that name them.
-    std::array<std::array<float, kMaxUnitSamples>, iclforge::render::LayoutRenderer::kMaxCoded>
-        planes{};
+    // The planes a block's samples are converted into, one allocation (made by open(), let go by
+    // close()): `plane_channels` planes of `plane_columns` floats, a channel's samples end to end.
+    std::unique_ptr<float, HeapFree> plane_storage;
+    std::size_t plane_channels = 0;
+    std::size_t plane_columns = 0;
+    // The most samples a block handed over holds, and the most converted ahead of it: whole units
+    // of the rate, the first at most the second.
+    std::size_t block_limit = 0;
+    std::size_t run_limit = 0;
+    // The spans that name the first `samples` of each plane in a block.
     std::array<std::span<const float>, iclforge::render::LayoutRenderer::kMaxCoded> spans{};
+
+    [[nodiscard]] float* plane(std::size_t channel) const {
+        return plane_storage.get() + (channel * plane_columns);
+    }
 };
 
 TruehdStream::TruehdStream() : impl_(std::make_unique<Impl>()) {}
@@ -154,6 +189,29 @@ bool TruehdStream::open(const Config& config) {
         im.reason = "not enough free heap for a TrueHD decoder";
         return false;
     }
+    // The planes: the channels this board decodes (the renderer's most when it states none, and the
+    // stereo pair a unit of silence is made in at the least) by the samples of the longest run.
+    const std::size_t unit = samples_per_unit(config.sample_rate_hz);
+    im.plane_channels = std::max<std::size_t>(
+        2, std::min(config.max_channels != 0 ? config.max_channels
+                                             : iclforge::render::LayoutRenderer::kMaxCoded,
+                    iclforge::render::LayoutRenderer::kMaxCoded));
+    im.block_limit = std::max(unit, (config.max_block_samples / unit) * unit);
+    // A run longer than a block is a thing of a part with PSRAM, held to a chunk and to a budget.
+    std::size_t run = im.block_limit;
+    if (config.max_run_samples > im.block_limit && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0) {
+        const std::size_t chunk = kMaxUnitsPerChunk * unit;
+        const std::size_t budget = kPlaneBudgetBytes / (im.plane_channels * sizeof(float));
+        run = std::max(im.block_limit, (std::min({config.max_run_samples, chunk, budget}) / unit) * unit);
+    }
+    im.run_limit = run;
+    im.plane_columns = std::max(im.run_limit, kMaxUnitSamples);
+    im.plane_storage.reset(static_cast<float*>(
+        heap_caps_malloc(im.plane_channels * im.plane_columns * sizeof(float), plane_caps())));
+    if (!im.plane_storage) {
+        im.reason = "not enough memory for the TrueHD planes";
+        return false;
+    }
     im.decoder = std::make_unique<th::Decoder>(th::DecoderConfig{});
     return true;
 }
@@ -175,6 +233,7 @@ void TruehdStream::reset() {
 void TruehdStream::close() {
     impl_->decoder.reset();
     impl_->bed.reset();
+    impl_->plane_storage.reset();
 }
 
 TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, BlockFn fn,
@@ -202,6 +261,48 @@ TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, Bloc
         return Result::kInvalid;
     }
 
+    // The run of units being gathered into a block: its layout and unit length, the number of the
+    // first unit, and the samples each plane holds of it so far.
+    struct Run {
+        iclforge::ac3::eac3::chanmap::Layout bed;
+        std::size_t channels = 0;
+        std::size_t unit = 0;
+        std::size_t filled = 0;
+        int first = 0;
+    } run;
+    // The run handed to `fn` as a block. Called before anything that ends a run, so that a unit
+    // refused later in the chunk finds everything before it played, as it did when each unit was
+    // a block of its own.
+    const auto hand_over = [&]() {
+        // In blocks of whole units no longer than the bound (one unit, if that is longer).
+        const std::size_t piece_limit = std::max(run.unit, (im.block_limit / std::max<std::size_t>(run.unit, 1)) * run.unit);
+        for (std::size_t at = 0; at < run.filled; at += piece_limit) {
+            const std::size_t piece = std::min(piece_limit, run.filled - at);
+            for (std::size_t c = 0; c < run.channels; ++c) {
+                im.spans[c] = std::span<const float>(im.plane(c) + at, piece);
+            }
+            fn(context, Block{.channels = std::span<const std::span<const float>>(im.spans.data(), run.channels),
+                              .bed = run.bed,
+                              .samples = piece,
+                              .unit_samples = run.unit,
+                              .index = run.first + static_cast<int>(at / run.unit)});
+        }
+        run.filled = 0;
+    };
+    // Room for a unit of `samples` in `bed` after what the run holds, or a new run begun for it
+    // (the one before handed over).
+    const auto place = [&](const iclforge::ac3::eac3::chanmap::Layout& bed, std::size_t samples, int n) {
+        const bool joins = run.filled != 0 && run.unit == samples && same_bed(run.bed, bed) &&
+                           run.filled + samples <= im.run_limit;
+        if (!joins) {
+            hand_over();
+            run.bed = bed;
+            run.channels = static_cast<std::size_t>(bed.count);
+            run.unit = samples;
+            run.first = n;
+        }
+    };
+
     bool any = false;
     for (std::size_t n = 0; n < count; ++n) {
         const auto decoded = im.decoder->decode(units[n]);
@@ -209,6 +310,7 @@ TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, Bloc
             const th::DecodedAccessUnit& unit = **decoded;
             if (unit.sample_rate != im.config.sample_rate_hz) {
                 im.reason = "a sample rate the player does not play";
+                hand_over();
                 return Result::kRefused;
             }
             const auto bed = bed_of(unit.layout);
@@ -216,35 +318,34 @@ TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, Bloc
                 static_cast<std::size_t>(unit.samples) > kMaxUnitSamples ||
                 static_cast<std::size_t>(unit.channels) != unit.layout.size()) {
                 im.reason = "a channel layout the renderer does not place";
+                hand_over();
                 return Result::kRefused;
             }
             if (im.config.max_channels != 0 &&
                 static_cast<std::size_t>(unit.channels) > im.config.max_channels) {
                 im.reason = "more channels than this board decodes of TrueHD";
+                hand_over();
                 return Result::kRefused;
             }
             const std::size_t samples = static_cast<std::size_t>(unit.samples);
             const std::size_t channels = static_cast<std::size_t>(unit.channels);
+            place(*bed, samples, static_cast<int>(n));
             // 24-bit values, sign-extended in an int32, to the renderer's floats; interleaved to a
-            // plane a channel.
+            // plane a channel, a plane at a time (one conversion and one multiply by the same
+            // constant a sample, as before: only the order the samples are visited in is another).
             constexpr float kScale = 1.0F / 8388608.0F;
-            for (std::size_t s = 0; s < samples; ++s) {
-                for (std::size_t c = 0; c < channels; ++c) {
-                    im.planes[c][s] = static_cast<float>(unit.pcm[s * channels + c]) * kScale;
+            for (std::size_t c = 0; c < channels; ++c) {
+                float* const into = im.plane(c) + run.filled;
+                for (std::size_t s = 0; s < samples; ++s) {
+                    into[s] = static_cast<float>(unit.pcm[(s * channels) + c]) * kScale;
                 }
             }
-            for (std::size_t c = 0; c < channels; ++c) {
-                im.spans[c] = std::span<const float>(im.planes[c].data(), samples);
-            }
+            run.filled += samples;
             im.bed = bed;
             im.unit_samples = samples;
             im.report.channels = unit.channels;
             im.report.lfe = bed->index_of(Location::kLfe) >= 0;
             im.report.acmod = acmod_of(*bed);
-            fn(context, Block{.channels = std::span<const std::span<const float>>(im.spans.data(), channels),
-                              .bed = *bed,
-                              .samples = samples,
-                              .index = static_cast<int>(n)});
             any = true;
             continue;
         }
@@ -261,19 +362,16 @@ TruehdStream::Result TruehdStream::decode(std::span<const std::byte> chunk, Bloc
             bed.items[1] = Location::kRight;
             bed.count = 2;
         }
-        const std::size_t channels = static_cast<std::size_t>(bed.count);
-        for (std::size_t c = 0; c < channels; ++c) {
-            std::fill_n(im.planes[c].begin(), samples, 0.0F);
-            im.spans[c] = std::span<const float>(im.planes[c].data(), samples);
+        place(bed, samples, static_cast<int>(n));
+        for (std::size_t c = 0; c < run.channels; ++c) {
+            std::fill_n(im.plane(c) + run.filled, samples, 0.0F);
         }
-        fn(context, Block{.channels = std::span<const std::span<const float>>(im.spans.data(), channels),
-                          .bed = bed,
-                          .samples = samples,
-                          .index = static_cast<int>(n)});
+        run.filled += samples;
         if (!decoded) {
             im.reason = "a unit the decoder refused";
         }
     }
+    hand_over();
     return any ? Result::kDecoded : Result::kWaiting;
 }
 

@@ -10,8 +10,11 @@
 
 // The TrueHD decoder as the Sendspin player's burst path uses it:
 // a chunk of one to 24 whole access units (the Sendspin extension's TrueHD data type), each decoded
-// to a block of 40, 80 or 160 samples a channel in the order and layout the renderer takes, as
-// AC-3's, E-AC-3's and AC-4's decoders hand them over. It is libs/truehd's decoder, built by
+// to 40, 80 or 160 samples a channel in the order and layout the renderer takes, as AC-3's,
+// E-AC-3's and AC-4's decoders hand them over. The units of a run that share a layout and a length
+// are handed over together, as one block of up to Config::max_block_samples (6 units at 48 kHz when
+// the player's 256-sample block is the bound), because the player's path from the renderer to the
+// sink costs a fixed amount a block that a unit of 40 samples does not pay back. It is libs/truehd's decoder, built by
 // CONFIG_ICLFORGE_TRUEHD; a build without that option links truehd_stream_none.cpp instead, where
 // available() is false and nothing opens, so the player lists no TrueHD and refuses a stream of it
 // (the way ac4_stream.hpp does for AC-4).
@@ -27,14 +30,18 @@ namespace iclforge {
 
 class TruehdStream {
    public:
-    // One unit's samples, for the player's renderer.
+    // A run of units' samples, for the player's renderer.
     struct Block {
         // One span a channel, `samples` long, in the order of `bed`; valid for the call.
         std::span<const std::span<const float>> channels;
         // The layout the channels are in, as the renderer's set_bed() takes it.
         iclforge::ac3::eac3::chanmap::Layout bed;
         std::size_t samples = 0;
-        // The unit's number in its chunk, from 0.
+        // The samples of each unit the block holds, which `samples` is a whole number of: the
+        // block-length state of the player's stages (a level ramp, a meter's window) is kept in
+        // units, as it was when each unit was a block of its own.
+        std::size_t unit_samples = 0;
+        // The first unit's number in its chunk, from 0.
         int index = 0;
     };
     using BlockFn = void (*)(void* context, const Block& block);
@@ -55,6 +62,17 @@ class TruehdStream {
         std::size_t max_channels = 0;
         // The one rate the player plays; a unit at another is refused.
         std::uint32_t sample_rate_hz = 48000;
+        // The most samples a channel of one block handed to the player may hold: rounded down to whole
+        // units of the rate, and at least one. 0 is one unit a block, which is what the player did
+        // before units were handed over together.
+        std::size_t max_block_samples = 0;
+        // The most samples a channel the stream converts ahead of handing them over: a chunk's units
+        // are decoded and converted into the planes first, and handed over a block at a time after
+        // them, so that the decoder's code runs through the chunk before the player's does (kMaxRunSamples
+        // for a chunk's worth, 0 for none: a block is converted, handed over, and the next converted).
+        // Rounded down to whole units, held to a chunk and to kPlaneBudgetBytes of planes, and not
+        // honoured on a part with no PSRAM, where a run is a block.
+        std::size_t max_run_samples = 0;
     };
 
     // What the decoder found in the last unit that decoded.
@@ -70,6 +88,10 @@ class TruehdStream {
     static constexpr std::size_t kMaxUnitsPerChunk = 24;
     // The most samples a channel of one unit holds (160, at 192 kHz).
     static constexpr std::size_t kMaxUnitSamples = 160;
+    // A whole chunk of the longest units: Config::max_run_samples for no limit but the budget.
+    static constexpr std::size_t kMaxRunSamples = kMaxUnitsPerChunk * kMaxUnitSamples;
+    // The most bytes the planes hold when they are made to hold more than a block.
+    static constexpr std::size_t kPlaneBudgetBytes = 64 * 1024;
 
     TruehdStream();
     ~TruehdStream();
@@ -97,8 +119,10 @@ class TruehdStream {
     [[nodiscard]] static std::size_t chunk_samples(std::span<const std::byte> chunk,
                                                    std::uint32_t sample_rate_hz);
 
-    // Makes the decoder. False, with reason() saying why, when the heap is under the floor or the
-    // decoder could not be made. Made once and kept across streams until the object goes.
+    // Makes the decoder, and the planes a block's samples are converted into (max_channels, or the
+    // renderer's most, planes of the block length: PSRAM where the part has it, internal RAM
+    // otherwise). False, with reason() saying why, when the heap is under the floor or either
+    // could not be made. Made once and kept across streams until close() or the object goes.
     [[nodiscard]] bool open(const Config& config);
     [[nodiscard]] bool is_open() const;
 
@@ -107,8 +131,11 @@ class TruehdStream {
     // The decoder let go, with its state. open() makes another.
     void close();
 
-    // One chunk: whole access units in stream order. Each is decoded and its samples handed to `fn`
-    // as one block.
+    // One chunk: whole access units in stream order. Each is decoded, and the samples of the units
+    // of a run that share a layout and a length are handed to `fn` as one block, in order; a unit
+    // that gives nothing is silence of the length and layout of the one before and goes into the
+    // run it would have been a block beside. A unit that is refused ends the run first: what comes
+    // before it has been handed over when decode() returns.
     [[nodiscard]] Result decode(std::span<const std::byte> chunk, BlockFn fn, void* context);
 
     // The last decode's refusal or error, a string literal; empty after one that decoded.
