@@ -126,3 +126,10 @@ add_dependencies(iclforge-tests iclforge-truehd-ss3-lab)
 if(MSVC)
     set_source_files_properties(decoder/test_object_robustness.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()
+
+# encoder/test_encoder_object_downmix_interop.cpp reads std::getenv too (ICL_DOWNMIX_OUT and
+# ICL_DOWNMIX_DUMP, the directory and the files of its hidden lab cases).
+if(MSVC)
+    set_source_files_properties(encoder/test_encoder_object_downmix_interop.cpp
+        PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()
