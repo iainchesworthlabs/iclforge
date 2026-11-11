@@ -135,6 +135,27 @@ class TheFile(unittest.TestCase):
                     (sp.PROJECT / f"sdkconfig.{spec['fragment']}").is_file(), f"overlay {name}"
                 )
 
+    def test_wifi_buffers_in_psram_come_with_a_bound_on_the_out_of_order_queue(self) -> None:
+        """With CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP ESP-IDF's Kconfig defaults
+        LWIP_TCP_OOSEQ_MAX_PBUFS to 0, no bound, and one connection's out-of-order queue can then
+        hold every Wi-Fi receive buffer: the board answers nothing while its CPUs run (the S3
+        suite hang of 2026-10-25, bounded in sdkconfig.psram; shown again on 2026-11-10 by
+        setting the key back to 0 on an image that otherwise held to its profile). The profile
+        guard does not watch the key, so the line is held here: a profile whose fragments ask for
+        the PSRAM buffers must also set a bound above 0."""
+        for ident in self.data["profiles"]:
+            asked: dict[str, str] = {}
+            for name in sp.fragment_names(self.data, ident):
+                asked.update(sp.parse_config((sp.PROJECT / name).read_text(encoding="utf-8")))
+            if asked.get("CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP") != "y":
+                continue
+            bound = asked.get("CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS", "")
+            self.assertTrue(
+                bound.isdigit() and int(bound) > 0,
+                f"{ident}: Wi-Fi buffers in PSRAM and CONFIG_LWIP_TCP_OOSEQ_MAX_PBUFS is "
+                f"{bound or 'not set (ESP-IDF then takes 0, no bound)'}",
+            )
+
     def test_every_profile_has_a_layout_evidence_row(self) -> None:
         """layout_options.hpp says what a kind of board has been measured to play, by profile id,
         and answers "not verified" for an id it has no row for. A new profile is a new kind of
