@@ -601,6 +601,30 @@ TEST_CASE("ASPX streams read back with the encoder's trace at every rate, channe
     }
 }
 
+TEST_CASE("5.1 ASPX frames are the same from one call over seconds of input as from frame-sized pieces",
+          "[ac4][encoder][aspx]") {
+    // The encoder drops the input it has read for the last time as it codes:
+    // from one call that is most of what it holds, and the dropped samples
+    // are erased in batches, not a frame at a time. Neither may show in the
+    // bytes.
+    const std::size_t count = seconds(4.0, 2.0);
+    const std::vector<std::vector<float>> input = mixed(count, 48000, 6);
+    iclforge::ac4::EncoderConfig config;
+    config.channels = 6;
+    config.bitrate_kbps = 192;
+    const Encoded whole = encode(config, input, count);
+    const Encoded pieces = encode(config, input, 2048);
+    CHECK(count_records(whole, "5_X_codec_mode", 1) == whole.frames.size());
+    REQUIRE(whole.frames.size() == pieces.frames.size());
+    REQUIRE(whole.frames.size() > 40);
+    for (std::size_t f = 0; f < whole.frames.size(); ++f) {
+        CAPTURE(f);
+        CHECK(whole.frames[f].raw_ac4_frame == pieces.frames[f].raw_ac4_frame);
+        CHECK(whole.frames[f].samples == pieces.frames[f].samples);
+        CHECK(whole.frames[f].iframe == pieces.frames[f].iframe);
+    }
+}
+
 TEST_CASE("ASPX recreates the band above the crossover at its energy", "[ac4][encoder][aspx]") {
     // Noise over 11 to 20 kHz on a tone: the crossover is 7.5 kHz at 48 kbps
     // and 13.5 kHz at 96, and A-SPX recreates the band over it at the
