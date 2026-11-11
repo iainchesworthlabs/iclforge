@@ -106,8 +106,10 @@ config ICLFORGE_TRUEHD
         0.931, and 0.823 at 16 bit. The slowest 5.1 unit took 1.11 ms against
         the 0.83 ms of sound it decodes, the least internal heap free was
         33 KB, and 2.0 at 192 kHz stayed over real time (1.573). That is one
-        run of each configuration on one board with DIO flash and no Wi-Fi; a
-        5.1 play through the sink has not been measured. The ESP32-C6 did 2.0
+        run of each configuration on one board with DIO flash and no Wi-Fi. A
+        5.1 play through the sink, beside Wi-Fi, took 1.20 of real time at
+        24 bit and 1.01 at 16 bit (2.0: 0.55), so 5.1 does not keep up there
+        (docs/platforms/bare-metal/esp32-s3.md). The ESP32-C6 did 2.0
         at 0.367 and 5.1 at 0.809 with the unit-cost change, with 25 to 56 KB
         free in a play, so it does not fit beside Wi-Fi.
 

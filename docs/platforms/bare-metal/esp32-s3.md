@@ -1881,7 +1881,9 @@ took 1,106 microseconds with the overlay (2,599 without it): the mean is under t
 over it, so a player needs a ring to absorb it. The 192 kHz stereo stream is over real time at 1.573. Wi-Fi's buffers
 come out of the same internal heap that the probe left 33 KB of at the least. The board ran in DIO flash mode, and a sink
 flashed with its bootloader runs QIO, whose effect on the decoder was not measured. A 5.1 TrueHD play through the sink
-has not been measured. The sink lists `truehd` on an S3 only when `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD` is set to 1
+does not keep up: in a measurement build of the sink on 2026-11-11, beside Wi-Fi, a 20 ms chunk of 5.1 at 24 bit took
+23.9 ms (1.20 of real time), 20.3 ms of it in the decoder, a chunk at 16 bit 20.1 ms (1.01), and a 2.0 chunk 11.0 ms
+(0.55); one play each. The sink lists `truehd` on an S3 only when `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD` is set to 1
 (it is 0 by default there), and then states two coded channels, so a server sends it the 2.0 presentation or PCM
 (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS`, `firmware/hearth-sink/main/Kconfig.projbuild`).
 On `main` before the unit-cost change the same overlay with the PSRAM lines made the probe abort in the first decode

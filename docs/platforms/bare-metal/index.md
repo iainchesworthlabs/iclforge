@@ -18,7 +18,7 @@ A Hearth sink built with the decoder takes AC-4 in a Sendspin group on the P4 an
 TrueHD (`libs/truehd`) is an option of the component, `CONFIG_ICLFORGE_TRUEHD`, and of the Hearth sink's `truehd`
 overlay; no published image has it. `firmware/truehd-probe` has measured its decoder on a board for the ESP32-C6, -S3
 and -P4, and on the [ESP32-S3](esp32-s3.md#truehd) 5.1 at 24 bit took 0.93 of real time with the sink's memory
-settings and 1.095 without them (one run each, no Wi-Fi, no I2S; a play through the sink has not been measured). The
+settings and 1.095 without them (one run each, no Wi-Fi, no I2S; a 5.1 play through the sink took 1.20 and does not keep up). The
 variant table has the row, and the
 [roadmap](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md#truehd-and-e-ac-3-as-equals-proposed) the work.
 

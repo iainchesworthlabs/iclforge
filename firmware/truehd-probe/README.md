@@ -54,7 +54,8 @@ PR #1815, PCM matching the reference hash in every fixture (`results/esp32s3.txt
 A 5.1 unit at 48 kHz is 40 samples, 833 us of audio, so the slowest unit with the overlay (1,106 us) is longer than
 the unit it decodes while the mean (776 us) is shorter: a player needs the ring to ride out the slow ones. The
 probe has no Wi-Fi and no I2S; Wi-Fi's buffers come out of the same internal heap, and this is the decoder
-alone. What a play of 5.1 through the sink does with these settings has not been measured.
+alone. A play of 5.1 at 24 bit through the sink with these settings does
+not keep up: 23.9 ms a 20 ms chunk, 20.3 ms of it in the decoder (docs/platforms/bare-metal/esp32-s3.md).
 
 On main's decoder (`57fef9af0`) the larger caches alone took 5.1 at 24 bit from 1.499 to 1.094, and the caches with the
 PSRAM lines aborted in the first decode and rebooted in a loop; those captures are not kept here, and why was not
