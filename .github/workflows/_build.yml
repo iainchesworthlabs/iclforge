@@ -4198,6 +4198,7 @@ jobs:
         # step - after the probe has already printed "pass", which makes it read as
         # a probe regression that it is not. Same reason, same fix as build-esp32s3's
         # ICLFORGE_ESP32S3_SUMMARY above.
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --icount | tee "build/config-arm-none-eabi-minimal/icount.txt"
 
       # The encode direction on the same terms. Both encoders are double
@@ -4205,6 +4206,7 @@ jobs:
       # and the counts are several times the decode rows' - the figure an
       # integrator sizing an encoder for a part without an FPU actually needs.
       - name: Instructions per ENCODED frame under QEMU -icount
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --encoder --icount | tee "build/config-arm-none-eabi-minimal/icount-encode.txt"
 
       # The fixed-point tier on the same leg:
@@ -4221,12 +4223,14 @@ jobs:
         # steps above give, and not this run's own -fixed directory either:
         # the shell opens tee's file when it builds the pipeline, before the
         # script has configured anything, so the target has to exist already.
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed | tee "build/config-arm-none-eabi-minimal/fixed-arm.txt"
 
       - name: Fixed-point hashes against the pinned ones
         run: python3 tools/checks/check_probe_hashes.py --expected testdata/fixed-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/fixed-arm.txt"
 
       - name: Fixed-point instructions per frame under QEMU -icount
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-fixed.txt"
 
       # The AC-4 decoder on the same leg: its own probe
@@ -4237,6 +4241,7 @@ jobs:
       # against the ceilings in the runner. Into the FLOAT build directory of the
       # first step, for the reason the -icount steps above give.
       - name: Build and run the AC-4 probe under QEMU
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --ac4 | tee "build/config-arm-none-eabi-minimal/ac4-arm.txt"
 
       # decision 26: the float PCM is the same on the host, the Cortex-M3 and the
@@ -4245,6 +4250,7 @@ jobs:
         run: python3 tools/checks/check_probe_hashes.py --expected testdata/ac4-probe-pcm-hashes.json "build/config-arm-none-eabi-minimal/ac4-arm.txt"
 
       - name: AC-4 instructions per frame under QEMU -icount
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4.txt"
 
       # The AC-4 decoder's fixed-point tier on the same leg:
@@ -4253,6 +4259,7 @@ jobs:
       # (testdata/ac4-fixed-probe-pcm-hashes.json). The -icount run gates the
       # tier's own instruction ceilings (ICOUNT_CEILING_AC4_FIXED in the runner).
       - name: Build and run the fixed-point AC-4 probe under QEMU -icount
+        shell: bash
         run: ./tools/checks/run_baremetal_probe.sh --ac4 --scalar=fixed --icount | tee "build/config-arm-none-eabi-minimal/icount-ac4-fixed.txt"
 
       - name: Fixed-point AC-4 hashes against the pinned ones
