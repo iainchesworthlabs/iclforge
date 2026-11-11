@@ -1,8 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <numbers>
+#include <random>
+#include <span>
 #include <vector>
 
 #include "iclforge/ac3/core/tables.hpp"
@@ -140,4 +144,213 @@ TEST_CASE("the float detector decides as the double one does on a loud onset", "
         const bool narrow_hit = narrow.detect(segments[i]);
         CHECK(narrow_hit == wide_hit);
     }
+}
+
+namespace {
+
+// The detector as it was before run_pass kept the filter's memory in locals
+// and reduced each block of 64 to its peak as it went: the cascade through
+// members, a stored array of filtered samples, peak_abs over each quarter,
+// the same tree and the same comparisons. A transcription, so a change to
+// the arithmetic of the real one shows as a different decision here.
+template <typename Scalar>
+class ReferenceDetector {
+   public:
+    explicit ReferenceDetector(iclforge::ac3::SampleRate sample_rate) {
+        const double fs = static_cast<double>(iclforge::ac3::sample_rate_hz(sample_rate));
+        const double w0 = 2.0 * std::numbers::pi * 8000.0 / fs;
+        const double cos_w0 = std::cos(w0);
+        const double alpha = std::sin(w0) / (2.0 * (std::numbers::sqrt2 / 2.0));
+        const double a0 = 1.0 + alpha;
+        const Biquad stage{.b0 = static_cast<Scalar>((1.0 + cos_w0) / 2.0 / a0),
+                           .b1 = static_cast<Scalar>(-(1.0 + cos_w0) / a0),
+                           .b2 = static_cast<Scalar>((1.0 + cos_w0) / 2.0 / a0),
+                           .a1 = static_cast<Scalar>((-2.0 * cos_w0) / a0),
+                           .a2 = static_cast<Scalar>((1.0 - alpha) / a0)};
+        stages_.fill(stage);
+    }
+
+    bool detect(const std::array<float, 256>& pcm) {
+        const bool suppress = first_block_;
+        first_block_ = false;
+        const bool hit = run_pass(pcm);
+        return !suppress && hit;
+    }
+
+   private:
+    struct Biquad {
+        Scalar b0 = 0, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
+        Scalar x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        Scalar process(Scalar x) {
+            const Scalar y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+            x2 = x1;
+            x1 = x;
+            y2 = y1;
+            y1 = y;
+            return y;
+        }
+    };
+
+    static Scalar peak_abs(std::span<const Scalar> x) {
+        Scalar m = 0;
+        for (const Scalar v : x) {
+            m = std::max(m, std::abs(v));
+        }
+        return m;
+    }
+
+    bool run_pass(const std::array<float, 256>& half) {
+        std::array<Scalar, 256> filtered{};
+        for (std::size_t n = 0; n < half.size(); ++n) {
+            Scalar x = static_cast<Scalar>(half[n]);
+            for (auto& stage : stages_) {
+                x = stage.process(x);
+            }
+            filtered[n] = x;
+        }
+        const std::span<const Scalar> all(filtered);
+        const std::array<Scalar, 4> p3{
+            peak_abs(all.subspan(0, 64)),
+            peak_abs(all.subspan(64, 64)),
+            peak_abs(all.subspan(128, 64)),
+            peak_abs(all.subspan(192, 64)),
+        };
+        const std::array<Scalar, 2> p2{std::max(p3[0], p3[1]), std::max(p3[2], p3[3])};
+        const Scalar p1 = std::max(p2[0], p2[1]);
+        bool transient = false;
+        if (p1 >= static_cast<Scalar>(100.0 / 32768.0)) {
+            if (p1 * static_cast<Scalar>(0.1) > prev_level1_) {
+                transient = true;
+            }
+            if (p2[0] * static_cast<Scalar>(0.075) > prev_level2_) {
+                transient = true;
+            }
+            if (p2[1] * static_cast<Scalar>(0.075) > p2[0]) {
+                transient = true;
+            }
+            if (p3[0] * static_cast<Scalar>(0.05) > prev_level3_) {
+                transient = true;
+            }
+            for (std::size_t k = 1; k < p3.size(); ++k) {
+                if (p3[k] * static_cast<Scalar>(0.05) > p3[k - 1]) {
+                    transient = true;
+                }
+            }
+        }
+        prev_level1_ = p1;
+        prev_level2_ = p2[1];
+        prev_level3_ = p3.back();
+        return transient;
+    }
+
+    std::array<Biquad, 2> stages_;
+    Scalar prev_level1_ = 0;
+    Scalar prev_level2_ = 0;
+    Scalar prev_level3_ = 0;
+    bool first_block_ = true;
+};
+
+struct Tally {
+    int hits = 0;
+    int misses = 0;
+};
+
+// Feeds one stream to the real detector and the transcription and holds every
+// segment's decision equal. Returns how many decisions there were of each
+// kind, so a caller can see the signal exercised both.
+template <typename Scalar>
+Tally agree_on(const std::vector<std::array<float, 256>>& segments,
+               iclforge::ac3::SampleRate rate) {
+    iclforge::ac3::BasicTransientDetector<Scalar> real(rate);
+    ReferenceDetector<Scalar> reference(rate);
+    Tally tally;
+    for (std::size_t i = 0; i < segments.size(); ++i) {
+        const bool want = reference.detect(segments[i]);
+        const bool got = real.detect(segments[i]);
+        CAPTURE(i);
+        CHECK(got == want);
+        (want ? tally.hits : tally.misses) += 1;
+    }
+    return tally;
+}
+
+}  // namespace
+
+TEST_CASE("the detector decides as the transcription of its old form on random streams",
+          "[transient]") {
+    std::mt19937 rng(0x7A41);
+    std::uniform_real_distribution<float> noise(-1.0F, 1.0F);
+    std::uniform_int_distribution<int> level_pick(0, 5);
+    std::uniform_int_distribution<int> position(0, 255);
+    std::uniform_int_distribution<int> burst_length(1, 96);
+    std::uniform_int_distribution<int> burst_gain(3, 60);
+    std::uniform_int_distribution<int> coin(0, 3);
+    // Quiet enough to sit under the silence gate, near it, and well over it.
+    constexpr std::array<float, 6> kLevels = {0.0F, 0.0004F, 0.002F, 0.01F, 0.06F, 0.4F};
+    Tally total_double;
+    Tally total_float;
+    for (const auto rate : {iclforge::ac3::SampleRate::k48000, iclforge::ac3::SampleRate::k44100,
+                            iclforge::ac3::SampleRate::k32000}) {
+        for (int stream = 0; stream < 6; ++stream) {
+            std::vector<std::array<float, 256>> segments(300);
+            float level = kLevels[static_cast<std::size_t>(level_pick(rng))];
+            for (auto& segment : segments) {
+                if (coin(rng) == 0) {
+                    level = kLevels[static_cast<std::size_t>(level_pick(rng))];
+                }
+                for (auto& v : segment) {
+                    v = noise(rng) * level;
+                }
+                if (coin(rng) == 0) {
+                    const int from = position(rng);
+                    const int to = std::min(256, from + burst_length(rng));
+                    const float gain = static_cast<float>(burst_gain(rng));
+                    for (int n = from; n < to; ++n) {
+                        auto& v = segment[static_cast<std::size_t>(n)];
+                        v = std::clamp(v * gain + noise(rng) * 0.05F, -1.0F, 1.0F);
+                    }
+                }
+            }
+            const Tally d = agree_on<double>(segments, rate);
+            total_double.hits += d.hits;
+            total_double.misses += d.misses;
+            const Tally f = agree_on<float>(segments, rate);
+            total_float.hits += f.hits;
+            total_float.misses += f.misses;
+        }
+    }
+    // The streams are not all one answer: both kinds of decision were held.
+    CHECK(total_double.hits > 100);
+    CHECK(total_double.misses > 100);
+    CHECK(total_float.hits > 100);
+    CHECK(total_float.misses > 100);
+}
+
+TEST_CASE("the detector decides as the transcription at every onset position", "[transient]") {
+    // Six quiet segments, then a loud burst starting at each sample of the
+    // seventh in turn (so each of the four blocks of 64 and every offset in
+    // it is the first to hold the onset), then a decaying tail.
+    std::mt19937 rng(0x7A42);
+    std::uniform_real_distribution<float> noise(-1.0F, 1.0F);
+    int hits = 0;
+    int misses = 0;
+    for (int onset = 0; onset < 256; ++onset) {
+        std::vector<std::array<float, 256>> segments(9);
+        for (std::size_t s = 0; s < segments.size(); ++s) {
+            for (auto& v : segments[s]) {
+                v = noise(rng) * 0.01F;
+            }
+        }
+        for (std::size_t s = 6; s < 8; ++s) {
+            for (int n = (s == 6 ? onset : 0); n < 256; ++n) {
+                segments[s][static_cast<std::size_t>(n)] += noise(rng) * (s == 6 ? 0.6F : 0.3F);
+            }
+        }
+        const Tally d = agree_on<double>(segments, iclforge::ac3::SampleRate::k48000);
+        const Tally f = agree_on<float>(segments, iclforge::ac3::SampleRate::k48000);
+        hits += d.hits + f.hits;
+        misses += d.misses + f.misses;
+    }
+    CHECK(hits > 100);
+    CHECK(misses > 100);
 }
