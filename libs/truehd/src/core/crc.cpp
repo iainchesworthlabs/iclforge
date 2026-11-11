@@ -121,7 +121,7 @@ std::uint8_t block_header_crc(std::span<const std::byte> data, std::size_t first
     std::uint8_t reg = 0xA2;
     const auto step = [&reg](unsigned in) noexcept {
         const bool top = (reg & 0x80U) != 0;
-        reg = static_cast<std::uint8_t>((reg << 1U) | in);
+        reg = static_cast<std::uint8_t>((static_cast<unsigned>(reg) << 1U) | in);
         if (top) {
             reg ^= kPoly;
         }

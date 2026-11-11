@@ -41,8 +41,9 @@ std::uint8_t reference_crc(std::span<const std::byte> payload) {
     for (std::size_t i = 0; i + 1 < payload.size(); ++i) {
         reg = static_cast<std::uint8_t>(reg ^ static_cast<std::uint8_t>(payload[i]));
         for (int bit = 0; bit < 8; ++bit) {
-            reg = (reg & 0x80U) != 0 ? static_cast<std::uint8_t>((reg << 1U) ^ 0x63U)
-                                     : static_cast<std::uint8_t>(reg << 1U);
+            reg = (reg & 0x80U) != 0
+                      ? static_cast<std::uint8_t>((static_cast<unsigned>(reg) << 1U) ^ 0x63U)
+                      : static_cast<std::uint8_t>(reg << 1U);
         }
     }
     return static_cast<std::uint8_t>(reg ^ static_cast<std::uint8_t>(payload.back()));
@@ -99,7 +100,7 @@ TEST_CASE("the byte-wise block header CRC matches the bit-by-bit CRC", "[truehd]
                     ? (std::to_integer<unsigned>(data[byte]) >> (7U - (bit & 7U))) & 1U
                     : 0U;
             const bool top = (reg & 0x80U) != 0;
-            reg = static_cast<std::uint8_t>((reg << 1U) | in);
+            reg = static_cast<std::uint8_t>((static_cast<unsigned>(reg) << 1U) | in);
             if (top) {
                 reg ^= 0x1DU;
             }
