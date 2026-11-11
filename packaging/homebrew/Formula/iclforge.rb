@@ -17,12 +17,12 @@
 class Iclforge < Formula
   desc "Clean-room AC-3/E-AC-3/AC-4 encoder, decoder and Atmos object-layer CLI"
   homepage "https://github.com/iainchesworthlabs/iclforge"
-  url "https://github.com/iainchesworthlabs/ac3forge/archive/refs/tags/v0.10.0-beta.1.tar.gz"
+  url "https://github.com/iainchesworthlabs/ac3forge/archive/refs/tags/v0.11.0-beta.1.tar.gz"
   # Computed directly (sha256sum) from the same release tarball the vcpkg
   # port's portfile.cmake pins by SHA512 - see that file's comment. If
   # `brew install` reports a mismatch, trust brew's reported hash over this
   # one and update it here.
-  sha256 "e9a54c509f8af73d51d75ca465816d8579e3e33715fe2c02f19873a2f08f5cf5"
+  sha256 "00246b4fd8b382455e618a8c518149fdf808a4e6fe0b06530977afbe537f8ad2"
   license "GPL-3.0-or-later"
   head "https://github.com/iainchesworthlabs/iclforge.git", branch: "main"
 

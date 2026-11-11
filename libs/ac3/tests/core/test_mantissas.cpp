@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <random>
 #include <span>
 #include <vector>
@@ -106,5 +107,105 @@ TEST_CASE("bit counter agrees with the writer for random allocations", "[mantiss
         CAPTURE(trial);
         CHECK(writer.bit_count() == iclforge::ac3::mantissa_bits_per_block(views));
         CHECK(token_bits == writer.bit_count());
+    }
+}
+
+namespace {
+
+// Today's mantissa_bits_per_block, transcribed from before the tally form
+// replaced it: a switch per bin, then the group arithmetic.
+std::size_t reference_mantissa_bits(std::span<const std::span<const std::uint8_t>> channel_baps) {
+    std::size_t direct = 0;
+    std::size_t count1 = 0;
+    std::size_t count2 = 0;
+    std::size_t count4 = 0;
+    for (const auto& baps : channel_baps) {
+        for (const auto bap : baps) {
+            switch (bap) {
+                case 0: break;
+                case 1: ++count1; break;
+                case 2: ++count2; break;
+                case 4: ++count4; break;
+                default: direct += static_cast<std::size_t>(iclforge::ac3::kBapBits[bap]); break;
+            }
+        }
+    }
+    return direct + 5 * ((count1 + 2) / 3) + 7 * ((count2 + 2) / 3) + 7 * ((count4 + 1) / 2);
+}
+
+std::vector<std::span<const std::uint8_t>> views_of(
+    const std::vector<std::vector<std::uint8_t>>& channels) {
+    std::vector<std::span<const std::uint8_t>> views;
+    views.reserve(channels.size());
+    for (const auto& channel : channels) {
+        views.emplace_back(channel);
+    }
+    return views;
+}
+
+}  // namespace
+
+TEST_CASE("bit count equals the per-bin switch for every bap and every short length",
+          "[mantissas]") {
+    // Every bap alone, at every length through two full cycles of the
+    // 3-member groups and the 2-member pairs and a bit more: the partial
+    // groups at the end of the count are where an error would sit.
+    for (int bap = 0; bap <= 15; ++bap) {
+        for (std::size_t length = 0; length <= 70; ++length) {
+            const std::vector<std::vector<std::uint8_t>> one{
+                std::vector<std::uint8_t>(length, static_cast<std::uint8_t>(bap))};
+            const auto views = views_of(one);
+            CAPTURE(bap, length);
+            CHECK(iclforge::ac3::mantissa_bits_per_block(views) == reference_mantissa_bits(views));
+        }
+    }
+}
+
+TEST_CASE("bit count equals the per-bin switch on random allocations", "[mantissas]") {
+    std::mt19937 rng(0x14C0);
+    // Weighted towards 1, 2 and 4 so the grouped counts take every residue.
+    std::discrete_distribution<int> pick({3, 6, 6, 3, 6, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2});
+    std::uniform_int_distribution<std::size_t> length_dist(0, 300);
+    std::uniform_int_distribution<int> channel_dist(0, 7);
+    for (int trial = 0; trial < 4000; ++trial) {
+        std::vector<std::vector<std::uint8_t>> channels(
+            static_cast<std::size_t>(channel_dist(rng)));
+        for (auto& channel : channels) {
+            channel.resize(length_dist(rng));
+            for (auto& bap : channel) {
+                bap = static_cast<std::uint8_t>(pick(rng));
+            }
+        }
+        const auto views = views_of(channels);
+        CAPTURE(trial);
+        CHECK(iclforge::ac3::mantissa_bits_per_block(views) == reference_mantissa_bits(views));
+    }
+}
+
+TEST_CASE("bit count equals the per-bin switch across the 16-bit tally limit", "[mantissas]") {
+    // A channel longer than the run the packed tally takes at once, so the
+    // fields are unpacked and restarted part-way: all of one bap (the widest
+    // direct code and each grouped bap fill a field fastest) and a random mix.
+    std::mt19937 rng(0x14C1);
+    std::uniform_int_distribution<int> any(0, 15);
+    for (const std::size_t length : {std::size_t{4094}, std::size_t{4095}, std::size_t{4096},
+                                     std::size_t{4097}, std::size_t{8189}, std::size_t{8190},
+                                     std::size_t{8191}, std::size_t{12290}, std::size_t{40000}}) {
+        for (int bap = 0; bap <= 15; ++bap) {
+            const std::vector<std::vector<std::uint8_t>> one{
+                std::vector<std::uint8_t>(length, static_cast<std::uint8_t>(bap))};
+            const auto views = views_of(one);
+            CAPTURE(bap, length);
+            CHECK(iclforge::ac3::mantissa_bits_per_block(views) == reference_mantissa_bits(views));
+        }
+        std::vector<std::vector<std::uint8_t>> mixed(3, std::vector<std::uint8_t>(length));
+        for (auto& channel : mixed) {
+            for (auto& bap : channel) {
+                bap = static_cast<std::uint8_t>(any(rng));
+            }
+        }
+        const auto views = views_of(mixed);
+        CAPTURE(length);
+        CHECK(iclforge::ac3::mantissa_bits_per_block(views) == reference_mantissa_bits(views));
     }
 }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -31,7 +32,66 @@ void accumulate_peak_exponents_over(std::span<const Scalar> coefficients,
     }
 }
 
+template <typename Scalar>
+void accumulate_peak_scan_over(PeakScan<Scalar>& scan, std::span<const Scalar> coefficients) {
+    const std::size_t bins = std::min(coefficients.size(), kPeakScanBins);
+    const Scalar* const in = coefficients.data();
+    Scalar* const peak = scan.magnitude.data();
+    // `a > peak ? a : peak`, not std::max: the compare is false for a NaN, so
+    // a NaN never reaches the magnitude (it is dealt with below), and the
+    // select is the form a compiler turns into a vector max (maxps/maxpd on
+    // x86-64, checked in the MSVC disassembly). The NaN test is a loop of its
+    // own, OR-ed rather than branched on: folded into the max loop it made
+    // MSVC leave both scalar.
+    for (std::size_t bin = 0; bin < bins; ++bin) {
+        const Scalar a = std::abs(in[bin]);
+        peak[bin] = a > peak[bin] ? a : peak[bin];
+    }
+    unsigned unordered = 0;
+    for (std::size_t bin = 0; bin < bins; ++bin) {
+        unordered |= static_cast<unsigned>(in[bin] != in[bin]);
+    }
+    if (unordered == 0) {
+        return;
+    }
+    // A NaN in this block: contribute exactly what the per-coefficient loop
+    // contributed for it, the same two calls on the same value.
+    for (std::size_t bin = 0; bin < bins; ++bin) {
+        if (in[bin] != in[bin]) {
+            const auto exponent =
+                static_cast<std::uint8_t>(exponent_from_fixed(to_fixed25(in[bin])));
+            scan.floor_exponent[bin] = std::min(scan.floor_exponent[bin], exponent);
+        }
+    }
+}
+
+template <typename Scalar>
+void peak_scan_exponents_over(const PeakScan<Scalar>& scan, std::span<std::uint8_t> exponents) {
+    const std::size_t bins = std::min(exponents.size(), kPeakScanBins);
+    for (std::size_t bin = 0; bin < bins; ++bin) {
+        const auto exponent = static_cast<std::uint8_t>(
+            exponent_from_fixed(to_fixed25(scan.magnitude[bin])));
+        exponents[bin] = std::min(scan.floor_exponent[bin], exponent);
+    }
+}
+
 }  // namespace
+
+void accumulate_peak_scan(PeakScan<double>& scan, std::span<const double> coefficients) {
+    accumulate_peak_scan_over<double>(scan, coefficients);
+}
+
+void accumulate_peak_scan(PeakScan<float>& scan, std::span<const float> coefficients) {
+    accumulate_peak_scan_over<float>(scan, coefficients);
+}
+
+void peak_scan_exponents(const PeakScan<double>& scan, std::span<std::uint8_t> exponents) {
+    peak_scan_exponents_over<double>(scan, exponents);
+}
+
+void peak_scan_exponents(const PeakScan<float>& scan, std::span<std::uint8_t> exponents) {
+    peak_scan_exponents_over<float>(scan, exponents);
+}
 
 int chbwcod_for_endmant(int endmant) {
     if (endmant <= kMinEndmant) {

@@ -525,3 +525,205 @@ TEST_CASE("the one-pass planner reproduces the two-pass one exactly", "[eac3][ex
     }
     CHECK(compared == 400);
 }
+
+// --- The planner's trimmed work against the plain model --------------------
+//
+// The planner builds only the groups its coded bins read, scores runs by end
+// block with lower bounds that skip candidates, and sums rows a byte at a
+// time. Each of those is held here to the plain statement of it.
+
+namespace {
+
+// One stream shape, as the random tests below draw it: the §7.1.3 grid of a
+// full-bandwidth channel, the LFE's 7 bins, or a coupling region (a multiple
+// of 12 bins, so some strategies divide it and some do not).
+struct Shape {
+    int bins = 0;
+    bool lfe = false;
+    bool coupling = false;
+};
+
+Shape draw_shape(std::mt19937& rng, int trial) {
+    Shape shape;
+    shape.lfe = trial % 3 == 1;
+    shape.coupling = trial % 3 == 2;
+    if (shape.lfe) {
+        shape.bins = 7;
+    } else if (shape.coupling) {
+        shape.bins = 12 * (1 + static_cast<int>(rng() % 21));  // 12..252
+    } else {
+        shape.bins = 37 + 3 * static_cast<int>(rng() % 73);  // 37..253
+    }
+    return shape;
+}
+
+// limited_group_exponents<Shift> for the groups the coded bins read, against
+// banded_run_exponents (the whole-spectrum model) on every bin up to the last
+// coded one.
+template <int Shift>
+int count_group_mismatches(const std::vector<std::uint8_t>& run_min, bool coupling,
+                           int coded_end) {
+    constexpr auto strategy = Shift == 0   ? iclforge::ac3::ExpStrategy::kD15
+                              : Shift == 1 ? iclforge::ac3::ExpStrategy::kD25
+                                           : iclforge::ac3::ExpStrategy::kD45;
+    const int bins = static_cast<int>(run_min.size());
+    const int group = 1 << Shift;
+    const int first = coupling ? 0 : 1;
+    std::vector<std::uint8_t> whole(run_min.size());
+    iclforge::ac3::internal::banded_run_exponents(run_min, strategy, coupling, whole);
+    const int needed = (coded_end - 1 + group - first) >> Shift;
+    std::array<std::uint8_t, 264> pre{};
+    iclforge::ac3::internal::limited_group_exponents<Shift>(run_min.data(), bins, coupling,
+                                                            needed, pre.data());
+    int mismatches = 0;
+    for (int bin = 0; bin < coded_end; ++bin) {
+        const int index = (bin + group - first) >> Shift;
+        mismatches += pre[static_cast<std::size_t>(index)] != whole[static_cast<std::size_t>(bin)];
+    }
+    return mismatches;
+}
+
+}  // namespace
+
+TEST_CASE("the trimmed group exponents are the whole-spectrum model on every coded bin",
+          "[eac3][exponents]") {
+    // Spectra drawn to make the limiter reach: runs of high exponents with
+    // deep notches, so a low group far past the last coded bin still pulls a
+    // coded one down (it takes up to kLimiterReach groups to stop mattering).
+    std::mt19937 rng(0x51ed270bU);
+    std::uniform_int_distribution<int> exp_dist(0, iclforge::ac3::kMaxExponent);
+    int compared = 0;
+    int mismatches = 0;
+    for (int trial = 0; trial < 3000; ++trial) {
+        const Shape shape = draw_shape(rng, trial);
+        std::vector<std::uint8_t> run_min(static_cast<std::size_t>(shape.bins));
+        const bool notched = trial % 2 == 0;
+        for (int bin = 0; bin < shape.bins; ++bin) {
+            int value = exp_dist(rng);
+            if (notched) {
+                const int high = iclforge::ac3::kMaxExponent - static_cast<int>(rng() % 3);
+                value = (rng() % 9 == 0) ? static_cast<int>(rng() % 4) : high;
+            }
+            run_min[static_cast<std::size_t>(bin)] = static_cast<std::uint8_t>(value);
+        }
+        const int coded_end = 1 + static_cast<int>(rng() % static_cast<unsigned>(shape.bins));
+        mismatches += count_group_mismatches<0>(run_min, shape.coupling, coded_end);
+        mismatches += count_group_mismatches<1>(run_min, shape.coupling, coded_end);
+        mismatches += count_group_mismatches<2>(run_min, shape.coupling, coded_end);
+        ++compared;
+    }
+    CHECK(mismatches == 0);
+    CHECK(compared == 3000);
+}
+
+TEST_CASE("the byte-wise minimum matches the plain one on every byte pair",
+          "[eac3][exponents]") {
+    // Whole bytes, not just exponents: the lane arithmetic must not leak a
+    // borrow across lanes whatever the values are.
+    std::mt19937_64 rng(0x7e57ab1eULL);
+    int wrong = 0;
+    for (int trial = 0; trial < 20000; ++trial) {
+        const std::uint64_t x = rng();
+        const std::uint64_t y = trial % 4 == 0 ? (x ^ (rng() & rng())) : rng();
+        const std::uint64_t got = iclforge::ac3::internal::min_of_bytes(x, y);
+        for (int lane = 0; lane < 8; ++lane) {
+            const auto a = static_cast<std::uint8_t>(x >> (8 * lane));
+            const auto b = static_cast<std::uint8_t>(y >> (8 * lane));
+            wrong += static_cast<std::uint8_t>(got >> (8 * lane)) != std::min(a, b);
+        }
+    }
+    CHECK(wrong == 0);
+    // And the run minimum built from it: any length (the word loop and the
+    // tail), and "moved" true exactly when some entry went down.
+    std::mt19937 small(0x1234567U);
+    for (int trial = 0; trial < 4000; ++trial) {
+        const int n = static_cast<int>(small() % 70);
+        std::vector<std::uint8_t> row(static_cast<std::size_t>(n) + 8);
+        std::vector<std::uint8_t> held(static_cast<std::size_t>(n) + 8);
+        for (auto& value : row) {
+            value = static_cast<std::uint8_t>(small() % 4 == 0 ? small() : small() % 25);
+        }
+        for (auto& value : held) {
+            value = static_cast<std::uint8_t>(small() % 4 == 0 ? small() : 24);
+        }
+        auto expected = held;
+        bool expected_moved = false;
+        for (int i = 0; i < n; ++i) {
+            const auto ui = static_cast<std::size_t>(i);
+            if (row[ui] < expected[ui]) {
+                expected[ui] = row[ui];
+                expected_moved = true;
+            }
+        }
+        const bool moved = iclforge::ac3::internal::lower_minimum(row.data(), held.data(), n);
+        CHECK(moved == expected_moved);
+        CHECK(held == expected);
+    }
+}
+
+TEST_CASE("the planner reproduces the reference on ties and trimmed coded ranges",
+          "[eac3][exponents]") {
+    // Inputs built to make plans TIE: identical blocks, flat spectra, tiny
+    // precision caps, so many partitions score exactly alike and only the
+    // order in which candidates are taken decides which one is written. And
+    // precision that stops at some bin (the usual shape of an allocation), so
+    // the planner's trimming of the coded range is exercised, with the odd
+    // coded hole inside it.
+    std::mt19937 rng(0xc0ffee11U);
+    std::uniform_int_distribution<int> exp_dist(0, iclforge::ac3::kMaxExponent);
+    int compared = 0;
+    for (int trial = 0; trial < 3000; ++trial) {
+        const Shape shape = draw_shape(rng, trial);
+        const int bins = shape.bins;
+        const int blocks = 1 + static_cast<int>(rng() % 6);
+        std::vector<std::uint8_t> exps(static_cast<std::size_t>(blocks) *
+                                       static_cast<std::size_t>(bins));
+        const int flavour = trial % 5;
+        for (int bin = 0; bin < bins; ++bin) {
+            exps[static_cast<std::size_t>(bin)] =
+                static_cast<std::uint8_t>(flavour == 0 ? 12 : exp_dist(rng));
+        }
+        for (int blk = 1; blk < blocks; ++blk) {
+            const bool repeat = rng() % 3 != 0;
+            const int step = static_cast<int>(rng() % 3) - 1;
+            for (int bin = 0; bin < bins; ++bin) {
+                const auto prev = exps[static_cast<std::size_t>(blk - 1) *
+                                           static_cast<std::size_t>(bins) +
+                                       static_cast<std::size_t>(bin)];
+                const int next = repeat ? prev
+                                        : std::clamp(prev + step, 0, iclforge::ac3::kMaxExponent);
+                exps[static_cast<std::size_t>(blk) * static_cast<std::size_t>(bins) +
+                     static_cast<std::size_t>(bin)] = static_cast<std::uint8_t>(next);
+            }
+        }
+        std::vector<std::uint8_t> precision;
+        if (rng() % 6 != 0) {
+            precision.assign(static_cast<std::size_t>(bins), 0);
+            const int end = 1 + static_cast<int>(rng() % static_cast<unsigned>(bins));
+            for (int bin = 0; bin < end; ++bin) {
+                precision[static_cast<std::size_t>(bin)] =
+                    rng() % 11 == 0 ? 0 : static_cast<std::uint8_t>(1 + rng() % 2);
+            }
+        }
+        iclforge::ac3::internal::ExponentRunInput in{.exps = exps,
+                                                     .bins = bins,
+                                                     .blocks = blocks,
+                                                     .precision = precision,
+                                                     .boundary = {},
+                                                     .coupling = shape.coupling,
+                                                     .lfe = shape.lfe,
+                                                     .free_strategy = false};
+        for (int blk = 1; blk < blocks; ++blk) {
+            in.boundary[static_cast<std::size_t>(blk)] = rng() % 8 == 0;
+        }
+        const auto both = iclforge::ac3::internal::plan_exponent_runs_both(in);
+        in.free_strategy = false;
+        const auto ref_hoisted = reference_plan(in);
+        in.free_strategy = true;
+        const auto ref_per_block = reference_plan(in);
+        CHECK(same_plan(both.hoisted, ref_hoisted));
+        CHECK(same_plan(both.per_block, ref_per_block));
+        ++compared;
+    }
+    CHECK(compared == 3000);
+}

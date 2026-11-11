@@ -78,17 +78,6 @@ const std::array<CodebookShape, kCodebooks>& shapes() {
     return kShapes;
 }
 
-// Whether every line of a band fits codebook `cb`'s values.
-[[nodiscard]] bool fits(const CodebookShape& s, int cb, std::int32_t max_abs) noexcept {
-    if (cb == 11) {
-        return true;
-    }
-    if (s.is_unsigned) {
-        return max_abs <= s.max_value;
-    }
-    return max_abs <= s.max_value && -max_abs >= s.min_value;
-}
-
 // Pseudocode 19 in reverse: the index of the codeword for `dim` values.
 [[nodiscard]] std::size_t codeword_index(const CodebookShape& s, int cb, std::span<const std::int32_t> values) {
     std::array<int, 4> v{};
@@ -130,42 +119,244 @@ struct ExtCode {
     return code;
 }
 
-// The bits of one band's lines in codebook `cb`: codewords, sign bits and
-// escapes.
-[[nodiscard]] std::size_t band_cost(std::span<const std::int32_t> q, int cb) {
-    const CodebookShape& s = shapes()[static_cast<std::size_t>(cb)];
-    const std::span<const HuffCode> codes = tables::kAsfSpectrumCodes[static_cast<std::size_t>(cb)];
-    const auto dim = static_cast<std::size_t>(s.dim);
-    std::size_t bits = 0;
-    for (std::size_t k = 0; k + dim <= q.size(); k += dim) {
-        const std::span<const std::int32_t> values = q.subspan(k, dim);
-        bits += codes[codeword_index(s, cb, values)].bits;
-        if (s.is_unsigned) {
-            for (const std::int32_t x : values) {
-                bits += x != 0 ? 1U : 0U;
-                if (cb == 11 && std::abs(x) >= kEscape) {
-                    bits += ext_code(std::abs(x)).bits;
-                }
+constexpr std::size_t kNever = std::numeric_limits<std::size_t>::max() / 4;
+
+// Codebooks that share a shape (dimension, signedness and range: Tables A.2 to
+// A.12 pair them up) index their codewords alike and differ only in the
+// codeword lengths, so a band is walked once for both. `bits` holds the two
+// books' lengths side by side, by index.
+struct PriceGroup {
+    int limit = 0;  // the largest magnitude a book of the group codes directly
+    int mod = 0, mod2 = 0, mod3 = 0;
+    int base = 0;   // what cb_off adds to the index
+    std::array<std::array<std::uint8_t, 2>, 289> bits{};
+};
+
+// Signed quads (books 1, 2), unsigned quads (3, 4), signed pairs (5, 6),
+// unsigned pairs (7, 8) and (9, 10), then book 11 on its own.
+struct Pricing {
+    std::array<PriceGroup, 6> group{};
+};
+
+[[nodiscard]] Pricing build_pricing() {
+    Pricing p;
+    const std::array<std::array<int, 2>, 6> books{{{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}, {11, 11}}};
+    for (std::size_t i = 0; i < books.size(); ++i) {
+        PriceGroup& g = p.group[i];
+        const CodebookShape& s = shapes()[static_cast<std::size_t>(books[i][0])];
+        g.limit = books[i][0] == 11 ? std::numeric_limits<int>::max() : s.max_value;
+        g.mod = s.mod;
+        g.mod2 = s.mod2;
+        g.mod3 = s.mod3;
+        g.base = s.dim == 4 ? s.off * (s.mod3 + s.mod2 + s.mod + 1) : s.off * (s.mod + 1);
+        for (std::size_t j = 0; j < 2; ++j) {
+            const std::span<const HuffCode> codes =
+                tables::kAsfSpectrumCodes[static_cast<std::size_t>(books[i][j])];
+            for (std::size_t k = 0; k < codes.size() && k < g.bits.size(); ++k) {
+                g.bits[k][j] = codes[k].bits;
             }
         }
     }
-    return bits;
+    return p;
 }
 
+[[nodiscard]] const Pricing& pricing() {
+    static const Pricing kPricing = build_pricing();
+    return kPricing;
+}
+
+// The two quad groups' lengths over `quads` tuples, and how many lines are not
+// zero (a sign bit each, in the unsigned books).
+template <bool WithSigned>
+void price_quads(const std::int32_t* d, std::size_t quads, const Pricing& p, std::array<std::uint32_t, 4>& acc,
+                 std::uint32_t& nonzero) {
+    const PriceGroup& sg = p.group[0];
+    const PriceGroup& ug = p.group[1];
+    for (std::size_t i = 0; i < quads; ++i, d += 4) {
+        const int a0 = std::abs(d[0]);
+        const int a1 = std::abs(d[1]);
+        const int a2 = std::abs(d[2]);
+        const int a3 = std::abs(d[3]);
+        const auto ui = static_cast<std::size_t>(a0 * ug.mod3 + a1 * ug.mod2 + a2 * ug.mod + a3 + ug.base);
+        acc[2] += ug.bits[ui][0];
+        acc[3] += ug.bits[ui][1];
+        nonzero += static_cast<std::uint32_t>((a0 != 0) + (a1 != 0) + (a2 != 0) + (a3 != 0));
+        if constexpr (WithSigned) {
+            const auto si = static_cast<std::size_t>(d[0] * sg.mod3 + d[1] * sg.mod2 + d[2] * sg.mod + d[3] + sg.base);
+            acc[0] += sg.bits[si][0];
+            acc[1] += sg.bits[si][1];
+        }
+    }
+}
+
+// The pair groups' lengths: acc[0], [1] books 5 and 6, [2], [3] books 7 and 8,
+// [4], [5] books 9 and 10, [6] book 11 (which codes magnitudes past 16 as 16
+// and an escape). Only the groups the band fits are read.
+template <bool Signed, bool Group78, bool Group910>
+void price_pairs(const std::int32_t* d, std::size_t pairs, const Pricing& p, std::array<std::uint32_t, 7>& acc,
+                 std::uint32_t& nonzero) {
+    const PriceGroup& sg = p.group[2];
+    const PriceGroup& g78 = p.group[3];
+    const PriceGroup& g910 = p.group[4];
+    const PriceGroup& g11 = p.group[5];
+    for (std::size_t i = 0; i < pairs; ++i, d += 2) {
+        const int a0 = std::abs(d[0]);
+        const int a1 = std::abs(d[1]);
+        nonzero += static_cast<std::uint32_t>((a0 != 0) + (a1 != 0));
+        acc[6] += g11.bits[static_cast<std::size_t>(std::min(a0, kEscape) * g11.mod + std::min(a1, kEscape))][0];
+        if constexpr (Group910) {
+            const auto index = static_cast<std::size_t>(a0 * g910.mod + a1);
+            acc[4] += g910.bits[index][0];
+            acc[5] += g910.bits[index][1];
+        }
+        if constexpr (Group78) {
+            const auto index = static_cast<std::size_t>(a0 * g78.mod + a1);
+            acc[2] += g78.bits[index][0];
+            acc[3] += g78.bits[index][1];
+        }
+        if constexpr (Signed) {
+            const auto index = static_cast<std::size_t>(d[0] * sg.mod + d[1] + sg.base);
+            acc[0] += sg.bits[index][0];
+            acc[1] += sg.bits[index][1];
+        }
+    }
+}
+
+// The bits of one band's lines in every codebook the band fits (kNever in the
+// others; codebook 0 for a band of zeros): codewords, sign bits and escapes.
+void price_band(std::span<const std::int32_t> q, std::int32_t max_abs, const Pricing& p,
+                std::array<std::size_t, kCodebooks>& cost) {
+    cost.fill(kNever);
+    if (max_abs == 0) {
+        cost[0] = 0;
+    }
+    const std::int32_t* d = q.data();
+    if (max_abs <= p.group[1].limit) {
+        std::array<std::uint32_t, 4> acc{};
+        std::uint32_t nonzero = 0;
+        if (max_abs <= p.group[0].limit) {
+            price_quads<true>(d, q.size() / 4, p, acc, nonzero);
+            cost[1] = acc[0];
+            cost[2] = acc[1];
+        } else {
+            price_quads<false>(d, q.size() / 4, p, acc, nonzero);
+        }
+        cost[3] = acc[2] + nonzero;
+        cost[4] = acc[3] + nonzero;
+    }
+    std::array<std::uint32_t, 7> acc{};
+    std::uint32_t nonzero = 0;
+    const std::size_t pairs = q.size() / 2;
+    if (max_abs <= p.group[2].limit) {
+        price_pairs<true, true, true>(d, pairs, p, acc, nonzero);
+        cost[5] = acc[0];
+        cost[6] = acc[1];
+    } else if (max_abs <= p.group[3].limit) {
+        price_pairs<false, true, true>(d, pairs, p, acc, nonzero);
+    } else if (max_abs <= p.group[4].limit) {
+        price_pairs<false, false, true>(d, pairs, p, acc, nonzero);
+    } else {
+        price_pairs<false, false, false>(d, pairs, p, acc, nonzero);
+    }
+    if (max_abs <= p.group[3].limit) {
+        cost[7] = acc[2] + nonzero;
+        cost[8] = acc[3] + nonzero;
+    }
+    if (max_abs <= p.group[4].limit) {
+        cost[9] = acc[4] + nonzero;
+        cost[10] = acc[5] + nonzero;
+    }
+    std::size_t bits = acc[6] + nonzero;
+    if (max_abs >= kEscape) {
+        for (std::size_t k = 0; k < pairs * 2; ++k) {
+            if (std::abs(d[k]) >= kEscape) {
+                bits += ext_code(std::abs(d[k])).bits;
+            }
+        }
+    }
+    cost[11] = bits;
+}
+
+// price_band() of `count` lines that are all zero: the same sums, each tuple
+// priced alike.
+void price_zero_band(std::size_t count, const Pricing& p, std::array<std::size_t, kCodebooks>& cost) {
+    cost.fill(kNever);
+    cost[0] = 0;
+    const std::size_t quads = count / 4;
+    const std::size_t pairs = count / 2;
+    const PriceGroup& quad_signed = p.group[0];
+    const PriceGroup& quad_unsigned = p.group[1];
+    const PriceGroup& pair_signed = p.group[2];
+    const PriceGroup& g78 = p.group[3];
+    const PriceGroup& g910 = p.group[4];
+    const PriceGroup& g11 = p.group[5];
+    const auto at = [](const PriceGroup& g, std::size_t index, std::size_t book) -> std::size_t {
+        return g.bits[index][book];
+    };
+    cost[1] = quads * at(quad_signed, static_cast<std::size_t>(quad_signed.base), 0);
+    cost[2] = quads * at(quad_signed, static_cast<std::size_t>(quad_signed.base), 1);
+    cost[3] = quads * at(quad_unsigned, static_cast<std::size_t>(quad_unsigned.base), 0);
+    cost[4] = quads * at(quad_unsigned, static_cast<std::size_t>(quad_unsigned.base), 1);
+    cost[5] = pairs * at(pair_signed, static_cast<std::size_t>(pair_signed.base), 0);
+    cost[6] = pairs * at(pair_signed, static_cast<std::size_t>(pair_signed.base), 1);
+    cost[7] = pairs * at(g78, 0, 0);
+    cost[8] = pairs * at(g78, 0, 1);
+    cost[9] = pairs * at(g910, 0, 0);
+    cost[10] = pairs * at(g910, 0, 1);
+    cost[11] = pairs * at(g11, 0, 0);
+}
+
+// How far the fast power may sit from an integer boundary before the exact one
+// decides. sqrt(y sqrt y) is within a few ulp (some 1e-12 at the top of the
+// range) of std::pow(y, 0.75), so a result more than this from a boundary
+// floors to the same integer either way.
+constexpr double kBoundaryMargin = 1e-9;
+constexpr double kFastLimit = 8000.0;
+
 [[nodiscard]] std::int32_t quantize_line(double x, double inverse_gain) {
-    const double scaled = std::pow(std::abs(x) * inverse_gain, 0.75) + kRounding;
-    const auto magnitude = static_cast<std::int32_t>(std::min(scaled, static_cast<double>(kMaxQuant)));
+    const double y = std::abs(x) * inverse_gain;
+    const double fast = std::sqrt(y * std::sqrt(y)) + kRounding;
+    std::int32_t magnitude = -1;
+    if (fast < kFastLimit) {
+        const auto whole = static_cast<std::int32_t>(fast);
+        const double fraction = fast - static_cast<double>(whole);
+        if (fraction > kBoundaryMargin && fraction < 1.0 - kBoundaryMargin) {
+            magnitude = whole;
+        }
+    }
+    if (magnitude < 0) {  // too close to call, past the range, or not a number
+        const double scaled = std::pow(y, 0.75) + kRounding;
+        magnitude = static_cast<std::int32_t>(std::min(scaled, static_cast<double>(kMaxQuant)));
+    }
     return x < 0.0 ? -magnitude : magnitude;
 }
 
-[[nodiscard]] std::int32_t quantize_band(std::span<const double> lines, int sf, std::span<std::int32_t> out) {
-    const double inverse_gain = std::pow(2.0, -0.25 * static_cast<double>(sf - 100));
+[[nodiscard]] double inverse_gain_of(int sf) {
+    return std::pow(2.0, -0.25 * static_cast<double>(sf - 100));
+}
+
+// A line quantises to zero when |x| g^-1 raised to 3/4, plus kRounding, is below
+// 1: |x| g^-1 below 0.4976. A band whose largest line is under 0.45 of a step
+// (with a margin on the line's rounding) is all zeros; a larger one, or a
+// line that is not a number, is quantised line by line as ever.
+constexpr double kAllZeroBelow = 0.45;
+
+[[nodiscard]] std::int32_t quantize_band(std::span<const double> lines, double inverse_gain,
+                                         std::span<std::int32_t> out) {
     std::int32_t max_abs = 0;
     for (std::size_t k = 0; k < lines.size(); ++k) {
         out[k] = quantize_line(lines[k], inverse_gain);
         max_abs = std::max(max_abs, std::abs(out[k]));
     }
     return max_abs;
+}
+
+// Buffers code_track reuses from one call to the next on a thread.
+static_assert(std::tuple_size_v<decltype(CoderScratch::cost)::value_type> == kCodebooks);
+
+[[nodiscard]] CoderScratch& scratch_buffers() {
+    thread_local CoderScratch scratch;
+    return scratch;
 }
 
 // A band's mean square as the decoder reconstructs it: sign(q) |q|^(4/3) at
@@ -181,44 +372,346 @@ struct ExtCode {
     return sum / static_cast<double>(q.size());
 }
 
+}  // namespace
+
+std::span<const std::uint16_t> band_offsets(int transform_length) {
+    return tables::sfb_offsets_48(transform_length);
+}
+
+Grouped regroup(std::span<const double> spectrum, const FrameLayout& layout, std::array<int, 2> max_sfb) {
+    Grouped out;
+    regroup_into(out, spectrum, layout, max_sfb);
+    return out;
+}
+
+void regroup_into(Grouped& out, std::span<const double> spectrum, const FrameLayout& layout,
+                  std::array<int, 2> max_sfb) {
+    out.lines.clear();
+    out.max_sfb.clear();
+    out.offset.resize(layout.group_windows.size());
+    std::size_t total = 0;
+    for (const int length : layout.window_length) {
+        total += static_cast<std::size_t>(length);
+    }
+    out.lines.reserve(total);
+    std::size_t base = 0;
+    std::size_t window = 0;
+    for (std::size_t g = 0; g < layout.group_windows.size(); ++g) {
+        const auto windows = static_cast<std::size_t>(layout.group_windows[g]);
+        const std::span<const std::uint16_t> bands = band_offsets(layout.group_length[g]);
+        const int available = std::max(0, static_cast<int>(bands.size()) - 1);
+        const int limit = std::clamp(max_sfb[static_cast<std::size_t>(layout.group_half[g])], 0, available);
+        out.max_sfb.push_back(limit);
+        std::vector<std::size_t>& offsets = out.offset[g];
+        offsets.resize(static_cast<std::size_t>(limit) + 1);
+        for (std::size_t b = 0; b < offsets.size(); ++b) {
+            offsets[b] = base + static_cast<std::size_t>(bands[b]) * windows;
+        }
+        // Where each of the group's windows starts in the spectrum.
+        std::size_t first_start = 0;
+        for (std::size_t w = 0; w < window; ++w) {
+            first_start += static_cast<std::size_t>(layout.window_length[w]);
+        }
+        for (int b = 0; b < limit; ++b) {
+            const auto bi = static_cast<std::size_t>(b);
+            std::size_t first = first_start;
+            for (std::size_t w = 0; w < windows; ++w) {
+                for (std::size_t l = bands[bi]; l < bands[bi + 1]; ++l) {
+                    out.lines.push_back(spectrum[first + l]);
+                }
+                first += static_cast<std::size_t>(layout.window_length[window + w]);
+            }
+        }
+        base = offsets[static_cast<std::size_t>(limit)];
+        window += windows;
+    }
+}
+
+void band_peaks(const Grouped& grouped, std::vector<std::vector<double>>& peaks) {
+    peaks.resize(grouped.offset.size());
+    for (std::size_t g = 0; g < grouped.offset.size(); ++g) {
+        const auto bands = static_cast<std::size_t>(grouped.max_sfb[g]);
+        peaks[g].assign(bands, 0.0);
+        for (std::size_t b = 0; b < bands; ++b) {
+            double largest = 0.0;
+            bool plain = true;
+            for (std::size_t k = grouped.offset[g][b]; k < grouped.offset[g][b + 1]; ++k) {
+                const double magnitude = std::abs(grouped.lines[k]);
+                plain = plain && !std::isnan(magnitude);  // not a number: the band is never all zeros
+                largest = std::max(largest, magnitude);
+            }
+            peaks[g][b] = plain ? largest : std::numeric_limits<double>::infinity();
+        }
+    }
+}
+
+void TrackCoder::reserve(const Grouped& grouped, bool noise_fill) {
+    const std::size_t groups = grouped.offset.size();
+    std::size_t bands = 0;
+    std::size_t group_bands = 0;
+    std::size_t band_lines = 0;
+    for (std::size_t g = 0; g < groups; ++g) {
+        const auto count = static_cast<std::size_t>(grouped.max_sfb[g]);
+        bands += count;
+        group_bands = std::max(group_bands, count);
+        for (std::size_t b = 0; b < count; ++b) {
+            band_lines = std::max(band_lines, grouped.offset[g][b + 1] - grouped.offset[g][b]);
+        }
+    }
+    band_base_.reserve(groups + 1);
+    section_base_.reserve(groups + 1);
+    sf_.reserve(bands);
+    peak_.reserve(bands);
+    cb_.reserve(bands);
+    dpcm_.reserve(bands);
+    sections_.reserve(bands);
+    if (noise_fill) {
+        level_.reserve(bands);
+    }
+    band_q_.reserve(band_lines);
+    const std::size_t stride = group_bands + 1;
+    search_.cost.reserve(group_bands);
+    search_.prefix.reserve(kCodebooks * stride);
+    search_.ahead.reserve(kCodebooks * stride);
+    search_.header.reserve(stride);
+    search_.best.reserve(stride);
+    search_.lowest.reserve(kCodebooks * stride);
+    search_.from.reserve(stride);
+    search_.book.reserve(stride);
+}
+
+void TrackCoder::analyse(CoderScratch& search, std::vector<std::int32_t>* q_out, const Grouped& grouped,
+                         const std::vector<std::vector<int>>& sf, int offset, const FrameLayout& layout,
+                         bool noise_fill, const std::vector<std::vector<double>>* peaks) {
+    const std::size_t groups = grouped.offset.size();
+    // Only the track a caller keeps needs every quantised line at once; to
+    // count bits, one band's are priced as soon as they are quantised.
+    const bool full = q_out != nullptr;
+    if (full) {
+        // Room for the most lines a frame has, as regroup_into() left it in
+        // `grouped`, so that the track's storage does not grow with the
+        // frames that come to need more of it.
+        q_out->reserve(grouped.lines.capacity());
+        q_out->assign(grouped.lines.size(), 0);
+    }
+    band_base_.assign(groups + 1, 0);
+    for (std::size_t g = 0; g < groups; ++g) {
+        band_base_[g + 1] = band_base_[g] + static_cast<std::size_t>(grouped.max_sfb[g]);
+    }
+    const std::size_t total_bands = band_base_[groups];
+    sf_.assign(total_bands, 0);
+    peak_.assign(total_bands, 0);
+    cb_.assign(total_bands, 0);
+    if (noise_fill) {
+        level_.assign(total_bands, 0.0);
+    }
+    sections_.clear();
+    section_base_.assign(groups + 1, 0);
+    section_bits_ = 0;
+    spectral_bits_ = 0;
+    scalefac_bits_ = 0;
+    noise_bits_ = 0;
+    noise_fill_ = false;
+
+    const Pricing& prices = pricing();
+    CoderScratch& scratch = search;
+    // Scale factors: each band's, offset and clamped, then held to the deltas
+    // Table A.1 can send from one transmitted band to the next.
+    bool first = true;
+    int previous = 0;
+    for (std::size_t g = 0; g < groups; ++g) {
+        const int bands = grouped.max_sfb[g];
+        const int width = section_bits_width(group_transf_index(layout, g));
+        const auto count = static_cast<std::size_t>(bands);
+        const std::size_t stride = count + 1;
+        std::vector<std::array<std::size_t, kCodebooks>>& cost = scratch.cost;
+        cost.resize(count);
+        for (std::size_t b = 0; b < count; ++b) {
+            const std::size_t begin = grouped.offset[g][b];
+            const std::size_t end = grouped.offset[g][b + 1];
+            const std::span<const double> lines = std::span<const double>(grouped.lines).subspan(begin, end - begin);
+            if (!full && band_q_.size() < end - begin) {
+                band_q_.resize(end - begin);
+            }
+            const std::span<std::int32_t> q = full ? std::span<std::int32_t>(*q_out).subspan(begin, end - begin)
+                                                   : std::span<std::int32_t>(band_q_).first(end - begin);
+            int s = std::clamp(sf[g][b] + offset, 0, 255);
+            if (!first) {
+                s = std::clamp(s, std::max(0, previous - kMaxDelta), std::min(255, previous + kMaxDelta));
+            }
+            double inverse_gain = inverse_gain_of(s);
+            if (peaks != nullptr && (*peaks)[g][b] * inverse_gain < kAllZeroBelow) {
+                // Every line quantises to zero (a kept track's are zeros
+                // already, from the assign above), and the band is priced as
+                // the zeros it is: no peak, no change to the bands after it.
+                sf_[band_base_[g] + b] = s;
+                price_zero_band(end - begin, prices, cost[b]);
+                continue;
+            }
+            std::int32_t peak = quantize_band(lines, inverse_gain, q);
+            // A line past what ext_code reaches clips; coarser steps avoid it
+            // where the delta from the band before allows.
+            while (peak >= kMaxQuant && s < 255 && (first || s < previous + kMaxDelta)) {
+                ++s;
+                inverse_gain = inverse_gain_of(s);
+                peak = quantize_band(lines, inverse_gain, q);
+            }
+            sf_[band_base_[g] + b] = s;
+            peak_[band_base_[g] + b] = peak;
+            if (peak > 0) {
+                first = false;
+                previous = s;
+                if (noise_fill) {
+                    // The level the decoder tracks from this band (it has energy).
+                    level_[band_base_[g] + b] = kLog2E * std::log(reconstructed_mean_square(q, s));
+                }
+            }
+            price_band(q, peak, prices, cost[b]);
+        }
+        // Codebooks and sections, by exact cost: each band is priced in every
+        // codebook its values fit (above), then the cheapest division into
+        // sections found, counting each section's header.
+        // Per codebook, over the bands in order: prefix[cb][b] the cost of
+        // bands [0, b) (the unpriced ones count nothing), and lowest[cb][e]
+        // the first band from which a section of cb can run up to e, -1 where
+        // band e - 1 is not priced.
+        std::vector<std::size_t>& prefix = scratch.prefix;
+        std::vector<int>& lowest = scratch.lowest;
+        std::vector<std::size_t>& ahead = scratch.ahead;
+        std::vector<std::size_t>& header = scratch.header;
+        prefix.resize(kCodebooks * stride);
+        lowest.resize(kCodebooks * stride);
+        ahead.resize(kCodebooks * stride);
+        header.resize(stride);
+        for (std::size_t len = 1; len < stride; ++len) {
+            header[len] = section_header_bits(static_cast<int>(len), width);
+        }
+        for (std::size_t cb = 0; cb < kCodebooks; ++cb) {
+            std::size_t* p = prefix.data() + cb * stride;
+            int* low = lowest.data() + cb * stride;
+            p[0] = 0;
+            low[0] = -1;
+            for (std::size_t b = 0; b < count; ++b) {
+                const std::size_t c = cost[b][cb];
+                const bool priced = c < kNever;
+                p[b + 1] = p[b] + (priced ? c : 0);
+                low[b + 1] = !priced ? -1 : (low[b] >= 0 ? low[b] : static_cast<int>(b));
+            }
+        }
+        // best[b]: the cheapest coding of bands [0, b); from[b] and book[b]
+        // say where its last section started and which codebook it took.
+        // A section [start, end) in cb costs best[start] + prefix[end] -
+        // prefix[start] + header, so ahead[cb][start] holds the part that
+        // does not depend on end. The candidates are met in the same order as
+        // ever (end, then cb, then start downwards, a later one winning only
+        // by being cheaper) so the same ones win ties.
+        std::vector<std::size_t>& best = scratch.best;
+        std::vector<int>& from = scratch.from;
+        std::vector<int>& book = scratch.book;
+        best.assign(stride, kNever);
+        from.assign(stride, 0);
+        book.assign(stride, 0);
+        best[0] = 0;
+        for (std::size_t end = 1; end <= count; ++end) {
+            for (std::size_t cb = 0; cb < kCodebooks; ++cb) {
+                ahead[cb * stride + end - 1] = best[end - 1] - prefix[cb * stride + end - 1];
+            }
+            std::size_t cheapest = kNever;
+            int cheapest_start = 0;
+            int cheapest_book = 0;
+            for (std::size_t cb = 0; cb < kCodebooks; ++cb) {
+                const int earliest = lowest[cb * stride + end];
+                if (earliest < 0) {
+                    continue;
+                }
+                const std::size_t at_end = prefix[cb * stride + end];
+                const std::size_t* before = ahead.data() + cb * stride;
+                for (std::size_t start = end; start-- > static_cast<std::size_t>(earliest);) {
+                    const std::size_t total = before[start] + at_end + header[end - start];
+                    if (total < cheapest) {
+                        cheapest = total;
+                        cheapest_start = static_cast<int>(start);
+                        cheapest_book = static_cast<int>(cb);
+                    }
+                }
+            }
+            best[end] = cheapest;
+            from[end] = cheapest_start;
+            book[end] = cheapest_book;
+        }
+        // The sections from the last back, which is the order they are found in.
+        const std::size_t first_section = sections_.size();
+        for (int end = bands; end > 0; end = from[static_cast<std::size_t>(end)]) {
+            const int start = from[static_cast<std::size_t>(end)];
+            const int chosen = book[static_cast<std::size_t>(end)];
+            section_bits_ += section_header_bits(end - start, width);
+            for (int b = start; b < end; ++b) {
+                cb_[band_base_[g] + static_cast<std::size_t>(b)] = chosen;
+                spectral_bits_ += chosen == 0 ? 0 : cost[static_cast<std::size_t>(b)][static_cast<std::size_t>(chosen)];
+            }
+            if (full) {
+                sections_.push_back(Section{chosen, start, end});
+            }
+        }
+        std::reverse(sections_.begin() + static_cast<std::ptrdiff_t>(first_section), sections_.end());
+        section_base_[g + 1] = sections_.size();
+    }
+
+    // asf_scalefac_data(): the reference, then a delta for each later band
+    // that sends a scale factor.
+    scalefac_bits_ = 8;
+    bool found = false;
+    int last = 0;
+    for (std::size_t bi = 0; bi < total_bands; ++bi) {
+        if (cb_[bi] == 0 || peak_[bi] == 0) {
+            continue;
+        }
+        if (found) {
+            const int index = sf_[bi] - last + kMaxDelta;
+            scalefac_bits_ += tables::kAsfHcbScalefacCodes[static_cast<std::size_t>(index)].bits;
+        }
+        found = true;
+        last = sf_[bi];
+    }
+    if (noise_fill) {
+        plan_noise_fill(grouped);
+    }
+}
+
 // Pseudocodes 22 and 23 run forwards over a coded track: the codeword each
 // noise band sends, so that the decoder's noise comes out at the band's own
 // level to the nearest 3 dB step. The level the decoder tracks (previous_rms)
 // starts at that of the first band that has energy, moves to that of each band
 // that has some, and by the delta of each noise band that is not the escape.
-void plan_noise_fill(const Grouped& grouped, CodedTrack& t) {
-    const std::size_t groups = t.cb.size();
-    const auto has_energy = [&](std::size_t g, std::size_t b) { return t.cb[g][b] != 0 && t.max_abs[g][b] > 0; };
-    const auto level_of = [&](std::size_t g, std::size_t b) {
-        const std::size_t begin = t.offset[g][b];
-        const std::size_t end = t.offset[g][b + 1];
-        const std::span<const std::int32_t> q = std::span<const std::int32_t>(t.q).subspan(begin, end - begin);
-        return kLog2E * std::log(reconstructed_mean_square(q, t.sf[g][b]));
-    };
+void TrackCoder::plan_noise_fill(const Grouped& grouped) {
+    const std::size_t groups = grouped.offset.size();
+    const std::size_t total_bands = band_base_[groups];
+    const auto has_energy = [&](std::size_t bi) { return cb_[bi] != 0 && peak_[bi] > 0; };
+    // The level of a band that has energy, measured as it was quantised.
+    const auto level_of = [&](std::size_t g, std::size_t b) { return level_[band_base_[g] + b]; };
 
     double previous = 0.0;
     bool found = false;
     for (std::size_t g = 0; g < groups && !found; ++g) {
-        for (std::size_t b = 0; b < t.cb[g].size(); ++b) {
-            if (has_energy(g, b)) {
+        for (std::size_t b = 0; b < static_cast<std::size_t>(grouped.max_sfb[g]); ++b) {
+            if (has_energy(band_base_[g] + b)) {
                 previous = level_of(g, b);
                 found = true;
                 break;
             }
         }
     }
-    t.dpcm_snf.assign(groups, {});
-    t.noise_fill = false;
-    t.noise_bits = 0;
+    noise_fill_ = false;
+    noise_bits_ = 0;
     if (!found) {
         return;  // no level to be relative to: every band would send the escape
     }
+    dpcm_.assign(total_bands, -1);
     std::size_t bits = 0;
     bool any = false;
     for (std::size_t g = 0; g < groups; ++g) {
-        t.dpcm_snf[g].assign(t.cb[g].size(), -1);
-        for (std::size_t b = 0; b < t.cb[g].size(); ++b) {
-            if (has_energy(g, b)) {
+        for (std::size_t b = 0; b < static_cast<std::size_t>(grouped.max_sfb[g]); ++b) {
+            if (has_energy(band_base_[g] + b)) {
                 previous = level_of(g, b);
                 continue;
             }
@@ -240,190 +733,74 @@ void plan_noise_fill(const Grouped& grouped, CodedTrack& t) {
                     any = true;
                 }
             }
-            t.dpcm_snf[g][b] = index;
+            dpcm_[band_base_[g] + b] = index;
             bits += tables::kAsfHcbSnfCodes[static_cast<std::size_t>(index)].bits;
         }
     }
     if (any) {
-        t.noise_fill = true;
-        t.noise_bits = bits;
-    } else {
-        t.dpcm_snf.assign(groups, {});
+        noise_fill_ = true;
+        noise_bits_ = bits;
     }
 }
 
-}  // namespace
-
-std::span<const std::uint16_t> band_offsets(int transform_length) {
-    return tables::sfb_offsets_48(transform_length);
+void TrackCoder::fill(CodedTrack& out, const Grouped& grouped, bool noise_fill) const {
+    const std::size_t groups = grouped.offset.size();
+    out.offset = grouped.offset;
+    out.cb.resize(groups);
+    out.sf.resize(groups);
+    out.max_abs.resize(groups);
+    out.sections.resize(groups);
+    for (std::size_t g = 0; g < groups; ++g) {
+        const auto from = static_cast<std::ptrdiff_t>(band_base_[g]);
+        const auto to = static_cast<std::ptrdiff_t>(band_base_[g + 1]);
+        out.cb[g].assign(cb_.begin() + from, cb_.begin() + to);
+        out.sf[g].assign(sf_.begin() + from, sf_.begin() + to);
+        out.max_abs[g].assign(peak_.begin() + from, peak_.begin() + to);
+        out.sections[g].assign(sections_.begin() + static_cast<std::ptrdiff_t>(section_base_[g]),
+                               sections_.begin() + static_cast<std::ptrdiff_t>(section_base_[g + 1]));
+    }
+    out.noise_fill = noise_fill_;
+    out.section_bits = section_bits_;
+    out.spectral_bits = spectral_bits_;
+    out.scalefac_bits = scalefac_bits_;
+    out.noise_bits = noise_bits_;
+    // A track that asked for noise fill has one entry per group, and per band
+    // where it sends any; one that did not has none.
+    if (!noise_fill) {
+        out.dpcm_snf.clear();
+        return;
+    }
+    out.dpcm_snf.resize(groups);
+    for (std::size_t g = 0; g < groups; ++g) {
+        if (noise_fill_) {
+            out.dpcm_snf[g].assign(dpcm_.begin() + static_cast<std::ptrdiff_t>(band_base_[g]),
+                                   dpcm_.begin() + static_cast<std::ptrdiff_t>(band_base_[g + 1]));
+        } else {
+            out.dpcm_snf[g].clear();
+        }
+    }
 }
 
-Grouped regroup(std::span<const double> spectrum, const FrameLayout& layout, std::array<int, 2> max_sfb) {
-    Grouped out;
-    std::vector<std::size_t> window_start;
-    std::size_t total = 0;
-    for (const int length : layout.window_length) {
-        window_start.push_back(total);
-        total += static_cast<std::size_t>(length);
-    }
-    std::size_t base = 0;
-    std::size_t window = 0;
-    for (std::size_t g = 0; g < layout.group_windows.size(); ++g) {
-        const auto windows = static_cast<std::size_t>(layout.group_windows[g]);
-        const std::span<const std::uint16_t> bands = band_offsets(layout.group_length[g]);
-        const int available = std::max(0, static_cast<int>(bands.size()) - 1);
-        const int limit = std::clamp(max_sfb[static_cast<std::size_t>(layout.group_half[g])], 0, available);
-        out.max_sfb.push_back(limit);
-        std::vector<std::size_t> offsets(static_cast<std::size_t>(limit) + 1);
-        for (std::size_t b = 0; b < offsets.size(); ++b) {
-            offsets[b] = base + static_cast<std::size_t>(bands[b]) * windows;
-        }
-        for (int b = 0; b < limit; ++b) {
-            const auto bi = static_cast<std::size_t>(b);
-            for (std::size_t w = 0; w < windows; ++w) {
-                const std::size_t first = window_start[window + w];
-                for (std::size_t l = bands[bi]; l < bands[bi + 1]; ++l) {
-                    out.lines.push_back(spectrum[first + l]);
-                }
-            }
-        }
-        base = offsets[static_cast<std::size_t>(limit)];
-        out.offset.push_back(std::move(offsets));
-        window += windows;
-    }
-    return out;
+std::size_t TrackCoder::bits(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
+                             const FrameLayout& layout, bool noise_fill,
+                             const std::vector<std::vector<double>>* peaks) {
+    analyse(search_, nullptr, grouped, sf, offset, layout, noise_fill, peaks);
+    return section_bits_ + spectral_bits_ + scalefac_bits_ + noise_bits_ + 1;
+}
+
+void TrackCoder::code(CodedTrack& out, const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
+                      const FrameLayout& layout, bool noise_fill,
+                      const std::vector<std::vector<double>>* peaks) {
+    analyse(search_, &out.q, grouped, sf, offset, layout, noise_fill, peaks);
+    fill(out, grouped, noise_fill);
 }
 
 CodedTrack code_track(const Grouped& grouped, const std::vector<std::vector<int>>& sf, int offset,
                       const FrameLayout& layout, bool noise_fill) {
+    TrackCoder coder;
     CodedTrack t;
-    t.q.assign(grouped.lines.size(), 0);
-    t.offset = grouped.offset;
-    const std::size_t groups = grouped.offset.size();
-    t.cb.resize(groups);
-    t.sf.resize(groups);
-    t.sections.resize(groups);
-    std::vector<std::vector<std::int32_t>>& max_abs = t.max_abs;
-    max_abs.resize(groups);
-
-    // Scale factors: each band's, offset and clamped, then held to the deltas
-    // Table A.1 can send from one transmitted band to the next.
-    bool first = true;
-    int previous = 0;
-    for (std::size_t g = 0; g < groups; ++g) {
-        const auto bands = static_cast<std::size_t>(grouped.max_sfb[g]);
-        t.sf[g].assign(bands, 0);
-        max_abs[g].assign(bands, 0);
-        for (std::size_t b = 0; b < bands; ++b) {
-            const std::size_t begin = grouped.offset[g][b];
-            const std::size_t end = grouped.offset[g][b + 1];
-            const std::span<const double> lines = std::span<const double>(grouped.lines).subspan(begin, end - begin);
-            const std::span<std::int32_t> q = std::span<std::int32_t>(t.q).subspan(begin, end - begin);
-            int s = std::clamp(sf[g][b] + offset, 0, 255);
-            if (!first) {
-                s = std::clamp(s, std::max(0, previous - kMaxDelta), std::min(255, previous + kMaxDelta));
-            }
-            std::int32_t peak = quantize_band(lines, s, q);
-            // A line past what ext_code reaches clips; coarser steps avoid it
-            // where the delta from the band before allows.
-            while (peak >= kMaxQuant && s < 255 && (first || s < previous + kMaxDelta)) {
-                ++s;
-                peak = quantize_band(lines, s, q);
-            }
-            t.sf[g][b] = s;
-            max_abs[g][b] = peak;
-            if (peak > 0) {
-                first = false;
-                previous = s;
-            }
-        }
-    }
-
-    // Codebooks and sections, by exact cost: each band priced in every
-    // codebook its values fit, then the cheapest division into sections,
-    // counting each section's header.
-    for (std::size_t g = 0; g < groups; ++g) {
-        const int bands = grouped.max_sfb[g];
-        const int width = section_bits_width(group_transf_index(layout, g));
-        std::vector<std::array<std::size_t, kCodebooks>> cost(static_cast<std::size_t>(bands));
-        constexpr std::size_t kNever = std::numeric_limits<std::size_t>::max() / 4;
-        for (int b = 0; b < bands; ++b) {
-            const auto bi = static_cast<std::size_t>(b);
-            const std::size_t begin = grouped.offset[g][bi];
-            const std::size_t end = grouped.offset[g][bi + 1];
-            const std::span<const std::int32_t> q = std::span<const std::int32_t>(t.q).subspan(begin, end - begin);
-            for (int cb = 0; cb < kCodebooks; ++cb) {
-                std::size_t c = kNever;
-                if (cb == 0) {
-                    c = max_abs[g][bi] == 0 ? 0 : kNever;
-                } else if (fits(shapes()[static_cast<std::size_t>(cb)], cb, max_abs[g][bi])) {
-                    c = band_cost(q, cb);
-                }
-                cost[bi][static_cast<std::size_t>(cb)] = c;
-            }
-        }
-        // best[b]: the cheapest coding of bands [0, b); from[b] and book[b]
-        // say where its last section started and which codebook it took.
-        std::vector<std::size_t> best(static_cast<std::size_t>(bands) + 1, kNever);
-        std::vector<int> from(static_cast<std::size_t>(bands) + 1, 0);
-        std::vector<int> book(static_cast<std::size_t>(bands) + 1, 0);
-        best[0] = 0;
-        for (int end = 1; end <= bands; ++end) {
-            for (int cb = 0; cb < kCodebooks; ++cb) {
-                std::size_t run = 0;
-                for (int start = end - 1; start >= 0; --start) {
-                    const std::size_t c = cost[static_cast<std::size_t>(start)][static_cast<std::size_t>(cb)];
-                    if (c >= kNever) {
-                        break;
-                    }
-                    run += c;
-                    const std::size_t total =
-                        best[static_cast<std::size_t>(start)] + run + section_header_bits(end - start, width);
-                    if (total < best[static_cast<std::size_t>(end)]) {
-                        best[static_cast<std::size_t>(end)] = total;
-                        from[static_cast<std::size_t>(end)] = start;
-                        book[static_cast<std::size_t>(end)] = cb;
-                    }
-                }
-            }
-        }
-        std::vector<Section> sections;
-        for (int end = bands; end > 0; end = from[static_cast<std::size_t>(end)]) {
-            sections.push_back(Section{book[static_cast<std::size_t>(end)], from[static_cast<std::size_t>(end)], end});
-        }
-        std::reverse(sections.begin(), sections.end());
-        t.cb[g].assign(static_cast<std::size_t>(bands), 0);
-        for (const Section& section : sections) {
-            t.section_bits += section_header_bits(section.end - section.start, width);
-            for (int b = section.start; b < section.end; ++b) {
-                t.cb[g][static_cast<std::size_t>(b)] = section.cb;
-                t.spectral_bits += section.cb == 0 ? 0 : cost[static_cast<std::size_t>(b)][static_cast<std::size_t>(section.cb)];
-            }
-        }
-        t.sections[g] = std::move(sections);
-    }
-
-    // asf_scalefac_data(): the reference, then a delta for each later band
-    // that sends a scale factor.
-    t.scalefac_bits = 8;
-    bool found = false;
-    int last = 0;
-    for (std::size_t g = 0; g < groups; ++g) {
-        for (std::size_t b = 0; b < t.cb[g].size(); ++b) {
-            if (t.cb[g][b] == 0 || max_abs[g][b] == 0) {
-                continue;
-            }
-            if (found) {
-                const int index = t.sf[g][b] - last + kMaxDelta;
-                t.scalefac_bits += tables::kAsfHcbScalefacCodes[static_cast<std::size_t>(index)].bits;
-            }
-            found = true;
-            last = t.sf[g][b];
-        }
-    }
-    if (noise_fill) {
-        plan_noise_fill(grouped, t);
-    }
+    coder.analyse(scratch_buffers(), &t.q, grouped, sf, offset, layout, noise_fill, nullptr);
+    coder.fill(t, grouped, noise_fill);
     return t;
 }
 

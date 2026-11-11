@@ -1111,9 +1111,20 @@ struct SubstreamCoder {
 
     // The input at the internal rate, from sample index `base` of the delayed
     // signal on; the first `delay` samples of that signal are the silence
-    // ahead of the input.
+    // ahead of the input. The six buffers this and after_frame() walk (signal,
+    // source, de_programme, de_dialogue, kept_input and the A-JOC objects)
+    // start at `origin`, at or ahead of `base`: the samples between are read
+    // for the last time, and dropping them is moving `base`. They are erased
+    // together once they outnumber the rest, so the cost of a frame does not
+    // grow with the input buffered.
     std::vector<std::vector<double>> signal;
     std::int64_t base = 0;
+    std::int64_t origin = 0;  // the sample index of element 0 of each of those buffers
+
+    // Where sample s (base <= s < signal_end()) is in each of those buffers.
+    [[nodiscard]] std::size_t at(std::int64_t s) const noexcept {
+        return static_cast<std::size_t>(s - origin);
+    }
 
     // The metadata beside the audio (frame/metadata.hpp). With dialogue
     // enhancement: the input channels its parameters are for, in
@@ -1145,7 +1156,7 @@ struct SubstreamCoder {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return kept_input[c][static_cast<std::size_t>(s - base)];
+        return kept_input[c][at(s)];
     }
 
     // Each layout group's transform layouts, decided for the frame being coded
@@ -1228,7 +1239,7 @@ struct SubstreamCoder {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return ajoc->objects[k][static_cast<std::size_t>(s - base)];
+        return ajoc->objects[k][at(s)];
     }
 
     // Analyses the QMF slots of the downmix and the objects that frame f's
@@ -1432,10 +1443,10 @@ struct SubstreamCoder {
     // With interleaving, the bands above the crossover the spectral frontend
     // leaves silent: all but those that meet `waveform_hz`, the frequency
     // ranges it codes there.
-    [[nodiscard]] std::vector<std::vector<bool>> silenced_bands(
-        const detail::Grouped& grouped, const FrameLayout& layout,
-        const std::vector<std::pair<double, double>>& waveform_hz) const {
-        std::vector<std::vector<bool>> out(grouped.offset.size());
+    void silenced_bands(std::vector<std::vector<bool>>& out, const detail::Grouped& grouped,
+                        const FrameLayout& layout,
+                        const std::vector<std::pair<double, double>>& waveform_hz) const {
+        out.resize(grouped.offset.size());
         const double crossover =
             aspx ? aspx->groups.sbx * static_cast<double>(rate_hz) / 128.0 : 0.0;
         for (std::size_t g = 0; g < grouped.offset.size(); ++g) {
@@ -1455,18 +1466,17 @@ struct SubstreamCoder {
                 out[g][b] = lo >= crossover && !coded;
             }
         }
-        return out;
     }
 
     [[nodiscard]] std::int64_t signal_end() const noexcept {
-        return base + static_cast<std::int64_t>(signal.front().size());
+        return origin + static_cast<std::int64_t>(signal.front().size());
     }
 
     [[nodiscard]] double sample(std::size_t c, std::int64_t s) const noexcept {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return signal[c][static_cast<std::size_t>(s - base)];
+        return signal[c][at(s)];
     }
 
     // Sample s of the input channel A-CPL's analysis reads k-th.
@@ -1474,7 +1484,7 @@ struct SubstreamCoder {
         if (s < base || s >= signal_end()) {
             return 0.0;
         }
-        return source[k][static_cast<std::size_t>(s - base)];
+        return source[k][at(s)];
     }
 
     // Analyses the QMF slots of the input channels A-CPL rebuilds that frame
@@ -1676,7 +1686,7 @@ struct SubstreamCoder {
                 for (std::size_t n = 0; n < window.size(); ++n) {
                     const std::int64_t s = start + static_cast<std::int64_t>(n);
                     window[n] = s >= base && s < signal_end()
-                                    ? (*from)[static_cast<std::size_t>(s - base)]
+                                    ? (*from)[at(s)]
                                     : 0.0;
                 }
                 analysis.transform(window, layout, frame_length, frame_length, *to);
@@ -2230,10 +2240,32 @@ struct SubstreamCoder {
         std::size_t side_bits = 0;
         double top_level = 0.0;  // the highest allowance per line
         std::vector<std::vector<std::vector<int>>> sf;
+        // Per channel, band_root_sums() of its lines: all that the scale
+        // factors take of them, whatever the step.
+        std::vector<std::vector<std::vector<double>>> roots;
+        // And band_peaks(): which bands quantise to zeros at a step is a
+        // question of their largest line.
+        std::vector<std::vector<std::vector<double>>> peaks;
         std::vector<std::vector<double>> capped;
         double kappa = kCaps.front();
     };
     Pending pending;
+    // The spectral coder's storage, kept for the rate loop's many bit counts
+    // and for the track it settles on.
+    detail::TrackCoder track_coder;
+
+    // What prepare() works in, kept from frame to frame so that it allocates
+    // only while the frames grow.
+    struct PrepareScratch {
+        std::vector<int> next_first;
+        std::vector<std::vector<std::pair<double, double>>> waveform_hz;
+        std::vector<std::vector<std::pair<int, int>>> interleaved;
+        std::vector<double> window;
+        std::vector<double> spectrum;
+        std::vector<char> analysed;
+        detail::PsychoScratch psycho;
+    };
+    PrepareScratch scratch;
 
     // Frame f's analysis, up to the rate loop: its transform layouts are the
     // first of each group's (before_frame()).
@@ -2251,11 +2283,22 @@ struct SubstreamCoder {
         p.fields = fields_for(iframe);
         p.de_prepared = de_current;
         Coding& f = p.f;
+        // The tracks' storage carries over, for code() to refill: it rewrites
+        // every track a unit reads, and the rest are never read.
+        std::vector<detail::CodedTrack> spare_tracks = std::move(f.tracks);
+        std::vector<FrameLayout> spare_layout = std::move(f.layout);
+        std::vector<std::array<int, 2>> spare_max_sfb = std::move(f.max_sfb);
         f = Coding{};
+        f.tracks = std::move(spare_tracks);
+        f.layout = std::move(spare_layout);
+        f.max_sfb = std::move(spare_max_sfb);
         f.iframe = iframe;
-        std::vector<int> next_first(groups.size());
+        std::vector<int>& next_first = scratch.next_first;
+        next_first.assign(groups.size(), 0);
+        f.layout.resize(groups.size());
+        f.max_sfb.clear();
         for (std::size_t g = 0; g < groups.size(); ++g) {
-            f.layout.push_back(groups[g].layouts[0]);
+            f.layout[g] = groups[g].layouts[0];
             next_first[g] = groups[g].layouts[1].window_length.front();
             f.max_sfb.push_back(max_sfb_for(f.layout[g], groups[g]));
         }
@@ -2289,8 +2332,16 @@ struct SubstreamCoder {
         // the groups this frame's A-SPX data marks and the last frame's,
         // whose slots its transform window overlaps, and nothing else there,
         // in each layout group's channels.
-        std::vector<std::vector<std::pair<double, double>>> waveform_hz(groups.size());
-        std::vector<std::vector<std::pair<int, int>>> interleaved(channels);
+        std::vector<std::vector<std::pair<double, double>>>& waveform_hz = scratch.waveform_hz;
+        std::vector<std::vector<std::pair<int, int>>>& interleaved = scratch.interleaved;
+        waveform_hz.resize(groups.size());
+        for (auto& ranges : waveform_hz) {
+            ranges.clear();
+        }
+        interleaved.resize(channels);
+        for (auto& ranges : interleaved) {
+            ranges.clear();
+        }
         if (aspx && aspx->interleave) {
             const double subband_hz = static_cast<double>(rate_hz) / 128.0;
             for (std::size_t g = 0; g < groups.size(); ++g) {
@@ -2320,20 +2371,26 @@ struct SubstreamCoder {
         limit_residuals(f);
         std::vector<detail::Channel>& spectra = p.spectra;
         std::vector<std::vector<std::vector<bool>>>& silenced = p.silenced;
-        spectra.assign(channels, detail::Channel{});
-        silenced.assign(channels, {});
-        std::vector<double> window(2 * static_cast<std::size_t>(frame_length));
-        std::vector<double> spectrum;
+        // Each channel's storage is kept; every channel a group lists is
+        // rewritten below, and any other left as an empty one.
+        spectra.resize(channels);
+        silenced.resize(channels);
+        std::vector<char>& analysed = scratch.analysed;
+        analysed.assign(channels, 0);
+        std::vector<double>& window = scratch.window;
+        window.resize(2 * static_cast<std::size_t>(frame_length));
+        std::vector<double>& spectrum = scratch.spectrum;
         for (std::size_t g = 0; g < groups.size(); ++g) {
             for (const int channel : groups[g].channels) {
                 const auto c = static_cast<std::size_t>(channel);
+                analysed[c] = 1;
                 for (std::size_t i = 0; i < window.size(); ++i) {
                     window[i] = coded_sample(c, start + static_cast<std::int64_t>(i));
                 }
                 analysis.transform(window, f.layout[g], groups[g].previous_last, next_first[g], spectrum);
-                spectra[c].grouped = detail::regroup(spectrum, f.layout[g], max_sfb_of(f, c));
-                spectra[c].allowed = psycho.thresholds(spectra[c].grouped, f.layout[g]);
-                silenced[c] = silenced_bands(spectra[c].grouped, f.layout[g], waveform_hz[g]);
+                detail::regroup_into(spectra[c].grouped, spectrum, f.layout[g], max_sfb_of(f, c));
+                psycho.thresholds(spectra[c].grouped, f.layout[g], spectra[c].allowed, scratch.psycho);
+                silenced_bands(silenced[c], spectra[c].grouped, f.layout[g], waveform_hz[g]);
                 for (std::size_t gr = 0; gr < spectra[c].allowed.size(); ++gr) {
                     for (std::size_t b = 0; b < spectra[c].allowed[gr].size(); ++b) {
                         if (silenced[c][gr][b]) {
@@ -2341,6 +2398,12 @@ struct SubstreamCoder {
                         }
                     }
                 }
+            }
+        }
+        for (std::size_t c = 0; c < channels; ++c) {
+            if (analysed[c] == 0) {
+                spectra[c] = detail::Channel{};
+                silenced[c].clear();
             }
         }
         if (plan.coupled()) {
@@ -2371,16 +2434,20 @@ struct SubstreamCoder {
             }
         }
         f.tracks.resize(channels);
-        BitWriter side = BitWriter::buffered();
+        BitWriter side;  // only its length is wanted: no records
         write_element(side, f, false);
         p.side_bits = side.bit_count();
 
         // The rate loop's level of noise per line is measured from the
         // highest allowance per line, and its cap from each band's energy.
         p.top_level = 0.0;
-        p.energy.assign(channels, {});
+        p.energy.resize(channels);
+        p.roots.resize(channels);
+        p.peaks.resize(channels);
         for (const std::size_t c : p.order) {
             const detail::Channel& track = spectra[c];
+            detail::band_root_sums(track.grouped, p.roots[c]);
+            detail::band_peaks(track.grouped, p.peaks[c]);
             p.energy[c].resize(track.allowed.size());
             for (std::size_t g = 0; g < track.allowed.size(); ++g) {
                 p.energy[c][g].assign(track.allowed[g].size(), 0.0);
@@ -2398,8 +2465,17 @@ struct SubstreamCoder {
                 }
             }
         }
-        p.sf.assign(channels, {});
+        p.sf.resize(channels);
+        // Room for the tracks the rate loop is about to count and code, so that
+        // it allocates only when a frame needs more than any before.
+        for (const std::size_t c : p.order) {
+            track_coder.reserve(spectra[c].grouped, config.experimental.noise_fill);
+        }
+        // As prepared: no tracks yet, but their places.
+        std::vector<detail::CodedTrack> tracks = std::move(f.tracks);
         p.prepared = f;
+        p.prepared.tracks.resize(channels);
+        f.tracks = std::move(tracks);
     }
 
     // The rate loop: a level of noise per line, top_level * 10^(kStepDb p /
@@ -2442,7 +2518,7 @@ struct SubstreamCoder {
                     }
                 }
             }
-            p.sf[c] = detail::scale_factors_for(track.grouped, p.capped);
+            detail::scale_factors_into(p.sf[c], track.grouped, p.roots[c], p.capped);
         }
     }
 
@@ -2454,9 +2530,8 @@ struct SubstreamCoder {
         set_step(pull, step);
         std::size_t total = 0;
         for (const std::size_t c : pending.order) {
-            total += detail::code_track(pending.spectra[c].grouped, pending.sf[c], 0, layout_of(c),
-                                      config.experimental.noise_fill)
-                         .bits();
+            total += track_coder.bits(pending.spectra[c].grouped, pending.sf[c], 0, layout_of(c),
+                                      config.experimental.noise_fill, &pending.peaks[c]);
         }
         return total;
     }
@@ -2470,12 +2545,16 @@ struct SubstreamCoder {
     }
 
     // The prepared frame, coded into an audio substream of exactly
-    // `substream_bytes`: a buffered writer, its records kept; nothing where
-    // not even the frame the fallbacks end at fits.
-    [[nodiscard]] std::optional<BitWriter> code(std::size_t substream_bytes) {
+    // `substream_bytes`: a buffered writer, its records kept when
+    // `keep_records` (a syntax trace asks for them); nothing where not even the
+    // frame the fallbacks end at fits.
+    [[nodiscard]] std::optional<BitWriter> code(std::size_t substream_bytes, bool keep_records = true) {
         Pending& p = pending;
+        p.fields.keep_records = keep_records;
         Coding& f = p.f;
+        std::vector<detail::CodedTrack> tracks = std::move(f.tracks);
         f = p.prepared;
+        f.tracks = std::move(tracks);  // the storage, for write_at() to refill
         de_current = p.de_prepared;
         p.kappa = kCaps.front();
         const std::int64_t frame = p.frame;
@@ -2497,15 +2576,16 @@ struct SubstreamCoder {
             return low;
         };
         const auto write = [&]() {
-            BitWriter audio = BitWriter::buffered();
+            BitWriter audio = keep_records ? BitWriter::buffered() : BitWriter{};
+            audio.reserve(substream_bytes);
             write_element(audio, f, true);
             return detail::write_audio_substream(p.fields, audio, substream_bytes);
         };
         const auto write_at = [&](bool pull, int step) {
             set_step(pull, step);
             for (const std::size_t c : p.order) {
-                f.tracks[c] = detail::code_track(p.spectra[c].grouped, p.sf[c], 0, layout_of(c),
-                                                     config.experimental.noise_fill);
+                track_coder.code(f.tracks[c], p.spectra[c].grouped, p.sf[c], 0, layout_of(c),
+                                 config.experimental.noise_fill, &p.peaks[c]);
             }
             return write();
         };
@@ -2739,15 +2819,27 @@ struct SubstreamCoder {
         if (keep_from > base) {
             const auto drop =
                 static_cast<std::size_t>(std::min(keep_from - base, signal_end() - base));
-            std::vector<std::vector<double>> none;
-            for (auto* buffers : {&signal, &source, &de_programme, &de_dialogue, &kept_input,
-                                  ajoc ? &ajoc->objects : &none}) {
-                for (std::vector<double>& channel : *buffers) {
-                    channel.erase(channel.begin(),
-                                  channel.begin() + static_cast<std::ptrdiff_t>(drop));
-                }
-            }
             base += static_cast<std::int64_t>(drop);
+            const auto dead = static_cast<std::size_t>(base - origin);
+            // The dead samples go at once while the live ones are few, which
+            // is all a caller feeding a frame at a time ever holds and keeps
+            // its buffers as small as they were; and once they outnumber the
+            // live ones when those are many, so that what is moved is a
+            // sample's worth for each sample taken, however much of the input
+            // is buffered.
+            constexpr std::size_t kFewLive = 16384;
+            const std::size_t live = signal.front().size() - dead;
+            if (live <= kFewLive || dead > live) {
+                std::vector<std::vector<double>> none;
+                for (auto* buffers : {&signal, &source, &de_programme, &de_dialogue, &kept_input,
+                                      ajoc ? &ajoc->objects : &none}) {
+                    for (std::vector<double>& channel : *buffers) {
+                        channel.erase(channel.begin(),
+                                      channel.begin() + static_cast<std::ptrdiff_t>(dead));
+                    }
+                }
+                origin = base;
+            }
         }
     }
 
@@ -4145,7 +4237,8 @@ std::vector<EncodedFrame> Encoder::Impl::encode_frame(std::int64_t frame) {
         }
         bool fits = true;
         for (std::size_t i = 0; i < substreams.size() && fits; ++i) {
-            std::optional<BitWriter> audio = substreams[i].coder->code(sizes[first_audio + i]);
+            std::optional<BitWriter> audio =
+                substreams[i].coder->code(sizes[first_audio + i], static_cast<bool>(config.trace));
             fits = audio.has_value();
             if (audio) {
                 written[first_audio + i] = std::move(*audio);
@@ -5480,10 +5573,10 @@ std::vector<std::vector<double>> SubstreamCoder::internal(
     std::vector<std::vector<double>> out(input.size());
     std::vector<double> samples;
     for (std::size_t c = 0; c < input.size(); ++c) {
-        samples.assign(input[c].begin(), input[c].end());
         if (through.empty()) {
-            out[c] = samples;
+            out[c].assign(input[c].begin(), input[c].end());
         } else {
+            samples.assign(input[c].begin(), input[c].end());
             through[c].process(samples, out[c]);
         }
     }

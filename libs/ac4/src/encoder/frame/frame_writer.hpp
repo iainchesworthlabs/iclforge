@@ -41,6 +41,10 @@ struct AudioSubstreamFields {
     const DeFrameParameters* de_core_previous = nullptr;
     const DialogueMixCodes* dialogue = nullptr;  // b_dialog
     std::span<const EmdfPayloadCodes> emdf;      // b_emdf_payloads_substream
+    // Whether the substream's writer keeps the records of what it writes, for a
+    // syntax trace; nothing reads them otherwise, and a frame's worth of them
+    // is most of what the writer allocates.
+    bool keep_records = true;
 };
 
 // The bits an audio substream of `substream_bytes` spends on everything but
@@ -64,7 +68,7 @@ struct AudioSubstreamFields {
 // audio_data_chan(): with `substream_bytes` above zero exactly that long, the
 // audio taking fill_bits, and nothing when the content alone is longer or the
 // size is not possible; with zero, as long as its content. A buffered writer,
-// its records kept.
+// its records kept unless `fields.keep_records` is false.
 [[nodiscard]] std::optional<BitWriter> write_audio_substream(const AudioSubstreamFields& fields,
                                                              const BitWriter& audio,
                                                              std::size_t substream_bytes);

@@ -23,15 +23,6 @@ constexpr double kT1 = 0.1;
 constexpr double kT2 = 0.075;
 constexpr double kT3 = 0.05;
 
-template <typename Scalar>
-Scalar peak_abs(std::span<const Scalar> x) {
-    Scalar m = 0;
-    for (const Scalar v : x) {
-        m = std::max(m, std::abs(v));
-    }
-    return m;
-}
-
 }  // namespace
 
 template <typename Scalar>
@@ -65,25 +56,44 @@ BasicTransientDetector<Scalar>::BasicTransientDetector(SampleRate sample_rate) {
 
 template <typename Scalar>
 bool BasicTransientDetector<Scalar>::run_pass(std::span<const float, 256> half) {
-    std::array<Scalar, 256> filtered{};
-    for (std::size_t n = 0; n < half.size(); ++n) {
-        Scalar x = static_cast<Scalar>(half[n]);
-        for (auto& stage : stages_) {
-            x = stage.process(x);
-        }
-        filtered[n] = x;
-    }
+    // The two stages' coefficients and memories live in locals for the whole
+    // pass, and the memories go back into the members once at the end. Held in
+    // the members they were read and written through memory on every sample
+    // of every stage, which put a store-to-load forward on the filter's
+    // loop-carried chain (y1 and y2 feed the next sample). The stages are
+    // written out in the loop, each line Biquad::process's own expression in
+    // its own order (process stays, exported, and the tests hold this loop to
+    // it); nothing is added, removed or reassociated.
+    const Scalar b0 = stages_[0].b0, b1 = stages_[0].b1, b2 = stages_[0].b2;
+    const Scalar a1 = stages_[0].a1, a2 = stages_[0].a2;
+    const Scalar d0 = stages_[1].b0, d1 = stages_[1].b1, d2 = stages_[1].b2;
+    const Scalar e1 = stages_[1].a1, e2 = stages_[1].a2;
+    Scalar px1 = stages_[0].x1, px2 = stages_[0].x2, py1 = stages_[0].y1, py2 = stages_[0].y2;
+    Scalar qx1 = stages_[1].x1, qx2 = stages_[1].x2, qy1 = stages_[1].y1, qy2 = stages_[1].y2;
 
-    // One sweep of the array, at the tree's finest level - the coarser
-    // levels are maxima of it (bit-identical to sweeping each level's own
-    // span: max over the same values, just associated differently).
-    const std::span<const Scalar> all(filtered);
-    const std::array<Scalar, 4> p3{
-        peak_abs(all.subspan(0, 64)),
-        peak_abs(all.subspan(64, 64)),
-        peak_abs(all.subspan(128, 64)),
-        peak_abs(all.subspan(192, 64)),
-    };
+    // The filtered samples are not kept: each block of 64 is reduced to its
+    // peak as it comes out of the second stage, the tree's finest level - the
+    // coarser levels are maxima of it (bit-identical to sweeping each level's
+    // own span: max over the same values, just associated differently). The
+    // peak is m = max(m, |v|) from 0 in sample order, as it was over a stored
+    // array.
+    std::array<Scalar, 4> p3{};
+    for (std::size_t block = 0; block < p3.size(); ++block) {
+        Scalar peak = 0;
+        const std::size_t first = block * 64;
+        for (std::size_t n = first; n < first + 64; ++n) {
+            const Scalar x = static_cast<Scalar>(half[n]);
+            const Scalar y = b0 * x + b1 * px1 + b2 * px2 - a1 * py1 - a2 * py2;
+            px2 = px1; px1 = x; py2 = py1; py1 = y;
+            const Scalar z = d0 * y + d1 * qx1 + d2 * qx2 - e1 * qy1 - e2 * qy2;
+            qx2 = qx1; qx1 = y; qy2 = qy1; qy1 = z;
+            peak = std::max(peak, std::abs(z));
+        }
+        p3[block] = peak;
+    }
+    stages_[0].x1 = px1; stages_[0].x2 = px2; stages_[0].y1 = py1; stages_[0].y2 = py2;
+    stages_[1].x1 = qx1; stages_[1].x2 = qx2; stages_[1].y1 = qy1; stages_[1].y2 = qy2;
+
     const std::array<Scalar, 2> p2{std::max(p3[0], p3[1]), std::max(p3[2], p3[3])};
     const Scalar p1 = std::max(p2[0], p2[1]);
 

@@ -91,6 +91,9 @@ struct f64x2 {
 [[nodiscard]] inline f64x2 operator*(f64x2 a, f64x2 b) {
     return f64x2{a.lo * b.lo, a.hi * b.hi};
 }
+[[nodiscard]] inline f64x2 operator/(f64x2 a, f64x2 b) {
+    return f64x2{a.lo / b.lo, a.hi / b.hi};
+}
 [[nodiscard]] inline f64x2 operator-(f64x2 a) { return f64x2{-a.lo, -a.hi}; }
 
 // IEEE-754 roundToIntegralTiesAway, lane by lane: exactly std::round() for

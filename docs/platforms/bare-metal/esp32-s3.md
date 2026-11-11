@@ -1880,38 +1880,15 @@ What this does not say. A 5.1 unit at 48 kHz is 833 microseconds of sound, and t
 took 1,106 microseconds with the overlay (2,599 without it): the mean is under the sound's time and the worst unit is
 over it, so a player needs a ring to absorb it. The 192 kHz stereo stream is over real time at 1.573. Wi-Fi's buffers
 come out of the same internal heap that the probe left 33 KB of at the least. The board ran in DIO flash mode, and a sink
-flashed with its bootloader runs QIO, whose effect on the decoder was not measured. The sink lists `truehd` on an S3 only when `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD` is set to 1
+flashed with its bootloader runs QIO, whose effect on the decoder was not measured. A 5.1 TrueHD play through the sink
+does not keep up: in a measurement build of the sink on 2026-11-11, beside Wi-Fi, a 20 ms chunk of 5.1 at 24 bit took
+23.9 ms (1.20 of real time), 20.3 ms of it in the decoder, a chunk at 16 bit 20.1 ms (1.01), and a 2.0 chunk 11.0 ms
+(0.55); one play each. The sink lists `truehd` on an S3 only when `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD` is set to 1
 (it is 0 by default there), and then states two coded channels, so a server sends it the 2.0 presentation or PCM
 (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS`, `firmware/hearth-sink/main/Kconfig.projbuild`).
 On `main` before the unit-cost change the same overlay with the PSRAM lines made the probe abort in the first decode
 and reboot in a loop; the larger caches alone took 5.1 at 24 bit from 1.499 to 1.094 there. Why it aborted was not
 investigated.
-
-**A TrueHD play through the sink, measured on 10 and 11 November 2026.** The same board (hearth-47b39c, 240 MHz) with
-the Hearth sink's own image (`s3-n16r8` with the `truehd` overlay, and for 5.1
-`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS` set to 6), playing the probe's 24-bit fixtures over
-Sendspin from `hearth-testserver`. The figure is the sink's own mean time per 20 ms burst (24 access units),
-`sendspin.burst_us` of `GET /status`, against the decoder alone in the probe:
-
-| 24 bit | Probe, decoder alone | Sink, per 20 ms burst | Sink less decoder |
-|---|---:|---:|---:|
-| 2.0 | 8.6 ms (0.43) | 11.7 to 12.0 ms (0.59) | about 3.2 ms |
-| 5.1 | 18.6 ms (0.93) | 28.1 to 28.4 ms (1.42) | about 9.7 ms |
-
-2.0 plays. 5.1 does not: nearly every chunk is late. What the sink does after the decoder is about three milliseconds
-of the burst for two channels and ten for six, so it grows with the channels. Two explanations were tried on the board
-and did not account for it. The decoder's state in PSRAM in place of internal RAM took the probe's 5.1 from 0.931 to
-0.949. The decode task's 16 KB of stack in internal RAM in place of PSRAM left the sink's 2.0 burst at 11.97 ms and its
-5.1 burst at 28.10 ms. These are one run of each on one board, so the difference between 11.7 and 12.0 ms, or between
-the two 5.1 figures, is not a result.
-
-The player's path after the decoder ran once for each access unit, which is 40 samples: 1,200 times a second, where an
-AC-3 block of 256 samples is 187 times a second. It now takes the units of a run together, up to the player's
-256-sample block (240 samples at 48 and 96 kHz), and on a part with PSRAM decodes and converts the chunk before it
-renders the first block (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_BLOCK_SAMPLES` and
-`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_DECODE_AHEAD`; 0 for both is the former path). On the host the samples it gives
-the sink are the same, bit for bit, as the former path's (`firmware/esp-idf/iclforge-host-tests`). What it does to the
-burst time on the board has not been measured.
 
 ## What the port required from the library
 

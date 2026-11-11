@@ -65,24 +65,39 @@ std::optional<Location> location_of(oba::BedLabel label) {
     return std::nullopt;
 }
 
-// Whether the layout is the stream's 7.1 bed, slot for slot: L R C LFE Ls Rs Lrs Rrs.
-bool is_stream_bed(const iclforge::render::OutputLayout& layout) {
-    constexpr std::array<Location, 8> expected{Location::kLeft,          Location::kRight,
-                                                Location::kCentre,        Location::kLfe,
-                                                Location::kLeftSurround,  Location::kRightSurround,
-                                                Location::kLrs,           Location::kRrs};
-    if (layout.slots() != expected.size()) {
-        return false;
+// The row of the stream's 7.1 bed (L R C LFE Ls Rs Lrs Rrs) each slot of the layout is, when the
+// layout is those eight speakers, each once, in any order: the name 7.1 lists them as L C R Ls Rs
+// Lrs Rrs LFE, a list may give the stream's own order. None for any other layout.
+std::optional<std::array<std::size_t, 8>> stream_bed_rows(
+    const iclforge::render::OutputLayout& layout) {
+    constexpr std::array<Location, 8> bed{Location::kLeft,         Location::kRight,
+                                           Location::kCentre,       Location::kLfe,
+                                           Location::kLeftSurround, Location::kRightSurround,
+                                           Location::kLrs,          Location::kRrs};
+    if (layout.slots() != bed.size()) {
+        return std::nullopt;
     }
-    for (std::size_t slot = 0; slot < expected.size(); ++slot) {
+    std::array<std::size_t, 8> rows{};
+    std::array<bool, 8> taken{};
+    for (std::size_t slot = 0; slot < bed.size(); ++slot) {
         const auto& speaker = layout.slot(slot);
-        const bool lfe = expected[slot] == Location::kLfe;
-        if (lfe ? speaker.kind != iclforge::render::Speaker::Kind::kLfe
-                : (!speaker.location || *speaker.location != expected[slot])) {
-            return false;
+        std::size_t row = bed.size();
+        for (std::size_t r = 0; r < bed.size(); ++r) {
+            const bool lfe = bed[r] == Location::kLfe;
+            if (lfe ? speaker.kind == iclforge::render::Speaker::Kind::kLfe
+                    : (speaker.kind != iclforge::render::Speaker::Kind::kLfe && speaker.location &&
+                       *speaker.location == bed[r])) {
+                row = r;
+                break;
+            }
         }
+        if (row == bed.size() || taken[row]) {
+            return std::nullopt;
+        }
+        taken[row] = true;
+        rows[slot] = row;
     }
-    return true;
+    return rows;
 }
 
 }  // namespace
@@ -92,8 +107,11 @@ TrueHdObjectRenderer::TrueHdObjectRenderer(const iclforge::render::OutputLayout&
     : layout_(layout),
       renderer_(layout, sample_rate),
       slots_(layout.slots()),
-      measured_(is_stream_bed(layout)),
       limit_(limit) {
+    if (const auto rows = stream_bed_rows(layout)) {
+        bed_rows_ = *rows;
+        measured_ = true;
+    }
     // Only the renderer's gains are used, never its render(), so its LFE delay line is not either.
     for (std::size_t slot = 0; slot < slots_; ++slot) {
         const auto& speaker = layout_.slot(slot);
@@ -152,8 +170,8 @@ void TrueHdObjectRenderer::add_update(std::size_t channel, std::uint64_t sample,
         const auto shares = iclforge::truehd::bed_pan_gains(iclforge::truehd::bed_position_code(
             state.position.x, state.position.y, state.position.z));
         const double level = state.active ? std::pow(10.0, state.gain_db / 20.0) : 0.0;
-        for (std::size_t slot = 0; slot < slots_ && slot < shares.size(); ++slot) {
-            event.target[slot] = level * shares[slot];
+        for (std::size_t slot = 0; slot < slots_ && slot < bed_rows_.size(); ++slot) {
+            event.target[slot] = level * shares[bed_rows_[slot]];
         }
         tracks_[channel].events.push_back(event);
         return;
