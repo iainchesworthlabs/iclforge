@@ -29,6 +29,9 @@ iclforge_add_test_binary(iclforge-truehd-tests PROJECT truehd SOURCES
     encoder/test_encoder_atmos.cpp
     encoder/test_encoder_object_bed.cpp
     encoder/test_encoder_object_downmix.cpp
+    encoder/test_encoder_object_downmix_adversarial.cpp
+    encoder/test_encoder_object_downmix_scaled.cpp
+    encoder/test_encoder_object_downmix_interop.cpp
     encoder/test_encoder_object_motion.cpp
     encoder/test_bed_pan.cpp
     encoder/test_render_bed.cpp
@@ -122,4 +125,11 @@ add_dependencies(iclforge-tests iclforge-truehd-ss3-lab)
 # reasoning as libs/ac3/tests/core/test_simd_kernels.cpp.
 if(MSVC)
     set_source_files_properties(decoder/test_object_robustness.cpp PROPERTIES COMPILE_OPTIONS "/wd4996")
+endif()
+
+# encoder/test_encoder_object_downmix_interop.cpp reads std::getenv too (ICL_DOWNMIX_OUT and
+# ICL_DOWNMIX_DUMP, the directory and the files of its hidden lab cases).
+if(MSVC)
+    set_source_files_properties(encoder/test_encoder_object_downmix_interop.cpp
+        PROPERTIES COMPILE_OPTIONS "/wd4996")
 endif()

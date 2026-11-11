@@ -217,6 +217,14 @@ struct DownmixChain {
     std::vector<int> zero_rows;  // bed rows the lower substreams' matrices set to 0
     int single_rows = 0;         // bed rows that are one scaled element (not already unit)
     int group_rows = 0;          // rows the shared primitive tunes (0: none)
+    // The matrices each lower substream that decodes the row applies to it, after its own: none of
+    // substream 3's matrices see them. A zero row's has no coefficients; with
+    // ObjectDownmixScaling::kBedSubstreams a row's has its scale as the row's own coefficient.
+    std::vector<MatrixSpec> bed_matrices;
+    // For each row the stream codes (0..7 the bed as coded, then substream 3's), the sum of the
+    // magnitudes of its gains on the objects: the most it can reach is this times the objects'
+    // peak, so the stream is certain to fit 24 bits when the objects peak below 1 / the largest.
+    std::vector<double> row_gain;
 };
 
 // The chain for `downmix` (row-major, 8 rows of `objects` gains: L R C LFE Ls Rs Lrs Rrs), or why
@@ -225,7 +233,8 @@ struct DownmixChain {
 // rows (the rows must be independent), a chain of more than 16 primitives (eight single-element
 // rows need 17), a coefficient of 32 or more.
 [[nodiscard]] std::expected<DownmixChain, std::string_view> build_downmix_chain(
-    std::span<const double> downmix, int objects, int noise_shift);
+    std::span<const double> downmix, int objects, int noise_shift,
+    ObjectDownmixScaling scaling = ObjectDownmixScaling::kChain);
 
 // The timeline of a chain whose coefficients never move: the whole section in the first block of
 // the interval, nothing after.
