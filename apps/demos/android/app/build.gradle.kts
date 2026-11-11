@@ -288,7 +288,9 @@ configurations.all {
             // is past GHSA-wg6q-6289-32hp (bcpkix, fixed in 1.84).
             "org.bouncycastle:bcprov-jdk18on:1.86",
             "org.bouncycastle:bcpkix-jdk18on:1.86",
-            "org.bouncycastle:bcutil-jdk18on:1.86"
+            "org.bouncycastle:bcutil-jdk18on:1.86",
+            // Guava in the lint tool and the unified test platform; build-time only, not in the APK.
+            "com.google.guava:guava:33.7.2-jre"             // GHSA-xxph-c9ww-hj94
         )
     }
 }
