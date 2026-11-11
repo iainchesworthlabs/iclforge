@@ -1,0 +1,61 @@
+# The ESP32-S3's memory settings for the TrueHD decoder: the Hearth sink's own, as an overlay on the
+# probe. Give it after sdkconfig.s3 (README.md has the command):
+#
+#   "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.s3;sdkconfig.s3mem"
+#
+# What it bought, on an S3 (hearth-47b39c, 240 MHz, DIO flash), one run a configuration, with the
+# decoder of PR #1815 (results/esp32s3.txt without it, results/esp32s3-mem.txt with it): 5.1 at 24 bit
+# 1.095 -> 0.931 of real time, 5.1 at 16 bit 0.970 -> 0.823, 2.0 at 192 kHz 1.706 -> 1.573. The least
+# internal heap free fell from 88,064 to 32,952 bytes. On main's decoder (57fef9af0) the same lines
+# were measured with the caches alone (larger caches, no PSRAM) and with the PSRAM lines too: the
+# second aborted in the first decode and rebooted in a loop. Why was not investigated; the overlay is
+# measured only with the decoder of PR #1815.
+#
+# These are the lines of firmware/hearth-sink/sdkconfig.s3-fast, sdkconfig.s3-dcache and
+# sdkconfig.psram that change the speed of the decoder, less CONFIG_ESPTOOLPY_FLASHMODE_QIO. The sink's
+# PSRAM lines that the probe does not take (SPIRAM_USE_MALLOC, SPIRAM_MALLOC_ALWAYSINTERNAL, the Wi-Fi
+# and lwIP buffers) are not here: the probe has no network, and its decoder's heap stays internal.
+
+# A 32 KB instruction cache, where ESP-IDF's default is 16 KB. The sink's sdkconfig.psram has it. It
+# takes 16 KB of the internal RAM the heap would have had.
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+
+# A 64 KB data cache, where the default is 32 KB (sink: sdkconfig.s3-dcache). The decoder's working
+# set is what the smaller cache cannot hold. It takes 32 KB of the internal RAM the heap would have
+# had.
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+
+# 64-byte data cache lines, where the default is 32 (sink: sdkconfig.s3-fast). The decoder reads its
+# state and its tables in runs and a line fill from the octal PSRAM costs little more for 64 bytes
+# than for 32. The cache size stays as the line above gives it, so no internal RAM goes for this.
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# The 8 MB of octal PSRAM at 80 MHz, mapped (sink: sdkconfig.psram). Code and constants run from it
+# below and need it. CONFIG_SPIRAM_USE_CAPS_ALLOC keeps it out of malloc: only an allocation that asks
+# for it with heap_caps gets it, so the decoder's heap stays in internal RAM as in the results
+# without this overlay, and the heap figures stay comparable. (The sink uses SPIRAM_USE_MALLOC, which
+# puts a decoder's larger blocks in PSRAM: a sink image is a different measurement.)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y
+
+# Not in the memory test at boot (sink: sdkconfig.psram): it takes a second on 8 MB and says nothing
+# the probe needs to know.
+CONFIG_SPIRAM_MEMTEST=n
+
+# The firmware's code and constants run from PSRAM (sink: sdkconfig.s3-fast, which measured a line
+# filling about three times as fast as from the flash in QIO mode): the decoder's tables and the code
+# beside them are far larger than the caches. They cost PSRAM, and a little internal RAM for the
+# mapping and the driver. In all the internal heap free at start is 55,112 bytes lower than without
+# this overlay (276,820 in results/esp32s3.txt, 221,708 in results/esp32s3-mem.txt, line 4), 48,380 of
+# it with the three cache lines alone (a capture of main's decoder with those lines, 228,440 free; not
+# kept in the tree), so 6,732 bytes are the PSRAM lines' (this section's and the section above's).
+CONFIG_SPIRAM_RODATA=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+
+# NOT here: CONFIG_ESPTOOLPY_FLASHMODE_QIO, which the sink's sdkconfig.s3-fast has. The flash mode is the
+# second-stage bootloader's, and the probe image is written to ota_0 over a board's own bootloader
+# (README.md), which it does not replace, so the line would change nothing on the board. The board
+# measured here ran in DIO. A sink flashed with its bootloader runs QIO, so its figures may be better
+# than this overlay's: that is not measured.

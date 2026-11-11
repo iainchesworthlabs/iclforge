@@ -1856,6 +1856,40 @@ dry for a block (5 ms) when a frame decoded late reaches it. No play had an inva
 with another server taking the board (its status afterwards named `Hearth on Iains-Computer`) are
 not in the tables.
 
+## TrueHD
+
+The TrueHD decoder of `libs/truehd` is behind `CONFIG_ICLFORGE_TRUEHD` in the component. It is not in the released
+S3 image. The measurements are those of `firmware/truehd-probe`, which decodes eight fixtures on a board and checks
+each against the PCM hash of FFmpeg's strict decode; every fixture matched in each run below. They are one run of
+each configuration, on one board (hearth-47b39c, 240 MHz, DIO flash), with the unit-cost change of draft PR #1815 in
+the decoder, and with no Wi-Fi and no I2S. The figure is the decode time over the sound's time: below 1 keeps up.
+
+| Probe configuration | 5.1, 24 bit | 5.1, 16 bit | 2.0, 24 bit | 2.0 at 192 kHz | Least internal heap free |
+|---|---:|---:|---:|---:|---:|
+| `sdkconfig.s3` (16 KB instruction and 32 KB data cache) | 1.095 | 0.970 | 0.554 | 1.706 | 88,064 bytes |
+| and `sdkconfig.s3mem` | 0.931 | 0.823 | 0.432 | 1.573 | 32,952 bytes |
+
+`sdkconfig.s3mem` is the Hearth sink's S3 memory settings, less the flash mode, which the bootloader sets and the
+probe does not replace: a 32 KB instruction cache, a 64 KB data cache in 64-byte lines, and the code and constants
+executed from PSRAM (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache` and `sdkconfig.psram`; the `s3-n16r8` profile has all of
+them). The 64 KB data cache and the 32 KB instruction cache take 48 KB of the internal RAM, and the overlay as a whole
+left the probe 55,112 bytes less heap at start (276,820 to 221,708). The probe keeps PSRAM out of `malloc`; the sink
+puts allocations of 4,096 bytes and over in it, so a sink's heap is not the probe's.
+
+What this does not say. A 5.1 unit at 48 kHz is 833 microseconds of sound, and the slowest 5.1 unit at 24 bit
+took 1,106 microseconds with the overlay (2,599 without it): the mean is under the sound's time and the worst unit is
+over it, so a player needs a ring to absorb it. The 192 kHz stereo stream is over real time at 1.573. Wi-Fi's buffers
+come out of the same internal heap that the probe left 33 KB of at the least. The board ran in DIO flash mode, and a sink
+flashed with its bootloader runs QIO, whose effect on the decoder was not measured. A 5.1 TrueHD play through the sink
+does not keep up: in a measurement build of the sink on 2026-11-11, beside Wi-Fi, a 20 ms chunk of 5.1 at 24 bit took
+23.9 ms (1.20 of real time), 20.3 ms of it in the decoder, a chunk at 16 bit 20.1 ms (1.01), and a 2.0 chunk 11.0 ms
+(0.55); one play each. The sink lists `truehd` on an S3 only when `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD` is set to 1
+(it is 0 by default there), and then states two coded channels, so a server sends it the 2.0 presentation or PCM
+(`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS`, `firmware/hearth-sink/main/Kconfig.projbuild`).
+On `main` before the unit-cost change the same overlay with the PSRAM lines made the probe abort in the first decode
+and reboot in a loop; the larger caches alone took 5.1 at 24 bit from 1.499 to 1.094 there. Why it aborted was not
+investigated.
+
 ## What the port required from the library
 
 **A `thread_local` that made the library unlinkable on any RTOS.** `eac3_tools.cpp`'s

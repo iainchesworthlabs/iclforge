@@ -93,13 +93,25 @@ config ICLFORGE_TRUEHD
         the Sendspin extension's TrueHD data type: one to 24 whole access
         units a chunk.
 
-        Measured by firmware/truehd-probe, bit-exact against FFmpeg's PCM
-        on all three chips: 158,020 bytes of heap and 60,944 bytes of stack
-        for a decoder, and, as a share of one core, 0.13 (ESP32-P4, 360 MHz)
-        and 0.56 (ESP32-S3, 240 MHz) for 2.0 at 48 kHz, and 0.32 (P4) and
-        1.13 (S3, so not real time) for 5.1. The ESP32-C6 does 2.0 at
-        48 kHz at 0.34 and 5.1 at 0.80, with 25 to 56 KB free in a play,
-        so it does not fit beside Wi-Fi.
+        Measured by firmware/truehd-probe, bit-exact against FFmpeg's PCM, with
+        no network and no I2S, as a share of one core at 48 kHz and 24 bit for
+        2.0 and 5.1. The ESP32-P4 (360 MHz) did 0.13 and 0.32, measured before
+        the unit-cost change (draft PR #1815) and not repeated with it. With
+        that change the decoder held 188,740 bytes of heap and reached 9,280
+        bytes of stack on the ESP32-S3 (240 MHz), which did 2.0 at 0.554 and 5.1
+        at 1.095 with the probe's own settings, so not real time. With the
+        Hearth sink's memory settings (a 32 KB instruction cache, a 64 KB data
+        cache with 64-byte lines, code and constants in PSRAM:
+        firmware/truehd-probe/sdkconfig.s3mem) it did 2.0 at 0.432 and 5.1 at
+        0.931, and 0.823 at 16 bit. The slowest 5.1 unit took 1.11 ms against
+        the 0.83 ms of sound it decodes, the least internal heap free was
+        33 KB, and 2.0 at 192 kHz stayed over real time (1.573). That is one
+        run of each configuration on one board with DIO flash and no Wi-Fi. A
+        5.1 play through the sink, beside Wi-Fi, took 1.20 of real time at
+        24 bit and 1.01 at 16 bit (2.0: 0.55), so 5.1 does not keep up there
+        (docs/platforms/bare-metal/esp32-s3.md). The ESP32-C6 did 2.0
+        at 0.367 and 5.1 at 0.809 with the unit-cost change, with 25 to 56 KB
+        free in a play, so it does not fit beside Wi-Fi.
 
         The task that decodes needs at least 64 KiB of stack. A board
         states the channels it takes in the hello (max_coded_channels for
