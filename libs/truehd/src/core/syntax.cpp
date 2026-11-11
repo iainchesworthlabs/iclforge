@@ -110,9 +110,11 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
 // matrix, and a presence mask over the matrix channels), the coefficients of every matrix, then
 // the second precision term (A2, B2, C2; ERRATA.md entry 69). Provisional for what the owner's
 // streams do not show.
-[[nodiscard]] std::expected<MatrixSet, Error> read_object_matrices(BitReader& reader,
-                                                                  const BlockContext& context) {
-    MatrixSet set;
+[[nodiscard]] std::expected<void, Error> read_object_matrices(BitReader& reader,
+                                                              const BlockContext& context,
+                                                              MatrixSet& set) {
+    // `set` is a new MatrixSet (read_block_header_into emplaces it); building one here and handing it
+    // back by value put a 2.7 KB temporary on the decoder's stack.
     const int channels = context.max_matrix_chan + 1;
     const bool changed = reader.read(1) != 0;
     set.coeffs_sent = changed;
@@ -209,7 +211,7 @@ void write_filter(BitWriter& writer, const FilterSpec& filter) {
             }
         }
     }
-    return set;
+    return {};
 }
 
 void write_object_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
@@ -286,22 +288,30 @@ void write_object_matrices(BitWriter& writer, const BlockContext& context, const
     }
 }
 
-[[nodiscard]] std::expected<MatrixSet, Error> read_matrices(BitReader& reader,
-                                                            const BlockContext& context) {
+// Reads the matrix section into `set`. The standard section fills the matrices 0 to count - 1 and
+// leaves the ones after them as they were (a decoder that reads a header a block does not need to
+// clear the rest); the object section replaces the whole set.
+[[nodiscard]] std::expected<void, Error> read_matrices(BitReader& reader,
+                                                       const BlockContext& context,
+                                                       MatrixSet& set) {
     if (context.object_matrices) {
-        return read_object_matrices(reader, context);
+        return read_object_matrices(reader, context, set);
     }
     const unsigned count = reader.read(4);
     if (count > kMaxMatrices) {
         return std::unexpected(Error{ErrorKind::kBadParameter, "more than 15 primitive matrices"});
     }
-    MatrixSet set;
     set.count = static_cast<std::uint8_t>(count);
+    set.extension = false;
+    set.coeffs_sent = false;
+    set.deltas_sent = false;
+    set.form = ObjectSectionForm{};
     // The streams carry a coefficient for each of the matrix channels and the two noise channels,
     // where TH spec §10.2 lists max_chan + 1 (ERRATA.md).
     const int coefficients = matrix_coefficients(context);
     for (unsigned m = 0; m < count; ++m) {
         MatrixSpec& matrix = set.items[m];
+        matrix = MatrixSpec{};
         matrix.out_ch = static_cast<std::uint8_t>(reader.read(4));
         matrix.frac_bits = static_cast<std::uint8_t>(reader.read(4));
         matrix.lsb_bypass = reader.read(1) != 0;
@@ -321,7 +331,7 @@ void write_object_matrices(BitWriter& writer, const BlockContext& context, const
             matrix.noise_shift = static_cast<std::uint8_t>(reader.read(4));
         }
     }
-    return set;
+    return {};
 }
 
 void write_matrices(BitWriter& writer, const BlockContext& context, const MatrixSet& set) {
@@ -445,9 +455,13 @@ void write_restart_header(BitWriter& writer, const RestartHeader& header) {
     writer.append(bits);
 }
 
-std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
-                                                        const BlockContext& context) {
-    BlockHeaderSpec header;
+std::expected<void, Error> read_block_header_into(BitReader& reader, const BlockContext& context,
+                                                  BlockHeaderSpec& header) {
+    header.presence_flags.reset();
+    header.block_size.reset();
+    header.matrices.reset();
+    header.output_shift.reset();
+    header.quant_step.reset();
     std::uint8_t flags = context.presence_flags;
     // new_guards exists only while bit 0 is set (TH spec §8.2); a block that clears it cannot
     // replace the flags again until the next restart.
@@ -459,11 +473,10 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
         header.block_size = static_cast<std::uint16_t>(reader.read(9));
     }
     if ((flags & presence::kMatrix) != 0 && reader.read(1) != 0) {
-        auto matrices = read_matrices(reader, context);
-        if (!matrices) {
+        MatrixSet& set = header.matrices.emplace();
+        if (auto matrices = read_matrices(reader, context, set); !matrices) {
             return std::unexpected(matrices.error());
         }
-        header.matrices = *matrices;
     }
     if ((flags & presence::kOutputShift) != 0 && reader.read(1) != 0) {
         std::array<std::int8_t, kMaxChannels> shifts{};
@@ -482,6 +495,12 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
     // The loop over the channels' parameters is not gated by the flags (TH spec §8.2).
     for (int ch = context.min_chan; ch <= context.max_chan; ++ch) {
         ChannelUpdate& update = header.channels[static_cast<std::size_t>(ch)];
+        update.present = false;
+        update.fir.reset();
+        update.iir.reset();
+        update.huff_offset.reset();
+        update.huff_type = 0;
+        update.huff_lsbs = 0;
         if (reader.read(1) == 0) {
             continue;
         }
@@ -512,6 +531,15 @@ std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
     }
     if (reader.overflowed()) {
         return std::unexpected(truncated("block header"));
+    }
+    return {};
+}
+
+std::expected<BlockHeaderSpec, Error> read_block_header(BitReader& reader,
+                                                        const BlockContext& context) {
+    BlockHeaderSpec header;
+    if (auto read = read_block_header_into(reader, context, header); !read) {
+        return std::unexpected(read.error());
     }
     return header;
 }
