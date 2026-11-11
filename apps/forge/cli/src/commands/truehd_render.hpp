@@ -21,7 +21,8 @@
 // effect at once. An object is silent until its first update. Width, divergence, zones, snapping
 // and the screen factor are not rendered, as the layout renderer renders none of them for E-AC-3.
 //
-// Where the layout is the stream's own 7.1 bed (L R C LFE Ls Rs Lrs Rrs), a dynamic object is panned
+// Where the layout is the eight speakers of the stream's own 7.1 bed (L R C LFE Ls Rs Lrs Rrs, in
+// that order or any other, so the name 7.1 as well as the list), a dynamic object is panned
 // by the measured law of iclforge/truehd/encoder/bed_pan.hpp, at the 6 bit code its metadata carries
 // and with the 7.1 layout's trim, instead of by the layout renderer, so that the bed the encoder
 // writes and the bed a decode renders from the objects are the same programme. When asked, the sum of
@@ -93,6 +94,7 @@ class TrueHdObjectRenderer {
     std::uint64_t position_ = 0;
     std::uint64_t clipped_ = 0;
     std::uint64_t limited_ = 0;
+    std::array<std::size_t, 8> bed_rows_{};  // the bed row of each slot, where measured_
     bool measured_ = false;
     bool limit_ = false;
 };
