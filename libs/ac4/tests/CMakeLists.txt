@@ -93,6 +93,7 @@ if(NOT BUILD_SHARED_LIBS)
         decoder/test_renderer.cpp
         decoder/test_ssf.cpp
         encoder/test_acpl.cpp
+        encoder/test_asf_coder.cpp
         encoder/test_aspx.cpp
         encoder/test_multichannel.cpp
         encoder/test_presentations_race.cpp
