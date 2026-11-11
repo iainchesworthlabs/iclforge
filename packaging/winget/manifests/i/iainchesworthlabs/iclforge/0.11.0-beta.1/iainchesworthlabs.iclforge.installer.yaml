@@ -1,0 +1,33 @@
+# Points at the win64.zip release asset (.github/workflows/release.yml's
+# windows-msvc leg) rather than an NSIS .exe: tools/release/bump_manifests.py
+# renders this zip shape and never downloads the .exe (docs/releasing.md#winget-manifest
+# says how a release that ships an installer is converted by hand). The zip
+# carries both end-user binaries (bin/forge.exe, bin/forge-gui.exe -
+# CPack's "runtime" component, see docs/releasing.md#what-gets-published).
+# InstallerType zip + NestedInstallerType portable installs straight from
+# that archive with no separate installer to run.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+PackageIdentifier: iainchesworthlabs.iclforge
+PackageVersion: 0.11.0-beta.1
+InstallerLocale: en-US
+Platform:
+  - Windows.Desktop
+MinimumOSVersion: 10.0.17763.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: bin/forge.exe
+    PortableCommandAlias: forge
+  - RelativeFilePath: bin/forge-gui.exe
+    PortableCommandAlias: forge-gui
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/iainchesworthlabs/iclforge/releases/download/v0.11.0-beta.1/iclforge-0.11.0-win64.zip
+    # Computed directly (sha256sum) from the release asset - winget wants
+    # SHA256, unlike the SHA512SUMS release.yml publishes (see
+    # docs/releasing.md#what-gets-published). If `winget install` ever
+    # reports a mismatch, trust winget's reported hash over this one and
+    # update it here, same policy as the vcpkg port's SHA512 comment.
+    InstallerSha256: 25e0b58d58c13dd261e64a95de17bad40ea7e0f957f0ee31f29689b554e05759
+ManifestType: installer
+ManifestVersion: 1.12.0
