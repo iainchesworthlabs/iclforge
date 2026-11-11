@@ -73,7 +73,15 @@ double Psychoacoustics::full_scale_line_energy(int transform_length) const noexc
 
 std::vector<std::vector<double>> Psychoacoustics::thresholds(const Grouped& grouped,
                                                              const FrameLayout& layout) const {
-    std::vector<std::vector<double>> out(grouped.offset.size());
+    std::vector<std::vector<double>> out;
+    PsychoScratch scratch;
+    thresholds(grouped, layout, out, scratch);
+    return out;
+}
+
+void Psychoacoustics::thresholds(const Grouped& grouped, const FrameLayout& layout,
+                                 std::vector<std::vector<double>>& out, PsychoScratch& scratch) const {
+    out.resize(grouped.offset.size());
     for (std::size_t g = 0; g < grouped.offset.size(); ++g) {
         const auto bands = static_cast<std::size_t>(grouped.max_sfb[g]);
         const int length = layout.group_length[g];
@@ -81,8 +89,10 @@ std::vector<std::vector<double>> Psychoacoustics::thresholds(const Grouped& grou
         const double line_hz = static_cast<double>(sample_rate_) / (2.0 * static_cast<double>(length));
         const double full_scale = full_scale_line_energy(length);
 
-        std::vector<double> masking(bands, 0.0);
-        std::vector<double> z(bands, 0.0);
+        std::vector<double>& masking = scratch.masking;
+        std::vector<double>& z = scratch.z;
+        masking.assign(bands, 0.0);
+        z.assign(bands, 0.0);
         const double line_floor = full_scale * std::pow(10.0, -kFloorDb / 10.0);
         for (std::size_t b = 0; b < bands; ++b) {
             const std::size_t begin = grouped.offset[g][b];
@@ -107,7 +117,8 @@ std::vector<std::vector<double>> Psychoacoustics::thresholds(const Grouped& grou
         }
         // Spreading: the largest of a band's own threshold and its neighbours',
         // each lowered by the slope over the Bark distance, weighted by width.
-        std::vector<double> spread = masking;
+        std::vector<double>& spread = scratch.spread;
+        spread.assign(masking.begin(), masking.end());
         for (std::size_t b = 1; b < bands; ++b) {
             const double width_ratio = static_cast<double>(offsets[b + 1] - offsets[b]) /
                                        static_cast<double>(offsets[b] - offsets[b - 1]);
@@ -126,20 +137,41 @@ std::vector<std::vector<double>> Psychoacoustics::thresholds(const Grouped& grou
             out[g][b] = std::max(spread[b], line_floor * lines);
         }
     }
-    return out;
 }
 
-std::vector<std::vector<int>> scale_factors_for(const Grouped& grouped,
-                                               const std::vector<std::vector<double>>& allowed) {
-    std::vector<std::vector<int>> sf(grouped.offset.size());
+void band_root_sums(const Grouped& grouped, std::vector<std::vector<double>>& roots) {
+    roots.resize(grouped.offset.size());
     for (std::size_t g = 0; g < grouped.offset.size(); ++g) {
         const auto bands = static_cast<std::size_t>(grouped.max_sfb[g]);
-        sf[g].assign(bands, 255);
+        roots[g].assign(bands, 0.0);
         for (std::size_t b = 0; b < bands; ++b) {
             double root_sum = 0.0;
             for (std::size_t k = grouped.offset[g][b]; k < grouped.offset[g][b + 1]; ++k) {
                 root_sum += std::sqrt(std::abs(grouped.lines[k]));
             }
+            roots[g][b] = root_sum;
+        }
+    }
+}
+
+std::vector<std::vector<int>> scale_factors_for(const Grouped& grouped,
+                                               const std::vector<std::vector<double>>& allowed) {
+    std::vector<std::vector<double>> roots;
+    band_root_sums(grouped, roots);
+    std::vector<std::vector<int>> sf;
+    scale_factors_into(sf, grouped, roots, allowed);
+    return sf;
+}
+
+void scale_factors_into(std::vector<std::vector<int>>& sf, const Grouped& grouped,
+                        const std::vector<std::vector<double>>& roots,
+                        const std::vector<std::vector<double>>& allowed) {
+    sf.resize(grouped.offset.size());
+    for (std::size_t g = 0; g < grouped.offset.size(); ++g) {
+        const auto bands = static_cast<std::size_t>(grouped.max_sfb[g]);
+        sf[g].assign(bands, 255);
+        for (std::size_t b = 0; b < bands; ++b) {
+            const double root_sum = roots[g][b];
             if (root_sum <= 0.0 || allowed[g][b] <= 0.0) {
                 continue;
             }
@@ -148,7 +180,6 @@ std::vector<std::vector<int>> scale_factors_for(const Grouped& grouped,
             sf[g][b] = static_cast<int>(std::clamp(std::floor(value), 0.0, 255.0));
         }
     }
-    return sf;
 }
 
 }  // namespace iclforge::ac4::detail
