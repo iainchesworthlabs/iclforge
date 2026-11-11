@@ -49,7 +49,7 @@ void accumulate_peak_scan_over(PeakScan<Scalar>& scan, std::span<const Scalar> c
     }
     unsigned unordered = 0;
     for (std::size_t bin = 0; bin < bins; ++bin) {
-        unordered |= static_cast<unsigned>(in[bin] != in[bin]);
+        unordered |= static_cast<unsigned>(std::isunordered(in[bin], in[bin]));
     }
     if (unordered == 0) {
         return;
@@ -57,7 +57,7 @@ void accumulate_peak_scan_over(PeakScan<Scalar>& scan, std::span<const Scalar> c
     // A NaN in this block: contribute exactly what the per-coefficient loop
     // contributed for it, the same two calls on the same value.
     for (std::size_t bin = 0; bin < bins; ++bin) {
-        if (in[bin] != in[bin]) {
+        if (std::isnan(in[bin])) {
             const auto exponent =
                 static_cast<std::uint8_t>(exponent_from_fixed(to_fixed25(in[bin])));
             scan.floor_exponent[bin] = std::min(scan.floor_exponent[bin], exponent);

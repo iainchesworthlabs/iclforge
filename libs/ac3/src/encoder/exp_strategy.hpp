@@ -187,7 +187,7 @@ inline void limited_group_exponents(const std::uint8_t* run_min, int bins, bool 
     const int full = (bins - first) >> Shift;  // groups with all `group` bins inside
     // The minimum of group i (1-based) when every bin of it is inside.
     const auto group_min = [&](int i) {
-        const std::uint8_t* p = run_min + first + ((i - 1) << Shift);
+        const std::uint8_t* p = run_min + first + (static_cast<std::ptrdiff_t>(i - 1) << Shift);
         if constexpr (Shift == 0) {
             return static_cast<int>(p[0]);
         } else if constexpr (Shift == 1) {
