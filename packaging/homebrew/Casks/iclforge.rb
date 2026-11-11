@@ -33,14 +33,14 @@
 # alone. No `depends_on arch:` line any more for exactly that reason - the
 # same .dmg installs on both architectures.
 cask "iclforge" do
-  version "0.10.0-beta.1"
+  version "0.11.0-beta.1"
   # Pinned from the release's actual .dmg asset (GitHub's own reported digest
   # for iclforge-<MAJOR.MINOR.PATCH>-Darwin.dmg - the same CPACK_PACKAGE_CHECKSUM
   # SHA512 cmake/Packaging.cmake also computes and publishes alongside it,
   # just a different digest algorithm; Homebrew Casks pin sha256). If
   # `brew install` reports a mismatch, trust brew's reported hash over this
   # one and update it here.
-  sha256 "50c7ce9aa0b22c0a4473f4b6156d46d1fea3c94090f5515b83df7f17a463b3db"
+  sha256 "f6740803d441760d23cc993c08af2623bdb30f6b48e9993f1b714cbb7ec254fd"
 
   # CPack's dmg filename carries only MAJOR.MINOR.PATCH
   # (cmake/Packaging.cmake's CPACK_PACKAGE_FILE_NAME), dropping any
