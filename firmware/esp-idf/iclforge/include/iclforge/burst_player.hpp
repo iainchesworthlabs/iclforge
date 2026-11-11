@@ -115,6 +115,20 @@ struct BurstPlayerConfig {
     // S3's 2). A server cuts a stream with downmix substreams
     // to it, so a unit with more is refused once the decoder has said how many it has. 0 refuses none.
     std::size_t max_truehd_channels = 0;
+    // The most samples a channel of the block a TrueHD chunk's units are handed to the renderer in
+    // may hold: the units of a run that share a layout and a length (40 samples each at 48 kHz) go
+    // through the renderer, the routing, the trims, the meter and the hand-over to the sink as one
+    // block of up to this many, rounded down to whole units. The output is the same, sample for
+    // sample, as one unit a block (give it the unit's length, or 0, for that). The player's own
+    // block, 256 samples, is the most: its buffers from the renderer to the sink are that long.
+    std::size_t truehd_block_samples = Playout::kBlockFrames;
+    // A TrueHD chunk's units are all decoded and converted to float before the first of them is
+    // rendered, so that the decoder's code runs through the chunk and then the renderer's through the
+    // blocks, rather than the two taking turns for every block (the instruction cache of a part with
+    // its code in PSRAM is smaller than the two together). The planes hold a chunk for it, up to 64 KiB,
+    // in PSRAM: a part with none converts a block at a time whatever this says. The output is the
+    // same, sample for sample, either way.
+    bool truehd_decode_ahead = true;
     // The most objects an E-AC-3 stream may declare for the board to place them in real time, which
     // the support object states as max_objects (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), and
     // nothing for a board that states none. A stream that declares more (iclforge/object_limit.hpp:

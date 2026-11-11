@@ -966,8 +966,10 @@ config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD
         has: truehd-probe/sdkconfig.s3mem) 0.432 and 0.931, the slowest 5.1 unit taking 1.11 ms
         against the 0.83 ms of sound it decodes, 33 KB of internal heap left at the least and 2.0
         at 192 kHz still over real time (1.573), one run of each on one board in DIO flash mode;
-        the ESP32-C6 0.367 and 0.809. A 5.1 play through the sink on an S3 has not been
-        measured. The P4 lists it by default; the S3 played 2.0 with a burst of 0.83 of the chunk,
+        the ESP32-C6 0.367 and 0.809. A play through the sink on an S3, beside
+        Wi-Fi (11 November 2026, one play of each, a measurement build): a 20 ms chunk of 5.1 at
+        24 bit took 23.9 ms (1.20, it does not keep up), 20.3 ms of it in the decoder; at 16 bit
+        20.1 ms (1.01); a 2.0 chunk 11.0 ms (0.55, it plays). The P4 lists it by default; the S3 played 2.0 with a burst of 0.83 of the chunk,
         over the 0.7 the plan asks for, so it does not unless set by hand, and the C6 cannot: it
         has 53 KB of internal RAM free after start-up and no PSRAM, against a decoder of 158 KB
         (185,244 bytes on the C6 with the unit-cost change) and a 72 KiB stack.
@@ -984,6 +986,33 @@ config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS
         decodes, so a unit with more reaches the decoder only from a server that did not read the
         figure, which the board then refuses with a console line. The P4 states 6 until its 7.1
         decode has been measured; the S3 states 2.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_BLOCK_SAMPLES
+    int "TrueHD: most samples a channel of the block its access units are rendered in (0 = one unit)"
+    default 256
+    range 0 256
+    help
+        A TrueHD access unit is 40 samples at 48 kHz (80 at 96, 160 at 192). The units of a chunk that
+        share a layout are handed to the renderer, the routing, the trims and delays, the meter and the
+        sink's playout together, as one block of up to this many samples a channel (rounded down to
+        whole units: 240 at 48 and 96 kHz, 160 at 192), where they were handed over a unit at a time,
+        24 times a burst. The samples out are the same, bit for bit (host_tests in
+        firmware/esp-idf/iclforge-host-tests). 256 is the player's own block, the most its buffers
+        from the renderer to the sink hold; 0, or 40, is the former path a unit at a time, which is
+        what to measure it against.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_DECODE_AHEAD
+    int "TrueHD: decode and convert a chunk's access units before rendering the first (1) or not (0)"
+    default 1
+    range 0 1
+    help
+        With 1, a part with PSRAM decodes and converts to float all the units of a chunk (up to
+        24: 960 samples a channel at 48 kHz, 23 KB of PSRAM for 6 channels, held to 64 KiB) before it
+        renders the first block, so that the decoder's code runs through the chunk and the player's
+        through its blocks, where the two took turns for every block. With 0, or on a part with no
+        PSRAM, a block of units is converted, rendered, and the next converted. The samples out are
+        the same, bit for bit. Measured on the host only; on a board the effect is the thing to
+        measure (the S3 runs its code from PSRAM through a 32 KB instruction cache).
 
 config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_DATA_RATE_KBPS
     int "Fastest TrueHD stream taken: peak data rate, kbit/s (0 = no limit)"

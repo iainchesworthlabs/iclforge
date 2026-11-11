@@ -1003,7 +1003,7 @@ struct BurstPlayer::Impl {
     // An output that is live though no slot reached by this block feeds it (a delay line's tail, a server's
     // identify tone) reads its channel's slot, which render_reached() left as it was: the audio of an earlier
     // block. Those slots are zeroed first, so that the output takes silence.
-    void silence_unfed_slots(std::uint32_t live, std::uint32_t reached, std::size_t n) {
+    void silence_unfed_slots(std::uint32_t live, std::uint32_t reached, std::size_t offset, std::size_t n) {
         const std::uint32_t unfed = live & ~routing.outputs_fed_by(reached);
         for (std::size_t o = 0; unfed != 0 && o < outputs_open; ++o) {
             if (((unfed >> o) & 1U) == 0) {
@@ -1011,25 +1011,66 @@ struct BurstPlayer::Impl {
             }
             const int channel = routing.channel_of(o);
             if (channel != Routing::kUnassigned && static_cast<std::size_t>(channel) < layout.slots()) {
-                std::fill_n(rendered[static_cast<std::size_t>(channel)].data(), n, 0.0F);
+                std::fill_n(rendered[static_cast<std::size_t>(channel)].data() + offset, n, 0.0F);
             }
         }
     }
 
     // The rendered slots from here on: `n` frames of them, `reached` the slots that hold any.
-    void emit(std::size_t n, std::uint32_t reached) {
+    //
+    // `unit`, when it is not 0, says the n frames are whole units of that many, which a decoder with
+    // short units (TrueHD's 40 samples) hands over together so that the stages below run once for
+    // several of them. The output is the same, sample for sample, as if each unit had been emitted
+    // by itself: a stage whose result depends on where a block ends (a level ramp, the meter's float
+    // sums and its window) is run on the unit boundaries, and the units go one at a time through
+    // all of it while the volume is moving to its target (its ramp is over a block). The renderer,
+    // the routing, a delay line, a steady level, the identify tone (a sample at a time from a
+    // generator) and the playout's push do not care where a block ends.
+    void emit(std::size_t n, std::uint32_t reached, std::size_t unit = 0) {
+        if (unit == 0 || unit >= n || n % unit != 0) {
+            emit_range(0, n, reached, 0);
+        } else if (target_gain.load() != gain) {
+            for (std::size_t at = 0; at < n; at += unit) {
+                emit_range(at, unit, reached, 0);
+            }
+        } else {
+            emit_range(0, n, reached, unit);
+        }
+    }
+
+    // The trims and delays over the outputs in `live`. A level that is moving to its new value does it
+    // over the first block it reaches an output in, so when the block is several units the first
+    // unit goes alone and takes the ramp, as it did when it was a block of its own; the rest then has
+    // none, and a delay line and a steady level do not care where a block ends.
+    void trim_block(std::span<const std::span<float>> out, std::uint32_t live, std::size_t unit) {
+        if (unit == 0 || !trim.active()) {
+            trim.process(out, live);
+            return;
+        }
+        std::array<std::span<float>, Playout::kMaxOutputs> head{};
+        std::array<std::span<float>, Playout::kMaxOutputs> tail{};
+        for (std::size_t o = 0; o < out.size(); ++o) {
+            head[o] = out[o].first(unit);
+            tail[o] = out[o].subspan(unit);
+        }
+        trim.process(std::span<const std::span<float>>(head.data(), out.size()), live);
+        trim.process(std::span<const std::span<float>>(tail.data(), out.size()), live);
+    }
+
+    // emit() for `n` frames from frame `offset` of the rendered slots, which the sink gets as one push.
+    void emit_range(std::size_t offset, std::size_t n, std::uint32_t reached, std::size_t unit) {
         const std::size_t slots = layout.slots();
         for (std::size_t s = 0; s < slots; ++s) {
-            rendered_views[s] = std::span<const float>(rendered[s].data(), n);
+            rendered_views[s] = std::span<const float>(rendered[s].data() + offset, n);
         }
         std::array<std::span<float>, Playout::kMaxOutputs> view{};
         for (std::size_t o = 0; o < outputs_open; ++o) {
-            view[o] = outputs[o].first(n);
+            view[o] = outputs[o].subspan(offset, n);
             output_views[o] = view[o];
         }
         const std::span<const std::span<float>> out(view.data(), outputs_open);
         const std::uint32_t live = live_outputs(reached);
-        silence_unfed_slots(live, reached, n);
+        silence_unfed_slots(live, reached, offset, n);
         routing.apply(std::span<const std::span<const float>>(rendered_views.data(), slots), out, live);
         // Outputs past the patch's own, which only the identify tone opens.
         for (std::size_t o = routing.outputs(); o < outputs_open; ++o) {
@@ -1037,7 +1078,7 @@ struct BurstPlayer::Impl {
                 std::fill(view[o].begin(), view[o].end(), 0.0F);
             }
         }
-        trim.process(out, live);
+        trim_block(out, live, unit);
         if (identifying) {
             // Every output carries the tone or silence; the stream goes on
             // underneath, decoded and discarded, and keeps its timeline.
@@ -1048,7 +1089,7 @@ struct BurstPlayer::Impl {
         const bool scaled = apply_gain(out, n, live);
         tap_block(out, n, live);
         if (scaled || !meter_from_source(n)) {
-            meter(out, n, live);
+            meter(out, n, live, unit);
         }
 
         const std::uint64_t first = decoded_frame;
@@ -1105,12 +1146,31 @@ struct BurstPlayer::Impl {
     // The outputs in `live` measured over `n` frames. The others are silence: a peak of 0 and a sum of
     // 0 change nothing the window or the stream has, so they are not read, and the report says them
     // all the same (publish_levels() has every open output).
-    void meter(std::span<const std::span<float>> out, std::size_t n, std::uint32_t live = ~std::uint32_t{0}) {
+    //
+    // `unit`, when it is not 0, says the n frames are whole units of that many, each measured and
+    // counted into the window as a block of its own (the float partial sums of 16 and the closing
+    // of the window fall where they did when each unit was one), so that the levels are the same to
+    // the last bit whether a decoder hands its units over one at a time or together.
+    void meter(std::span<const std::span<float>> out, std::size_t n, std::uint32_t live = ~std::uint32_t{0},
+               std::size_t unit = 0) {
+        if (unit == 0 || unit >= n || n % unit != 0) {
+            meter_outputs(out, 0, n, live);
+            meter_commit(n);
+            return;
+        }
+        for (std::size_t at = 0; at < n; at += unit) {
+            meter_outputs(out, at, unit, live);
+            meter_commit(unit);
+        }
+    }
+
+    // `n` frames from frame `offset` of each output in `live`, into the window's peak and sums.
+    void meter_outputs(std::span<const std::span<float>> out, std::size_t offset, std::size_t n, std::uint32_t live) {
         for (std::size_t o = 0; o < out.size(); ++o) {
             if (((live >> o) & 1U) == 0) {
                 continue;
             }
-            const std::span<float> samples = out[o];
+            const std::span<float> samples = out[o].subspan(offset, n);
             float peak = window_peak[o];
             double sum = 0.0;
             std::size_t k = 0;
@@ -1135,7 +1195,6 @@ struct BurstPlayer::Impl {
             window_sum[o] += sum;
             stream_sum[o] += sum;
         }
-        meter_commit(n);
     }
 
     // `n` frames more in the window and the stream, and the window published once it is full.
@@ -1317,14 +1376,17 @@ struct BurstPlayer::Impl {
         static_cast<Impl*>(self)->ac4_deliver(block);
     }
 
+    // A run of TrueHD units, which the stream hands over as one block (TruehdStream::decode()): the
+    // renderer, the routing and the rest of emit() once for all of them, the unit's own length kept
+    // for the stages that depend on where a block ends.
     static void truehd_block(void* self, const TruehdStream::Block& block) {
-        static_cast<Impl*>(self)->ac4_deliver(block);
+        static_cast<Impl*>(self)->ac4_deliver(block, block.unit_samples);
     }
 
     // `Block` is Ac4Stream's or TruehdStream's: a bed, one span of samples a channel, and the
-    // number of samples, which is all the renderer is given.
+    // number of samples, which is all the renderer is given. `unit`: see emit().
     template <class Block>
-    void ac4_deliver(const Block& block) {
+    void ac4_deliver(const Block& block, std::size_t unit = 0) {
         if (!serving.fold && (!renderer_bed || !same_layout(*renderer_bed, block.bed))) {
             renderer.set_bed(block.bed);
             renderer_bed = block.bed;
@@ -1342,7 +1404,7 @@ struct BurstPlayer::Impl {
         } else {
             reached = renderer.render_reached(pcm, false, 1.0F, out);
         }
-        emit(block.samples, reached);
+        emit(block.samples, reached, unit);
     }
 
     // The AC-4 decoder made, when it is not: false, with the stream refused for good and its chunk
@@ -1419,8 +1481,12 @@ struct BurstPlayer::Impl {
         if (truehd->is_open()) {
             return true;
         }
+        // A block of no more than the player's own (kBlock): its buffers from the renderer to the
+        // sink are that long.
         if (truehd->open({.max_channels = config.max_truehd_channels,
-                          .sample_rate_hz = config.sample_rate})) {
+                          .sample_rate_hz = config.sample_rate,
+                          .max_block_samples = std::min(config.truehd_block_samples, kBlock),
+                          .max_run_samples = config.truehd_decode_ahead ? TruehdStream::kMaxRunSamples : 0})) {
             return true;
         }
         truehd_failed = true;

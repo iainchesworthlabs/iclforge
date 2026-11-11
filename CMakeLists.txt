@@ -497,6 +497,10 @@ option(ICLFORGE_BUILD_PYTHON "Build the pybind11 Python extension module (bindin
 # plain add_subdirectory(libs/sendspin) below fails resolving mbedTLS/cpp-httplib/libFLAC/Opus/mdns
 # that were never installed - found the hard way once this option's default flipped to ON.
 option(ICLFORGE_BUILD_HEARTH "Build Hearth: libs/sendspin and apps/hearth - see vcpkg.json's \"hearth\" feature, selected by default via CMakePresets.json's core fragment" ON)
+# The ESP-IDF component's TrueHD player path (firmware/esp-idf/iclforge/src/burst_player.cpp and
+# truehd_stream.cpp) built for the host over stand-ins for the part's kernel, with its tests and a bench
+# (firmware/esp-idf/iclforge-host-tests). Needs Hearth (libs/sendspin), TrueHD and the tests.
+option(ICLFORGE_BUILD_FIRMWARE_HOST_TESTS "Build the host tests and bench of the ESP-IDF component's TrueHD player path" OFF)
 
 # enable_testing() has to run before ANY add_subdirectory() that might contain
 # an add_test() call, not merely before tests/ itself - CTest silently drops
@@ -752,6 +756,9 @@ if(ICLFORGE_BUILD_TESTS)
     endforeach()
     unset(_iclforge_lib)
     unset(_iclforge_lib_target)
+    if(ICLFORGE_BUILD_FIRMWARE_HOST_TESTS AND ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_TRUEHD)
+        add_subdirectory(firmware/esp-idf/iclforge-host-tests)
+    endif()
 endif()
 
 # After the tests block: the examples register themselves as tests, which needs

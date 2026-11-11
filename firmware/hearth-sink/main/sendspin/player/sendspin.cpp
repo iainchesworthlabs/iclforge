@@ -87,6 +87,11 @@ constexpr std::size_t kTruehdMaxCodedChannels =
     CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_CODED_CHANNELS;
 constexpr std::uint32_t kTruehdMaxDataRate =
     CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_MAX_DATA_RATE_KBPS;
+// How the player's path takes a TrueHD chunk's access units (burst_player.hpp): the most samples a
+// channel of the block they are rendered in, and whether the whole chunk is decoded before the first
+// block is rendered.
+constexpr std::size_t kTruehdBlockSamples = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_BLOCK_SAMPLES;
+constexpr bool kTruehdDecodeAhead = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_DECODE_AHEAD != 0;
 // The objects of an E-AC-3 stream the board places in real time; -1 states none.
 constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
@@ -864,6 +869,8 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.max_ac4_channels = kAc4MaxCodedChannels;
     config.max_ac4_frame_rate = kAc4MaxFrameRate;
     config.max_truehd_channels = kTruehdMaxCodedChannels;
+    config.truehd_block_samples = kTruehdBlockSamples;
+    config.truehd_decode_ahead = kTruehdDecodeAhead;
     // A stream declaring more objects than the board states it places is played as its bed
     // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
     if (kMaxObjects >= 0) {
