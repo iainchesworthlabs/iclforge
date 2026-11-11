@@ -174,3 +174,18 @@ TEST_CASE("a stream resampler at equal rates is an identity", "[dsp][resampler][
     REQUIRE(out[0].size() == input.size());
     CHECK(out[0] == input);
 }
+
+TEST_CASE("a stream resampler with no channels or a zero rate still answers",
+          "[dsp][resampler][stream]") {
+    // No channels: nothing to count outputs for, and nothing to convert.
+    iclforge::dsp::StreamResampler none{96000, 48000, 0};
+    CHECK(none.outputs_for(1000) == 0);
+    std::vector<std::vector<float>> out;
+    none.process({}, 1000, out);
+    CHECK(out.empty());
+
+    // A zero rate has no ratio in lowest terms; the filter falls back to 1:1 rather than dividing
+    // by the zero common factor.
+    iclforge::dsp::StreamResampler zero{0, 0, 1};
+    CHECK(zero.delay() >= 0.0);
+}
