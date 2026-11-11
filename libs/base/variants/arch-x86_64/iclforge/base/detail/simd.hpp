@@ -51,6 +51,7 @@ struct f64x2 {
 [[nodiscard]] inline f64x2 operator+(f64x2 a, f64x2 b) { return f64x2{_mm_add_pd(a.v, b.v)}; }
 [[nodiscard]] inline f64x2 operator-(f64x2 a, f64x2 b) { return f64x2{_mm_sub_pd(a.v, b.v)}; }
 [[nodiscard]] inline f64x2 operator*(f64x2 a, f64x2 b) { return f64x2{_mm_mul_pd(a.v, b.v)}; }
+[[nodiscard]] inline f64x2 operator/(f64x2 a, f64x2 b) { return f64x2{_mm_div_pd(a.v, b.v)}; }
 // Sign-bit flip rather than 0.0 - a, so -0.0 negates to +0.0 the way the
 // unary operator on a double does, and not to -0.0 the way a subtraction
 // from positive zero would.

@@ -300,6 +300,37 @@ TEST_CASE("f64x2 arithmetic is lane-wise IEEE-754", "[simd]") {
     CHECK(mismatches == 0);
 }
 
+TEST_CASE("f64x2 division is a lane-wise IEEE-754 division", "[simd]") {
+    // A division, not a multiplication by a reciprocal: the two differ in the last bit for most
+    // operands, and JOC's ramp (libs/ac3/src/oba/joc.cpp) divides by 24 and 12.
+    const auto values = adversarial_doubles();
+    std::size_t mismatches = 0;
+    std::size_t compared = 0;
+    for (std::size_t i = 0; i + 1 < values.size(); i += 2) {
+        const double a = values[i];
+        const double b = values[i + 1];
+        if (std::isnan(a / b) || std::isnan(b / a)) {
+            continue;
+        }
+        const auto quot = arch::f64x2::set(a, b) / arch::f64x2::set(b, a);
+        ++compared;
+        if (!same_bits(quot.lane0(), a / b) || !same_bits(quot.lane1(), b / a)) {
+            ++mismatches;
+        }
+    }
+    CHECK(compared > 0);
+    CHECK(mismatches == 0);
+
+    for (const double divisor : {24.0, 12.0, 3.0, 7.0}) {
+        for (int n = -40; n <= 40; ++n) {
+            const double x = static_cast<double>(n) * 0.1234567890123;
+            const auto quot = arch::f64x2::set(x, -x) / arch::f64x2::broadcast(divisor);
+            CHECK(same_bits(quot.lane0(), x / divisor));
+            CHECK(same_bits(quot.lane1(), -x / divisor));
+        }
+    }
+}
+
 TEST_CASE("round_ties_away is exactly std::round", "[simd]") {
     // The seam's one non-obvious contract, and the one whose x86_64
     // implementation is arithmetic rather than an instruction: SSE2 has no
