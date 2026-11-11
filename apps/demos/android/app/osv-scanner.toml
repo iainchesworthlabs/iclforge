@@ -1,6 +1,6 @@
 # Read by OSV-Scanner for the manifests in THIS directory only (it does not look in parents).
 #
-# One advisory the lockfile cannot be refreshed past without a device. An entry is a decision to
+# Advisories the lockfile cannot be refreshed past without a device. An entry is a decision to
 # wait, not a judgement that the advisory is harmless: when the date passes the alert comes back and
 # the entry is renewed with a fresh check or removed.
 #
@@ -16,3 +16,12 @@
 id = "GHSA-735f-pc8j-v9w8"
 ignoreUntil = 2027-01-08
 reason = "protobuf-kotlin 3.24.4 is locked only in AGP's unified-test-platform configurations, which resolve only inside connectedDebugAndroidTest; the build forces 4.36.2"
+
+# guava 32.0.1-jre is locked only in the same _internal-unified-test-platform-* configurations, for
+# the same reason as above; the build forces guava 33.7.2-jre (GHSA-xxph-c9ww-hj94), so a device run
+# resolves the patched version and only the lock line is behind. Delete this entry together with the
+# one above when the lock is refreshed on a device. Not in the APK: test tooling only. Checked 2026-11-12.
+[[IgnoredVulns]]
+id = "GHSA-xxph-c9ww-hj94"
+ignoreUntil = 2027-01-08
+reason = "guava 32.0.1-jre is locked only in AGP's unified-test-platform configurations, which resolve only inside connectedDebugAndroidTest; the build forces 33.7.2-jre"
