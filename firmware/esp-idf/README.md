@@ -7,7 +7,7 @@ The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, wit
 A firmware library.
 
 - **Uses:** `ac3`, `ac4`, `base`, `device`, `dsp`, `lyrics`, `objects`, `render`, `sendspin`, `truehd`
-- **Used by:** `hearth-sink`
+- **Used by:** `esp-idf-host-tests`, `hearth-sink`
 - **CI lanes:** esp
 
 ## Build and test
