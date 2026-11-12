@@ -308,8 +308,8 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     # The fixed-point tier's image: 727,656 bytes at D14d (725,004 .text), 801,812 on
     # 2026-10-03 with the transform tables (Q7.24, and the post-twiddles the tier has besides)
     # in flash. Its converter tables are Q1.30 integers built by the compiler, the 1001/960 one
-    # 188,376 bytes and read in place, and the float tables are not linked. Peaks, churn, stack
-    # and retained bytes share the float tier's ceilings.
+    # 188,376 bytes and read in place, and the float tables are not linked. Peaks, churn
+    # and retained bytes share the float tier's ceilings; its stack has its own, below.
     if [[ "${SCALAR:-}" == "fixed" ]]; then
         # 1,020,000 since the 2026-11-11 nightly measured 1,001,916 bytes (see the float ceiling above).
         ICLFORGE_MAX_IMAGE_BYTES=${ICLFORGE_MAX_IMAGE_BYTES_AC4:-1020000}
@@ -321,6 +321,12 @@ if [[ "$DIRECTION" == "ac4" ]]; then
     ICLFORGE_MAX_RETAINED_BYTES=${ICLFORGE_MAX_RETAINED_BYTES_AC4:-1024}
     if [[ "$HOST" == "1" ]]; then
         ICLFORGE_MAX_STACK_BYTES=${ICLFORGE_MAX_STACK_BYTES_AC4:-28500}
+    elif [[ "${SCALAR:-}" == "fixed" ]]; then
+        # 24,500: the fixed tier has read 22,312 bytes (22,712 before 2026-10-11) on the Cortex-M3
+        # since its first nightly on 2026-10-04, over the float tier's 21,500 it was given by
+        # default. The overrun went unseen because the step pipes this script through tee, until
+        # a probe failure began to fail the leg. A tenth or so over the figure, as the others are.
+        ICLFORGE_MAX_STACK_BYTES=${ICLFORGE_MAX_STACK_BYTES_AC4:-24500}
     else
         ICLFORGE_MAX_STACK_BYTES=${ICLFORGE_MAX_STACK_BYTES_AC4:-21500}
     fi
