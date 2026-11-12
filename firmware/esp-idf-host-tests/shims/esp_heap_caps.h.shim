@@ -1,5 +1,5 @@
 #pragma once
-// The host build of the component's player code (iclforge-host-tests/): the heap by capability, over malloc.
+// The host build of the component's player code (esp-idf-host-tests/): the heap by capability, over malloc.
 // Every allocation is recorded with its capabilities (host_control.hpp), so that a test can say where
 // an allocation would have gone on a part, and whether the part has PSRAM is a thing a test sets.
 #include <cstddef>

@@ -997,7 +997,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_TRUEHD_BLOCK_SAMPLES
         sink's playout together, as one block of up to this many samples a channel (rounded down to
         whole units: 240 at 48 and 96 kHz, 160 at 192), where they were handed over a unit at a time,
         24 times a burst. The samples out are the same, bit for bit (host_tests in
-        firmware/esp-idf/iclforge-host-tests). 256 is the player's own block, the most its buffers
+        firmware/esp-idf-host-tests). 256 is the player's own block, the most its buffers
         from the renderer to the sink hold; 0, or 40, is the former path a unit at a time, which is
         what to measure it against.
 
