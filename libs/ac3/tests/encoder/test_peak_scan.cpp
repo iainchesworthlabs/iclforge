@@ -222,13 +222,52 @@ void check_scan_on_edge_value_pairs() {
     }
 }
 
+// What the scan does with a NaN is pinned only as far as the language defines
+// it. to_fixed25 casts the NaN to an integer, which is undefined behaviour, so
+// the exponent a NaN produces differs between compilers (and between two
+// inlined copies under clang -O2); comparing against the loop's value for it
+// would test the optimiser, not the scan. What is defined, and checked here:
+// no NaN ever reaches the magnitude, a bin that holds no NaN gives exactly the
+// loop's exponent, and a bin that holds one is never raised above what its
+// other coefficients give (a NaN can only lower the floor).
+template <typename T>
+void check_nan_frame(const std::vector<T>& frame) {
+    std::vector<T> without_nan = frame;
+    std::array<bool, kScanBins> has_nan{};
+    for (std::size_t i = 0; i < frame.size(); ++i) {
+        if (std::isnan(frame[i])) {
+            has_nan[i % kScanBins] = true;
+            without_nan[i] = T{0};  // exponent kMaxExponent: neutral to the minimum
+        }
+    }
+    const auto expected = reference_exponents(without_nan);
+
+    iclforge::ac3::encoder::PeakScan<T> scan;
+    for (std::size_t block = 0; block < kScanBlocks; ++block) {
+        iclforge::ac3::encoder::accumulate_peak_scan(
+            scan, std::span<const T>{frame.data() + (block * kScanBins), kScanBins});
+    }
+    std::array<std::uint8_t, kScanBins> exponents{};
+    iclforge::ac3::encoder::peak_scan_exponents(scan, exponents);
+
+    std::size_t magnitude_nan = 0;
+    std::size_t clean_bins_differing = 0;
+    std::size_t nan_bins_raised = 0;
+    for (std::size_t bin = 0; bin < kScanBins; ++bin) {
+        magnitude_nan += static_cast<std::size_t>(std::isnan(scan.magnitude[bin]));
+        if (has_nan[bin]) {
+            nan_bins_raised += static_cast<std::size_t>(exponents[bin] > expected[bin]);
+        } else {
+            clean_bins_differing += static_cast<std::size_t>(exponents[bin] != expected[bin]);
+        }
+    }
+    CHECK(magnitude_nan == 0);
+    CHECK(clean_bins_differing == 0);
+    CHECK(nan_bins_raised == 0);
+}
+
 template <typename T>
 void check_scan_with_nan() {
-    // A NaN has no exponent the language defines (to_fixed25 casts it to an
-    // integer), so the scan must do what the loop did on this machine rather
-    // than anything of its own: never let a NaN into the magnitude, and lower
-    // the floor with the same two calls. The expected side makes those very
-    // calls.
     const T nan = std::numeric_limits<T>::quiet_NaN();
     std::mt19937_64 rng{0xdeadbeefULL};
     std::uniform_real_distribution<double> unit{0.5, 1.0};
@@ -243,11 +282,10 @@ void check_scan_with_nan() {
             frame[pick(rng)] = nan;
         }
         frame[pick(rng)] = -nan;
-        CHECK(reference_exponents(frame) == scanned_exponents(frame));
+        check_nan_frame(frame);
     }
     // A frame that is nothing but NaN.
-    const std::vector<T> all_nan(kScanBlocks * kScanBins, nan);
-    CHECK(reference_exponents(all_nan) == scanned_exponents(all_nan));
+    check_nan_frame(std::vector<T>(kScanBlocks * kScanBins, nan));
 }
 
 }  // namespace
@@ -270,11 +308,11 @@ TEST_CASE("The peak scan matches the per-coefficient exponent loop on every pair
     check_scan_on_edge_value_pairs<float>();
 }
 
-TEST_CASE("The peak scan treats a double NaN as the per-coefficient loop did") {
+TEST_CASE("The peak scan keeps a double NaN out of the magnitude") {
     check_scan_with_nan<double>();
 }
 
-TEST_CASE("The peak scan treats a float NaN as the per-coefficient loop did") {
+TEST_CASE("The peak scan keeps a float NaN out of the magnitude") {
     check_scan_with_nan<float>();
 }
 
