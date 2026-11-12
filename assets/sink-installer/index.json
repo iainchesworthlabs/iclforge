@@ -1,0 +1,40 @@
+{
+  "repository": "iainchesworthlabs/iclforge",
+  "manifest": "hearth-sink-manifest.json",
+  "version": "v0.11.0-beta.1",
+  "tag": "v0.11.0-beta.1",
+  "page": "https://github.com/iainchesworthlabs/iclforge/releases/tag/v0.11.0-beta.1",
+  "published": "2026-11-11T01:11:20Z",
+  "images": [
+    {
+      "name": "hearth-sink-esp32c6",
+      "title": "ESP32-C6 with 4 MB of flash (any C6 module)",
+      "chip": "ESP32-C6",
+      "manifest": "hearth-sink-esp32c6.json"
+    },
+    {
+      "name": "hearth-sink-esp32c6-16mb",
+      "title": "ESP32-C6 with 16 MB of flash",
+      "chip": "ESP32-C6",
+      "manifest": "hearth-sink-esp32c6-16mb.json"
+    },
+    {
+      "name": "hearth-sink-esp32p4-rev1",
+      "title": "ESP32-P4 of silicon revision v1.x (such as the FireBeetle 2)",
+      "chip": "ESP32-P4",
+      "manifest": "hearth-sink-esp32p4-rev1.json"
+    },
+    {
+      "name": "hearth-sink-esp32p4-rev3",
+      "title": "ESP32-P4 of silicon revision v3.x with a 7-inch panel (such as the ESP32-P4-Function-EV-Board)",
+      "chip": "ESP32-P4",
+      "manifest": "hearth-sink-esp32p4-rev3.json"
+    },
+    {
+      "name": "hearth-sink-esp32s3",
+      "title": "ESP32-S3 with 16 MB of flash and octal PSRAM (such as the DevKitC-1 N16R8)",
+      "chip": "ESP32-S3",
+      "manifest": "hearth-sink-esp32s3.json"
+    }
+  ]
+}

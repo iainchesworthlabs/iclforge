@@ -1,0 +1,28 @@
+{
+  "name": "Hearth sink, ESP32-C6 with 4 MB of flash (any C6 module)",
+  "version": "v0.11.0-beta.1",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-C6",
+      "parts": [
+        {
+          "path": "hearth-sink-esp32c6/bootloader.bin",
+          "offset": 0
+        },
+        {
+          "path": "hearth-sink-esp32c6/partition-table.bin",
+          "offset": 32768
+        },
+        {
+          "path": "hearth-sink-esp32c6/ota_data_initial.bin",
+          "offset": 65536
+        },
+        {
+          "path": "hearth-sink-esp32c6/iclforge_hearth_sink.bin",
+          "offset": 131072
+        }
+      ]
+    }
+  ]
+}
