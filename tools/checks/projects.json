@@ -46,11 +46,18 @@
     "esphome":     {"kind": "firmware", "path": "firmware/esphome", "may_use": ["ac3"], "lanes": ["esp"], "purpose": "The ESPHome external component that brings the ESP-IDF component into an ESPHome build."},
     "baremetal":   {"kind": "firmware", "path": "firmware/baremetal", "may_use": ["ac3", "ac4", "base", "dsp", "objects", "render"], "lanes": ["esp"], "purpose": "The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode."},
 
+    "esp-idf-host-tests": {"kind": "firmware", "path": "firmware/esp-idf-host-tests", "may_use": ["ac3", "base", "device", "dsp", "esp-idf", "objects", "render", "sendspin", "truehd"], "lanes": ["core"], "purpose": "The host build of the ESP-IDF component's TrueHD player over stand-ins for the part's kernel, heap and clock: the Catch2 tests, the block-path bench and the stage bench. Kept outside firmware/esp-idf, which ESP-IDF scans for components."},
+
     "examples": {"kind": "example", "path": "examples", "may_use": ["ac3", "ac4", "adm", "base", "capi", "containers", "iab", "objects", "render"], "lanes": ["core"], "purpose": "The library's example programs, in C++ and Python."},
 
     "tests": {"kind": "tests", "path": "tests", "may_use": ["ac3", "ac4", "base", "dsp", "truehd"], "lanes": ["core"], "exposes": ["tests/support/"], "purpose": "What every test binary is built with (iclforge::test_support) and the performance tests."}
   },
   "exceptions": [
+    {
+      "from": "esp-idf-host-tests", "to": "esp-idf", "paths": ["firmware/esp-idf-host-tests/bench_truehd_block_path.cpp", "firmware/esp-idf-host-tests/test_truehd_block_path.cpp"],
+      "to_paths": ["firmware/esp-idf/iclforge/src/truehd_stream.hpp"],
+      "why": "The host tests drive the component's TrueHD stream through its private header (truehd_stream.hpp), as the host build of the player's own sources; they used to sit inside firmware/esp-idf, which ESP-IDF scans for components."
+    },
     {
       "from": "ac4", "to": "app-media", "paths": ["libs/ac4/tests/decoder/test_object_render.cpp"],
       "to_paths": ["apps/shared/media/src/ac4_object_render."],
