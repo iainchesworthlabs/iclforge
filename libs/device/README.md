@@ -7,7 +7,7 @@ The device-side logic of the ESP32 sinks and players that needs no SDK, so that 
 A library, internal to the repository.
 
 - **Uses:** nothing
-- **Used by:** `esp-idf`, `hearth`, `hearth-sink`
+- **Used by:** `esp-idf`, `esp-idf-host-tests`, `hearth`, `hearth-sink`
 - **CI lanes:** core
 - **CMake target:** `iclforge::device`
 

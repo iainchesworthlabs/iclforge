@@ -16,7 +16,7 @@
 #include "host_control.hpp"
 #include "iclforge/render/speaker_trim.hpp"
 #include "iclforge/truehd/decoder/decoder.hpp"
-#include "truehd_stream.hpp"
+#include "../esp-idf/iclforge/src/truehd_stream.hpp"  // the component's, not apps/shared/media's of the same name
 
 namespace {
 

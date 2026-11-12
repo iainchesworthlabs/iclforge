@@ -1,5 +1,5 @@
 #pragma once
-// The host build of the component's player code (iclforge-host-tests/): the FreeRTOS types and constants the
+// The host build of the component's player code (esp-idf-host-tests/): the FreeRTOS types and constants the
 // player names. The kernel itself is shim_runtime.cpp's threads, condition variables and queues.
 #include <cstddef>
 #include <cstdint>

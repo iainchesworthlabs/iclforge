@@ -1,4 +1,4 @@
-# Host tests of the ESP-IDF component's (../iclforge) TrueHD path (a directory of its own, so that the
+# Host tests of the ESP-IDF component's (../esp-idf/iclforge) TrueHD path (a directory of its own, outside firmware/esp-idf, which ESP-IDF scans for components, and so that the
 # component archive tools/packaging/pack_esp_component.py makes carries none of it): burst_player.cpp and truehd_stream.cpp compiled
 # for the host over stand-ins for the part's kernel, heap and clock (shims/*.shim, shim_runtime.cpp), and
 # run as the Sendspin session drives them - chunks into the player's ring, a decode task, a sink that
@@ -49,7 +49,7 @@ function(iclforge_fw_host_player target root)
     target_link_libraries(${target} PUBLIC Threads::Threads)
 endfunction()
 
-iclforge_fw_host_player(iclforge_fw_host_player "${CMAKE_CURRENT_LIST_DIR}/../iclforge")
+iclforge_fw_host_player(iclforge_fw_host_player "${CMAKE_CURRENT_LIST_DIR}/../esp-idf/iclforge")
 
 iclforge_add_test_binary(iclforge-fw-host-tests PROJECT firmware SOURCES test_truehd_block_path.cpp)
 target_link_libraries(iclforge-fw-host-tests PRIVATE iclforge_fw_host_player)
@@ -61,7 +61,7 @@ target_link_libraries(iclforge-fw-host-bench PRIVATE iclforge_fw_host_player)
 # What each stage of the path costs a call and a sample (bench_stages.cpp): the libraries alone.
 add_executable(iclforge-fw-host-stages bench_stages.cpp)
 target_link_libraries(iclforge-fw-host-stages PRIVATE iclforge::device iclforge::render iclforge::ac3)
-target_include_directories(iclforge-fw-host-stages PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../iclforge/include")
+target_include_directories(iclforge-fw-host-stages PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../esp-idf/iclforge/include")
 target_compile_features(iclforge-fw-host-stages PRIVATE cxx_std_23)
 
 if(ICLFORGE_FW_HOST_BASE_ROOT)

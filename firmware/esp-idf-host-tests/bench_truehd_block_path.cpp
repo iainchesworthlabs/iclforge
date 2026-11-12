@@ -19,7 +19,7 @@
 
 #include "harness.hpp"
 #include "iclforge/render/speaker_trim.hpp"
-#include "truehd_stream.hpp"
+#include "../esp-idf/iclforge/src/truehd_stream.hpp"  // the component's, not apps/shared/media's of the same name
 
 namespace {
 
