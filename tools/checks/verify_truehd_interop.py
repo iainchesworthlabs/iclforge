@@ -238,7 +238,7 @@ def in_stream_order(pcm, channels, columns):
     return b"".join(out)
 
 
-def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
+def check_handbuilt_ffmpeg(path, fixture, cache, held=True, major=None):
     """The problems with FFmpeg's strict decode of a hand-built stream against the outcome the
     manifest names for it (equal: the whole signal; short: fewer samples, the first of them the
     signal's; bed: the best presentation of a stream with a fourth substream, which it leaves alone;
@@ -250,6 +250,14 @@ def check_handbuilt_ffmpeg(path, fixture, cache, held=True):
     pcm, error = cache[path]
     outcome = fixture["ffmpeg"]
     kind = outcome["outcome"]
+    # `equal` with `refused_from`: a later FFmpeg major version refuses the stream (it was seen to
+    # decode it with the manifest's version), and that is held for the versions that do.
+    if kind == "equal" and major is not None and major >= outcome.get("refused_from", major + 1):
+        if pcm is None and "No restart header present" in error:
+            return []
+        if pcm is None:
+            return [f"ffmpeg refused the stream, but not as the manifest says: {error}"]
+        return ["ffmpeg decoded a stream the manifest says this version refuses"]
     if kind != "equal" and not held:
         return []
     if kind == "refused":
@@ -296,13 +304,15 @@ def check_handbuilt(args, have_ffmpeg, scratch):
     cache = {}
     failures = 0
     held = True
+    major = None
     if have_ffmpeg:
+        major = ffmpeg_major()
         seen = int(manifest["ffmpeg_version"].split(".")[0])
-        held = ffmpeg_major() == seen
+        held = major == seen
         if not held:
             print(
                 f"notice: the outcomes were seen with FFmpeg {manifest['ffmpeg_version']}, "
-                f"this is {ffmpeg_major()}.x: only the equal ones are held"
+                f"this is {major}.x: only the equal ones are held"
             )
     entries = [(f, False) for f in manifest["fixtures"]] + [
         (f, True) for f in manifest.get("refused", [])
@@ -313,7 +323,7 @@ def check_handbuilt(args, have_ffmpeg, scratch):
         if sha256(path.read_bytes()) != fixture["stream_sha256"]:
             problems.append("the stream is not the one the manifest names")
         if have_ffmpeg:
-            problems += check_handbuilt_ffmpeg(path, fixture, cache, held)
+            problems += check_handbuilt_ffmpeg(path, fixture, cache, held, major)
         presentation = fixture.get("presentation", "best")
         if args.forge:
             options = [f"truehd-presentation={presentation}"]

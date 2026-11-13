@@ -35,7 +35,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -78,7 +80,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -99,7 +103,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -120,7 +126,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -143,7 +151,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -319,7 +329,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -341,7 +353,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",
@@ -363,7 +377,9 @@
       ],
       "oracle": "ffmpeg",
       "ffmpeg": {
-        "outcome": "equal"
+        "outcome": "equal",
+        "refused_from": 8,
+        "note": "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel mask from the stream header's layout whenever the decoder is set to more than two channels, FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only for stereo and mono and for the substreams after the first, so the matrix channel assignment finds no channel to map and the restart header is refused ('No restart header present in substream 0'). A real TrueHD stream of more than two channels has a stereo first substream, so this shape is the writer's own"
       },
       "codec": "truehd",
       "presentation": "best",

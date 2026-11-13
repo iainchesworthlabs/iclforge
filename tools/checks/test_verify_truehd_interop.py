@@ -22,8 +22,8 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def problems(fixture, result, held=True):
-    return V.check_handbuilt_ffmpeg(STREAM, fixture, {STREAM: result}, held)
+def problems(fixture, result, held=True, major=None):
+    return V.check_handbuilt_ffmpeg(STREAM, fixture, {STREAM: result}, held, major)
 
 
 class HandbuiltOutcomes(unittest.TestCase):
@@ -32,6 +32,19 @@ class HandbuiltOutcomes(unittest.TestCase):
         self.assertEqual(problems(fixture, (PCM, "")), [])
         self.assertTrue(problems(fixture, (PCM[:-4] + b"\xff\xff\xff\xff", "")))
         self.assertTrue(problems(fixture, (None, "Lossless check failed")))
+
+    def test_refused_from_expects_equal_before_that_major_and_a_refusal_from_it(self):
+        fixture = {
+            "channels": 2,
+            "pcm_sha256": sha(PCM),
+            "ffmpeg": {"outcome": "equal", "refused_from": 8},
+        }
+        refusal = (None, "[truehd] No restart header present in substream 0.")
+        self.assertEqual(problems(fixture, (PCM, ""), major=7), [])
+        self.assertTrue(problems(fixture, refusal, major=7))
+        self.assertEqual(problems(fixture, refusal, major=8), [])
+        self.assertTrue(problems(fixture, (PCM, ""), major=8))
+        self.assertTrue(problems(fixture, (None, "Lossless check failed"), major=9))
 
     def test_short_wants_the_returned_length_and_an_equal_head(self):
         outcome = {
