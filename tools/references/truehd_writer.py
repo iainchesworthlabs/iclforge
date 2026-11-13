@@ -2701,7 +2701,18 @@ REFUSED = {}
 #   decodes  - it decodes, and the library refuses the stream (REFUSED)
 #   differs  - it decodes to other samples than the signal (the manifest's `ffmpeg` entry holds
 #              the SHA-256 of what it returns: the model of what it does is in ffmpeg_outcome)
+# An `equal` outcome with `refused_from` (a major version) is `equal` before that version and
+# `refused` from it on (SINGLE_SUBSTREAM_NOTE).
 FFMPEG_VERSION = "6.1.1"
+SINGLE_SUBSTREAM_NOTE = (
+    "a single substream of more than two channels: FFmpeg 6 and 7 take the substream's channel "
+    "mask from the stream header's layout whenever the decoder is set to more than two channels, "
+    "FFmpeg 8 (mlpdec.c, 'Set the layout for each substream') sets the mask of substream 0 only "
+    "for stereo and mono and for the substreams after the first, so the matrix channel "
+    "assignment finds no channel to map and the restart header is refused ('No restart header "
+    "present in substream 0'). A real TrueHD stream of more than two channels has a stereo "
+    "first substream, so this shape is the writer's own"
+)
 FFMPEG = {
     "hb_data_check": {
         "outcome": "refused",
@@ -2716,6 +2727,19 @@ FFMPEG = {
         "note": "with the end-of-stream marker in every access unit FFmpeg returns two of the 20 "
         "(the first is the signal's) and skips the rest "
         '("Stream parameters not seen; skipping frame")',
+    },
+    **{
+        name: {"outcome": "equal", "refused_from": 8, "note": SINGLE_SUBSTREAM_NOTE}
+        for name in (
+            "hb_filter_orders",
+            "hb_matrices",
+            "hb_iir_state",
+            "hb_output_shift_permuted",
+            "hb_ch_assign_changes",
+            "hb_noise_generator_1",
+            "hb_noise_generator_1_96k",
+            "hb_noise_generator_1_192k",
+        )
     },
     "hb_eight_channels": {
         "outcome": "equal",
