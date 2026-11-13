@@ -37,31 +37,36 @@ void accumulate_peak_scan_over(PeakScan<Scalar>& scan, std::span<const Scalar> c
     const std::size_t bins = std::min(coefficients.size(), kPeakScanBins);
     const Scalar* const in = coefficients.data();
     Scalar* const peak = scan.magnitude.data();
-    // `a > peak ? a : peak`, not std::max: the compare is false for a NaN, so
-    // a NaN never reaches the magnitude (it is dealt with below), and the
-    // select is the form a compiler turns into a vector max (maxps/maxpd on
-    // x86-64, checked in the MSVC disassembly). The NaN test is a loop of its
-    // own, OR-ed rather than branched on: folded into the max loop it made
-    // MSVC leave both scalar.
-    for (std::size_t bin = 0; bin < bins; ++bin) {
-        const Scalar a = std::abs(in[bin]);
-        peak[bin] = a > peak[bin] ? a : peak[bin];
-    }
+    // The NaN test comes first, as a loop of its own, OR-ed rather than
+    // branched on: folded into the max loop it made MSVC leave both scalar.
     unsigned unordered = 0;
     for (std::size_t bin = 0; bin < bins; ++bin) {
         unordered |= static_cast<unsigned>(std::isunordered(in[bin], in[bin]));
     }
-    if (unordered == 0) {
+    if (unordered != 0) {
+        // A NaN in this block. It is excluded before any float-to-int
+        // conversion (that cast is undefined for a NaN) and before any
+        // max, whose NaN behaviour differs between targets (fmax on arm64
+        // propagates it). A NaN counts as a zero coefficient: exponent
+        // kMaxExponent, neutral to the minimum, and no raise of the magnitude.
+        // Rare path, so a plain scalar loop with explicit branches.
+        for (std::size_t bin = 0; bin < bins; ++bin) {
+            if (!std::isnan(in[bin])) {
+                const Scalar a = std::abs(in[bin]);
+                if (a > peak[bin]) {
+                    peak[bin] = a;
+                }
+            }
+        }
         return;
     }
-    // A NaN in this block: contribute exactly what the per-coefficient loop
-    // contributed for it, the same two calls on the same value.
+    // `a > peak ? a : peak`, not std::max: the select is the form a compiler
+    // turns into a vector max (maxps/maxpd on x86-64, checked in the MSVC
+    // disassembly). No NaN can be here, so the target's max semantics for
+    // one do not matter.
     for (std::size_t bin = 0; bin < bins; ++bin) {
-        if (std::isnan(in[bin])) {
-            const auto exponent =
-                static_cast<std::uint8_t>(exponent_from_fixed(to_fixed25(in[bin])));
-            scan.floor_exponent[bin] = std::min(scan.floor_exponent[bin], exponent);
-        }
+        const Scalar a = std::abs(in[bin]);
+        peak[bin] = a > peak[bin] ? a : peak[bin];
     }
 }
 
