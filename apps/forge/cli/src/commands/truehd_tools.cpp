@@ -32,6 +32,7 @@
 #include "iclforge/truehd/io/major_sync.hpp"
 #include "iclforge/truehd/io/metadata_edit.hpp"
 #include "iclforge/truehd/signing/evolution_signer.hpp"
+#include "probe_truehd.hpp"
 #include "truehd.hpp"
 #include "truehd_meaning.hpp"
 #include "truehd_signing.hpp"
