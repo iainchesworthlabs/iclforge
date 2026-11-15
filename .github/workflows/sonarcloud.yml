@@ -304,7 +304,7 @@ jobs:
       # fails on missing sonar.projectKey/sonar.organization. Every other
       # property below is relative and resolves against the base dir.
       - name: Run SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -343,7 +343,7 @@ jobs:
       # msvc-analysis.yml's upload gives for PREfast.
       - name: Upload SARIF to GitHub
         if: ${{ !cancelled() }}
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ env.BUILD_DIR }}/sonarqube.sarif
 
