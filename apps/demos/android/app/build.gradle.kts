@@ -290,7 +290,7 @@ configurations.all {
             "org.bouncycastle:bcpkix-jdk18on:1.86",
             "org.bouncycastle:bcutil-jdk18on:1.86",
             // Guava in the lint tool and the unified test platform; build-time only, not in the APK.
-            "com.google.guava:guava:33.7.2-jre"             // GHSA-xxph-c9ww-hj94
+            "com.google.guava:guava:33.8.0-jre"             // GHSA-xxph-c9ww-hj94
         )
     }
 }
