@@ -527,6 +527,10 @@ def decode_block(sub, bits, rows, first):
             rows[first + i][17] = int8(shr7) * (1 << sub.noise_shift)
             seed = ((seed << 16) ^ shr7 ^ (shr7 << 5)) & 0xFFFFFFFF
         sub.noise_seed = seed
+    # The substreams share the rows, and the next substream starts from the rows this one decoded
+    # before its matrices (ERRATA 15; the library's decoder works on a copy), so the rows are kept
+    # to be put back after the output.
+    decoded = [list(row) for row in rows[first : first + size]]
     # The primitive matrices (ERRATA 8).
     shift = OBJECT_SHIFT if sub.object_matrices else MATRIX_SHIFT
     if sub.object_matrices and first == 0:
@@ -591,6 +595,8 @@ def decode_block(sub, bits, rows, first):
             # The shift is the matrix channel the output channel takes, modulo 8 (ERRATA 12, 69).
             sub.interval ^= (value & 0xFFFFFF) << (sub.output_source[ch] & 7)
             sub.interval &= 0xFFFFFFFF
+    for i in range(size):
+        rows[first + i][:] = decoded[i]
     return output_rows
 
 
