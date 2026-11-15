@@ -85,6 +85,12 @@ Atmos object motion out an NVIDIA Shield's HDMI passthrough to a real AV receive
 WebAssembly; the AC-4 module beside them has no demo page. Both demonstrate the library rather
 than being products of their own.
 
+## SAST Tools
+
+- [PVS-Studio](https://pvs-studio.com/en/pvs-studio/?utm_source=website&utm_medium=github&utm_campaign=open_source) -
+  static code analyzer for Enterprise (C, C++, C#, Go, and Java) and Web (JS and TS) development.
+  It is run on this project as a trial alongside CodeQL, SonarCloud and the other analyses above.
+
 ## Limits
 
 **Object playback in Dolby decoders.** Dolby's decoder requires a keyed authenticity tag before
