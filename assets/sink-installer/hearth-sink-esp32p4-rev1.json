@@ -1,0 +1,36 @@
+{
+  "name": "Hearth sink, ESP32-P4 of silicon revision v1.x (such as the FireBeetle 2)",
+  "version": "v0.11.0-beta.1",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-P4",
+      "parts": [
+        {
+          "path": "hearth-sink-esp32p4-rev1/bootloader.bin",
+          "offset": 8192
+        },
+        {
+          "path": "hearth-sink-esp32p4-rev1/partition-table.bin",
+          "offset": 32768
+        },
+        {
+          "path": "hearth-sink-esp32p4-rev1/ota_data_initial.bin",
+          "offset": 65536
+        },
+        {
+          "path": "hearth-sink-esp32p4-rev1/iclforge_hearth_sink.bin",
+          "offset": 131072
+        },
+        {
+          "path": "hearth-sink-esp32p4-rev1/sample.ac3",
+          "offset": 8585216
+        },
+        {
+          "path": "hearth-sink-esp32p4-rev1/storage.bin",
+          "offset": 8847360
+        }
+      ]
+    }
+  ]
+}
