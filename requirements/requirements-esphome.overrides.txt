@@ -13,4 +13,4 @@
 # valid with these versions. Remove an override when esphome's own pin reaches the version here
 # (both are inside the lock, so Dependabot keeps them current in the meantime).
 pillow==13.0.0
-filelock==4.2.9
+filelock==4.2.10
