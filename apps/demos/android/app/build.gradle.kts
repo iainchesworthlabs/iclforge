@@ -263,7 +263,7 @@ dependencyLocking {
 configurations.all {
     resolutionStrategy {
         force(
-            "io.netty:netty-buffer:4.2.19.Final",
+            "io.netty:netty-buffer:4.2.20.Final",
             "io.netty:netty-codec:4.2.19.Final",
             "io.netty:netty-codec-http:4.2.20.Final",
             "io.netty:netty-codec-http2:4.2.19.Final",
