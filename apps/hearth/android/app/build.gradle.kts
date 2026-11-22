@@ -245,7 +245,7 @@ configurations.all {
             "org.apache.httpcomponents:httpclient:4.5.14",   // GHSA-7r82-7xv7-xcpj
             // One release of the three so the set stays matched; 1.86 fixes GHSA-9pwp-9qqc-pr26,
             // GHSA-qp49-qgx5-5m26 and GHSA-c3fc-8qff-9hwx (bcprov) and GHSA-wg6q-6289-32hp (bcpkix).
-            "org.bouncycastle:bcprov-jdk18on:1.86",
+            "org.bouncycastle:bcprov-jdk18on:1.87",
             "org.bouncycastle:bcpkix-jdk18on:1.86",
             "org.bouncycastle:bcutil-jdk18on:1.86",
             // Guava in the lint tool and the unified test platform; build-time only, not in the APK.
