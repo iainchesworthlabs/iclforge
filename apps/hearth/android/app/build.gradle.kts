@@ -241,7 +241,7 @@ configurations.all {
             "com.google.protobuf:protobuf-java:4.36.2",
             "com.google.protobuf:protobuf-kotlin:4.36.2",
             "commons-io:commons-io:2.22.0",                  // GHSA-78wr-2p64-hpwj
-            "org.apache.commons:commons-lang3:3.21.0",       // GHSA-j288-q9x7-2f5v
+            "org.apache.commons:commons-lang3:3.22.0",       // GHSA-j288-q9x7-2f5v
             "org.apache.httpcomponents:httpclient:4.5.14",   // GHSA-7r82-7xv7-xcpj
             // One release of the three so the set stays matched; 1.86 fixes GHSA-9pwp-9qqc-pr26,
             // GHSA-qp49-qgx5-5m26 and GHSA-c3fc-8qff-9hwx (bcprov) and GHSA-wg6q-6289-32hp (bcpkix).
